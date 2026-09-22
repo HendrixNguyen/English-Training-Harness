@@ -193,7 +193,7 @@ CREATE TABLE pet\_states (
 
     id UUID PRIMARY KEY DEFAULT gen\_random\_uuid(),
 
-    user\_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user\_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
     plant\_name VARCHAR(100) DEFAULT 'My Green Buddy',
 

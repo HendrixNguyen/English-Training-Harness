@@ -4,7 +4,7 @@ One paragraph per package/module. Read this before exploring code. Executors upd
 
 ## Planned backend packages (`backend/internal/`) — none exist yet
 
-- **store** — Postgres + Redis clients, migrations (DDL from spec §3.2). Everything else depends on it.
+- **store** — Postgres + Redis clients, migrations (DDL from spec §3.2). `pet_states.user_id` is UNIQUE NOT NULL (1:1 with `users`). Everything else depends on it.
 - **auth** — Google OAuth code exchange, refresh-token storage, JWT issue/verify. `POST /api/v1/auth/google`.
 - **onboarding** — placement test (Redis `quiz:placement:*`), CEFR grading via airouter, roadmap kickoff. `POST /api/v1/onboarding/assessment`.
 - **quests** — daily quests + progress. Redis `INCRBY daily:accumulated:*` first, then Postgres `daily_progress`. `GET /quests/daily`, `POST /quests/progress`.
