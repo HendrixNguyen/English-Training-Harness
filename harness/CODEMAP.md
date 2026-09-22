@@ -20,3 +20,13 @@ One paragraph per package/module. Read this before exploring code. Executors upd
 ## Harness tooling (`tools/harness/`)
 
 - `frontmatter.py` YAML-subset parser · `schema.py` required keys/enums/transitions · `scan.py` walk + validate · `state.py` STATE.md renderer · `cli.py` all mutations. Tests: `python3 -m unittest discover -s tools/harness/tests`.
+
+## CI (`.github/workflows/ci.yml`)
+
+Three parallel GitHub Actions jobs, each capped at `timeout-minutes: 10`, on every push to `main` or a `harness/**` branch and on every pull request. A pushed `harness/*` branch is therefore checked before `/harness merge`; superseded runs are cancelled per branch but never on `main`, where each commit gets its own concurrency group. `actionlint` validates the file but not action tags or repo names — check those by hand.
+
+- **`backend-unit`** — from `backend/`: `go build ./...`, `go vet ./...`, `go test ./... -count=1`, after a guard that fails if `DATABASE_URL`, `REDIS_URL`, `TEST_DATABASE_URL` or `TEST_REDIS_URL` is exported, so the default suite is proved to need no services. (Whether the destructive suite stays gated is `internal/store/integration_gate_test.go`'s job, not this one's.)
+- **`backend-integration`** — `postgres:16-alpine` + `redis:7-alpine` service containers, `TEST_DATABASE_URL` / `TEST_REDIS_URL` exported, `go test ./... -count=1 -v -run Integration`; counts `func TestIntegration*` in `*_test.go` and fails unless that many `--- PASS` lines appear and no `--- SKIP` does, so new integration tests are picked up without editing the workflow and a silent skip is a failure. Reproduce from `backend/` with `POSTGRES_PORT=5433 REDIS_PORT=6380 docker compose up -d --wait` (`make up` has no `--wait`), then the `TEST_*` URLs on those ports.
+- **`harness-tooling`** — `python3 -m unittest discover -s tools/harness/tests` and `python3 tools/harness/cli.py validate`, so a malformed frontmatter commit fails CI.
+
+No linter yet: `golangci-lint` defaults flag one `errcheck` in `internal/store/redis_test.go`; add it only with that fixed and a committed `.golangci.yml`.

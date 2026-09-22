@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'harness/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Branches: one group per ref, superseded runs cancelled. main: one group per
+  # commit, so back-to-back merges each finish their own run (a shared group
+  # would cancel the *pending* run when a third push arrives).
+  group: ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Assert no service variables are set
+        run: |
+          for v in DATABASE_URL REDIS_URL TEST_DATABASE_URL TEST_REDIS_URL; do
+            if [ -n "${!v:-}" ]; then
+              echo "::error::$v is set; the unit job must run with no service variables"
+              exit 1
+            fi
+          done
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test without services
+        run: go test ./... -count=1
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: english
+          POSTGRES_PASSWORD: english
+          POSTGRES_DB: english
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U english"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://english:english@localhost:5432/english?sslmode=disable
+      TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Integration tests must run, not skip
+        run: |
+          set -o pipefail
+          go test ./... -count=1 -v -run Integration 2>&1 | tee integration.log
+          want=$(grep -rho '^func TestIntegration[A-Za-z0-9_]*' --include='*_test.go' . | wc -l | tr -d ' ')
+          got=$(grep -c '^--- PASS: TestIntegration' integration.log || true)
+          if grep -q '^--- SKIP' integration.log; then
+            echo "::error::an integration test skipped; TEST_DATABASE_URL / TEST_REDIS_URL did not reach the tests"
+            exit 1
+          fi
+          if [ "$want" -eq 0 ] || [ "$got" -ne "$want" ]; then
+            echo "::error::expected $want passing TestIntegration* tests, saw $got"
+            exit 1
+          fi
+          echo "$got/$want integration tests ran and passed"
+
+  harness-tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Harness unit tests
+        run: python3 -m unittest discover -s tools/harness/tests
+      - name: Validate harness artifacts
+        run: python3 tools/harness/cli.py validate
