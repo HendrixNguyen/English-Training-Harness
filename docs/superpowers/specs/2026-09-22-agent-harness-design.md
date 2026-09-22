@@ -121,6 +121,14 @@ Checks code against plan **and** plan against idea. Each bug becomes an idea fil
 | Executor | harness-execute | executing-plans, test-driven-development, verification-before-completion, using-git-worktrees | one `approved` plan, CODEMAP | code in `.worktrees/<slug>`, pushed branch + Draft PR, plan status + summary, CODEMAP |
 | Reviewer | harness-review | code-review, requesting-code-review, the-validator, typescript-review | plan, its idea, worktree + `main...harness/<slug>` diff | review file, `_inbox/` bugs, CODEMAP fixes, PR comment + ready state |
 
+**Division of labour between executor and reviewer:**
+
+The executor owns *does it work*; the reviewer owns *is it good*.
+
+`done` is a strong claim: the executor must prove the branch builds, passes its whole suite from a clean shell, boots and serves one real request, and that **every command the plan, Makefile, README or CODEMAP tells a human to run actually works as documented**, including that destructive ones refuse when they should. A documented workflow that fails is a plan `failure` with a reproduction — never a workaround applied outside the repo, and never a note in the summary. The evidence goes in a *Runtime proof* subsection of `## Execution summary`.
+
+The reviewer therefore does not spend its budget asking "does it run" — it re-runs the executor's evidence to confirm it, then reviews **quality**: design and boundaries, correctness on inputs nobody tried, performance and resource use, conventions and idiom, error handling, test honesty, documentation accuracy, security. If the executor's evidence does not reproduce, that is an **executor gate failure** — a blocker, plus an explicit statement in the review that the plan should not have been marked `done`.
+
 **Boundaries:**
 - Ideator never writes plans or code.
 - Evaluator never touches app code; rejection with a reason is a first-class outcome.
@@ -180,7 +188,7 @@ One execute per run bounds each scheduled tick to a reviewable diff. The orchest
 
 | Failure | Handling |
 |---|---|
-| Executor blocked | Plan `failed` + `## Failure`. Branch and worktree kept. Never auto-retried; surfaces in STATE.md until human acts. |
+| Executor blocked, or any *Definition of done* check fails (build, suite, boot, documented commands) | Plan `failed` + `## Failure` with a reproduction. Branch and worktree kept. Never auto-retried; surfaces in STATE.md until human acts. |
 | Review `fail` | Plan stays `done`, unmerged; worktree kept for inspection; at least one **blocker** (§3.2b) filed against the plan, which mechanically prevents the merge. |
 | Malformed frontmatter | Listed under Invalid in STATE.md, skipped. Never consumed silently. |
 | No GitHub remote / `gh` not authenticated | Push and PR steps skipped, noted in execution summary; pipeline continues locally. |

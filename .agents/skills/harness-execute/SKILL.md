@@ -19,13 +19,20 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
    - **Amending plan** (frontmatter has `amends: <other plan>`): do **not** create a branch or worktree. Read `branch` and `worktree` from that other plan and work in its existing worktree, on its existing branch — the fix has to land in the same history that the reviewer blocked. Set `status=executing branch=<inherited> worktree=<inherited>` on your own plan too, so `STATE.md` and the reviewer can find it. Skip step 9's `gh pr create`: the branch already has a PR, or none, either way one is enough.
 6. `cd $WT`. Execute the plan with the executing-plans skill: for each task — write the failing test, run it, implement, run, commit with the plan's message. Use `rg`/`grep -n` to find code; read only matched ranges.
 7. After the last task, run the plan's *Verification* section. Update `harness/CODEMAP.md` for touched packages and commit it.
-8. **Record outcome** (back in `ROOT`):
-   - Success: append `## Execution summary` to the plan (built / deviations + why / verification output), then `python3 tools/harness/cli.py set $PLAN status=done`.
-   - Blocked: append `## Failure` (tried / blocker / suggested plan change), then `python3 tools/harness/cli.py set $PLAN status=failed`. Skip steps 9–10.
-9. **Push + Draft PR** (skip with a note in the summary if `git remote get-url origin` fails or `gh auth status` fails):
+8. **Prove it runs** (still in `$WT`) — the role's *Definition of done*. In order, capturing real output:
+   a. Build the project.
+   b. Run the entire test suite from a clean shell (`env -u <every service/env var the project reads>` where that is meaningful), not only the tests this plan added.
+   c. Boot the application and exercise one real path end to end (e.g. start the server on a spare port and `curl` an endpoint; for a library, run a real call). Shut it down afterwards.
+   d. Run **every command the plan, the Makefile, the README or `harness/CODEMAP.md` tells a human to run**, exactly as documented, in a clean environment. Include the destructive-sounding ones and check they refuse when they should.
+   e. If any of these fails: do not work around it and do not hand-fix outside the plan. Record the reproduction and go to `failed` in step 9.
+
+9. **Record outcome** (back in `ROOT`):
+   - Success (every check in step 8 passed): append `## Execution summary` — built / deviations + why / the plan's verification output / a **Runtime proof** subsection with the step 8 output — then `python3 tools/harness/cli.py set $PLAN status=done`.
+   - Blocked, or any step 8 check failed: append `## Failure` (what you ran, what happened, suggested plan change), then `python3 tools/harness/cli.py set $PLAN status=failed`. Skip steps 10–11.
+10. **Push + Draft PR** (skip with a note in the summary if `git remote get-url origin` fails or `gh auth status` fails):
    `cd $WT && git push -u origin $BRANCH`, then
    `gh pr create --draft --base main --head $BRANCH --title "[$DATE][P<n>] <Idea title>" --body-file <tmpfile> --label harness --label "type: <type>" --label "priority: $PRIO"`
    where `P1/P2/P3` = high/medium/low, and for `mvp-slice` use `[MVP-<order>]` instead of `[P<n>]`. Create missing labels with `gh label create`. Body = idea *Why* + *Expected output*, links to plan and idea paths, the execution summary, then the attribution line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
    Then `python3 tools/harness/cli.py set $PLAN pr=<url>`.
-10. `python3 tools/harness/cli.py unlock && python3 tools/harness/cli.py state`; in `ROOT`: `git add harness && git commit -m "harness: execute $SLUG ($STATUS)"`.
-11. **Report:** status, branch, worktree, PR URL, verification result, deviations. Stop — do not review.
+11. `python3 tools/harness/cli.py unlock && python3 tools/harness/cli.py state`; in `ROOT`: `git add harness && git commit -m "harness: execute $SLUG ($STATUS)"`.
+12. **Report:** status, branch, worktree, PR URL, verification result, deviations. Stop — do not review.
