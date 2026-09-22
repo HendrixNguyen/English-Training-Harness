@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/pet-health-streak-and-stage-engine-with-revive.md
-status: draft
+status: approved
 priority: high
 merged: false
 order: 4

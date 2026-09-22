@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 23:07. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 23:08. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,8 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/a-rejected-post-quests-progress-still-writes-redis-and-daily.md` — A rejected POST /quests/progress still writes Redis and daily_progress — blocks `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md`
+- `harness/ideas/_inbox/duration-seconds-is-unbounded-so-one-request-bricks-a-user-s.md` — duration_seconds is unbounded so one request bricks a user's day for 48h — blocks `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
@@ -63,13 +64,13 @@ _none_
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high]
-- `harness/plans/2026-09-22-ai-router-multi-llm-providers-task-strategies-and-rate-limit.md` — AI Router: multi-LLM providers, task strategies and rate limit — Plan [high]
-- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high]
+_none_
 
 ## Approved
 
-_none_
+- `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high]
+- `harness/plans/2026-09-22-ai-router-multi-llm-providers-task-strategies-and-rate-limit.md` — AI Router: multi-LLM providers, task strategies and rate limit — Plan [high]
+- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high]
 
 ## Executing
 

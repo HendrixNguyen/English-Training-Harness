@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/ai-router-multi-llm-providers-task-strategies-and-rate-limit.md
-status: draft
+status: approved
 priority: high
 merged: false
 order: 5
