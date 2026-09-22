@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 21:47. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 22:00. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,6 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth reports Postgres and Redis failures as 401 and logs nothing [medium]
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
 - `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
@@ -20,10 +21,18 @@ _none_
 - `harness/ideas/_inbox/healthz-leaks-postgres-and-redis-driver-error-strings-public.md` — healthz leaks Postgres and Redis driver error strings publicly [medium]
 - `harness/ideas/_inbox/healthz-shares-one-2s-deadline-across-two-sequential-pings.md` — healthz shares one 2s deadline across two sequential pings [low]
 - `harness/ideas/_inbox/integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped [medium]
+- `harness/ideas/_inbox/integration-tests-share-one-database-and-p-1-is-a-workaround.md` — integration tests share one database and -p 1 is a workaround not isolation [medium]
+- `harness/ideas/_inbox/jwt-secret-is-accepted-at-any-length-including-one-character.md` — JWT_SECRET is accepted at any length including one character [medium]
+- `harness/ideas/_inbox/jwt-verify-does-not-require-exp-or-bind-iss-aud-and-bearer-i.md` — JWT verify does not require exp or bind iss/aud and Bearer is case-sensitive [low]
 - `harness/ideas/_inbox/migrate-is-only-tested-against-the-single-embedded-migration.md` — Migrate is only tested against the single embedded migration [medium]
+- `harness/ideas/_inbox/migrate-s-advisory-lock-can-hang-boot-forever-with-no-bound-.md` — Migrate's advisory lock can hang boot forever with no bound and no log [medium]
+- `harness/ideas/_inbox/migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context [high]
 - `harness/ideas/_inbox/migrations-run-on-every-boot-with-no-advisory-lock.md` — migrations run on every boot with no advisory lock [medium]
 - `harness/ideas/_inbox/root-gitignore-env-silently-swallows-every-module-s-env-exam.md` — Root .gitignore .env* silently swallows every module's .env.example [medium]
+- `harness/ideas/_inbox/service-and-require-failure-paths-are-untested-the-fakes-err.md` — Service and Require failure paths are untested; the fakes' err fields are never set [low]
+- `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
 - `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
+- `harness/ideas/_inbox/stale-main-go-header-comment-and-a-double-prefixed-config-er.md` — stale main.go header comment and a double-prefixed config error [low]
 
 ## Proposed
 
@@ -62,7 +71,7 @@ _none_
 - `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high] (unreviewed) (merged)
-- `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high] (unreviewed)
+- `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
