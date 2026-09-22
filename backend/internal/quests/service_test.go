@@ -423,3 +423,54 @@ func TestTaskTitleAndDurationComeFromContentJSON(t *testing.T) {
 		t.Errorf("malformed content_json must still yield the default duration, got %d", broken.DurationMinutes)
 	}
 }
+
+func TestARedisFailureWritesNothing(t *testing.T) {
+	// Counter.Total and Counter.Add both fail: the error surfaces and neither
+	// Postgres write runs — the §5.2 order means Redis failing first is clean.
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+	boom := errors.New("redis down")
+	h.counter.err = boom
+
+	_, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 600)
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want the redis error", err)
+	}
+	if len(h.log.calls) != 0 {
+		t.Errorf("a failed Redis call still reached Postgres: %v", h.log.calls)
+	}
+}
+
+func TestAnUpsertFailureAfterTheIncrbyLeavesTheCounterUsable(t *testing.T) {
+	// Redis is the source of truth for the day (plan, Notes): if the
+	// daily_progress upsert fails the increment stays, the error surfaces,
+	// MarkComplete does not run, and the next call re-derives the row from the
+	// counter and succeeds. (Recovering the once-only hook on the crossing
+	// call is a separate inbox bug, not asserted here.)
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+	boom := errors.New("postgres down")
+	h.progress.err = boom
+
+	_, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 600)
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want the postgres error", err)
+	}
+	want := []string{"INCRBY u1|2026-09-22 600", "EXPIRE u1|2026-09-22"}
+	if !reflect.DeepEqual(h.log.calls, want) {
+		t.Fatalf("calls = %v, want only the Redis increment %v", h.log.calls, want)
+	}
+
+	h.progress.err = nil
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-practice", 600)
+	if err != nil {
+		t.Fatalf("the call after recovery failed: %v", err)
+	}
+	if out.DailySecondsSpent != 1200 || out.DailyMinutesSpent != 20 {
+		t.Errorf("out = %+v, want the counter's 1200s/20m — the first increment was kept", out)
+	}
+	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 20 {
+		t.Errorf("daily_progress minutes = %d, want 20 re-derived from the counter", row.minutes)
+	}
+	if !h.quests.completed["ex-2-practice"] || h.quests.completed["ex-2-reading"] {
+		t.Errorf("completed = %v, want only ex-2-practice (the failed call must not mark its exercise)", h.quests.completed)
+	}
+}
