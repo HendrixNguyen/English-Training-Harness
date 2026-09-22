@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 23:45. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 23:55. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -51,6 +51,8 @@ _none_
 - `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
 - `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
 - `harness/ideas/_inbox/stale-main-go-header-comment-and-a-double-prefixed-config-er.md` — stale main.go header comment and a double-prefixed config error [low]
+- `harness/ideas/_inbox/two-comments-in-the-new-progress-validation-misstate-the-cod.md` — Two comments in the new progress validation misstate the code they describe [low]
+- `harness/ideas/_inbox/two-recordprogress-error-branches-are-uncovered-and-the-redi.md` — Two RecordProgress error branches are uncovered and the Redis-down test's comment overstates it [medium]
 
 ## Proposed
 
