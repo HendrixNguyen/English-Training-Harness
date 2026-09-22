@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 17:41. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 17:51. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -14,7 +14,11 @@ _none_
 ## Inbox
 
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
+- `harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on [medium]
+- `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
+- `harness/ideas/_inbox/ci-never-runs-on-harness-branches-so-it-gates-nothing-before.md` — CI never runs on harness/* branches so it gates nothing before merge [medium]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
+- `harness/ideas/_inbox/codemap-ci-section-overstates-the-unit-job-and-prescribes-a-.md` — CODEMAP CI section overstates the unit job and prescribes a racy local repro [low]
 - `harness/ideas/_inbox/docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally [high]
 - `harness/ideas/_inbox/gin-default-ships-debug-mode-and-all-proxies-trusted-to-prod.md` — gin.Default ships debug mode and all-proxies-trusted to production [medium]
 - `harness/ideas/_inbox/go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at [high]
@@ -63,7 +67,7 @@ _none_
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed) (merged)
-- `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (unreviewed)
+- `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
