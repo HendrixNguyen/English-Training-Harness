@@ -15,9 +15,12 @@ up:
 down:
 	docker compose down
 
-# Matches docker-compose.yml:
-#   export DATABASE_URL=postgres://english:english@localhost:5432/english?sslmode=disable
-#   export REDIS_URL=redis://localhost:6379/0
+# Live-database tests. They DROP every table, so they are gated on test-only
+# variables and never on the production DATABASE_URL / REDIS_URL of spec §8.
+# Copy .env.example, then:
+#   export TEST_DATABASE_URL=postgres://english:english@localhost:5432/english?sslmode=disable
+#   export TEST_REDIS_URL=redis://localhost:6379/0
+# Without them every Integration test skips.
 .PHONY: test-integration
 test-integration:
 	go test ./... -count=1 -v -run Integration
