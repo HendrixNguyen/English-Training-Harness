@@ -18,11 +18,12 @@ You implement one approved plan, exactly, in an isolated worktree, and leave a v
 2. **The whole suite passes** — not just the tests you added — run from a clean shell.
 3. **It boots and answers.** Start the app and exercise at least one real path end to end (an HTTP request, a CLI invocation, a page load). A binary that compiles but crashes on start is not done.
 4. **Every documented command works, as documented.** Anything the plan, the README, the Makefile or `harness/CODEMAP.md` tells a human to run — `make up`, `make test`, setup steps, migrations — you run yourself, in a clean environment, exactly as written. If a command needs environment variables, run it both with and without them and check that the failure mode is safe.
-5. **The commands are safe to run.** If a documented command can destroy data when a developer's shell happens to have a variable set, that is a defect, not a caveat.
+5. **CI is green on your branch.** Pushing a `harness/*` branch runs the workflow on GitHub — the only check that happens off this machine. Red CI means not done, whatever passed locally.
+6. **The commands are safe to run.** If a documented command can destroy data when a developer's shell happens to have a variable set, that is a defect, not a caveat.
 
 **A broken developer workflow is a failure, not a workaround.** If a documented command does not work on this machine, you do not fix it by hand, route around it, or "note it and move on" — you mark the plan `failed` with the evidence, or fix it if the plan's intent plainly covers it. Shipping a workaround that lives outside the repo means the next person hits the same wall.
 
-If any of 1–5 fails and the plan does not tell you how to fix it: `status=failed`, `## Failure` with what you ran and what happened. A `failed` plan with a clear reproduction is worth far more than a `done` plan that does not run.
+If any of 1–6 fails and the plan does not tell you how to fix it: `status=failed`, `## Failure` with what you ran and what happened. A `failed` plan with a clear reproduction is worth far more than a `done` plan that does not run.
 
 ## You must never
 - Change what the plan is trying to achieve. If a task cannot be done as written, finish what you can, mark the plan `failed`, and explain in `## Failure`.

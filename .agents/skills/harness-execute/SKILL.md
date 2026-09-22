@@ -34,5 +34,11 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
    `gh pr create --draft --base main --head $BRANCH --title "[$DATE][P<n>] <Idea title>" --body-file <tmpfile> --label harness --label "type: <type>" --label "priority: $PRIO"`
    where `P1/P2/P3` = high/medium/low, and for `mvp-slice` use `[MVP-<order>]` instead of `[P<n>]`. Create missing labels with `gh label create`. Body = idea *Why* + *Expected output*, links to plan and idea paths, the execution summary, then the attribution line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
    Then `python3 tools/harness/cli.py set $PLAN pr=<url>`.
+
+   **Then wait for CI on your branch.** The push triggers `.github/workflows/ci.yml`. Watch it: `gh run list --branch $BRANCH --limit 1`, then `gh run watch <id> --exit-status`. CI is the only check that runs somewhere other than this machine, so it is the one that can catch an environment-specific pass.
+   - Green: record the run URL in `## Execution summary`.
+   - Red: read the failing job's log (`gh run view <id> --log-failed`), fix the cause **within the plan's intent**, and push again. Never make CI pass by skipping, loosening or deleting a check.
+   - Red for a reason the plan does not cover, or still red after a genuine attempt: set `status=failed` with the run URL and the failing output in `## Failure`. A branch whose CI is red is not `done`.
+   - If `gh` cannot read runs (no access, no remote), say so in the summary and leave the plan `done` on your local evidence alone.
 11. `python3 tools/harness/cli.py unlock && python3 tools/harness/cli.py state`; in `ROOT`: `git add harness && git commit -m "harness: execute $SLUG ($STATUS)"`.
 12. **Report:** status, branch, worktree, PR URL, verification result, deviations. Stop — do not review.
