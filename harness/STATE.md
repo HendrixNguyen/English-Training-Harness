@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 15:32. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 15:33. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -23,11 +23,11 @@ _none_
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high]
+_none_
 
 ## Approved
 
-_none_
+- `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high]
 
 ## Executing
 

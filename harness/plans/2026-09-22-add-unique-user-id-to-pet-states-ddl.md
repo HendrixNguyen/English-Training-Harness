@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/add-unique-user-id-to-pet-states-ddl.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---
