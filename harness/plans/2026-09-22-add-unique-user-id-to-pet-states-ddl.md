@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-01/add-unique-user-id-to-pet-states-ddl.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-22-high-add-unique-user-id-to-pet-states-ddl
 worktree: .worktrees/add-unique-user-id-to-pet-states-ddl
 ---
