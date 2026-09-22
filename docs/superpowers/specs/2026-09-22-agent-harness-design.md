@@ -71,7 +71,7 @@ idea: harness/ideas/<run>/<slug>.md
 status: draft | approved | executing | done | failed
 branch: harness/<date>-<priority>-<slug>   # set by executor
 worktree: .worktrees/<slug>                # set by executor
-mr: https://gitlab.com/.../-/merge_requests/N   # set by executor, if remote exists
+pr: https://github.com/<owner>/<repo>/pull/N   # set by executor, if remote exists
 merged: false                              # set true by /harness merge
 design: harness/designs/<slug>.md    # UI features only
 ```
@@ -98,8 +98,8 @@ Checks code against plan **and** plan against idea. Each bug becomes an idea fil
 |---|---|---|---|---|
 | Ideator | harness-ideate | remembering-conversations, web research | spec, CODEMAP, `_inbox/`, last 2 `_run.md` | run folder: ideas + `_run.md` |
 | Evaluator | harness-evaluate | brainstorming (why), writing-plans, frontend-design (UI → designs/), code-review + systematic-debugging (bugs) | one idea or all `proposed` in a run | idea status/priority/reason, plan `draft`, optional design |
-| Executor | harness-execute | executing-plans, test-driven-development, verification-before-completion, using-git-worktrees | one `approved` plan, CODEMAP | code in `.worktrees/<slug>`, pushed branch + Draft MR, plan status + summary, CODEMAP |
-| Reviewer | harness-review | code-review, requesting-code-review, the-validator, typescript-review | plan, its idea, worktree + `main...harness/<slug>` diff | review file, `_inbox/` bugs, CODEMAP fixes, MR comment + ready state |
+| Executor | harness-execute | executing-plans, test-driven-development, verification-before-completion, using-git-worktrees | one `approved` plan, CODEMAP | code in `.worktrees/<slug>`, pushed branch + Draft PR, plan status + summary, CODEMAP |
+| Reviewer | harness-review | code-review, requesting-code-review, the-validator, typescript-review | plan, its idea, worktree + `main...harness/<slug>` diff | review file, `_inbox/` bugs, CODEMAP fixes, PR comment + ready state |
 
 **Boundaries:**
 - Ideator never writes plans or code.
@@ -161,7 +161,7 @@ One execute per run bounds each scheduled tick to a reviewable diff. The orchest
 | Executor blocked | Plan `failed` + `## Failure`. Branch and worktree kept. Never auto-retried; surfaces in STATE.md until human acts. |
 | Review `fail` | Plan stays `done`, unmerged; worktree kept for inspection; high-priority bug in `_inbox/` referencing the plan. |
 | Malformed frontmatter | Listed under Invalid in STATE.md, skipped. Never consumed silently. |
-| No GitLab remote / `glab` not authenticated | Push and MR steps skipped, noted in execution summary; pipeline continues locally. |
+| No GitHub remote / `gh` not authenticated | Push and PR steps skipped, noted in execution summary; pipeline continues locally. |
 | Concurrent executors | `harness/.lock` holds plan path; second executor exits. Lock older than 2h is stale. Separate worktrees mean a stale lock never corrupts another plan's files. |
 | Empty/useless ideation | Evaluator bulk-rejects; run is still recorded as history. |
 
@@ -175,20 +175,20 @@ The harness initialises the repo. `main` is the integration branch and the main 
 
 **Reviewer:** works inside the same worktree — runs the build and tests there, diffs `harness/<slug>` against `main`, and checks the result against plan and idea. The review file links branch, worktree, and the `git diff main...harness/<slug> --stat` summary.
 
-**Merge request (GitLab):** when a plan reaches `done`, the executor pushes `harness/<slug>` and opens a **Draft** MR with `glab`, targeting `main`. Naming is fixed so MRs sort and filter by eye:
+**Pull request (GitHub):** when a plan reaches `done`, the executor pushes the branch and opens a **Draft** PR with `gh pr create --draft`, targeting `main`. Naming is fixed so PRs sort and filter by eye:
 
 - Branch: `harness/<YYYY-MM-DD>-<priority>-<slug>` — e.g. `harness/2026-09-22-high-pet-unique-user`
-- MR title: `[<YYYY-MM-DD>][<P1|P2|P3>] <Idea title>` — `P1` = high, `P2` = medium, `P3` = low; mvp-slices use `[MVP-<order>]` in place of the priority tag
-- MR description: idea *Why* + *Expected output*, link to plan and idea files, execution summary; ends with the project's attribution line
-- Labels: `harness`, `type::<feature|bug|mvp-slice>`, `priority::<high|medium|low>`
+- PR title: `[<YYYY-MM-DD>][<P1|P2|P3>] <Idea title>` — `P1` = high, `P2` = medium, `P3` = low; mvp-slices use `[MVP-<order>]` in place of the priority tag
+- PR body: idea *Why* + *Expected output*, links to plan and idea files, execution summary; ends with the project's attribution line
+- Labels: `harness`, `type: <feature|bug|mvp-slice>`, `priority: <high|medium|low>` (created on first use with `gh label create` if missing)
 
-The plan's frontmatter records `mr:` (URL). If no GitLab remote is configured the executor skips push/MR and notes it in the execution summary; everything else works locally.
+The plan's frontmatter records `pr:` (URL). If no GitHub remote is configured or `gh` is not authenticated, the executor skips push/PR and notes it in the execution summary; everything else works locally.
 
-**Reviewer** posts its verdict as an MR comment (summary + link to the review file) and, on `pass`, marks the MR ready (`glab mr update --ready`). On `fail` the MR stays Draft.
+**Reviewer** posts its verdict as a PR comment (summary + link to the review file) and, on `pass`, marks the PR ready (`gh pr ready`). On `fail` the PR stays Draft.
 
-**Human merge:** after a `pass` or `pass-with-bugs` review, the human merges — either in GitLab or via `/harness merge <plan>`, which merges `--no-ff` into `main`, pushes `main`, removes the worktree, deletes the branch, and sets `merged: true`. A `fail` review leaves worktree and MR in place. Merging is human-only in every mode, including `--auto-approve`.
+**Human merge:** after a `pass` or `pass-with-bugs` review, the human merges — either in GitHub or via `/harness merge <plan>`, which merges `--no-ff` into `main`, pushes `main`, removes the worktree, deletes the branch, and sets `merged: true`. A `fail` review leaves worktree and PR in place. Merging is human-only in every mode, including `--auto-approve`.
 
-**Push permission:** the harness may push `harness/*` branches and open/update Draft MRs without asking. It never pushes `main` except inside `/harness merge`, which a human invoked.
+**Push permission:** the harness may push `harness/*` branches and open/update Draft PRs without asking. It never pushes `main` except inside `/harness merge`, which a human invoked.
 
 **Cleanup:** `/harness status` lists worktrees whose plan is `done` + reviewed + merged as stale; `/harness prune` removes them. Worktrees for `failed` plans are kept until the plan is re-approved or its idea rejected.
 
@@ -197,7 +197,7 @@ The plan's frontmatter records `mr:` (URL). If no GitLab remote is configured th
 ## 9. Acceptance tests for the harness
 
 1. `/ideate` against the spec alone → well-formed idea files, `## Why` tied to spec goals, `STATE.md` shows them Proposed.
-2. `/idea "add UNIQUE(user_id) to pet_states in the DDL doc"` → evaluate → `/approve` → `/execute` → `/review` → `/harness merge`: every transition fires, a worktree is created and removed, a Draft MR titled `[2026-09-22][P<n>] …` is opened then marked ready by the reviewer, the change lands on `main` only via the merge command, review verdict `pass`.
+2. `/idea "add UNIQUE(user_id) to pet_states in the DDL doc"` → evaluate → `/approve` → `/execute` → `/review` → `/harness merge`: every transition fires, a worktree is created and removed, a Draft PR titled `[2026-09-22][P<n>] …` is opened then marked ready by the reviewer, the change lands on `main` only via the merge command, review verdict `pass`.
 3. `/harness run` with nothing to do → exits cleanly, writes a log, changes nothing.
 4. `/ideate --mvp` → 8 ordered `mvp-slice` ideas; `/harness run --auto-approve` executes exactly the `order: 1` slice.
 
