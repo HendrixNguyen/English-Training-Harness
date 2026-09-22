@@ -9,11 +9,15 @@ import (
 )
 
 // These are the only tests in this package that need a database, and they skip
-// without DATABASE_URL — `go test ./...` stays green with no services.
+// without TEST_DATABASE_URL — `go test ./...` stays green with no services.
+// This deliberately does NOT read DATABASE_URL: that is the production
+// variable from spec §8, and CI's backend-integration job only exports
+// TEST_DATABASE_URL/TEST_REDIS_URL (see internal/store/integration_test.go
+// for the same convention).
 func TestIntegrationUpsertCreatesThenPreservesTheLearnerState(t *testing.T) {
-	url := os.Getenv("DATABASE_URL")
+	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("DATABASE_URL is unset; run `make up` and export it to run integration tests")
+		t.Skip("TEST_DATABASE_URL is unset; run `make up` and export it to run integration tests")
 	}
 	ctx := context.Background()
 
