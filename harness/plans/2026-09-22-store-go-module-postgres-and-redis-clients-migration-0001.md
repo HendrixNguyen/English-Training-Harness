@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/store-go-module-postgres-and-redis-clients-migration-0001.md
-status: draft
+status: approved
 priority: high
 merged: false
 order: 1

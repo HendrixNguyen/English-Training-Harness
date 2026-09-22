@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/auth-google-oauth-code-exchange-and-jwt-sessions.md
-status: draft
+status: approved
 priority: high
 merged: false
 order: 2

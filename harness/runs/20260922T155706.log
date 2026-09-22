@@ -15,3 +15,7 @@ proposed ideas:
   harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md
   harness/ideas/2026-09-22-run-02/spec-never-states-when-the-pet-states-row-is-created.md
   harness/ideas/2026-09-22-run-02/store-go-module-postgres-and-redis-clients-migration-0001.md
+auto-approved (mvp-slice): harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md
+auto-approved (mvp-slice): harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md
+auto-approved (mvp-slice): harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
+next execute -> harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md
