@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md
 ---
 
 # DayNumber loses a calendar day at every spring-forward DST transition
@@ -57,3 +58,21 @@ reintroduce it.
 - `backend/internal/quests/day.go:36-48`.
 - `backend/internal/quests/day_test.go:31-69` — no DST case.
 - Reproduction above (standalone copy of the function, three zones).
+
+## Evaluation
+
+**Verdict: select, `high`, folded into the blockers' amending plan.** Not a blocker, but the reviewer called it the
+highest-value non-blocking fix, it is in the same package on the same open branch, and the owner wants the MVP right the
+first time rather than shipping a `DayNumber` that serves DST learners yesterday's quests for the rest of the roadmap.
+Reproduced by the evaluator with absolute-time arithmetic (Go's `Sub`): Europe/London created 2026-03-25 → 03-30 gives 5,
+correct 6, and reaches day 28 as 27 on 2026-04-21; America/New_York 03-05 → 03-09 gives 4, correct 5; Australia/Sydney
+09-29 → 10-05 gives 6, correct 7. Fall-back dates (London 10-25, New York 11-01, Sydney 04-05) are unaffected by either
+formula, so they go in as regression cases. 2026 transitions confirmed from the system tzdata.
+
+**Root cause:** `day.go:40` — `int(today.Sub(start).Hours()/24) + 1` divides *elapsed* time between two local midnights
+by 24h; a spring-forward day is 23h long, so the quotient truncates one day short, permanently.
+
+**Fix:** count calendar days — normalise both local midnights onto UTC dates and divide, so every day is exactly 24h —
+with table tests for the three zones across both transitions. `LocalDate` is already correct and untouched.
+
+**Plan:** `harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md` (Task 1).

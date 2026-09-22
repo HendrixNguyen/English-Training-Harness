@@ -1,10 +1,11 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
 blocks: harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
+plan: harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md
 ---
 
 # A rejected POST /quests/progress still writes Redis and daily_progress
@@ -57,3 +58,26 @@ exactly as `TestRecordProgressRejectsNonPositiveSeconds` already does.
 - `backend/internal/quests/handler.go:67-69` — maps `ErrExerciseNotFound` to 404 after the writes landed.
 - `backend/internal/quests/service_test.go:203-211` — asserts the error only, never the call log.
 - Runtime proof above, re-run by the reviewer on branch `harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording` at `ee99b1a`.
+
+## Evaluation
+
+**Verdict: select, `high` (blocker).** Confirmed by the reviewer against the real binary (review
+`harness/reviews/2026-09-22-quests-daily-quest-suite-and-progress-recording.md`, *Runtime proof re-run*); not
+re-litigated here. The *Why* is real for this product: `daily_progress.is_target_met` is the retention metric the
+pet and notify slices key off, and today any authenticated user can flip it without holding one valid exercise id.
+
+**Root cause** (read in the worktree at `ef4b9fa`): `Service.RecordProgress` (`backend/internal/quests/service.go:75-90`)
+runs `counter.Add` → `progress.Upsert` → `quests.MarkComplete`; `MarkComplete` (`repo.go:135-144`) is the only place
+ownership is checked, via `RowsAffected() == 0` on an `UPDATE … WHERE id = $1 AND roadmap_id = $2`. Ownership is
+therefore established by the *last write*, after the two writes that matter have committed. Nothing in §5.2 requires
+that: §5.2 step 1 is "Complete Task", so the task is established before step 2's INCRBY.
+
+**Fix shape (owner's call):** a read-only lookup — `QuestRepo.CheckExercise(ctx, roadmapID, exerciseID, day)` —
+that returns `ErrExerciseNotFound` unless the exercise sits on the caller's active roadmap **and** on today's
+`day_number`, run before any write. The write sequence INCRBY → upsert → `MarkComplete` → hook is unchanged, so the
+§5.2 ordering test keeps passing. The two "rejects an unknown exercise" tests gain the `len(h.log.calls) != 0` assertion
+that `TestRecordProgressRejectsNonPositiveSeconds` already has — that missing line is why this shipped green
+(`the-progress-rejection-tests-assert-only-the-error-and-the-f.md`, folded into the same plan).
+
+**Dependencies:** none beyond the branch. **Plan:** one amending plan shared with the second blocker and the DST bug,
+`amends: harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md`, landing on the same branch.

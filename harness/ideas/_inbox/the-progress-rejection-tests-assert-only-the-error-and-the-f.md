@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md
 ---
 
 # The progress rejection tests assert only the error and the fakes error paths are dead
@@ -50,3 +51,21 @@ reviewer re-ran green against real services) all assert something real.
 - `backend/internal/quests/service_test.go:203-211` vs `:213-225`.
 - `backend/internal/quests/handler_test.go:151-163`.
 - `backend/internal/quests/fakes_test.go:22,96`.
+
+## Evaluation
+
+**Verdict: select, `medium`, folded into the blockers' amending plan** because the first half of its *Expected output* —
+`len(h.log.calls) == 0` in `TestRecordProgressRejectsAnExerciseOutsideTheActiveRoadmap` and
+`TestProgressHandlerReturns404ForAnUnknownExercise` — is the very edit that proves blocker 1 fixed, and it is the gap
+that let the write-before-validate defect ship green. The second half (a test per dead fake error field) is small and
+in the same files, so it goes in too: `fakeCounter.err` → the error surfaces and nothing is written;
+`fakeProgressRepo.err` → the error surfaces, the counter keeps the increment (Redis is the source of truth, as the plan
+documents) and the next call succeeds — which is also the "counter stays usable" test the second blocker asks for.
+
+**Scoped out, deliberately:** the idea's "replay after clearing the error fires `OnTargetMet` exactly once". With the
+current design that assertion fails by construction — `newly_met` is an edge inferred from the counter — and making it
+pass is the fix for `ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md`, which is not folded in (MVP
+first). This plan's `progress.err` test asserts current behaviour honestly and leaves the hook-recovery assertion to
+that bug's own plan.
+
+**Plan:** `harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md` (Tasks 2 and 4).

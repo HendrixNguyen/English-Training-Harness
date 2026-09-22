@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 23:10. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 23:23. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -15,14 +15,11 @@ _none_
 ## Inbox (reviewer bugs awaiting evaluation)
 
 - `harness/ideas/_inbox/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — A Pet.State failure reports pet_health 0 which means a dead plant [medium]
-- `harness/ideas/_inbox/a-rejected-post-quests-progress-still-writes-redis-and-daily.md` — A rejected POST /quests/progress still writes Redis and daily_progress [high]
 - `harness/ideas/_inbox/auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response returns token and omits token_type and expires_in required by backend spec 6.1 [high]
 - `harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth reports Postgres and Redis failures as 401 and logs nothing [medium]
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
 - `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
-- `harness/ideas/_inbox/daynumber-loses-a-calendar-day-at-every-spring-forward-dst-t.md` — DayNumber loses a calendar day at every spring-forward DST transition [high]
-- `harness/ideas/_inbox/duration-seconds-is-unbounded-so-one-request-bricks-a-user-s.md` — duration_seconds is unbounded so one request bricks a user's day for 48h [high]
 - `harness/ideas/_inbox/gin-default-ships-debug-mode-and-all-proxies-trusted-to-prod.md` — gin.Default ships debug mode and all-proxies-trusted to production [medium]
 - `harness/ideas/_inbox/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — google_refresh_token is stored in plaintext; backend spec 7 requires AES-256-GCM via ENCRYPTION_SECRET_KEY [high]
 - `harness/ideas/_inbox/healthz-leaks-postgres-and-redis-driver-error-strings-public.md` — healthz leaks Postgres and Redis driver error strings publicly [medium]
@@ -45,7 +42,6 @@ _none_
 - `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
 - `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
 - `harness/ideas/_inbox/stale-main-go-header-comment-and-a-double-prefixed-config-er.md` — stale main.go header comment and a double-prefixed config error [low]
-- `harness/ideas/_inbox/the-progress-rejection-tests-assert-only-the-error-and-the-f.md` — The progress rejection tests assert only the error and the fakes error paths are dead [medium]
 
 ## Proposed
 
@@ -64,7 +60,7 @@ _none_
 
 ## Planned (awaiting approval)
 
-_none_
+- `harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md` — Quests amend: validate before writing, bound duration_seconds, DST-safe day_number — Plan [high]
 
 ## Approved
 
