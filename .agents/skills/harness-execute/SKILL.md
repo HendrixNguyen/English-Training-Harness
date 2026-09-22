@@ -26,7 +26,7 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
    d. Run **every command the plan, the Makefile, the README or `harness/CODEMAP.md` tells a human to run**, exactly as documented, in a clean environment. Include the destructive-sounding ones and check they refuse when they should.
    e. If any of these fails: do not work around it and do not hand-fix outside the plan. Record the reproduction and go to `failed` in step 9.
 
-9. **Record outcome** (back in `ROOT`):
+9. **Record outcome** (back in `ROOT` — `cd $ROOT` first). The plan file under `harness/plans/` is **ROOT bookkeeping only**: append the summary to ROOT's copy and never edit or commit `harness/plans/*` inside the worktree, or the merge will conflict on it. The only `harness/` file the branch may change is `harness/CODEMAP.md`.
    - Success (every check in step 8 passed): append `## Execution summary` — built / deviations + why / the plan's verification output / a **Runtime proof** subsection with the step 8 output — then `python3 tools/harness/cli.py set $PLAN status=done`.
    - Blocked, or any step 8 check failed: append `## Failure` (what you ran, what happened, suggested plan change), then `python3 tools/harness/cli.py set $PLAN status=failed`. Skip steps 10–11.
 10. **Push + Draft PR** (skip with a note in the summary if `git remote get-url origin` fails or `gh auth status` fails):
