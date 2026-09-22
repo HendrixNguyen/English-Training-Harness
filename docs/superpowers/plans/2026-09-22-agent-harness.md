@@ -1084,7 +1084,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run all tests**
 
 Run: `python3 -m unittest discover -s tools/harness/tests -v`
-Expected: all tests `OK` (7 + 8 + 3 + 10 = 28)
+Expected: all tests `OK` (7 + 8 + 3 + 9 = 27)
 
 - [ ] **Step 5: Smoke-test from repo root and generate first STATE.md**
 
