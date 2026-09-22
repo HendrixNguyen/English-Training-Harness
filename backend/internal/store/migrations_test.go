@@ -167,3 +167,57 @@ func TestMigrateReportsApplyFailure(t *testing.T) {
 		t.Fatal("expected an error when Apply fails, got nil")
 	}
 }
+
+// fakeLockingMigrator additionally implements Locker, so Migrate can be
+// tested against a migrator that needs to serialize concurrent callers (the
+// real PgMigrator: two processes racing CREATE TABLE/TYPE IF NOT EXISTS
+// against the same database is not safe without one).
+type fakeLockingMigrator struct {
+	fakeMigrator
+	lockCalls, unlockCalls int
+	lockErr                error
+}
+
+func (f *fakeLockingMigrator) Lock(_ context.Context) (func(), error) {
+	f.lockCalls++
+	if f.lockErr != nil {
+		return nil, f.lockErr
+	}
+	return func() { f.unlockCalls++ }, nil
+}
+
+func TestMigrateLocksAndUnlocksWhenTheMigratorSupportsIt(t *testing.T) {
+	m := &fakeLockingMigrator{}
+
+	if _, err := Migrate(context.Background(), m, MigrationsFS); err != nil {
+		t.Fatalf("Migrate() = %v, want nil error", err)
+	}
+	if m.lockCalls != 1 {
+		t.Errorf("Lock called %d times, want 1", m.lockCalls)
+	}
+	if m.unlockCalls != 1 {
+		t.Errorf("unlock called %d times, want 1", m.unlockCalls)
+	}
+}
+
+func TestMigrateUnlocksEvenWhenApplyFails(t *testing.T) {
+	m := &fakeLockingMigrator{fakeMigrator: fakeMigrator{failOn: "0001_init"}}
+
+	if _, err := Migrate(context.Background(), m, MigrationsFS); err == nil {
+		t.Fatal("expected an error when Apply fails, got nil")
+	}
+	if m.unlockCalls != 1 {
+		t.Errorf("unlock called %d times after a failure, want 1", m.unlockCalls)
+	}
+}
+
+func TestMigratePropagatesALockFailure(t *testing.T) {
+	m := &fakeLockingMigrator{lockErr: errors.New("could not acquire lock")}
+
+	if _, err := Migrate(context.Background(), m, MigrationsFS); err == nil {
+		t.Fatal("expected an error when Lock fails, got nil")
+	}
+	if m.ensured != 0 {
+		t.Error("EnsureVersionTable ran even though the lock was never acquired")
+	}
+}

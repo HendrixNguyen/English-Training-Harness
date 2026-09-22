@@ -45,6 +45,33 @@ func (p *Postgres) Migrator() Migrator { return &PgMigrator{pool: p.Pool} }
 // PgMigrator applies migrations to Postgres, one transaction per version.
 type PgMigrator struct{ pool *pgxpool.Pool }
 
+// migrationLockKey is an arbitrary constant used with pg_advisory_lock to
+// serialize Migrate across concurrent processes. It has no meaning beyond
+// being unique to this migrator among the advisory locks this codebase takes.
+const migrationLockKey = 727100001
+
+// Lock implements store.Locker with a session-level Postgres advisory lock
+// held on a single pinned connection for the whole migration run. A second
+// caller blocks in pg_advisory_lock until the first's unlock runs, so by the
+// time it proceeds, AppliedVersions correctly reports the first caller's work
+// as already done instead of racing to apply it a second time.
+func (m *PgMigrator) Lock(ctx context.Context) (func(), error) {
+	conn, err := m.pool.Acquire(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("store: acquiring a connection for the migration lock: %w", err)
+	}
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, int64(migrationLockKey)); err != nil {
+		conn.Release()
+		return nil, fmt.Errorf("store: acquiring the migration lock: %w", err)
+	}
+	return func() {
+		_, _ = conn.Exec(ctx, `SELECT pg_advisory_unlock($1)`, int64(migrationLockKey))
+		conn.Release()
+	}, nil
+}
+
+var _ Locker = (*PgMigrator)(nil)
+
 func (m *PgMigrator) EnsureVersionTable(ctx context.Context) error {
 	_, err := m.pool.Exec(ctx, versionTableDDL)
 	return err

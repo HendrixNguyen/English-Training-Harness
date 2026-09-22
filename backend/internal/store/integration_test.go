@@ -95,6 +95,54 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 	}
 }
 
+// TestIntegrationConcurrentMigrateDoesNotRace reproduces the scenario that
+// bites in CI: two packages' integration tests (e.g. internal/store and
+// internal/auth) each call Migrate independently against one shared
+// TEST_DATABASE_URL when `go test ./...` runs their test binaries in
+// parallel. Without the PgMigrator.Lock serialization, this used to fail
+// intermittently with "duplicate key value violates unique constraint
+// pg_type_typname_nsp_index", because CREATE TABLE/TYPE IF NOT EXISTS is a
+// check-then-act, not atomic, under concurrency.
+func TestIntegrationConcurrentMigrateDoesNotRace(t *testing.T) {
+	pg := requirePostgres(t)
+	reset(t, pg)
+	t.Cleanup(func() { reset(t, pg) })
+
+	ctx := context.Background()
+	// Each goroutine gets its own Postgres (own pool/connection), the way two
+	// independent packages' test binaries would.
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	const n = 8
+	errs := make(chan error, n)
+	applied := make(chan []string, n)
+
+	for i := 0; i < n; i++ {
+		go func() {
+			p, err := NewPostgres(ctx, dbURL)
+			if err != nil {
+				errs <- err
+				applied <- nil
+				return
+			}
+			defer p.Close()
+			got, err := Migrate(ctx, p.Migrator(), MigrationsFS)
+			errs <- err
+			applied <- got
+		}()
+	}
+
+	total := 0
+	for i := 0; i < n; i++ {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent Migrate() call %d: %v", i, err)
+		}
+		total += len(<-applied)
+	}
+	if total != 1 {
+		t.Errorf("0001_init was applied %d times across %d concurrent callers, want exactly 1", total, n)
+	}
+}
+
 func TestIntegrationPetStatesRejectsASecondRowForTheSameUser(t *testing.T) {
 	pg := requirePostgres(t)
 	reset(t, pg)
