@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md
-status: approved
+status: draft
 priority: high
 merged: false
 order: 3
@@ -8,13 +8,15 @@ order: 3
 # Quests: daily quest suite and progress recording — Plan
 
 **Idea:** `harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md`
-**Goal:** Add `backend/internal/quests` — `GET /api/v1/quests/daily` and `POST /api/v1/quests/progress` behind `auth.Require()` — implementing spec §5.2's Redis-counter-first ordering, the 1800-second target, and a `TargetMetListener` hook the pet slice will register against.
+**Goal:** Add `backend/internal/quests` — `GET /api/v1/quests/daily` and `POST /api/v1/quests/progress` behind `auth.Require()` — implementing the 1st-thinking doc's §5.2 Redis-counter-first ordering and 1800-second target, the **backend spec's §6.2 request/response DTOs field for field**, and a `quests.Pet` hook (`OnTargetMet` + `State`) the pet slice will register against.
 
-**Architecture:** A `Service` over four interfaces: `Counter` (Redis `INCRBY` + `EXPIRE` on `store.DailyAccumulatedKey`), `QuestRepo` (active roadmap, the day's exercises, marking one complete), `ProgressRepo` (the `daily_progress` upsert) and `TargetMetListener` (in-process hook, no-op by default). `day_number` and the user's local date are pure functions of a clock, a timezone and `roadmaps.created_at`, in their own file, so the fiddly arithmetic is tested without any I/O. The ordering contract from §5.2 is enforced by a shared call log in the fakes, not by reading the code.
+**Spec precedence:** where the 1st-thinking doc (§5.2, §7 endpoint list) and the *Backend Technical Specification* (§6.2) differ, the backend spec wins for the wire contract (AGENTS.md → *Reading the spec*). The §6.2 JSON blocks are the DTOs this plan implements; §5.2 supplies the ordering; §4 supplies the Redis key and TTL; §8 supplies the pet arithmetic the hook triggers.
 
-**Tech stack:** Go 1.22, Gin, `pgx/v5`, `go-redis/v9` — all already in `go.mod` from slice 1. No new dependencies.
+**Architecture:** A `Service` over four interfaces: `Counter` (Redis `INCRBY` + `EXPIRE` on `store.DailyAccumulatedKey`), `QuestRepo` (active roadmap, the day's exercises, marking one complete), `ProgressRepo` (the `daily_progress` upsert) and `Pet` (in-process hook `OnTargetMet` plus `State`, because the §6.2 progress response carries `pet_health` and `streak_count`; `NopPet` by default). `day_number` and the user's local date are pure functions of a clock, a timezone and `roadmaps.created_at`, in their own file, so the fiddly arithmetic is tested without any I/O. The ordering contract from §5.2 is enforced by a shared call log in the fakes, not by reading the code.
 
-**Depends on:** slice 1 (`store`) and slice 2 (`auth`). Do not start until both are on `main`.
+**Tech stack:** Go 1.25 (`backend/go.mod`), Gin, `pgx/v5`, `go-redis/v9` — all already in `go.mod` from slice 1. No new dependencies.
+
+**Depends on:** slice 1 (`store`) and slice 2 (`auth`) — both merged on `main` (`f607282`). The symbols this plan calls were checked against that code: `store.DailyAccumulatedKey(userID string, day time.Time)`, `store.DailyAccumulatedTTL`, `store.NewPostgres`/`*store.Postgres{Pool}`/`.Migrator()`, `store.Migrate(ctx, migrator, store.MigrationsFS)`, `store.NewRedis`/`*store.Redis{Client}`, `auth.Require(tokens *auth.TokenIssuer, sessions auth.SessionStore)`, `auth.UserID(c)`, `auth.ContextUserID`.
 
 **Run every command from `backend/`** unless the step says otherwise. `rg` is not installed — use `grep -n`.
 
@@ -25,13 +27,13 @@ order: 3
 | `backend/internal/quests/day.go` `day_test.go` | local date, `day_number` (1..28 clamped) — pure |
 | `backend/internal/quests/counter.go` `counter_test.go` | `Counter` interface + `RedisCounter` |
 | `backend/internal/quests/repo.go` | `QuestRepo`/`ProgressRepo` interfaces + models + Postgres impls |
-| `backend/internal/quests/listener.go` | `TargetMetListener`, `NopListener` |
+| `backend/internal/quests/pet.go` | `Pet` interface (`OnTargetMet`, `State`), `PetState`, `NopPet` |
 | `backend/internal/quests/service.go` `service_test.go` | `Daily()` and `RecordProgress()` |
 | `backend/internal/quests/handler.go` `handler_test.go` | the two routes |
 | `backend/internal/quests/fakes_test.go` | shared in-memory fakes with the call log |
 | `backend/internal/store/seed.go` `seed_test.go` | `SeedDemoRoadmap` — temporary, dies with onboarding |
-| `backend/internal/quests/integration_test.go` | seed + upsert against a real DB, skipped without `DATABASE_URL` |
-| `backend/cmd/api/main.go` | mount both routes behind `auth.Require()` |
+| `backend/internal/quests/integration_test.go` | `TestIntegration…` — seed + both endpoints against real Postgres/Redis; gated on `TEST_DATABASE_URL`/`TEST_REDIS_URL` (skips locally, **must pass** in CI's `backend-integration` job) |
+| `backend/cmd/api/main.go` | hoist `tokens`/`sessions`, mount both routes behind `auth.Require()` |
 | `harness/CODEMAP.md` | `quests` paragraph |
 
 ---
@@ -139,7 +141,7 @@ Expected: build failure, `undefined: Location`.
 `backend/internal/quests/day.go`:
 ```go
 // Package quests serves the daily 30-minute exercise suite and records progress
-// against it (spec §5.2, §6.1, §7).
+// against it (1st-thinking doc §5.2, §6.1; backend spec §6.2 for the wire DTOs).
 package quests
 
 import "time"
@@ -354,39 +356,58 @@ cd .. && git add backend && git commit -m "quests: Redis daily counter with INCR
 
 ---
 
-### Task 3: Repository interfaces, models and the listener hook
+### Task 3: Repository interfaces, models and the Pet hook
 
 **Files:**
 - Create: `backend/internal/quests/repo.go`
-- Create: `backend/internal/quests/listener.go`
+- Create: `backend/internal/quests/pet.go`
 
 No tests of their own — these are interfaces and SQL constants, exercised by Tasks 4–6 and by the
 integration test in Task 7. Commit them together so the next task compiles.
 
-- [ ] **Step 1: Write `listener.go`**
+- [ ] **Step 1: Write `pet.go`**
 
 ```go
 package quests
 
 import "context"
 
-// TargetMetListener is the in-process hook fired the first time a user crosses
-// the 30-minute target on a given day (§5.2 step 4). The pet slice registers the
-// implementation that bumps health and streak.
-//
-// It is called AFTER the daily_progress upsert commits, and its error is logged
-// rather than returned: a failing pet update must never roll back a recorded
-// study session.
-type TargetMetListener interface {
-	OnTargetMet(ctx context.Context, userID, localDate string) error
+// PetState is the slice of pet_states (§3.2) that the §6.2 progress response
+// reports back as pet_health / streak_count.
+type PetState struct {
+	Health int // pet_states.health_points
+	Streak int // pet_states.current_streak
 }
 
-// NopListener is the default: quests works standalone until the pet slice lands.
-type NopListener struct{}
+// Pet is quests' view of the pet slice. Packages talk via interfaces, never
+// each other's tables (CODEMAP), so quests never reads pet_states itself.
+//
+// OnTargetMet is the in-process hook fired the first time a user crosses the
+// 30-minute target on a given local day — the trigger backend spec §6.2
+// describes for POST /quests/progress ("increases plant health (+20%), and
+// increments streak"; the arithmetic is §8's success logic). It is called
+// AFTER the daily_progress upsert, and its error is logged rather than
+// returned: a failing pet update must never roll back a recorded study session.
+//
+// State is read after the hook so the response carries the post-bump values.
+type Pet interface {
+	OnTargetMet(ctx context.Context, userID, localDate string) error
+	State(ctx context.Context, userID string) (PetState, error)
+}
 
-func (NopListener) OnTargetMet(context.Context, string, string) error { return nil }
+// NopPet is the default until the pet slice registers the real implementation.
+// It reports the §3.2 pet_states column defaults (health_points 100,
+// current_streak 0) — the state a freshly onboarded pet has — so the §6.2
+// response shape is complete from day one. See the plan's Reconciliation notes.
+type NopPet struct{}
 
-var _ TargetMetListener = NopListener{}
+func (NopPet) OnTargetMet(context.Context, string, string) error { return nil }
+
+func (NopPet) State(context.Context, string) (PetState, error) {
+	return PetState{Health: 100, Streak: 0}, nil
+}
+
+var _ Pet = NopPet{}
 ```
 
 - [ ] **Step 2: Write `repo.go`**
@@ -419,7 +440,8 @@ type Roadmap struct {
 	CreatedAt time.Time
 }
 
-// Exercise is one of a day's three tasks (§3.2 `exercises`, §6.1).
+// Exercise is a §3.2 `exercises` row. It is the storage model; the §6.2 wire
+// DTO is `Task` in service.go (see toTask).
 type Exercise struct {
 	ID          string
 	DayNumber   int
@@ -559,7 +581,7 @@ Expected: no output.
 - [ ] **Step 4: Commit**
 
 ```sh
-cd .. && git add backend && git commit -m "quests: repository interfaces, models and the TargetMet hook"
+cd .. && git add backend && git commit -m "quests: repository interfaces, models and the Pet hook"
 ```
 
 ---
@@ -692,16 +714,37 @@ func (f *fakeProgressRepo) Upsert(_ context.Context, userID, localDate string, m
 	return nil
 }
 
-type recordingListener struct {
-	log   *callLog
-	fired int
-	err   error
+type fakePet struct {
+	log      *callLog
+	fired    int
+	hookErr  error
+	state    PetState
+	stateErr error
 }
 
-func (l *recordingListener) OnTargetMet(_ context.Context, userID, localDate string) error {
-	l.fired++
-	l.log.add("ON TARGET MET %s|%s", userID, localDate)
-	return l.err
+// newFakePet starts mid-course (health 80, streak 4) so a +20/+1 bump is visible.
+func newFakePet(l *callLog) *fakePet {
+	return &fakePet{log: l, state: PetState{Health: 80, Streak: 4}}
+}
+
+// OnTargetMet applies §8's success arithmetic to the fake state so a test can
+// prove State() is read after the hook, not before.
+func (p *fakePet) OnTargetMet(_ context.Context, userID, localDate string) error {
+	p.fired++
+	p.log.add("ON TARGET MET %s|%s", userID, localDate)
+	if p.hookErr != nil {
+		return p.hookErr
+	}
+	p.state.Health = min(100, p.state.Health+20)
+	p.state.Streak++
+	return nil
+}
+
+func (p *fakePet) State(context.Context, string) (PetState, error) {
+	if p.stateErr != nil {
+		return PetState{}, p.stateErr
+	}
+	return p.state, nil
 }
 
 // demoExercises builds a day's three tasks in the §6.1 categories.
@@ -733,7 +776,7 @@ cd .. && git add backend && git commit -m "quests: shared test fakes with a cros
 
 ---
 
-### Task 5: `RecordProgress` — the §5.2 write path
+### Task 5: `RecordProgress` — the §5.2 write path, §6.2 response
 
 **Files:**
 - Create: `backend/internal/quests/service.go`
@@ -759,7 +802,7 @@ type harness struct {
 	counter  *fakeCounter
 	quests   *fakeQuestRepo
 	progress *fakeProgressRepo
-	listener *recordingListener
+	pet      *fakePet
 }
 
 func newHarness(t *testing.T, now time.Time) *harness {
@@ -770,12 +813,12 @@ func newHarness(t *testing.T, now time.Time) *harness {
 		counter:  newFakeCounter(log),
 		quests:   newFakeQuestRepo(log),
 		progress: newFakeProgressRepo(log),
-		listener: &recordingListener{log: log},
+		pet:      newFakePet(log),
 	}
 	h.quests.roadmap = &Roadmap{ID: "rm-1", CreatedAt: now.Add(-24 * time.Hour)}
 	h.quests.exercises[1] = demoExercises(1)
 	h.quests.exercises[2] = demoExercises(2)
-	h.svc = NewService(h.counter, h.quests, h.progress, h.listener, fixedClock(now))
+	h.svc = NewService(h.counter, h.quests, h.progress, h.pet, fixedClock(now))
 	return h
 }
 
@@ -787,8 +830,8 @@ func TestRecordProgressIncrementsRedisBeforeWritingPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RecordProgress() = %v", err)
 	}
-	if out.TotalSeconds != 600 || out.TargetMet || out.NewlyMet {
-		t.Errorf("out = %+v, want total=600 targetMet=false newlyMet=false", out)
+	if out.DailySecondsSpent != 600 || out.DailyMinutesSpent != 10 || out.IsTargetMet || out.NewlyMet {
+		t.Errorf("out = %+v, want seconds=600 minutes=10 isTargetMet=false newlyMet=false", out)
 	}
 
 	want := []string{
@@ -802,6 +845,23 @@ func TestRecordProgressIncrementsRedisBeforeWritingPostgres(t *testing.T) {
 	}
 }
 
+func TestProgressBelowTheTargetStillReportsThePetState(t *testing.T) {
+	// §6.2: pet_health and streak_count are on every progress response, not
+	// only the one that crosses the target.
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 600)
+	if err != nil {
+		t.Fatalf("RecordProgress() = %v", err)
+	}
+	if out.PetHealth != 80 || out.StreakCount != 4 {
+		t.Errorf("pet = (%d, %d), want the unbumped (80, 4)", out.PetHealth, out.StreakCount)
+	}
+	if h.pet.fired != 0 {
+		t.Errorf("hook fired %d times below the target, want 0", h.pet.fired)
+	}
+}
+
 func TestCrossingExactly1800SecondsMeetsTheTargetAndFiresOnce(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
@@ -812,8 +872,8 @@ func TestCrossingExactly1800SecondsMeetsTheTargetAndFiresOnce(t *testing.T) {
 		if err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
-		if out.TargetMet {
-			t.Fatalf("call %d: TargetMet true at %ds, want false", i, out.TotalSeconds)
+		if out.IsTargetMet {
+			t.Fatalf("call %d: IsTargetMet true at %ds, want false", i, out.DailySecondsSpent)
 		}
 	}
 
@@ -821,14 +881,18 @@ func TestCrossingExactly1800SecondsMeetsTheTargetAndFiresOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("third call: %v", err)
 	}
-	if out.TotalSeconds != 1800 {
-		t.Errorf("TotalSeconds = %d, want 1800", out.TotalSeconds)
+	if out.DailySecondsSpent != 1800 || out.DailyMinutesSpent != 30 {
+		t.Errorf("spent = %ds/%dm, want 1800/30", out.DailySecondsSpent, out.DailyMinutesSpent)
 	}
-	if !out.TargetMet || !out.NewlyMet {
-		t.Errorf("out = %+v, want targetMet and newlyMet both true at exactly 1800s", out)
+	if !out.IsTargetMet || !out.NewlyMet {
+		t.Errorf("out = %+v, want isTargetMet and newlyMet both true at exactly 1800s", out)
 	}
-	if h.listener.fired != 1 {
-		t.Errorf("listener fired %d times, want 1", h.listener.fired)
+	if h.pet.fired != 1 {
+		t.Errorf("hook fired %d times, want 1", h.pet.fired)
+	}
+	// State is read AFTER the hook: 80+20 = 100, 4+1 = 5 (§8 success logic).
+	if out.PetHealth != 100 || out.StreakCount != 5 {
+		t.Errorf("pet = (%d, %d), want the post-hook (100, 5)", out.PetHealth, out.StreakCount)
 	}
 	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 30 || !row.targetMet {
 		t.Errorf("daily_progress row = %+v, want minutes=30 target=true", row)
@@ -848,14 +912,17 @@ func TestFurtherProgressTheSameDayDoesNotRefire(t *testing.T) {
 		t.Fatalf("second call: %v", err)
 	}
 
-	if !out.TargetMet {
-		t.Error("TargetMet = false after the target was already met")
+	if !out.IsTargetMet {
+		t.Error("IsTargetMet = false after the target was already met")
 	}
 	if out.NewlyMet {
 		t.Error("NewlyMet = true on a second call the same day")
 	}
-	if h.listener.fired != 1 {
-		t.Errorf("listener fired %d times, want 1", h.listener.fired)
+	if h.pet.fired != 1 {
+		t.Errorf("hook fired %d times, want 1", h.pet.fired)
+	}
+	if out.PetHealth != 100 || out.StreakCount != 5 {
+		t.Errorf("pet = (%d, %d), want (100, 5) — no second bump", out.PetHealth, out.StreakCount)
 	}
 	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 40 {
 		t.Errorf("minutes_spent = %d, want 40 (2400s / 60)", row.minutes)
@@ -866,12 +933,13 @@ func TestMinutesUseIntegerDivision(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
 
-	if _, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 1799); err != nil {
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 1799)
+	if err != nil {
 		t.Fatalf("RecordProgress: %v", err)
 	}
 	row := h.progress.rows["u1|2026-09-22"]
-	if row.minutes != 29 || row.targetMet {
-		t.Errorf("row = %+v, want minutes=29 target=false at 1799s", row)
+	if row.minutes != 29 || row.targetMet || out.DailyMinutesSpent != 29 {
+		t.Errorf("row = %+v, out.minutes = %d; want minutes=29 target=false at 1799s", row, out.DailyMinutesSpent)
 	}
 }
 
@@ -889,17 +957,33 @@ func TestProgressUsesTheUsersTimezoneForTheDate(t *testing.T) {
 	}
 }
 
-func TestAListenerFailureDoesNotFailTheRequest(t *testing.T) {
+func TestAPetHookFailureDoesNotFailTheRequest(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
-	h.listener.err = errors.New("pet is on fire")
+	h.pet.hookErr = errors.New("pet is on fire")
 
 	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 1800)
 	if err != nil {
-		t.Fatalf("RecordProgress() = %v, want nil: a listener failure must not fail the write", err)
+		t.Fatalf("RecordProgress() = %v, want nil: a hook failure must not fail the write", err)
 	}
 	if !out.NewlyMet {
 		t.Error("NewlyMet = false despite crossing the target")
+	}
+}
+
+func TestAPetStateFailureDoesNotFailTheRequest(t *testing.T) {
+	// The write is already committed; a 500 here would make the client retry
+	// and double-count. Pet fields fall back to zero and are logged.
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	h.pet.stateErr = errors.New("pet_states unreachable")
+
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 600)
+	if err != nil {
+		t.Fatalf("RecordProgress() = %v, want nil", err)
+	}
+	if out.DailySecondsSpent != 600 || out.PetHealth != 0 || out.StreakCount != 0 {
+		t.Errorf("out = %+v, want the progress recorded and zero pet fields", out)
 	}
 }
 
@@ -941,7 +1025,7 @@ func TestRecordProgressWithoutAnActiveRoadmap(t *testing.T) {
 - [ ] **Step 2: Run and confirm it fails**
 
 ```sh
-go test ./internal/quests/... -run 'Record|Crossing|Further|Minutes|Listener|Timezone'
+go test ./internal/quests/... -run 'Record|Crossing|Further|Minutes|Pet|Timezone'
 ```
 Expected: build failure, `undefined: NewService`.
 
@@ -958,32 +1042,40 @@ import (
 	"time"
 )
 
-// ProgressResult is the POST /quests/progress response body.
+// ProgressResult is the POST /api/v1/quests/progress 200 body — backend spec
+// §6.2, field for field.
 type ProgressResult struct {
-	TotalSeconds int64 `json:"total_seconds"`
-	TargetMet    bool  `json:"target_met"`
-	NewlyMet     bool  `json:"newly_met"`
+	DailySecondsSpent int64 `json:"daily_seconds_spent"`
+	DailyMinutesSpent int   `json:"daily_minutes_spent"`
+	IsTargetMet       bool  `json:"is_target_met"`
+	PetHealth         int   `json:"pet_health"`
+	StreakCount       int   `json:"streak_count"`
+
+	// NewlyMet is true only on the call that crossed TargetSeconds. It is the
+	// once-only trigger for Pet.OnTargetMet and is asserted by tests; §6.2 has
+	// no such field, so it never reaches the wire.
+	NewlyMet bool `json:"-"`
 }
 
-// Service implements the §5.2 daily loop.
+// Service implements the daily loop (1st-thinking §5.2; backend spec §6.2).
 type Service struct {
 	counter  Counter
 	quests   QuestRepo
 	progress ProgressRepo
-	listener TargetMetListener
+	pet      Pet
 	now      func() time.Time
 }
 
 // NewService wires the collaborators. now is injectable so day boundaries are
-// testable; listener may be NopListener{} until the pet slice registers one.
-func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, listener TargetMetListener, now func() time.Time) *Service {
+// testable; pet may be NopPet{} until the pet slice registers the real one.
+func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pet, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	if listener == nil {
-		listener = NopListener{}
+	if pet == nil {
+		pet = NopPet{}
 	}
-	return &Service{counter: counter, quests: quests, progress: progress, listener: listener, now: now}
+	return &Service{counter: counter, quests: quests, progress: progress, pet: pet, now: now}
 }
 
 // RecordProgress implements §5.2 steps 2-4, in that order:
@@ -992,13 +1084,14 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, listen
 //	2. Upsert daily_progress from that total — Redis is the single source of
 //	   truth for the day, so bursts of calls cannot disagree.
 //	3. Mark the exercise complete.
-//	4. Fire OnTargetMet, but only on the call that crossed 1800s.
+//	4. Fire Pet.OnTargetMet, but only on the call that crossed 1800s, then read
+//	   Pet.State so the §6.2 response carries pet_health / streak_count.
 //
 // The ordering is a contract, not an implementation detail: see the call-log
 // test in service_test.go.
 func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string, seconds int64) (ProgressResult, error) {
 	if seconds <= 0 {
-		return ProgressResult{}, fmt.Errorf("quests: seconds must be positive, got %d", seconds)
+		return ProgressResult{}, fmt.Errorf("quests: duration_seconds must be positive, got %d", seconds)
 	}
 
 	profile, err := s.quests.Profile(ctx, userID)
@@ -1032,42 +1125,62 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 
 	if newlyMet {
 		// Best-effort: the study session is already recorded and must not be
-		// rolled back by a listener failure.
-		if err := s.listener.OnTargetMet(ctx, userID, date); err != nil {
-			log.Printf("quests: target-met listener failed for user %s on %s: %v", userID, date, err)
+		// rolled back by a pet failure.
+		if err := s.pet.OnTargetMet(ctx, userID, date); err != nil {
+			log.Printf("quests: pet target-met hook failed for user %s on %s: %v", userID, date, err)
 		}
 	}
 
-	return ProgressResult{TotalSeconds: total, TargetMet: targetMet, NewlyMet: newlyMet}, nil
+	// Also best-effort: the write is done, and a 500 here would make the client
+	// retry and double-count. GET /pet/status (pet slice) is the authoritative read.
+	pet, err := s.pet.State(ctx, userID)
+	if err != nil {
+		log.Printf("quests: reading pet state for user %s: %v", userID, err)
+		pet = PetState{}
+	}
+
+	return ProgressResult{
+		DailySecondsSpent: total,
+		DailyMinutesSpent: int(total / 60),
+		IsTargetMet:       targetMet,
+		PetHealth:         pet.Health,
+		StreakCount:       pet.Streak,
+		NewlyMet:          newlyMet,
+	}, nil
 }
 ```
+
+(Task 6 adds `"encoding/json"` to this import block when it introduces `Task`/`toTask`; importing it now would be an unused-import compile error.)
 
 - [ ] **Step 4: Run and confirm it passes**
 
 ```sh
 go test ./internal/quests/... -v
 ```
-Expected: every service test `--- PASS`, including the exact call-order assertion.
+Expected: every service test `--- PASS`, including the exact call-order assertion and the (100, 5) post-hook pet state.
 
 - [ ] **Step 5: Commit**
 
 ```sh
-cd .. && git add backend && git commit -m "quests: RecordProgress with Redis-first ordering and a once-only target hook"
+cd .. && git add backend && git commit -m "quests: RecordProgress with Redis-first ordering, once-only pet hook and the §6.2 response"
 ```
 
 ---
 
-### Task 6: `Daily()` and both HTTP handlers
+### Task 6: `Daily()` and both HTTP handlers — §6.2 wire shapes
 
 **Files:**
-- Modify: `backend/internal/quests/service.go` (add `Daily`)
+- Modify: `backend/internal/quests/service.go` (add `Task`, `DailySuite`, `toTask`, `Daily`)
 - Create: `backend/internal/quests/handler.go`
 - Test: `backend/internal/quests/service_test.go` (append)
 - Test: `backend/internal/quests/handler_test.go`
 
+The two response bodies and the request body are copied from the backend spec §6.2 JSON blocks. Do
+not rename, add or drop a field without updating the Reconciliation section.
+
 - [ ] **Step 1: Write the failing tests**
 
-Append to `service_test.go`:
+Append to `service_test.go` (and add `"encoding/json"` to its import block):
 ```go
 func TestDailyReturnsTodaysThreeTasksAndTheRunningTotal(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
@@ -1081,23 +1194,47 @@ func TestDailyReturnsTodaysThreeTasksAndTheRunningTotal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Daily() = %v", err)
 	}
+	if got.Date != "2026-09-22" {
+		t.Errorf("Date = %q, want 2026-09-22", got.Date)
+	}
 	if got.DayNumber != 2 {
 		t.Errorf("DayNumber = %d, want 2", got.DayNumber)
 	}
-	if len(got.Exercises) != 3 {
-		t.Fatalf("len(Exercises) = %d, want 3", len(got.Exercises))
+	if got.TotalMinutesRequired != 30 {
+		t.Errorf("TotalMinutesRequired = %d, want 30 (§6.2)", got.TotalMinutesRequired)
 	}
-	if got.TotalSeconds != 900 || got.TargetMet {
-		t.Errorf("total = %d targetMet = %t, want 900/false", got.TotalSeconds, got.TargetMet)
+	if len(got.Tasks) != 3 {
+		t.Fatalf("len(Tasks) = %d, want 3", len(got.Tasks))
+	}
+	if got.AccumulatedSeconds != 900 || got.IsTargetMet {
+		t.Errorf("accumulated = %d isTargetMet = %t, want 900/false", got.AccumulatedSeconds, got.IsTargetMet)
 	}
 	seen := map[string]bool{}
-	for _, e := range got.Exercises {
-		seen[e.TaskType] = true
+	for _, task := range got.Tasks {
+		seen[task.TaskType] = true
+		if task.DurationMinutes != DefaultTaskMinutes {
+			t.Errorf("task %s DurationMinutes = %d, want the %d-minute default", task.ID, task.DurationMinutes, DefaultTaskMinutes)
+		}
 	}
 	for _, want := range []string{"vocabulary", "reading", "practice"} {
 		if !seen[want] {
 			t.Errorf("missing the %s task", want)
 		}
+	}
+}
+
+func TestDailyDateIsTheUsersLocalDate(t *testing.T) {
+	// 18:30Z is already the 23rd in Ho Chi Minh City; §6.2's `date` must agree
+	// with the day the counter and daily_progress are keyed on.
+	h := newHarness(t, time.Date(2026, time.September, 22, 18, 30, 0, 0, time.UTC))
+	h.quests.timezone = "Asia/Ho_Chi_Minh"
+
+	got, err := h.svc.Daily(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("Daily() = %v", err)
+	}
+	if got.Date != "2026-09-23" {
+		t.Errorf("Date = %q, want 2026-09-23", got.Date)
 	}
 }
 
@@ -1123,8 +1260,49 @@ func TestDailyClampsPastDay28(t *testing.T) {
 	if got.DayNumber != 28 {
 		t.Errorf("DayNumber = %d, want 28 (clamped)", got.DayNumber)
 	}
-	if len(got.Exercises) != 3 {
-		t.Errorf("len(Exercises) = %d, want 3", len(got.Exercises))
+	if len(got.Tasks) != 3 {
+		t.Errorf("len(Tasks) = %d, want 3", len(got.Tasks))
+	}
+}
+
+func TestDailyWithNoRowsForTheDayReturnsAnEmptyList(t *testing.T) {
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+	delete(h.quests.exercises, 2)
+
+	got, err := h.svc.Daily(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("Daily() = %v", err)
+	}
+	if got.Tasks == nil || len(got.Tasks) != 0 {
+		t.Errorf("Tasks = %#v, want an empty non-nil slice (serialises as [])", got.Tasks)
+	}
+}
+
+func TestTaskTitleAndDurationComeFromContentJSON(t *testing.T) {
+	// §6.2 puts title and duration_minutes on each task; §3.2 has no such
+	// columns, so they ride inside content_json.
+	rich := toTask(Exercise{
+		ID: "ex-1", TaskType: "vocabulary", IsCompleted: true,
+		ContentJSON: json.RawMessage(`{"title":"10 Key Business Email Phrasings","duration_minutes":15,"words":[]}`),
+	})
+	if rich.ID != "ex-1" || rich.TaskType != "vocabulary" || !rich.IsCompleted {
+		t.Errorf("identity fields not copied: %+v", rich)
+	}
+	if rich.Title != "10 Key Business Email Phrasings" || rich.DurationMinutes != 15 {
+		t.Errorf("title/duration = %q/%d, want the content_json values", rich.Title, rich.DurationMinutes)
+	}
+	if string(rich.ContentJSON) != `{"title":"10 Key Business Email Phrasings","duration_minutes":15,"words":[]}` {
+		t.Errorf("ContentJSON was altered: %s", rich.ContentJSON)
+	}
+
+	bare := toTask(Exercise{ID: "ex-2", TaskType: "reading", ContentJSON: json.RawMessage(`{"passage":"..."}`)})
+	if bare.Title != "" || bare.DurationMinutes != DefaultTaskMinutes {
+		t.Errorf("bare task = %q/%d, want \"\"/%d", bare.Title, bare.DurationMinutes, DefaultTaskMinutes)
+	}
+
+	broken := toTask(Exercise{ID: "ex-3", TaskType: "practice", ContentJSON: json.RawMessage(`not json`)})
+	if broken.DurationMinutes != DefaultTaskMinutes {
+		t.Errorf("malformed content_json must still yield the default duration, got %d", broken.DurationMinutes)
 	}
 }
 ```
@@ -1142,15 +1320,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 )
 
-// withUser mounts the routes with a stub that injects the authenticated user,
-// standing in for auth.Require() (which is covered in the auth slice).
+// newQuestRouter mounts the routes with a stub that injects the authenticated
+// user under auth.ContextUserID, standing in for auth.Require() (covered in the
+// auth slice, middleware_test.go).
 func newQuestRouter(svc *Service, userID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	inject := func(c *gin.Context) {
-		c.Set("user_id", userID)
+		c.Set(auth.ContextUserID, userID)
 		c.Next()
 	}
 	g := r.Group("/api/v1", inject)
@@ -1159,7 +1340,15 @@ func newQuestRouter(svc *Service, userID string) *gin.Engine {
 	return r
 }
 
-func TestDailyHandlerReturns200WithTheSuite(t *testing.T) {
+func postJSON(r *gin.Engine, path, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestDailyHandlerReturnsTheSpec62Body(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
 
@@ -1169,22 +1358,35 @@ func TestDailyHandlerReturns200WithTheSuite(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
 	}
+	// Exactly the backend spec §6.2 GET /quests/daily shape.
 	var body struct {
-		DayNumber    int  `json:"day_number"`
-		TotalSeconds int  `json:"total_seconds"`
-		TargetMet    bool `json:"target_met"`
-		Exercises    []struct {
-			ID          string          `json:"id"`
-			TaskType    string          `json:"task_type"`
-			ContentJSON json.RawMessage `json:"content_json"`
-			IsCompleted bool            `json:"is_completed"`
-		} `json:"exercises"`
+		Date                 string `json:"date"`
+		DayNumber            int    `json:"day_number"`
+		TotalMinutesRequired int    `json:"total_minutes_required"`
+		AccumulatedSeconds   int64  `json:"accumulated_seconds"`
+		IsTargetMet          bool   `json:"is_target_met"`
+		Tasks                []struct {
+			ID              string          `json:"id"`
+			TaskType        string          `json:"task_type"`
+			Title           string          `json:"title"`
+			DurationMinutes int             `json:"duration_minutes"`
+			IsCompleted     bool            `json:"is_completed"`
+			ContentJSON     json.RawMessage `json:"content_json"`
+		} `json:"tasks"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decoding: %v (%s)", err, w.Body.String())
 	}
-	if body.DayNumber != 2 || len(body.Exercises) != 3 {
+	if body.Date != "2026-09-22" || body.DayNumber != 2 || body.TotalMinutesRequired != 30 || len(body.Tasks) != 3 {
 		t.Errorf("body = %+v", body)
+	}
+	if body.Tasks[0].DurationMinutes != DefaultTaskMinutes || len(body.Tasks[0].ContentJSON) == 0 {
+		t.Errorf("task[0] = %+v, want duration_minutes=%d and content_json present", body.Tasks[0], DefaultTaskMinutes)
+	}
+	for _, stale := range []string{`"exercises"`, `"total_seconds"`, `"target_met"`} {
+		if strings.Contains(w.Body.String(), stale) {
+			t.Errorf("body still uses pre-reconciliation field %s: %s", stale, w.Body.String())
+		}
 	}
 }
 
@@ -1203,23 +1405,39 @@ func TestDailyHandlerReturns404WithoutARoadmap(t *testing.T) {
 	}
 }
 
-func TestProgressHandlerReturnsTheTotals(t *testing.T) {
+func TestProgressHandlerReturnsTheSpec62Body(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/quests/progress",
-		strings.NewReader(`{"exercise_id":"ex-2-reading","seconds":1800}`))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	newQuestRouter(h.svc, "u1").ServeHTTP(w, req)
+	// The full §6.2 request, user_answers included.
+	w := postJSON(newQuestRouter(h.svc, "u1"), "/api/v1/quests/progress",
+		`{"exercise_id":"ex-2-reading","duration_seconds":1800,"user_answers":{"q1":"A"}}`)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
 	}
-	for _, want := range []string{`"total_seconds":1800`, `"target_met":true`, `"newly_met":true`} {
+	for _, want := range []string{
+		`"daily_seconds_spent":1800`, `"daily_minutes_spent":30`, `"is_target_met":true`,
+		`"pet_health":100`, `"streak_count":5`,
+	} {
 		if !strings.Contains(w.Body.String(), want) {
 			t.Errorf("body = %s, missing %s", w.Body.String(), want)
 		}
+	}
+	for _, stale := range []string{`newly_met`, `"total_seconds"`, `"target_met"`} {
+		if strings.Contains(w.Body.String(), stale) {
+			t.Errorf("body leaks non-§6.2 field %s: %s", stale, w.Body.String())
+		}
+	}
+}
+
+func TestProgressHandlerAcceptsABodyWithoutUserAnswers(t *testing.T) {
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+
+	w := postJSON(newQuestRouter(h.svc, "u1"), "/api/v1/quests/progress",
+		`{"exercise_id":"ex-2-reading","duration_seconds":600}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 — user_answers is optional; body = %s", w.Code, w.Body.String())
 	}
 }
 
@@ -1227,12 +1445,15 @@ func TestProgressHandlerRejectsABadBody(t *testing.T) {
 	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
 	r := newQuestRouter(h.svc, "u1")
 
-	for _, body := range []string{`{}`, `{"exercise_id":"ex-2-reading"}`, `{"exercise_id":"ex-2-reading","seconds":0}`, `{"exercise_id":"ex-2-reading","seconds":-5}`, `nonsense`} {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/quests/progress", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		if w.Code != http.StatusBadRequest {
+	for _, body := range []string{
+		`{}`,
+		`{"exercise_id":"ex-2-reading"}`,
+		`{"exercise_id":"ex-2-reading","duration_seconds":0}`,
+		`{"exercise_id":"ex-2-reading","duration_seconds":-5}`,
+		`{"exercise_id":"ex-2-reading","seconds":600}`, // the pre-§6.2 field name is not an alias
+		`nonsense`,
+	} {
+		if w := postJSON(r, "/api/v1/quests/progress", body); w.Code != http.StatusBadRequest {
 			t.Errorf("body %q → status %d, want 400", body, w.Code)
 		}
 	}
@@ -1242,14 +1463,12 @@ func TestProgressHandlerReturns404ForAnUnknownExercise(t *testing.T) {
 	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
 	h.quests.markErr = ErrExerciseNotFound
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/quests/progress",
-		strings.NewReader(`{"exercise_id":"nope","seconds":600}`))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	newQuestRouter(h.svc, "u1").ServeHTTP(w, req)
-
+	w := postJSON(newQuestRouter(h.svc, "u1"), "/api/v1/quests/progress", `{"exercise_id":"nope","duration_seconds":600}`)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"error":"exercise_not_found"`) {
+		t.Errorf("body = %s, want the exercise_not_found error", w.Body.String())
 	}
 }
 ```
@@ -1257,23 +1476,66 @@ func TestProgressHandlerReturns404ForAnUnknownExercise(t *testing.T) {
 - [ ] **Step 2: Run and confirm it fails**
 
 ```sh
-go test ./internal/quests/... -run 'Daily|Progress'
+go test ./internal/quests/... -run 'Daily|Progress|Task'
 ```
-Expected: build failure, `undefined: DailyHandler`.
+Expected: build failure, `undefined: DailyHandler` (and `toTask`, `DefaultTaskMinutes`).
 
-- [ ] **Step 3: Implement `Daily` in `service.go`**
+- [ ] **Step 3: Implement the §6.2 daily body and `Daily` in `service.go`**
 
+Add `"encoding/json"` to `service.go`'s import block, then append:
 ```go
-// DailySuite is the GET /quests/daily response.
+// DefaultTaskMinutes is the §6.2 task length ("3x 10-min tasks"), used when an
+// exercise's content_json carries no duration_minutes.
+const DefaultTaskMinutes = 10
+
+// Task is one entry of the GET /api/v1/quests/daily `tasks` array (backend spec
+// §6.2). title and duration_minutes are not §3.2 columns; toTask reads them
+// from content_json.
+type Task struct {
+	ID              string          `json:"id"`
+	TaskType        string          `json:"task_type"`
+	Title           string          `json:"title"`
+	DurationMinutes int             `json:"duration_minutes"`
+	IsCompleted     bool            `json:"is_completed"`
+	ContentJSON     json.RawMessage `json:"content_json"`
+}
+
+// DailySuite is the GET /api/v1/quests/daily 200 body — backend spec §6.2,
+// field for field.
 type DailySuite struct {
-	DayNumber    int        `json:"day_number"`
-	TotalSeconds int64      `json:"total_seconds"`
-	TargetMet    bool       `json:"target_met"`
-	Exercises    []Exercise `json:"exercises"`
+	Date                 string `json:"date"`
+	DayNumber            int    `json:"day_number"`
+	TotalMinutesRequired int    `json:"total_minutes_required"`
+	AccumulatedSeconds   int64  `json:"accumulated_seconds"`
+	IsTargetMet          bool   `json:"is_target_met"`
+	Tasks                []Task `json:"tasks"`
+}
+
+// toTask maps a §3.2 exercises row onto the §6.2 task DTO. A missing title is
+// "", a missing or non-positive duration is DefaultTaskMinutes. Malformed
+// content_json is the generator's bug, not a reason to 500 the whole day, so the
+// unmarshal error is deliberately ignored and the defaults apply.
+func toTask(e Exercise) Task {
+	var meta struct {
+		Title           string `json:"title"`
+		DurationMinutes int    `json:"duration_minutes"`
+	}
+	_ = json.Unmarshal(e.ContentJSON, &meta)
+	if meta.DurationMinutes <= 0 {
+		meta.DurationMinutes = DefaultTaskMinutes
+	}
+	return Task{
+		ID:              e.ID,
+		TaskType:        e.TaskType,
+		Title:           meta.Title,
+		DurationMinutes: meta.DurationMinutes,
+		IsCompleted:     e.IsCompleted,
+		ContentJSON:     e.ContentJSON,
+	}
 }
 
 // Daily resolves the active roadmap, computes today's day_number in the user's
-// timezone and returns that day's three tasks plus today's running total.
+// timezone and returns that day's tasks plus today's running total.
 func (s *Service) Daily(ctx context.Context, userID string) (DailySuite, error) {
 	profile, err := s.quests.Profile(ctx, userID)
 	if err != nil {
@@ -1286,36 +1548,35 @@ func (s *Service) Daily(ctx context.Context, userID string) (DailySuite, error) 
 
 	loc := Location(profile.Timezone)
 	now := s.now()
+	date := LocalDate(now, loc)
 	day := DayNumber(roadmap.CreatedAt, now, loc)
 
 	exercises, err := s.quests.ExercisesForDay(ctx, roadmap.ID, day)
 	if err != nil {
 		return DailySuite{}, err
 	}
-	total, err := s.counter.Total(ctx, userID, LocalDate(now, loc))
+	total, err := s.counter.Total(ctx, userID, date)
 	if err != nil {
 		return DailySuite{}, err
 	}
 
+	tasks := make([]Task, 0, len(exercises)) // never nil: serialises as []
+	for _, e := range exercises {
+		tasks = append(tasks, toTask(e))
+	}
+
 	return DailySuite{
-		DayNumber:    day,
-		TotalSeconds: total,
-		TargetMet:    total >= TargetSeconds,
-		Exercises:    exercises,
+		Date:                 date,
+		DayNumber:            day,
+		TotalMinutesRequired: TargetSeconds / 60,
+		AccumulatedSeconds:   total,
+		IsTargetMet:          total >= TargetSeconds,
+		Tasks:                tasks,
 	}, nil
 }
 ```
 
-Add the JSON tags to `Exercise` in `repo.go` so it serialises as §7 expects:
-```go
-type Exercise struct {
-	ID          string          `json:"id"`
-	DayNumber   int             `json:"day_number"`
-	TaskType    string          `json:"task_type"`
-	ContentJSON json.RawMessage `json:"content_json"`
-	IsCompleted bool            `json:"is_completed"`
-}
-```
+`Exercise` in `repo.go` keeps no JSON tags — it is the storage model and never reaches the wire.
 
 - [ ] **Step 4: Implement the handlers**
 
@@ -1324,6 +1585,7 @@ type Exercise struct {
 package quests
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -1332,8 +1594,8 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 )
 
-// DailyHandler serves GET /api/v1/quests/daily (spec §7). It must be mounted
-// behind auth.Require().
+// DailyHandler serves GET /api/v1/quests/daily (backend spec §6.2). It must be
+// mounted behind auth.Require().
 func DailyHandler(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := auth.UserID(c)
@@ -1351,17 +1613,19 @@ func DailyHandler(svc *Service) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
 			return
 		}
-		if suite.Exercises == nil {
-			suite.Exercises = []Exercise{} // serialise as [] rather than null
-		}
 		c.JSON(http.StatusOK, suite)
 	}
 }
 
-// progressRequest is the §7 POST /api/v1/quests/progress body.
+// progressRequest is the backend spec §6.2 POST /api/v1/quests/progress body.
 type progressRequest struct {
-	ExerciseID string `json:"exercise_id" binding:"required"`
-	Seconds    int64  `json:"seconds" binding:"required,gt=0"`
+	ExerciseID      string `json:"exercise_id" binding:"required"`
+	DurationSeconds int64  `json:"duration_seconds" binding:"required,gt=0"`
+	// UserAnswers is part of the §6.2 request and is accepted so a
+	// spec-conformant client is never rejected, but it is not persisted: no
+	// §3.2 table stores answers and §6.2 does not say what becomes of them.
+	// See the plan's Reconciliation section.
+	UserAnswers json.RawMessage `json:"user_answers"`
 }
 
 // ProgressHandler serves POST /api/v1/quests/progress. It must be mounted
@@ -1380,7 +1644,7 @@ func ProgressHandler(svc *Service) gin.HandlerFunc {
 			return
 		}
 
-		out, err := svc.RecordProgress(c.Request.Context(), userID, req.ExerciseID, req.Seconds)
+		out, err := svc.RecordProgress(c.Request.Context(), userID, req.ExerciseID, req.DurationSeconds)
 		switch {
 		case errors.Is(err, ErrNoActiveRoadmap):
 			c.JSON(http.StatusNotFound, gin.H{"error": "no_active_roadmap"})
@@ -1396,8 +1660,10 @@ func ProgressHandler(svc *Service) gin.HandlerFunc {
 }
 ```
 
-The handler test's `inject` stub sets `"user_id"`, which is `auth.ContextUserID` — if the auth slice
-renamed that constant, use `c.Set(auth.ContextUserID, userID)` in the test instead of the literal.
+Error bodies follow the merged auth slice's `{"error": "<snake_case_code>"}` convention
+(`auth/handler.go`, `auth/middleware.go`); §6.2 defines no error shapes, so that convention is the
+contract here. `auth.ContextUserID` is `"user_id"` on `main` (`auth/middleware.go:11`) — the test uses
+the constant, not the literal.
 
 - [ ] **Step 5: Run and confirm it passes**
 
@@ -1409,7 +1675,7 @@ Expected: every test `--- PASS`.
 - [ ] **Step 6: Commit**
 
 ```sh
-cd .. && git add backend && git commit -m "quests: GET /quests/daily and POST /quests/progress handlers"
+cd .. && git add backend && git commit -m "quests: GET /quests/daily and POST /quests/progress with the §6.2 DTOs"
 ```
 
 ---
@@ -1423,6 +1689,12 @@ cd .. && git add backend && git commit -m "quests: GET /quests/daily and POST /q
 
 The seed exists only because `onboarding` has no slice in this run. Its doc comment says so, so that
 whoever builds onboarding deletes it rather than extending it.
+
+The integration test is named `TestIntegration…`, so CI's `backend-integration` job **counts it and
+fails if it skips** (`.github/workflows/ci.yml`, "Integration tests must run, not skip"). It is gated on
+`TEST_DATABASE_URL` / `TEST_REDIS_URL` — never on the production `DATABASE_URL` / `REDIS_URL` — exactly
+as `internal/store/integration_test.go` and `internal/auth/integration_test.go` are, because
+`internal/store`'s tests drop every table in whatever database they are pointed at.
 
 - [ ] **Step 1: Write the seed helper**
 
@@ -1445,7 +1717,9 @@ const DemoRoadmapDays = 28
 var DemoTaskTypes = []string{"vocabulary", "reading", "practice"}
 
 // SeedDemoRoadmap inserts one active roadmap with 28 days x 3 exercises for a
-// user and returns the roadmap id.
+// user and returns the roadmap id. Each content_json carries the `title` and
+// `duration_minutes` that the backend spec §6.2 daily response exposes per
+// task — §3.2 has no columns for them, so quests reads them from here.
 //
 // TEMPORARY. This exists only because the onboarding slice (which generates a
 // real roadmap via the AI router, spec §5.1 steps 4-5) is not part of this MVP
@@ -1462,7 +1736,7 @@ func SeedDemoRoadmap(ctx context.Context, pool *pgxpool.Pool, userID string) (st
 
 	for day := 1; day <= DemoRoadmapDays; day++ {
 		for _, taskType := range DemoTaskTypes {
-			content := fmt.Sprintf(`{"day":%d,"task":"%s","minutes":10}`, day, taskType)
+			content := fmt.Sprintf(`{"title":"Day %d %s","duration_minutes":10,"day":%d,"task":"%s"}`, day, taskType, day, taskType)
 			if _, err := pool.Exec(ctx,
 				`INSERT INTO exercises (roadmap_id, day_number, task_type, content_json)
 				 VALUES ($1, $2, $3::task_category, $4::jsonb)`,
@@ -1513,12 +1787,19 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
-// Skipped unless both services are configured — `go test ./...` stays green
-// without them.
+// TestIntegration* names are counted by CI's backend-integration job, which
+// exports TEST_DATABASE_URL/TEST_REDIS_URL and fails on any --- SKIP, so this
+// test must pass there. Locally it skips without them — `go test ./...` stays
+// green with no services. It deliberately does NOT read DATABASE_URL/REDIS_URL:
+// those are the production variables (spec §9), and internal/store's tests
+// drop every table in the database they are pointed at (see
+// internal/store/integration_test.go and internal/auth/integration_test.go for
+// the same convention). Run with -p 1 (make test-integration): all packages
+// share the one database.
 func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
-	dbURL, redisURL := os.Getenv("DATABASE_URL"), os.Getenv("REDIS_URL")
+	dbURL, redisURL := os.Getenv("TEST_DATABASE_URL"), os.Getenv("TEST_REDIS_URL")
 	if dbURL == "" || redisURL == "" {
-		t.Skip("DATABASE_URL/REDIS_URL unset; run `make up` and export them")
+		t.Skip("TEST_DATABASE_URL/TEST_REDIS_URL unset; run `make up` and export them to run integration tests")
 	}
 	ctx := context.Background()
 
@@ -1557,25 +1838,37 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 		rdb.Client.Del(ctx, store.DailyAccumulatedKey(userID, now))
 	})
 
-	svc := NewService(counter, repo, repo, NopListener{}, func() time.Time { return now })
+	svc := NewService(counter, repo, repo, NopPet{}, func() time.Time { return now })
 
 	suite, err := svc.Daily(ctx, userID)
 	if err != nil {
 		t.Fatalf("Daily: %v", err)
 	}
+	if suite.Date != LocalDate(now, time.UTC) {
+		t.Errorf("Date = %q, want %q", suite.Date, LocalDate(now, time.UTC))
+	}
 	if suite.DayNumber != 1 {
 		t.Errorf("DayNumber = %d, want 1 on a freshly seeded roadmap", suite.DayNumber)
 	}
-	if len(suite.Exercises) != 3 {
-		t.Fatalf("len(Exercises) = %d, want 3", len(suite.Exercises))
+	if suite.TotalMinutesRequired != 30 || suite.AccumulatedSeconds != 0 || suite.IsTargetMet {
+		t.Errorf("suite = %+v, want 30 required, 0 accumulated, target unmet", suite)
+	}
+	if len(suite.Tasks) != 3 {
+		t.Fatalf("len(Tasks) = %d, want 3", len(suite.Tasks))
+	}
+	if suite.Tasks[0].Title == "" || suite.Tasks[0].DurationMinutes != 10 {
+		t.Errorf("task = %+v, want the seed's title and 10-minute duration", suite.Tasks[0])
 	}
 
-	out, err := svc.RecordProgress(ctx, userID, suite.Exercises[0].ID, 1800)
+	out, err := svc.RecordProgress(ctx, userID, suite.Tasks[0].ID, 1800)
 	if err != nil {
 		t.Fatalf("RecordProgress: %v", err)
 	}
-	if !out.TargetMet || !out.NewlyMet {
-		t.Errorf("out = %+v, want target met on the first 1800s", out)
+	if out.DailySecondsSpent != 1800 || out.DailyMinutesSpent != 30 || !out.IsTargetMet || !out.NewlyMet {
+		t.Errorf("out = %+v, want 1800s/30m and the target newly met", out)
+	}
+	if out.PetHealth != 100 || out.StreakCount != 0 {
+		t.Errorf("pet = (%d, %d), want NopPet's §3.2 defaults (100, 0)", out.PetHealth, out.StreakCount)
 	}
 
 	var minutes int
@@ -1588,26 +1881,46 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	if minutes != 30 || !met {
 		t.Errorf("daily_progress = (%d, %t), want (30, true)", minutes, met)
 	}
+
+	var completed bool
+	if err := pg.Pool.QueryRow(ctx, `SELECT is_completed FROM exercises WHERE id = $1`, suite.Tasks[0].ID).Scan(&completed); err != nil {
+		t.Fatalf("reading exercise: %v", err)
+	}
+	if !completed {
+		t.Error("exercises.is_completed = false after progress was recorded against it")
+	}
+
+	again, err := svc.Daily(ctx, userID)
+	if err != nil {
+		t.Fatalf("second Daily: %v", err)
+	}
+	if again.AccumulatedSeconds != 1800 || !again.IsTargetMet || !again.Tasks[0].IsCompleted {
+		t.Errorf("second Daily = %+v, want 1800s accumulated, target met, task[0] completed", again)
+	}
 }
 ```
 
 - [ ] **Step 3: Confirm it skips without services, and the suite stays green**
 
 ```sh
-env -u DATABASE_URL -u REDIS_URL go test ./... -count=1
+env -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1
+go test ./internal/quests/... -count=1 -run Integration -v
 ```
-Expected: `ok` everywhere, with the integration tests reported as skipped under `-v`.
+Expected: `ok` everywhere; the second command prints `--- SKIP: TestIntegrationDailyAndProgressAgainstRealServices` with the `TEST_DATABASE_URL/TEST_REDIS_URL unset` message.
 
-- [ ] **Step 4: Optionally run it for real**
+- [ ] **Step 4: Run it for real (CI will; do this locally if Docker is available)**
 
 ```sh
-docker compose up -d
-export DATABASE_URL='postgres://english:english@localhost:5432/english?sslmode=disable'
-export REDIS_URL='redis://localhost:6379/0'
-go test ./internal/quests/... -count=1 -run Integration -v
+POSTGRES_PORT=5433 REDIS_PORT=6380 docker compose up -d --wait
+export TEST_DATABASE_URL='postgres://english:english@localhost:5433/english?sslmode=disable'
+export TEST_REDIS_URL='redis://localhost:6380/0'
+make test-integration      # = go test ./... -count=1 -v -run Integration -p 1
 docker compose down
 ```
-Expected: `--- PASS`. If Docker is unavailable, note it in the execution summary.
+Expected: `--- PASS` for every `TestIntegration*` (store's, auth's and this one) and no `--- SKIP`. Keep
+`-p 1`: every package's integration tests share this one database and `internal/store` drops the
+schema around its own. If Docker is unavailable, say so in the execution summary — CI's
+`backend-integration` job is the gate either way.
 
 - [ ] **Step 5: Commit**
 
@@ -1622,33 +1935,50 @@ cd .. && git add backend && git commit -m "quests: demo roadmap seed and end-to-
 **Files:**
 - Modify: `backend/cmd/api/main.go`
 
+On `main`, `cmd/api/main.go:49-54` builds the token issuer and session store *inline* inside the
+`auth.NewService(...)` call — there are **no** `tokens` / `sessions` locals to reuse, and lines 59-60
+are a placeholder comment (`// Later slices mount their routes on this group: // guarded := ...`).
+Hoist the two values so `Require()` shares them with sign-in, and replace the placeholder.
+
 - [ ] **Step 1: Wire it**
 
-Extend the `/api/v1` group added by the auth slice:
+Add `"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"` to the imports, then
+replace the block from `authSvc := auth.NewService(` through the placeholder comment with:
 ```go
+	tokens := auth.NewTokenIssuer(cfg.JWTSecret, time.Now)
+	sessions := auth.NewRedisSessionStore(rdb)
+	authSvc := auth.NewService(
+		auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
+		auth.NewPgUserRepo(pg.Pool),
+		sessions,
+		tokens,
+	)
+
+	questRepo := quests.NewPgRepo(pg.Pool) // satisfies both QuestRepo and ProgressRepo
 	questSvc := quests.NewService(
 		quests.NewRedisCounter(rdb),
-		quests.NewPgRepo(pg.Pool),
-		quests.NewPgRepo(pg.Pool),
-		quests.NopListener{}, // the pet slice replaces this
+		questRepo,
+		questRepo,
+		quests.NopPet{}, // the pet slice replaces this
 		time.Now,
 	)
+
+	v1 := r.Group("/api/v1")
+	v1.POST("/auth/google", auth.Handler(authSvc))
 
 	guarded := v1.Group("", auth.Require(tokens, sessions))
 	guarded.GET("/quests/daily", quests.DailyHandler(questSvc))
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
 ```
-where `tokens` and `sessions` are the `*auth.TokenIssuer` and `auth.SessionStore` the auth slice left in
-local variables. Construct `NewPgRepo` once and pass it twice rather than building it twice, if you
-prefer — it satisfies both interfaces.
 
 - [ ] **Step 2: Confirm build, vet and tests**
 
 ```sh
-go build ./... && go vet ./... && go test ./...
+go build ./... && go vet ./... && go test ./... -count=1
+grep -n 'auth.Require(tokens, sessions)' cmd/api/main.go
 ```
 Expected: clean build/vet; `ok` for `internal/auth`, `internal/config`, `internal/health`,
-`internal/quests`, `internal/store`.
+`internal/quests`, `internal/store`; one grep hit.
 
 - [ ] **Step 3: Commit**
 
@@ -1666,27 +1996,27 @@ cd .. && git add backend && git commit -m "quests: mount daily and progress rout
 - [ ] **Step 1: Replace the quests bullet**
 
 ```
-- **quests** — the daily loop (§5.2). `GET /api/v1/quests/daily` resolves `roadmaps.is_active`, computes `day_number` = calendar days since `roadmaps.created_at` in `users.timezone`, +1, clamped to 1..28, and returns that day's three `exercises` with today's `total_seconds`/`target_met`; 404 `no_active_roadmap` when there is none. `POST /api/v1/quests/progress` ({exercise_id, seconds}) does `INCRBY daily:accumulated:{user_id}:{local-date}` + `EXPIRE` 48h **first**, then upserts `daily_progress` (`minutes_spent = total/60`, `is_target_met = total >= 1800`) from that Redis total, then sets `exercises.is_completed`; a `service_test.go` call-log test pins that order. `newly_met` is derived from the counter alone (`total >= 1800 && total-delta < 1800`), so `quests.TargetMetListener.OnTargetMet` fires exactly once per user per local day — the pet slice registers the implementation; a listener error is logged, never returned. Known accepted gap: a crash between the INCRBY and the upsert loses the Postgres row but keeps the Redis count, and the next progress call re-derives and re-upserts it. Both routes sit behind `auth.Require()`. Tests are pure (in-memory `Counter`/`QuestRepo`/`ProgressRepo`); one `DATABASE_URL`+`REDIS_URL`-gated test skips.
+- **quests** — the daily loop (1st-thinking §5.2; wire contract = backend spec §6.2). `GET /api/v1/quests/daily` resolves `roadmaps.is_active`, computes `day_number` = calendar days since `roadmaps.created_at` in `users.timezone`, +1, clamped to 1..28, and returns `{date, day_number, total_minutes_required: 30, accumulated_seconds, is_target_met, tasks[]}`, each task `{id, task_type, title, duration_minutes, is_completed, content_json}` — `title`/`duration_minutes` are read from `content_json` (no §3.2 column; default 10 min); 404 `no_active_roadmap` when there is none. `POST /api/v1/quests/progress` (`{exercise_id, duration_seconds, user_answers?}` — `user_answers` accepted, not persisted) does `INCRBY daily:accumulated:{user_id}:{local-date}` + `EXPIRE` 48h **first**, then upserts `daily_progress` (`minutes_spent = total/60`, `is_target_met = total >= 1800`) from that Redis total, then sets `exercises.is_completed`, and answers `{daily_seconds_spent, daily_minutes_spent, is_target_met, pet_health, streak_count}`; a `service_test.go` call-log test pins that order. Crossing 1800 is derived from the counter alone (`total >= 1800 && total-delta < 1800`), so `quests.Pet.OnTargetMet` fires exactly once per user per local day — the pet slice registers the implementation (§6.2/§8: health +20, streak +1) and `Pet.State` supplies `pet_health`/`streak_count`; until then `NopPet` reports the §3.2 defaults (100, 0). Hook and state errors are logged, never returned. Known accepted gap: a crash between the INCRBY and the upsert loses the Postgres row but keeps the Redis count, and the next progress call re-derives and re-upserts it. Both routes sit behind `auth.Require()`. Tests are pure (in-memory `Counter`/`QuestRepo`/`ProgressRepo`/`Pet`); `TestIntegrationDailyAndProgressAgainstRealServices` is gated on `TEST_DATABASE_URL`+`TEST_REDIS_URL` (skips locally, must pass in CI's `backend-integration` job).
 ```
 
 - [ ] **Step 2: Append to the store bullet**
 
 Add at the end of the `**store**` bullet:
 ```
-`store.SeedDemoRoadmap` inserts a 28-day x 3-exercise demo roadmap; it is TEMPORARY scaffolding for the missing onboarding slice and should be deleted, not extended, when onboarding lands.
+`store.SeedDemoRoadmap` inserts a 28-day x 3-exercise demo roadmap whose `content_json` carries the §6.2 `title`/`duration_minutes`; it is TEMPORARY scaffolding for the missing onboarding slice and should be deleted, not extended, when onboarding lands.
 ```
 
 - [ ] **Step 3: Verify**
 
 ```sh
-grep -n 'TargetMetListener\|SeedDemoRoadmap' harness/CODEMAP.md
+grep -n 'quests.Pet\|SeedDemoRoadmap' harness/CODEMAP.md
 ```
 Expected: two hits.
 
 - [ ] **Step 4: Commit**
 
 ```sh
-git add harness/CODEMAP.md && git commit -m "codemap: quests — daily loop, ordering contract, target-met hook"
+git add harness/CODEMAP.md && git commit -m "codemap: quests — daily loop, §6.2 DTOs, ordering contract, pet hook"
 ```
 
 ---
@@ -1699,20 +2029,35 @@ Run from the worktree root.
 cd backend && go build ./... && go vet ./...
 # expect: no output
 
-go test ./...
+go test ./... -count=1
 # expect: ok for internal/auth, internal/config, internal/health, internal/quests, internal/store; no FAIL
 
-env -u DATABASE_URL -u REDIS_URL go test ./... -count=1
+env -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1
 # expect: still ok — no test needs a live service
 
 go test ./internal/quests/... -run 'IncrementsRedisBeforeWritingPostgres' -v
 # expect: --- PASS — the §5.2 ordering contract
 
 go test ./internal/quests/... -run 'CrossingExactly1800|FurtherProgress' -v
-# expect: two --- PASS — the target fires once and only once
+# expect: two --- PASS — the target fires once and only once, and State is read after the hook
 
-go test ./internal/quests/... -run 'Timezone|Boundary|Clamps' -v
-# expect: --- PASS for the timezone-boundary and day-28 clamp cases
+go test ./internal/quests/... -run 'Timezone|Boundary|Clamps|LocalDate' -v
+# expect: --- PASS for the timezone-boundary, local-date and day-28 clamp cases
+
+go test ./internal/quests/... -run 'Handler|Spec62|Task' -v
+# expect: --- PASS — the §6.2 wire shapes, request validation and content_json mapping
+
+grep -n '"accumulated_seconds"\|"total_minutes_required"\|"tasks"' internal/quests/service.go
+# expect 3 hits — §6.2 GET /quests/daily body
+
+grep -n '"daily_seconds_spent"\|"daily_minutes_spent"\|"pet_health"\|"streak_count"' internal/quests/service.go
+# expect 4 hits — §6.2 POST /quests/progress body
+
+grep -n '"duration_seconds"\|"user_answers"' internal/quests/handler.go
+# expect 2 hits — §6.2 POST /quests/progress request
+
+grep -rn --include='*.go' --exclude='*_test.go' '"total_seconds"\|"target_met"\|"newly_met"\|"exercises"\|"seconds"' internal/quests/
+# expect: no hits — the pre-reconciliation field names are gone from the wire (the tests mention them only to assert their absence)
 
 grep -n 'store.DailyAccumulatedKey\|store.DailyAccumulatedTTL' internal/quests/counter.go
 # expect two hits — quests never hand-builds a §4 key
@@ -1722,6 +2067,15 @@ grep -n 'TargetSeconds = 1800' internal/quests/day.go
 
 grep -n 'TEMPORARY' internal/store/seed.go
 # expect one hit — the seed is marked for deletion when onboarding lands
+
+grep -rn 'Getenv("DATABASE_URL")\|Getenv("REDIS_URL")' internal/quests/ internal/store/seed*.go
+# expect: no hits — integration gating is on TEST_DATABASE_URL / TEST_REDIS_URL only
+
+grep -c '^func TestIntegration' internal/quests/integration_test.go
+# expect: 1 — CI counts it and fails if it skips there
+
+grep -n 'auth.Require(tokens, sessions)' cmd/api/main.go
+# expect one hit
 
 cd .. && python3 tools/harness/cli.py validate; echo exit=$?
 # expect: exit=0
@@ -1733,11 +2087,61 @@ git status --short
 # expect: clean
 ```
 
+After pushing the branch: `gh run list --branch <branch>` must show `backend-unit`, `backend-integration`
+and `harness-tooling` green; `backend-integration` is where the new `TestIntegration…` actually runs.
+
 ## Notes and open questions
 
-- **The seed is a stopgap.** `store.SeedDemoRoadmap` exists only because `onboarding` was left out of this run (`_run.md`, first Note). Delete it when onboarding lands.
+- **The seed is a stopgap.** `store.SeedDemoRoadmap` exists only because `onboarding` was left out of this run (`_run.md`, first Note). Delete it when onboarding lands. Whatever generates real roadmaps must write `title` and `duration_minutes` into each exercise's `content_json`, or the §6.2 daily response will show empty titles and 10-minute defaults.
 - **`day_number` clamps at 28** rather than ending the roadmap, because the spec never says what day 29 is. A returning learner past day 28 keeps seeing day 28's quests. The real fix (regenerate, or a "course complete" state) needs a product decision.
 - **Nothing resets `exercises.is_completed`.** §3.2 makes it per-exercise, not per-day, so a learner revisiting day 5 sees it already ticked. Flagged, not changed — changing it would mean a schema change.
-- **`OnTargetMet` is best-effort and fires after the commit.** The spec (§5.2 step 4) does not say whether the pet update is transactional with the progress write. This plan chooses "never lose a recorded study session"; if the human wants them atomic, the listener has to move inside the upsert transaction, which couples quests to pet's tables and breaks the CODEMAP boundary rule.
+- **`Pet.OnTargetMet` is best-effort and fires after the commit.** §6.2 says the progress call "increases plant health (+20%), and increments streak" but not whether that is transactional with the progress write. This plan chooses "never lose a recorded study session"; if the human wants them atomic, the hook has to move inside the upsert transaction, which couples quests to pet's tables and breaks the CODEMAP boundary rule. **For the pet slice:** §8's hourly cron *also* has a "Success Logic" (+20 / +1 at local midnight). Applying it both on the progress call and in the cron would double-bump; the pet slice must pick one (this plan assumes the progress-time hook, per §6.2, and the cron handles only the inactivity decay).
+- **`pet_health` / `streak_count` before the pet slice exists** come from `NopPet` — the §3.2 `pet_states` defaults (100, 0), i.e. a freshly onboarded pet. This is a placeholder, not a read of anything; it is replaced when the pet slice registers its `Pet`. A `Pet.State` error is logged and reported as (0, 0) rather than failing the request, because the progress write has already committed and a retry would double-count.
+- **`user_answers` is accepted and dropped.** §6.2 puts it on the request but no §3.2 table stores answers and no endpoint reads them back. Persisting them would be a schema change and a product decision (essay grading in §5.1's `TaskEssayGrading` is the likely consumer). Accepting the field keeps a spec-conformant client from being rejected.
 - **Redis is the source of truth for the day, Postgres is the record.** A crash between the two leaves Postgres behind until the next progress call re-derives the total. Self-healing within the 48h TTL; recorded in CODEMAP so a reviewer does not file it as a bug.
-- **`POST /quests/progress` trusts the client's `seconds`.** Nothing stops a client posting 1800 instantly. §5.2 shows the client reporting duration, so this matches the spec, but it means the 30-minute metric is client-asserted. Server-side plausibility limits (e.g. cap per call, cap per day) would be a separate, product-level decision.
+- **`POST /quests/progress` trusts the client's `duration_seconds`.** Nothing stops a client posting 1800 instantly. §5.2 shows the client reporting duration, so this matches the spec, but it means the 30-minute metric is client-asserted. Server-side plausibility limits (e.g. cap per call, cap per day) would be a separate, product-level decision.
+
+## Reconciliation
+
+Reconciled on 2026-09-22 by the evaluator against the *Backend Technical Specification* (§4, §6.2, §8) and
+the code merged on `main` at `f607282` (`internal/store`, `internal/auth`, `cmd/api`, `.github/workflows/ci.yml`).
+The plan had been written against the 1st-thinking doc only and diverged from the §6.2 DTO contract on
+nearly every wire field, so it went `approved → draft` and needs re-approval. Every change and its
+citation:
+
+**Wire contract (backend spec §6.2 — the JSON blocks are the contract per AGENTS.md → *Reading the spec*)**
+
+1. `GET /quests/daily` response renamed/extended to `{date, day_number, total_minutes_required, accumulated_seconds, is_target_met, tasks[]}` (was `{day_number, total_seconds, target_met, exercises[]}`). §6.2 `Response (200 OK)`. Tasks 6, 9, Verification.
+2. Each task is `{id, task_type, title, duration_minutes, is_completed, content_json}` (was `{id, day_number, task_type, content_json, is_completed}`). `title` and `duration_minutes` are not §3.2 `exercises` columns, so they are read from `content_json` with defaults `""` / 10 (`DefaultTaskMinutes`, §6.2 "3x 10-min tasks"); a new `Task` DTO separates the wire shape from the `Exercise` storage model. §6.2 `tasks[]` item; §3.2 DDL. Tasks 3, 6, 7 (seed writes both keys).
+3. `POST /quests/progress` request is `{exercise_id, duration_seconds, user_answers?}` (was `{exercise_id, seconds}`). `user_answers` is accepted (`json.RawMessage`, optional) and not persisted — see open questions. The old `seconds` name is rejected with 400, not aliased. §6.2 `Request Body`. Task 6.
+4. `POST /quests/progress` response is `{daily_seconds_spent, daily_minutes_spent, is_target_met, pet_health, streak_count}` (was `{total_seconds, target_met, newly_met}`). `newly_met` stays as an internal, `json:"-"` field because it is the once-only hook trigger the tests assert. §6.2 `Response (200 OK)`. Tasks 5, 6.
+5. Because the response carries `pet_health` / `streak_count`, the `TargetMetListener` hook became a `quests.Pet` interface with `OnTargetMet` **and** `State`; `NopPet` reports the §3.2 `pet_states` defaults until the pet slice registers. Fakes, service and tests updated; new tests prove `State` is read after the hook (80→100, 4→5) and that pet fields appear on sub-target calls too. §6.2 description ("increases plant health (+20%), and increments streak"), §8 success logic, §3.2 `pet_states` defaults, CODEMAP boundary rule. Tasks 3, 4, 5, 8, 9.
+6. `total_minutes_required` is `TargetSeconds / 60` = 30 (§6.2 value; §1/§8 "30 mins"). Task 6.
+7. Error shapes: §6.2 defines none; the plan keeps the merged auth slice's `{"error": "<code>"}` convention (400 `invalid_request`, 401 `unauthorized`, 404 `no_active_roadmap` / `exercise_not_found`, 500 `internal_error`). Stated explicitly in Task 6 rather than implied.
+
+**§8 — what "target met" triggers**
+
+8. The hook's doc comment and the open questions now cite §8's arithmetic (`Health = Min(100, Health + 20)`, `Streak + 1`) and warn the pet slice that §8's hourly cron carries the same "Success Logic", so the bump must be applied once, not both at progress time and at local midnight. No behaviour change in quests; it fires the hook once per user per local day as before.
+
+**§4 — Redis keys**
+
+9. Checked, unchanged: `daily:accumulated:{user_id}:{YYYY-MM-DD}` String(Int) 48h maps to `store.DailyAccumulatedKey` / `store.DailyAccumulatedTTL` on `main` (`internal/store/keys.go:14,30-32`); the counter test asserts both. `counterKey` parses the localised date string back to `time.Time` because the merged builder takes `(userID string, day time.Time)`.
+
+**Conventions that changed since the plan was written (merged `main`)**
+
+10. Integration test gates on `TEST_DATABASE_URL` / `TEST_REDIS_URL`, never `DATABASE_URL` / `REDIS_URL` — `internal/store/integration_test.go:16-18`, `internal/auth/integration_test.go:18-20`, `Makefile` `test-integration`. Its `TestIntegration…` name means CI's `backend-integration` job counts it and fails on `--- SKIP` (`ci.yml:84-104`), so it must pass there, not skip. The "skip locally" check, the "run for real" step (`--wait`, non-default ports, `make test-integration` with `-p 1`) and the CODEMAP wording were rewritten accordingly. Task 7, Task 9, Verification, File structure.
+11. `cmd/api/main.go` on `main` (`:49-54`) builds `auth.NewTokenIssuer` / `auth.NewRedisSessionStore` inline inside `auth.NewService(...)`; there are no `tokens` / `sessions` locals as the plan assumed, and `:59-60` is a placeholder comment. Task 8 now hoists them and replaces the placeholder. `auth.Require(tokens *TokenIssuer, sessions SessionStore)` signature confirmed at `internal/auth/middleware.go:20`.
+12. `auth.ContextUserID = "user_id"` and `auth.UserID(c)` confirmed (`middleware.go:11,43`); the handler test now sets the constant instead of the literal and the "if the auth slice renamed it" hedge is gone. Task 6.
+13. `store.Migrate(ctx, pg.Migrator(), store.MigrationsFS)` returns `(applied, err)` and `pg.Migrator()` is the advisory-lock `PgMigrator` (`postgres.go:43`, `migrations.go`); `store.NewRedis` returns `*store.Redis{Client}` with `Close() error`. The integration test already matched; noted in *Depends on*.
+14. Go version corrected to 1.25 (`backend/go.mod:3`). Header.
+15. Verification gained greps that fail if any pre-reconciliation field name (`total_seconds`, `target_met`, `newly_met`, `exercises`, `seconds`) reappears on the wire, and that the §6.2 names are present.
+
+**Open questions for the human (recorded, not blocking re-approval)**
+
+- `user_answers`: accept-and-drop (this plan) vs persist. Persisting needs a table that §3.2 does not have.
+- `pet_health` / `streak_count` placeholder from `NopPet` (100, 0) until the pet slice: acceptable, or should the fields be omitted/`null` until then? The spec types them as integers, so the plan keeps integers.
+- `Pet.State` failure → log and report (0, 0) with a 200, rather than a 500 that would invite a double-counting retry. Confirm.
+- §6.2 progress-time pet bump vs §8 cron "Success Logic": which one the pet slice implements (plan assumes progress-time).
+- `title` / `duration_minutes` sourced from `content_json` keys of the same name — the onboarding/AI generator must agree on those key names.
+
+The idea file (`## Evaluation`, *Reconciliation note*) records that this plan's DTOs supersede the field names in its *Expected output*.
