@@ -132,6 +132,34 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
         self.assertIs(read_fm(plan)["merged"], True)
 
+    def test_two_blockers_can_share_one_fix_plan_via_the_plan_backlink(self):
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Slice", "--type", "mvp-slice", "--source", "ideator", "--order", "1")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, plan = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", plan, f"status={st}")
+        # the reviewer files two blockers against the same branch
+        _, bug1 = self.run_cli("new-idea", "--run", run, "--title", "Trigger", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        _, bug2 = self.run_cli("new-idea", "--run", run, "--title", "Concurrency", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        for b in (bug1, bug2):
+            self.assertEqual(self.run_cli("set", b, f"blocks={plan}")[0], 0)
+        # one amending plan hangs off bug1; bug2 is pointed at it through its own plan: field
+        self.run_cli("set", bug1, "status=selected")
+        _, fix = self.run_cli("new-plan", "--idea", bug1)
+        self.assertEqual(self.run_cli("set", fix, f"amends={plan}")[0], 0)
+        self.run_cli("set", bug2, "status=selected")
+        self.assertEqual(self.run_cli("set", bug2, "status=planned", f"plan={fix}")[0], 0)
+        # both still block while the shared fix is in flight
+        code, out = self.run_cli("blockers", "--plan", plan)
+        self.assertEqual(code, 1)
+        self.assertIn(bug1, out); self.assertIn(bug2, out)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", fix, f"status={st}")
+        # and both clear once it is done
+        self.assertEqual(self.run_cli("blockers", "--plan", plan), (0, ""))
+        self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
+
     def test_blocker_must_be_high_priority_bug(self):
         _, run = self.run_cli("new-run")
         _, feat = self.run_cli("new-idea", "--run", run, "--title", "Feat", "--type", "feature", "--source", "ideator", "--priority", "high")

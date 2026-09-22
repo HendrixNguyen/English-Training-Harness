@@ -30,13 +30,21 @@ class ScanResult:
     def plan_for_idea(self, idea_rel):
         return next((p for p in self.plans if p.fm.get("idea") == idea_rel), None)
 
+    def plan_by_rel(self, plan_rel):
+        return next((p for p in self.plans if p.rel == plan_rel), None)
+
     def blockers_for(self, plan_rel):
-        """Blocker ideas for plan_rel whose own fix plan is not yet done."""
+        """Blocker ideas for plan_rel whose own fix plan is not yet done.
+
+        The fix plan is the one whose `idea:` is the blocker, or — when several
+        blockers share one amending plan — the plan the blocker's own `plan:`
+        points at.
+        """
         out = []
         for i in self.ideas:
             if i.fm.get("blocks") != plan_rel:
                 continue
-            fix = self.plan_for_idea(i.rel)
+            fix = self.plan_for_idea(i.rel) or self.plan_by_rel(i.fm.get("plan"))
             if fix is None or fix.fm.get("status") != "done":
                 out.append(i)
         return out
