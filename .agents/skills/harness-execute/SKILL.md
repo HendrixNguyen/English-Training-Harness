@@ -16,7 +16,7 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
 3. Read the plan, its idea, its design (if any), and `harness/CODEMAP.md`. Do not explore beyond what the plan names.
 4. Derive names: `SLUG=$(basename $PLAN .md | sed 's/^[0-9-]*-//')`; `PRIO` = plan frontmatter `priority`; `DATE=$(date +%F)`; `BRANCH=harness/$DATE-$PRIO-$SLUG`; `WT=.worktrees/$SLUG`.
 5. `git worktree add $WT -b $BRANCH main` (using-git-worktrees skill). Then `python3 tools/harness/cli.py set $PLAN status=executing branch=$BRANCH worktree=$WT`.
-6. `cd $WT`. Execute the plan with the executing-plans skill: for each task — write the failing test, run it, implement, run, commit with the plan's message. Use `rg` to find code; read only matched ranges.
+6. `cd $WT`. Execute the plan with the executing-plans skill: for each task — write the failing test, run it, implement, run, commit with the plan's message. Use `rg`/`grep -n` to find code; read only matched ranges.
 7. After the last task, run the plan's *Verification* section. Update `harness/CODEMAP.md` for touched packages and commit it.
 8. **Record outcome** (back in `ROOT`):
    - Success: append `## Execution summary` to the plan (built / deviations + why / verification output), then `python3 tools/harness/cli.py set $PLAN status=done`.

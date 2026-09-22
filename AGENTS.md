@@ -12,14 +12,15 @@ Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pa
 
 ## Reading the spec
 
-`1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `rg -n '7\\\. Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
+`1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `grep -n 'Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
 
 ## Rules every role follows
 
 - Never modify the main checkout's app code; executors work in `.worktrees/<slug>` on `harness/*` branches.
 - Never merge to `main`. Only a human runs `/harness merge`.
 - Pushing `harness/*` branches and opening Draft PRs is allowed without asking. Pushing `main` is not.
-- Token discipline: CODEMAP → `rg` with tight patterns → read only matched ranges. Never `cat` a directory.
+- Token discipline: CODEMAP → `rg`/`grep -n` with tight patterns → read only matched ranges. Never `cat` a directory.
+- Tooling caveats on this machine: `rg` is **not installed** — use `grep -n` / `grep -c`. An output-rewriting proxy (rtk) wraps shell commands and can mangle `ls` output — capture directory names with shell globs, `find`, or `python3`, never `$(ls …)`.
 - Files under `.agents/` and `harness/` are tool-neutral: say "spawn the evaluator role" or "load skill harness-evaluate", never name a specific tool.
 - This project's remote is **GitHub** (`gh`, pull requests).
 

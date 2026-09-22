@@ -29,7 +29,7 @@ git checkout main && git merge --no-ff <branch> -m "Merge <branch>: <idea title>
 git worktree remove <worktree> && git branch -d <branch> && git push origin --delete <branch>
 python3 tools/harness/cli.py set <plan> merged=true
 ```
-If a `pr` exists, `gh pr merge <pr> --merge` may replace the local merge — pick one, never both. Commit `harness/`.
+If `git remote get-url origin` fails, skip both `git push` commands and say so. If a `pr` exists, `gh pr merge <pr> --merge` may replace the local merge — pick one, never both. Commit `harness/`.
 
 ## prune
 For each path from `cli.py stale-worktrees`: `git worktree remove <path>`. Print what was removed.
