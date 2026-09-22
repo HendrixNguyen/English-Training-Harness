@@ -46,6 +46,11 @@ type QuestRepo interface {
 	Profile(ctx context.Context, userID string) (Profile, error)
 	ActiveRoadmap(ctx context.Context, userID string) (Roadmap, error)
 	ExercisesForDay(ctx context.Context, roadmapID string, day int) ([]Exercise, error)
+	// CheckExercise is the read-only ownership check RecordProgress runs
+	// before it writes anything: nil when exerciseID is on roadmapID for
+	// day, ErrExerciseNotFound otherwise. Unknown ids and other users' ids
+	// are deliberately indistinguishable.
+	CheckExercise(ctx context.Context, roadmapID, exerciseID string, day int) error
 	// MarkComplete sets is_completed and returns ErrExerciseNotFound when the
 	// exercise is not on roadmapID.
 	MarkComplete(ctx context.Context, roadmapID, exerciseID string) error
@@ -72,6 +77,11 @@ SELECT id, day_number, task_type, content_json, is_completed
 FROM exercises
 WHERE roadmap_id = $1 AND day_number = $2
 ORDER BY task_type`
+
+	checkExerciseSQL = `
+SELECT 1
+FROM exercises
+WHERE id = $1 AND roadmap_id = $2 AND day_number = $3`
 
 	markCompleteSQL = `
 UPDATE exercises
@@ -130,6 +140,18 @@ func (r *PgRepo) ExercisesForDay(ctx context.Context, roadmapID string, day int)
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+func (r *PgRepo) CheckExercise(ctx context.Context, roadmapID, exerciseID string, day int) error {
+	var one int
+	err := r.Pool.QueryRow(ctx, checkExerciseSQL, exerciseID, roadmapID, day).Scan(&one)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrExerciseNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("quests: checking exercise: %w", err)
+	}
+	return nil
 }
 
 func (r *PgRepo) MarkComplete(ctx context.Context, roadmapID, exerciseID string) error {

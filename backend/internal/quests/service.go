@@ -44,8 +44,13 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pe
 	return &Service{counter: counter, quests: quests, progress: progress, pet: pet, now: now}
 }
 
-// RecordProgress implements §5.2 steps 2-4, in that order:
+// RecordProgress validates, then implements §5.2 steps 2-4 in that order:
 //
+//  0. Reads only — resolve the profile and active roadmap, then CheckExercise:
+//     the exercise must be on the caller's active roadmap and on today's
+//     day_number, or the call is rejected with ErrExerciseNotFound before a
+//     single write. A rejected request leaves Redis and daily_progress
+//     untouched (reviewer 2026-09-22).
 //  1. INCRBY the Redis counter (+ EXPIRE) and read the running total back.
 //  2. Upsert daily_progress from that total — Redis is the single source of
 //     truth for the day, so bursts of calls cannot disagree.
@@ -70,7 +75,13 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 	}
 
 	loc := Location(profile.Timezone)
-	date := LocalDate(s.now(), loc)
+	now := s.now()
+	date := LocalDate(now, loc)
+	day := DayNumber(roadmap.CreatedAt, now, loc)
+
+	if err := s.quests.CheckExercise(ctx, roadmap.ID, exerciseID, day); err != nil {
+		return ProgressResult{}, err
+	}
 
 	total, err := s.counter.Add(ctx, userID, date, seconds)
 	if err != nil {
@@ -85,6 +96,9 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 	if err := s.progress.Upsert(ctx, userID, date, int(total/60), targetMet); err != nil {
 		return ProgressResult{}, err
 	}
+	// MarkComplete keeps its own ErrExerciseNotFound for the race where the
+	// row vanished between CheckExercise and here; the handler still maps it
+	// to 404.
 	if err := s.quests.MarkComplete(ctx, roadmap.ID, exerciseID); err != nil {
 		return ProgressResult{}, err
 	}

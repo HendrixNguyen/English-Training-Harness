@@ -203,10 +203,30 @@ func TestAPetStateFailureDoesNotFailTheRequest(t *testing.T) {
 func TestRecordProgressRejectsAnExerciseOutsideTheActiveRoadmap(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
-	h.quests.markErr = ErrExerciseNotFound
 
-	if _, err := h.svc.RecordProgress(context.Background(), "u1", "someone-elses-exercise", 600); !errors.Is(err, ErrExerciseNotFound) {
+	_, err := h.svc.RecordProgress(context.Background(), "u1", "someone-elses-exercise", 600)
+	if !errors.Is(err, ErrExerciseNotFound) {
 		t.Fatalf("err = %v, want ErrExerciseNotFound", err)
+	}
+	// A 404 must leave Redis and daily_progress byte for byte as they were:
+	// this line was missing when the write-before-validate defect shipped.
+	if len(h.log.calls) != 0 {
+		t.Errorf("a rejected call touched Redis/Postgres: %v", h.log.calls)
+	}
+}
+
+func TestRecordProgressRejectsAnExerciseFromAnotherDay(t *testing.T) {
+	// The roadmap is on day 2; ex-1-reading is a real, owned exercise from
+	// day 1. Progress is only recordable against today's tasks.
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+
+	_, err := h.svc.RecordProgress(context.Background(), "u1", "ex-1-reading", 600)
+	if !errors.Is(err, ErrExerciseNotFound) {
+		t.Fatalf("err = %v, want ErrExerciseNotFound", err)
+	}
+	if len(h.log.calls) != 0 {
+		t.Errorf("a rejected call touched Redis/Postgres: %v", h.log.calls)
 	}
 }
 

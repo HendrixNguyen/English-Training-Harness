@@ -51,7 +51,6 @@ type fakeQuestRepo struct {
 	roadmap   *Roadmap
 	exercises map[int][]Exercise // by day_number
 	completed map[string]bool
-	markErr   error
 }
 
 func newFakeQuestRepo(l *callLog) *fakeQuestRepo {
@@ -78,10 +77,16 @@ func (f *fakeQuestRepo) ExercisesForDay(_ context.Context, _ string, day int) ([
 	return f.exercises[day], nil
 }
 
-func (f *fakeQuestRepo) MarkComplete(_ context.Context, _, exerciseID string) error {
-	if f.markErr != nil {
-		return f.markErr
+func (f *fakeQuestRepo) CheckExercise(_ context.Context, _, exerciseID string, day int) error {
+	for _, e := range f.exercises[day] {
+		if e.ID == exerciseID {
+			return nil
+		}
 	}
+	return ErrExerciseNotFound
+}
+
+func (f *fakeQuestRepo) MarkComplete(_ context.Context, _, exerciseID string) error {
 	f.log.add("MARK COMPLETE %s", exerciseID)
 	f.completed[exerciseID] = true
 	return nil

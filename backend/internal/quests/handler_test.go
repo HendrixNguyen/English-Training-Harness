@@ -150,7 +150,6 @@ func TestProgressHandlerRejectsABadBody(t *testing.T) {
 
 func TestProgressHandlerReturns404ForAnUnknownExercise(t *testing.T) {
 	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
-	h.quests.markErr = ErrExerciseNotFound
 
 	w := postJSON(newQuestRouter(h.svc, "u1"), "/api/v1/quests/progress", `{"exercise_id":"nope","duration_seconds":600}`)
 	if w.Code != http.StatusNotFound {
@@ -158,5 +157,8 @@ func TestProgressHandlerReturns404ForAnUnknownExercise(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), `"error":"exercise_not_found"`) {
 		t.Errorf("body = %s, want the exercise_not_found error", w.Body.String())
+	}
+	if len(h.log.calls) != 0 {
+		t.Errorf("a 404 touched Redis/Postgres: %v", h.log.calls)
 	}
 }
