@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/store-go-module-postgres-and-redis-clients-migration-0001.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 1
+branch: harness/2026-09-22-high-store-go-module-postgres-and-redis-clients-migration-0001
+worktree: .worktrees/store-go-module-postgres-and-redis-clients-migration-0001
 ---
 # Store: Go module, Postgres and Redis clients, migration 0001 — Plan
 
@@ -1559,3 +1561,164 @@ git status --short
 - **`gen_random_uuid()`** is core from PostgreSQL 13; `docker-compose.yml` pins `postgres:16-alpine`. If the Railway plugin turns out to be PG 12 or older, migration 0002 adds `CREATE EXTENSION IF NOT EXISTS pgcrypto;` — do not edit 0001 after it has been applied anywhere.
 - **The two open `pet_states` spec bugs** in this run (`reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul`, `spec-never-states-when-the-pet-states-row-is-created`) are not resolved here. 0001 ships `stage pet_stage DEFAULT 'sprout'` because that is what §3.2 says today; any correction lands as 0002.
 - **No `JWT_SECRET` in `config.Config`** — §8 does not list it and this slice does not need it. Slice 2 adds the field and the required-variable check.
+
+## Execution summary
+
+**Status: done.** All 10 tasks implemented test-first, one commit per task, each carrying the
+`Co-Authored-By: Claude Opus 5 (1M context)` trailer.
+
+Branch: `harness/2026-09-22-high-store-go-module-postgres-and-redis-clients-migration-0001`
+Worktree: `.worktrees/store-go-module-postgres-and-redis-clients-migration-0001`
+
+### Built
+
+- `backend/` Go module `github.com/HendrixNguyen/English-Training-Harness/backend` with `Makefile`
+  (`test`, `run`, `tidy`, `up`, `down`, `test-integration`), `.gitignore`, dev `docker-compose.yml`
+  (postgres:16-alpine + redis:7-alpine, both health-checked).
+- `internal/config` — `Load()` requires `DATABASE_URL` and `REDIS_URL`, defaults `PORT` to 8080.
+- `internal/store` — §4 key builders + TTL constants; embedded `migrations/` FS; `Migrate` over a
+  `Migrator` interface; `Postgres` (pgxpool) with `PgMigrator` (one transaction per version, version
+  recorded in `schema_migrations`); `Redis` (go-redis v9). `0001_init.up/.down.sql` carry the §3.2 DDL.
+- `internal/health` — `Handler(db, cache Pinger)` returns 200 / 503 naming the failing dependency.
+- `cmd/api/main.go` — wiring only: config → clients → `Migrate` → Gin with `GET /healthz`.
+- `harness/CODEMAP.md` — heading changed to `## Backend packages`, `store` bullet rewritten.
+
+### Deviations
+
+1. **`go.mod` says `go 1.25.0`, not `go 1.22`.** The plan's Task 5 Step 1 command is
+   `go get github.com/jackc/pgx/v5@latest`; pgx v5.11.0 requires Go 1.25, so the toolchain reported
+   `go: upgraded go 1.22 => 1.25.0`. The plan's command was followed literally rather than pinning an
+   older pgx (which would have substituted an approach). Local toolchain is Go 1.27.1, so everything
+   builds. The CODEMAP bullet says "Go 1.25" instead of the plan's "Go 1.22" so the map is not false.
+2. **`grep -n` for the five §4 keys in `keys.go` returns 6 lines, not 5** — the extra line is the
+   `// TTLs from spec §4. queue:webpush:delay ...` comment, which contains the literal key name. All
+   five key formats are present exactly once each in code.
+3. **Task 9 Step 4 (live-service run) used Redis on host port 6380.** See below — `make up` cannot bind
+   6379 on this machine. `docker-compose.yml` is committed exactly as the plan specifies.
+4. **PR not created: `gh` is authenticated as the wrong account** (see PR section below).
+
+Nothing else departed from the plan; all SQL, Go source and test files are byte-for-byte the plan's.
+
+### Verification
+
+`cd backend && go build ./... && go vet ./...` — no output (clean).
+
+```
+$ env -u DATABASE_URL -u REDIS_URL go test ./... -count=1
+?   	github.com/HendrixNguyen/English-Training-Harness/backend/cmd/api	[no test files]
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/config	0.196s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/health	0.509s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/store	0.273s
+
+$ make test
+go test ./...
+?   	github.com/HendrixNguyen/English-Training-Harness/backend/cmd/api	[no test files]
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/config	(cached)
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/health	(cached)
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/store	0.267s
+
+$ grep -c 'CREATE TABLE' internal/store/migrations/0001_init.up.sql
+6
+$ grep -c 'CREATE TYPE' internal/store/migrations/0001_init.up.sql
+3
+$ grep -n 'user_id UUID UNIQUE NOT NULL' internal/store/migrations/0001_init.up.sql
+35:    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,   # inside CREATE TABLE pet_states (line 33)
+$ grep -n 'sess:%s:token\|quiz:placement:%s\|daily:accumulated:%s:%s\|ratelimit:ai:%s\|queue:webpush:delay' internal/store/keys.go
+10:// TTLs from spec §4. queue:webpush:delay is persistent and has no TTL.
+19:const WebPushDelayQueueKey = "queue:webpush:delay"
+22:func SessionKey(userID string) string { return fmt.Sprintf("sess:%s:token", userID) }
+25:func PlacementQuizKey(userID string) string { return fmt.Sprintf("quiz:placement:%s", userID) }
+31:	return fmt.Sprintf("daily:accumulated:%s:%s", userID, day.Format("2006-01-02"))
+35:func AIRateLimitKey(userID string) string { return fmt.Sprintf("ratelimit:ai:%s", userID) }
+
+$ python3 tools/harness/cli.py validate; echo exit=$?
+exit=0
+
+$ git log --oneline main..HEAD
+4690cd2 codemap: store — module path, migration runner, test commands
+4eef425 store: dev docker-compose and skippable integration tests
+ef0e7f6 store: cmd/api boots Gin with /healthz and runs migrations
+b9dda42 store: GET /healthz handler over a Pinger interface
+c568bc8 store: go-redis client
+bd65d9b store: pgx pool client and Postgres migrator
+6554222 store: migration runner with version bookkeeping
+1081547 store: migration 0001 with the spec §3.2 DDL
+9e2434e store: Redis key builders and TTL constants from spec §4
+14e3da9 store: go module skeleton, config loader, Makefile
+(10 commits, all with the Co-Authored-By trailer)
+
+$ git status --short
+(clean)
+```
+
+Extra check beyond the plan: the full §3.2 DDL block was diffed against the spec, not just the first
+table —
+`diff <(sed -n '144,256p' 1st-thinking-architecture-doc.md | tr -d '\\' | grep -v '^$' | grep -v '^## ') <(grep -v '^--' backend/internal/store/migrations/0001_init.up.sql | grep -v '^$')`
+exits 0, so all six tables and three types match the spec line for line.
+
+### Local stack verification
+
+Docker Desktop 28.3.3 / Compose v2.39.2 were available and the stack was brought up for real.
+
+`make up` **failed** on this machine: host port 6379 is already bound by an unrelated pre-existing
+container (`scio3-redis-1`, the user's other project).
+
+```
+Error response from daemon: failed to set up container networking: driver failed programming external
+connectivity on endpoint backend-redis-1: Bind for 0.0.0.0:6379 failed: port is already allocated
+make: *** [up] Error 1
+```
+
+That other container was left running and untouched. Instead the same compose file was started with a
+throwaway override (kept outside the repo, in a scratch dir) mapping Redis to host port 6380:
+`docker compose -f docker-compose.yml -f <scratch>/compose.override.yml up -d`.
+
+```
+$ docker compose ps
+backend-postgres-1	Up 38 seconds (healthy)	0.0.0.0:5432->5432/tcp
+backend-redis-1  	Up (healthy)           	0.0.0.0:6380->6379/tcp
+
+$ export DATABASE_URL='postgres://english:english@localhost:5432/english?sslmode=disable'
+$ export REDIS_URL='redis://localhost:6380/0'      # 6379 on this machine, per docker-compose.yml
+$ make test-integration
+go test ./... -count=1 -v -run Integration
+?   	github.com/HendrixNguyen/English-Training-Harness/backend/cmd/api	[no test files]
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/config	0.397s [no tests to run]
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/health	0.258s [no tests to run]
+--- PASS: TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent (0.05s)
+--- PASS: TestIntegrationPetStatesRejectsASecondRowForTheSameUser (0.03s)
+--- PASS: TestIntegrationRedisRoundTrip (0.00s)
+PASS
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/store	0.559s
+```
+
+So migration 0001 really applies to an empty PostgreSQL 16, is idempotent on re-run, all six tables
+exist afterwards, `pet_states.user_id` really rejects a second row, and the Redis round-trip with
+`SessionKey` / `SessionTTL` works against Redis 7.
+
+The binary was also booted against the live stack and the one endpoint this slice ships was called:
+
+```
+$ PORT=8099 ./api        # migrations ran on boot
+$ curl -s -w '%{http_code}' http://localhost:8099/healthz
+200 {"postgres":"ok","redis":"ok","status":"ok"}
+```
+
+Then `make down` (Removed both containers and `backend_default`; `scio3-redis-1` and `scio3-mongo-1`
+still running, untouched), and `env -u DATABASE_URL -u REDIS_URL go test ./... -count=1` re-run with
+the services gone — still `ok` for all three packages, confirming the default suite needs no services.
+
+### PR
+
+`gh pr create` was attempted once and refused:
+
+```
+pull request create failed: GraphQL: must be a collaborator (createPullRequest)
+```
+
+The `gh` CLI on this machine is authenticated as the work account `hendrixnguyen-optisigns`, which has
+no write access to the personal repo `HendrixNguyen/English-Training-Harness`.
+**PR skipped: gh authenticated as wrong account.** The branch is pushed
+(`git push -u origin` succeeded over SSH as `HendrixNguyen`), so a PR can be opened by hand at
+`https://github.com/HendrixNguyen/English-Training-Harness/pull/new/harness/2026-09-22-high-store-go-module-postgres-and-redis-clients-migration-0001`
+or after `gh auth switch`.
