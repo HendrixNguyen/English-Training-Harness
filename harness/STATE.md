@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 16:41. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:42. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,8 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — blocks `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md`
+- `harness/ideas/_inbox/go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — blocks `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md`
 
 ## Inbox
 

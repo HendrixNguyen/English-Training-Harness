@@ -4,6 +4,7 @@ status: proposed
 source: reviewer
 run: _inbox
 priority: high
+blocks: harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md
 ---
 # docker-compose hard-codes host ports so make up fails locally
 
