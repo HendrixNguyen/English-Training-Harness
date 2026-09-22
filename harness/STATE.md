@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 16:47. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:49. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -43,13 +43,14 @@ _none_
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high]
-- `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high]
+_none_
 
 ## Approved
 
 - `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high]
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high]
+- `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high]
+- `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high]
 
 ## Executing
 
