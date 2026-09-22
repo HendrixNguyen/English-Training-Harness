@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 15:35. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 15:43. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,8 @@ _none_
 
 ## Inbox
 
-_none_
+- `harness/ideas/_inbox/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
+- `harness/ideas/_inbox/spec-never-states-when-the-pet-states-row-is-created.md` — Spec never states when the pet_states row is created [low]
 
 ## Proposed
 
@@ -35,7 +36,7 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (unreviewed)
+- `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs)
 
 ## Failed
 
