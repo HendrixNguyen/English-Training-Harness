@@ -95,6 +95,15 @@ class CliTests(unittest.TestCase):
         self.assertEqual(read_fm(first)["verdict"], "fail")
         self.assertEqual(read_fm(second)["verdict"], "pass")
 
+    def test_next_evaluate_includes_inbox_bugs_blockers_first(self):
+        _, run = self.run_cli("new-run")
+        _, feat = self.run_cli("new-idea", "--run", run, "--title", "Feature", "--type", "feature", "--source", "ideator")
+        _, bug = self.run_cli("new-idea", "--run", "harness/ideas/_inbox", "--title", "Inbox bug", "--type", "bug", "--source", "reviewer", "--priority", "medium")
+        _, blocker = self.run_cli("new-idea", "--run", "harness/ideas/_inbox", "--title", "Blocker", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        self.run_cli("set", blocker, "blocks=harness/plans/x.md")
+        _, out = self.run_cli("next", "--stage", "evaluate", "--all")
+        self.assertEqual(out.splitlines(), [blocker, bug, feat])
+
     def test_lock_unlock_and_stale(self):
         self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 0)
         self.assertEqual(self.run_cli("lock", "harness/plans/b.md")[0], 1)

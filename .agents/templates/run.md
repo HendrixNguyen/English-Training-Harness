@@ -2,7 +2,7 @@
 
 **Mode:** {mode}
 **Read:** <!-- spec sections, CODEMAP, inbox files, prior runs -->
-**Inbox swept:** <!-- list bug files moved into this run -->
+**Inbox noted:** <!-- bugs already filed that you deliberately did not re-propose -->
 
 ## Proposed
 <!-- one line per idea file -->

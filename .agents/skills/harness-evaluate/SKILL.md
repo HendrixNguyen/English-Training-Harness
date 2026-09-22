@@ -5,7 +5,7 @@ description: Evaluate one idea or every proposed idea in a run — reject with r
 
 # harness-evaluate
 
-Adopt `.agents/roles/evaluator.md`. Input: one idea path, or `--run <dir>` for all `proposed` ideas in it, or nothing (then use `python3 tools/harness/cli.py next --stage evaluate --all`).
+Adopt `.agents/roles/evaluator.md`. Input: one idea path, or `--run <dir>` for all `proposed` ideas in it, or nothing (then use `python3 tools/harness/cli.py next --stage evaluate --all` — this includes the reviewer's `_inbox/` bugs; you rank features and bugs together, per the role's *Choosing the work*).
 
 ## Blockers first
 

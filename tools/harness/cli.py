@@ -7,7 +7,7 @@ if __package__ in (None, ""):
 from tools.harness.frontmatter import split_document, parse, join_document
 from tools.harness.schema import kind_of, validate, TRANSITIONS
 from tools.harness.scan import scan, load
-from tools.harness.state import render_state, plan_sort_key
+from tools.harness.state import render_state, plan_sort_key, PRIO_RANK
 
 TEMPLATES = pathlib.Path(".agents/templates")
 LOCK = pathlib.Path("harness/.lock")
@@ -179,7 +179,12 @@ def cmd_set(a):
 def cmd_next(a):
     res = scan(".")
     if a.stage == "evaluate":
-        items = [i.rel for i in res.ideas if i.fm["status"] == "proposed" and "/_inbox/" not in i.rel]
+        # The evaluator is the single point that chooses between reviewer-filed
+        # bugs (_inbox/) and ideator features (run folders): both queues, one list.
+        # Blockers first, then by priority, then inbox before runs, then path.
+        def key(i):
+            return (0 if i.fm.get("blocks") else 1, PRIO_RANK.get(i.fm.get("priority"), 3), 0 if "/_inbox/" in i.rel else 1, i.rel)
+        items = [i.rel for i in sorted(res.ideas, key=key) if i.fm["status"] == "proposed"]
     elif a.stage == "execute":
         items = [p.rel for p in sorted(res.plans, key=plan_sort_key) if p.fm["status"] == "approved"]
     elif a.stage == "review":

@@ -62,7 +62,7 @@ rejected_reason: "..."               # set when rejected
 ```
 Body: `# Title`, `## Why` (tied to spec goals — retention, 30 min/day, CEFR progression), `## Expected output` (user-visible + technical), `## Evidence` (spec sections, research links, prior runs).
 
-Run folders are append-only. No cross-run deduplication; an idea may recur and the evaluator judges it fresh. `_run.md` summarises what the ideator read, proposed, and which inbox bugs it swept in.
+Run folders are append-only. No cross-run deduplication; an idea may recur and the evaluator judges it fresh. `_run.md` summarises what the ideator read and proposed, and which inbox bugs it noticed and deliberately did not duplicate.
 
 ### 3.2 Plan — `harness/plans/<date>-<slug>.md`
 
@@ -106,6 +106,8 @@ bugs: [harness/ideas/_inbox/<slug>.md, ...]
 ```
 Checks code against plan **and** plan against idea. Each bug becomes an idea file in `_inbox/` with `type: bug`, `source: reviewer`, referencing the plan. A `fail` verdict creates at least one `priority: high` bug.
 
+**Who chooses the work.** The ideator only proposes features; the reviewer only files bugs; the **evaluator is the single point that ranks across both queues** (`next --stage evaluate` returns run ideas and `_inbox/` bugs together — blockers first, then priority, then inbox before runs). Bugs therefore never wait for an ideation run, and the ideator never moves or re-files them; it reads the inbox only to avoid proposing a known bug as a feature.
+
 ### 3.4 `STATE.md` and `CODEMAP.md`
 
 `STATE.md` sections: Invalid, Inbox, Proposed, Selected, Planned (awaiting approval), Approved, Executing, Done (last 10), Failed. Regenerated at the end of every command.
@@ -130,7 +132,7 @@ The executor owns *does it work*; the reviewer owns *is it good*.
 The reviewer therefore does not spend its budget asking "does it run" — it re-runs the executor's evidence to confirm it, then reviews **quality**: design and boundaries, correctness on inputs nobody tried, performance and resource use, conventions and idiom, error handling, test honesty, documentation accuracy, security. If the executor's evidence does not reproduce, that is an **executor gate failure** — a blocker, plus an explicit statement in the review that the plan should not have been marked `done`.
 
 **Boundaries:**
-- Ideator never writes plans or code.
+- Ideator never writes plans or code, and never moves, edits or ranks bugs.
 - Evaluator never touches app code; rejection with a reason is a first-class outcome.
 - Executor never changes a plan's intent. Small deviations are logged; an unfollowable plan goes to `failed`, not reinterpreted.
 - Reviewer never fixes code. Bugs flow back through ideation.

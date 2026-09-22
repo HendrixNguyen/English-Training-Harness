@@ -14,9 +14,9 @@ Subcommands: `status`, `run [--auto-approve] [--stages ideate,evaluate,execute,r
 Idempotent; safe to call on a schedule. `LOG=harness/runs/$(date +%Y%m%dT%H%M%S).log`. Every step appends one line to `$LOG`. Stages default to all four; `--stages` limits them.
 
 1. `python3 tools/harness/cli.py validate` → if it fails, log the invalid files and **stop** (never build on broken state).
-2. **ideate** if enabled and (`ls harness/ideas/_inbox/*.md` is non-empty **or** `next --stage evaluate` is empty): spawn the ideator role (features mode, count 5). Log the run path.
+2. **ideate** if enabled and there are no `proposed` ideas in any run folder (inbox bugs do not count — they are the evaluator's, not the ideator's): spawn the ideator role (features mode, count 5). Log the run path.
 3. **blockers** — run `python3 tools/harness/cli.py blockers`. Any listed bug is holding up an unmerged branch: spawn the evaluator on those first, ahead of the ordinary queue, and log them.
-4. **evaluate** if enabled and `next --stage evaluate --all` is non-empty: spawn the evaluator role on all of them. Log verdicts.
+4. **evaluate** if enabled and `next --stage evaluate --all` is non-empty: spawn the evaluator role on all of them — features and inbox bugs together; the evaluator ranks. Log verdicts.
 4. **auto-approve** if `--auto-approve`: for each `draft` plan whose idea is `type: mvp-slice` **or** (`type: bug` and `priority: high`): `cli.py set <plan> status=approved`. Log each. Never auto-approve features.
 5. **execute** if enabled and `next --stage execute` is non-empty: spawn the executor role on exactly that one plan. Log status, branch, PR.
 6. **review** if enabled: for each path in `next --stage review --all`: spawn the reviewer role. Log verdicts and bugs filed.

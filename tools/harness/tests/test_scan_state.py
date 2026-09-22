@@ -30,6 +30,8 @@ class ScanTests(unittest.TestCase):
     def test_render_state_sections(self):
         s = render_state(scan(self.root))
         for h in ["## Invalid", "## Inbox", "## Proposed", "## Approved", "## Done", "## Failed"]:
+            pass
+        for h in ["## Invalid", "## Inbox (reviewer bugs awaiting evaluation)", "## Proposed", "## Approved", "## Done", "## Failed"]:
             self.assertIn(h, s)
         self.assertIn("broken.md", s.split("## Invalid")[1].split("##")[0])
         self.assertIn("bugone.md", s.split("## Inbox")[1].split("##")[0])

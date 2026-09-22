@@ -29,7 +29,7 @@ def render_state(res):
         for b in res.blockers_for(plan.rel):
             blocked.append(f"- `{b.rel}` — {b.title} — blocks `{plan.rel}`")
     section("Blockers (merge refused until fixed)", blocked)
-    section("Inbox", [_line(a) for a in res.ideas if "/_inbox/" in a.rel])
+    section("Inbox (reviewer bugs awaiting evaluation)", [_line(a) for a in res.ideas if "/_inbox/" in a.rel and a.fm["status"] == "proposed"])
     section("Proposed", [_line(a) for a in res.ideas if a.fm["status"] == "proposed" and "/_inbox/" not in a.rel])
     section("Selected", [_line(a) for a in res.ideas if a.fm["status"] == "selected"])
     section("Planned (awaiting approval)", [_line(a) for a in sorted(res.plans, key=plan_sort_key) if a.fm["status"] == "draft"])
