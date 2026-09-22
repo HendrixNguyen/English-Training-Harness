@@ -2,19 +2,23 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'harness/**']
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Branches: one group per ref, superseded runs cancelled. main: one group per
+  # commit, so back-to-back merges each finish their own run (a shared group
+  # would cancel the *pending* run when a third push arrives).
+  group: ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   backend-unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -41,6 +45,7 @@ jobs:
 
   backend-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -94,6 +99,7 @@ jobs:
 
   harness-tooling:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
