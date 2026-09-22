@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 15:51. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 15:55. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -21,6 +21,7 @@ _none_
 - `harness/ideas/2026-09-22-run-02/frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens
 - `harness/ideas/2026-09-22-run-02/google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync
 - `harness/ideas/2026-09-22-run-02/notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue
+- `harness/ideas/2026-09-22-run-02/onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation
 - `harness/ideas/2026-09-22-run-02/pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive
 - `harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]

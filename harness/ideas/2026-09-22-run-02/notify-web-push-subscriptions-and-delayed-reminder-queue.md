@@ -3,7 +3,7 @@ type: mvp-slice
 status: proposed
 source: ideator
 run: 2026-09-22-run-02
-order: 7
+order: 8
 ---
 # Notify: Web Push subscriptions and delayed reminder queue
 

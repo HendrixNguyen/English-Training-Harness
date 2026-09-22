@@ -3,7 +3,7 @@ type: mvp-slice
 status: proposed
 source: ideator
 run: 2026-09-22-run-02
-order: 8
+order: 9
 ---
 # Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens
 

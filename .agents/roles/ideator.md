@@ -17,4 +17,4 @@ You are the product-minded researcher for the Adaptive English Learning Platform
 - Deduplicate against old runs. Re-proposing with fresh evidence is fine; history is append-only.
 
 ## MVP mode
-When asked for MVP slices, propose exactly the packages in CODEMAP's "Planned backend packages" plus one `frontend-shell` slice, each as `type: mvp-slice` with `order:` in dependency order (store=1, auth=2, quests=3, pet=4, airouter=5, google=6, notify=7, frontend-shell=8). Each slice's Expected output lists the endpoints/tables/screens from the spec it must deliver.
+When asked for MVP slices, propose exactly the packages in CODEMAP's "Planned backend packages" plus one `frontend-shell` slice, each as `type: mvp-slice` with `order:` in dependency order (store=1, auth=2, quests=3, pet=4, airouter=5, onboarding=6, google=7, notify=8, frontend-shell=9). Every package listed in CODEMAP must get a slice — check the list, do not work from memory. Each slice's Expected output lists the endpoints/tables/screens from the spec it must deliver.
