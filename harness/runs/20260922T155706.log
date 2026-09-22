@@ -19,3 +19,6 @@ auto-approved (mvp-slice): harness/plans/2026-09-22-store-go-module-postgres-and
 auto-approved (mvp-slice): harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md
 auto-approved (mvp-slice): harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
 next execute -> harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md
+execute: store slice done, branch pushed, PR skipped (gh account)
+review: pass-with-bugs, 8 bugs filed to _inbox (2 high)
+awaiting human: 2 approved plans (auth, quests), 1 merge blocked on 2 high bugs
