@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/go-test-drops-every-table-in-whatever-database-url-points-at.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md
 branch: harness/2026-09-22-high-store-go-module-postgres-and-redis-clients-migration-0001
 worktree: .worktrees/store-go-module-postgres-and-redis-clients-migration-0001

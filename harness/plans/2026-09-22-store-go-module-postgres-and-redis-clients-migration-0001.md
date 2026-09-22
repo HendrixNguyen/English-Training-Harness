@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/store-go-module-postgres-and-redis-clients-migration-0001.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 1
 branch: harness/2026-09-22-high-store-go-module-postgres-and-redis-clients-migration-0001
 worktree: .worktrees/store-go-module-postgres-and-redis-clients-migration-0001
