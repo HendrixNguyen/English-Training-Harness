@@ -1,5 +1,5 @@
 -- Migration 0001 — initial schema, transcribed verbatim from
--- 1st-thinking-architecture-doc.md §3.2 (the spec escapes underscores; this does not).
+-- project-base/1st-thinking-architecture-doc.md §3.2 (the spec escapes underscores; this does not).
 -- gen_random_uuid() is core in PostgreSQL 13+; docker-compose.yml pins postgres:16.
 
 CREATE TYPE cefr_level AS ENUM ('A1', 'A2', 'B1', 'B2', 'C1', 'C2');

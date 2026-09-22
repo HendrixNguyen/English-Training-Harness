@@ -5,7 +5,7 @@
 
 ## 1. Purpose
 
-A tool-neutral, file-driven pipeline of four agent roles that continuously improves the Adaptive English Learning Platform: propose ideas → judge and plan them → implement → review. It runs manually stage-by-stage, or unattended via an orchestrator called by any scheduler. Its first workload is building the MVP from `1st-thinking-architecture-doc.md`.
+A tool-neutral, file-driven pipeline of four agent roles that continuously improves the Adaptive English Learning Platform: propose ideas → judge and plan them → implement → review. It runs manually stage-by-stage, or unattended via an orchestrator called by any scheduler. Its first workload is building the MVP from `project-base/1st-thinking-architecture-doc.md`.
 
 Non-goals: merging code to `main` (always human), vector/semantic code search (deferred; see §7), adapters for tools other than Claude Code (follow-ups).
 

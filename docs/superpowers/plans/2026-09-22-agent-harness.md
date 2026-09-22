@@ -80,7 +80,7 @@ Canonical instructions for any coding agent (Claude Code, Codex, Gemini CLI, …
 
 ## What this repo is
 
-An adaptive English-learning PWA (spec: `1st-thinking-architecture-doc.md`) built and evolved by an **agent harness** (design: `docs/superpowers/specs/2026-09-22-agent-harness-design.md`). App code lives in `frontend/` (Nuxt 3) and `backend/` (Go modular monolith) once the MVP slices land.
+An adaptive English-learning PWA (spec: `project-base/1st-thinking-architecture-doc.md`) built and evolved by an **agent harness** (design: `docs/superpowers/specs/2026-09-22-agent-harness-design.md`). App code lives in `frontend/` (Nuxt 3) and `backend/` (Go modular monolith) once the MVP slices land.
 
 ## The harness in one paragraph
 
@@ -1191,7 +1191,7 @@ Adopt the role in `.agents/roles/ideator.md`. Inputs: `mode` (`features` default
 1. **Validate first.** Run `python3 tools/harness/cli.py validate`. If it exits 1, stop and report the invalid files — do not build on a broken state.
 2. **Create the run.** `RUN=$(python3 tools/harness/cli.py new-run [--mvp])`.
 3. **Sweep the inbox.** For every `harness/ideas/_inbox/*.md`: `git mv` it into `$RUN/`, then `python3 tools/harness/cli.py set $RUN/<file> run=<run-name>`. Record each in `_run.md` under *Inbox swept*.
-4. **Read, in this order, and no more than needed:** `harness/CODEMAP.md`; the spec sections relevant to the mode (`1st-thinking-architecture-doc.md` §1, §5, §7 for features; §2–§4, §6, §7 for mvp); the last two `_run.md` files; if a `remembering-conversations` skill is available, query it for prior decisions about this project.
+4. **Read, in this order, and no more than needed:** `harness/CODEMAP.md`; the spec sections relevant to the mode (`project-base/1st-thinking-architecture-doc.md` §1, §5, §7 for features; §2–§4, §6, §7 for mvp); the last two `_run.md` files; if a `remembering-conversations` skill is available, query it for prior decisions about this project.
 5. **Research (features mode only).** Look for 2–3 external references on retention mechanics in language-learning apps or on the specific gap you are targeting. Record URLs under `## Evidence`.
 6. **Write ideas.** For each: `python3 tools/harness/cli.py new-idea --run $RUN --title "<Title>" --type <feature|bug|mvp-slice> --source ideator [--order N]`, then fill the three body sections of the created file (body only — leave frontmatter alone).
 7. **Write `_run.md`.** Fill *Read*, *Inbox swept*, *Proposed* (one line per idea path + title), *Notes* (what you considered and dropped).
@@ -1638,7 +1638,7 @@ Check: `harness/ideas/<today>-run-01/` has 3 idea files + `_run.md`; each `## Wh
 
 - [ ] **Step 3: Test 2 — human idea end to end**
 
-Run: `/idea "add UNIQUE(user_id) to pet_states in the DDL section of 1st-thinking-architecture-doc.md"`
+Run: `/idea "add UNIQUE(user_id) to pet_states in the DDL section of project-base/1st-thinking-architecture-doc.md"`
 Expected: idea created with `source: human`; evaluator selects it (priority medium or high) and writes a draft plan.
 Run: `/approve harness/plans/<today>-<slug>.md` → Approved.
 Run: `/execute` → worktree `.worktrees/<slug>` exists; branch `harness/<today>-<prio>-<slug>`; plan `done` with execution summary; Draft PR opened if remote configured (title `[<today>][P2] …`).

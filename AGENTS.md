@@ -4,7 +4,7 @@ Canonical instructions for any coding agent (Claude Code, Codex, Gemini CLI, …
 
 ## What this repo is
 
-An adaptive English-learning PWA (spec: `1st-thinking-architecture-doc.md`) built and evolved by an **agent harness** (design: `docs/superpowers/specs/2026-09-22-agent-harness-design.md`). App code lives in `frontend/` (Nuxt 3) and `backend/` (Go modular monolith) once the MVP slices land.
+An adaptive English-learning PWA (spec: `project-base/1st-thinking-architecture-doc.md`) built and evolved by an **agent harness** (design: `docs/superpowers/specs/2026-09-22-agent-harness-design.md`). App code lives in `frontend/` (Nuxt 3) and `backend/` (Go modular monolith) once the MVP slices land.
 
 ## The harness in one paragraph
 
@@ -12,7 +12,7 @@ Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pa
 
 ## Reading the spec
 
-`1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `grep -n 'Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
+`project-base/1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `grep -n 'Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
 
 ## Rules every role follows
 
