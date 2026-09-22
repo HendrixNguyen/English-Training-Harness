@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Superseded by harness/ideas/2026-09-22-run-02/ci-on-github-actions-for-backend-and-harness-tooling.md (selected, high), whose backend-integration job runs the TEST_*-gated suite in CI and fails on any skip."
 ---
 # no CI runs the integration suite so PgMigrator is never verified
 
@@ -47,3 +48,12 @@ and `PgMigrator` stops shipping unverified.
 - Coverage measured in the plan's worktree with `go test ./... -covermode=set` and
   `DATABASE_URL`/`REDIS_URL` unset.
 - Repo-wide search found no CI configuration; the only YAML under `backend/` is `docker-compose.yml`.
+
+## Evaluation
+
+**Verdict: reject — superseded.** The finding is correct and is the *Why* of the owner's `source: human`
+idea `harness/ideas/2026-09-22-run-02/ci-on-github-actions-for-backend-and-harness-tooling.md`, which
+was selected (`priority: high`) on 2026-09-22 and takes the first of the two options here: a GitHub
+Actions workflow whose `backend-integration` job runs the `TEST_*`-gated suite against Postgres and
+Redis service containers and fails if any integration test skips. Keeping both open would put a
+duplicate in the queue; the coverage figures above stay useful as the reviewer's baseline for that plan.
