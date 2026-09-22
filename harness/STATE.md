@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 15:55. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:03. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -26,7 +26,6 @@ _none_
 - `harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
 - `harness/ideas/2026-09-22-run-02/spec-never-states-when-the-pet-states-row-is-created.md` — Spec never states when the pet_states row is created [low]
-- `harness/ideas/2026-09-22-run-02/store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001
 
 ## Selected
 
@@ -34,7 +33,7 @@ _none_
 
 ## Planned (awaiting approval)
 
-_none_
+- `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high]
 
 ## Approved
 

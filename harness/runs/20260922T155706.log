@@ -1,0 +1,17 @@
+run 2026-09-22T15:57:06+07:00 stages=evaluate,execute auto-approve=yes
+validate: ok
+proposed ideas:
+  harness/ideas/2026-09-22-run-01/adaptive-reminder-timing-and-pre-decay-rescue-push.md
+  harness/ideas/2026-09-22-run-01/pet-streak-shield-earned-by-target-days.md
+  harness/ideas/2026-09-22-run-01/spaced-repetition-vocabulary-review-in-the-daily-quest.md
+  harness/ideas/2026-09-22-run-02/ai-router-multi-llm-providers-task-strategies-and-rate-limit.md
+  harness/ideas/2026-09-22-run-02/auth-google-oauth-code-exchange-and-jwt-sessions.md
+  harness/ideas/2026-09-22-run-02/frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md
+  harness/ideas/2026-09-22-run-02/google-one-way-calendar-and-tasks-sync.md
+  harness/ideas/2026-09-22-run-02/notify-web-push-subscriptions-and-delayed-reminder-queue.md
+  harness/ideas/2026-09-22-run-02/onboarding-placement-test-cefr-grading-and-roadmap-generatio.md
+  harness/ideas/2026-09-22-run-02/pet-health-streak-and-stage-engine-with-revive.md
+  harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md
+  harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md
+  harness/ideas/2026-09-22-run-02/spec-never-states-when-the-pet-states-row-is-created.md
+  harness/ideas/2026-09-22-run-02/store-go-module-postgres-and-redis-clients-migration-0001.md
