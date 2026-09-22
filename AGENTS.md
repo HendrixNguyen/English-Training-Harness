@@ -20,7 +20,7 @@ Three documents in `project-base/`, all canonical:
 
 Where the documents disagree, the backend/frontend specs win for their own layer; say so in the plan. The filenames contain spaces — quote them in shell.
 
-`project-base/1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `grep -n 'Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
+All three were pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`), so search by content (`grep -n 'Core REST'`), not by `^## `. In the 1st-thinking doc the DDL and Go are escaped and de-indented too (treat its §6 Go as pseudocode); in the backend/frontend specs the fenced ```sql blocks are clean. The backend spec's DDL must stay identical to `backend/internal/store/migrations/0001_init.up.sql` (plus later migrations) — the executor's Definition of done for any store change includes that diff.
 
 ## Rules every role follows
 

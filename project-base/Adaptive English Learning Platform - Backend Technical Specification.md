@@ -109,7 +109,7 @@ CREATE TABLE push_subscriptions (
 
 CREATE TABLE pet_states (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     plant_name VARCHAR(100) DEFAULT 'My Green Buddy',
     health_points INT DEFAULT 100 CHECK (health_points BETWEEN 0 AND 100),
     stage pet_stage DEFAULT 'sprout',

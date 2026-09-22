@@ -1,5 +1,7 @@
 # CODEMAP
 
+Specs: see `AGENTS.md` → *Reading the spec* (three documents in `project-base/`; backend DTO contracts are in the Backend spec §6, plant math in §8, frontend wireframes in the Frontend spec §7).
+
 One paragraph per package/module. Read this before exploring code. Executors update the paragraph for any package they change; reviewers correct it.
 
 ## Backend packages (`backend/internal/`)
