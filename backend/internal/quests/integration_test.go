@@ -2,6 +2,7 @@ package quests
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -112,11 +113,82 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 		t.Error("exercises.is_completed = false after progress was recorded against it")
 	}
 
+	// --- Review reproduction 1: a 404 must leave both stores untouched. ---
+	// Another user's real exercise (ids are UUIDs; a random string would be a
+	// Postgres type error, not a 404 — see the plan).
+	const otherGid = "google-quests-integration-other"
+	var otherID string
+	_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, otherGid)
+	if err := pg.Pool.QueryRow(ctx,
+		`INSERT INTO users (email, google_id, target_goal, timezone) VALUES ($1,$2,$3,$4) RETURNING id`,
+		"quests-other@example.com", otherGid, "", "UTC").Scan(&otherID); err != nil {
+		t.Fatalf("inserting the other user: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, otherGid) })
+	if _, err := store.SeedDemoRoadmap(ctx, pg.Pool, otherID); err != nil {
+		t.Fatalf("SeedDemoRoadmap(other): %v", err)
+	}
+	otherSuite, err := svc.Daily(ctx, otherID)
+	if err != nil {
+		t.Fatalf("Daily(other): %v", err)
+	}
+
+	_, err = svc.RecordProgress(ctx, userID, otherSuite.Tasks[0].ID, 999)
+	if !errors.Is(err, ErrExerciseNotFound) {
+		t.Fatalf("progress against another user's exercise: err = %v, want ErrExerciseNotFound", err)
+	}
+	assertUntouched := func(t *testing.T, what string) {
+		t.Helper()
+		total, err := counter.Total(ctx, userID, LocalDate(now, time.UTC))
+		if err != nil {
+			t.Fatalf("%s: reading counter: %v", what, err)
+		}
+		if total != 1800 {
+			t.Errorf("%s: daily:accumulated = %d, want 1800 untouched", what, total)
+		}
+		var m int
+		var met bool
+		if err := pg.Pool.QueryRow(ctx,
+			`SELECT minutes_spent, is_target_met FROM daily_progress WHERE user_id = $1 AND date = $2::date`,
+			userID, LocalDate(now, time.UTC)).Scan(&m, &met); err != nil {
+			t.Fatalf("%s: reading daily_progress: %v", what, err)
+		}
+		if m != 30 || !met {
+			t.Errorf("%s: daily_progress = (%d, %t), want (30, true) untouched", what, m, met)
+		}
+	}
+	assertUntouched(t, "after the 404")
+	var otherCompleted bool
+	if err := pg.Pool.QueryRow(ctx, `SELECT is_completed FROM exercises WHERE id = $1`, otherSuite.Tasks[0].ID).Scan(&otherCompleted); err != nil {
+		t.Fatalf("reading the other user's exercise: %v", err)
+	}
+	if otherCompleted {
+		t.Error("the other user's exercise was marked complete by a rejected request")
+	}
+
+	// --- Review reproduction 2: an oversized report is a 400, not a 48h brick. ---
+	for _, seconds := range []int64{MaxDurationSeconds + 1, 100_000_000_000_000} {
+		if _, err := svc.RecordProgress(ctx, userID, suite.Tasks[1].ID, seconds); !errors.Is(err, ErrInvalidDuration) {
+			t.Errorf("duration %d: err = %v, want ErrInvalidDuration", seconds, err)
+		}
+	}
+	assertUntouched(t, "after the oversized reports")
+
+	// The day is still writable afterwards — the reviewer's ordinary 60s call
+	// was a 500 before this fix.
+	out2, err := svc.RecordProgress(ctx, userID, suite.Tasks[1].ID, 60)
+	if err != nil {
+		t.Fatalf("an ordinary 60s report after the rejections failed: %v", err)
+	}
+	if out2.DailySecondsSpent != 1860 || out2.DailyMinutesSpent != 31 || out2.NewlyMet {
+		t.Errorf("out = %+v, want 1860s/31m and not newly met", out2)
+	}
+
 	again, err := svc.Daily(ctx, userID)
 	if err != nil {
 		t.Fatalf("second Daily: %v", err)
 	}
-	if again.AccumulatedSeconds != 1800 || !again.IsTargetMet || !again.Tasks[0].IsCompleted {
-		t.Errorf("second Daily = %+v, want 1800s accumulated, target met, task[0] completed", again)
+	if again.AccumulatedSeconds != 1860 || !again.IsTargetMet || !again.Tasks[0].IsCompleted || !again.Tasks[1].IsCompleted {
+		t.Errorf("second Daily = %+v, want 1860s accumulated, target met, tasks[0] and [1] completed", again)
 	}
 }
