@@ -70,6 +70,8 @@ Run folders are append-only. No cross-run deduplication; an idea may recur and t
 idea: harness/ideas/<run>/<slug>.md
 status: draft | approved | executing | done | failed
 branch: harness/<slug>               # set by executor
+worktree: .worktrees/<slug>          # set by executor
+merged: false                        # set true by /harness merge
 design: harness/designs/<slug>.md    # UI features only
 ```
 Body is the `writing-plans` format: bite-sized tasks with verification steps. On completion the executor appends `## Execution summary` (built, deviations + why, verification evidence). On failure it appends `## Failure` (tried, blocker).
@@ -95,15 +97,15 @@ Checks code against plan **and** plan against idea. Each bug becomes an idea fil
 |---|---|---|---|---|
 | Ideator | harness-ideate | remembering-conversations, web research | spec, CODEMAP, `_inbox/`, last 2 `_run.md` | run folder: ideas + `_run.md` |
 | Evaluator | harness-evaluate | brainstorming (why), writing-plans, frontend-design (UI → designs/), code-review + systematic-debugging (bugs) | one idea or all `proposed` in a run | idea status/priority/reason, plan `draft`, optional design |
-| Executor | harness-execute | executing-plans, test-driven-development, verification-before-completion, using-git-worktrees | one `approved` plan, CODEMAP | code on branch, plan status + summary, CODEMAP |
-| Reviewer | harness-review | code-review, requesting-code-review, the-validator, typescript-review | plan, its idea, branch diff | review file, `_inbox/` bugs, CODEMAP fixes |
+| Executor | harness-execute | executing-plans, test-driven-development, verification-before-completion, using-git-worktrees | one `approved` plan, CODEMAP | code in `.worktrees/<slug>` on `harness/<slug>`, plan status + summary, CODEMAP |
+| Reviewer | harness-review | code-review, requesting-code-review, the-validator, typescript-review | plan, its idea, worktree + `main...harness/<slug>` diff | review file, `_inbox/` bugs, CODEMAP fixes |
 
 **Boundaries:**
 - Ideator never writes plans or code.
 - Evaluator never touches app code; rejection with a reason is a first-class outcome.
 - Executor never changes a plan's intent. Small deviations are logged; an unfollowable plan goes to `failed`, not reinterpreted.
 - Reviewer never fixes code. Bugs flow back through ideation.
-- Nobody merges to `main`.
+- Nobody merges to `main`; only the human via `/harness merge`.
 
 **Human ideas:** `/idea "<text>"` writes a `source: human` idea into the current run (or a new `manual` run folder) and immediately runs the evaluator on it.
 
@@ -133,7 +135,9 @@ Checks code against plan **and** plan against idea. Each bug becomes an idea fil
 | `/approve <plan>` | `draft → approved`. The safety boundary. |
 | `/execute [<plan>]` | Default: highest-priority `approved` |
 | `/review [<plan>]` | Default: oldest `done` without review |
-| `/harness status` | Regenerate + print `STATE.md` |
+| `/harness status` | Regenerate + print `STATE.md`, list stale worktrees |
+| `/harness merge <plan>` | Human-only: merge `harness/<slug>` into `main` (`--no-ff`), remove worktree, delete branch, set `merged: true` |
+| `/harness prune` | Remove worktrees of merged plans |
 
 **Orchestrator:** `/harness run [--auto-approve] [--stages a,b,c]`
 
@@ -153,22 +157,32 @@ One execute per run bounds each scheduled tick to a reviewable diff. The orchest
 
 | Failure | Handling |
 |---|---|
-| Executor blocked | Plan `failed` + `## Failure`. Branch kept. Never auto-retried; surfaces in STATE.md until human acts. |
-| Review `fail` | Plan stays `done`; high-priority bug in `_inbox/` referencing the plan. |
+| Executor blocked | Plan `failed` + `## Failure`. Branch and worktree kept. Never auto-retried; surfaces in STATE.md until human acts. |
+| Review `fail` | Plan stays `done`, unmerged; worktree kept for inspection; high-priority bug in `_inbox/` referencing the plan. |
 | Malformed frontmatter | Listed under Invalid in STATE.md, skipped. Never consumed silently. |
-| Concurrent executors | `harness/.lock` holds plan path; second executor exits. Lock older than 2h is stale. |
+| Concurrent executors | `harness/.lock` holds plan path; second executor exits. Lock older than 2h is stale. Separate worktrees mean a stale lock never corrupts another plan's files. |
 | Empty/useless ideation | Evaluator bulk-rejects; run is still recorded as history. |
 
 Deferred: vector/semantic search. Revisit when CODEMAP + `rg` stop being enough; the ideator may propose it.
 
-## 8. Git
+## 8. Git and worktrees
 
-The harness initialises the repo. Executor works on `harness/<slug>` branches and never merges. Reviews link the branch. Merging is a human action after review, in every mode.
+The harness initialises the repo. `main` is the integration branch and the main checkout is never modified by any role.
+
+**Executor:** for each plan, `git worktree add .worktrees/<slug> -b harness/<slug> main`. All code changes, builds, and tests happen inside that worktree. Commits land on `harness/<slug>`. The plan's frontmatter records `branch:` and `worktree: .worktrees/<slug>`. The executor never merges and never deletes the worktree.
+
+**Reviewer:** works inside the same worktree — runs the build and tests there, diffs `harness/<slug>` against `main`, and checks the result against plan and idea. The review file links branch, worktree, and the `git diff main...harness/<slug> --stat` summary.
+
+**Human merge:** after a `pass` or `pass-with-bugs` review, the human merges (`/harness merge <plan>` runs `git merge --no-ff harness/<slug>` on `main`, removes the worktree, and deletes the branch). A `fail` review leaves the worktree in place for inspection. Merging is human-only in every mode, including `--auto-approve`.
+
+**Cleanup:** `/harness status` lists worktrees whose plan is `done` + reviewed + merged as stale; `/harness prune` removes them. Worktrees for `failed` plans are kept until the plan is re-approved or its idea rejected.
+
+`.worktrees/` is git-ignored.
 
 ## 9. Acceptance tests for the harness
 
 1. `/ideate` against the spec alone → well-formed idea files, `## Why` tied to spec goals, `STATE.md` shows them Proposed.
-2. `/idea "add UNIQUE(user_id) to pet_states in the DDL doc"` → evaluate → `/approve` → `/execute` → `/review`: every transition fires, artifacts link correctly, review verdict `pass`.
+2. `/idea "add UNIQUE(user_id) to pet_states in the DDL doc"` → evaluate → `/approve` → `/execute` → `/review` → `/harness merge`: every transition fires, a worktree is created and removed, the change lands on `main` only via the merge command, review verdict `pass`.
 3. `/harness run` with nothing to do → exits cleanly, writes a log, changes nothing.
 4. `/ideate --mvp` → 8 ordered `mvp-slice` ideas; `/harness run --auto-approve` executes exactly the `order: 1` slice.
 

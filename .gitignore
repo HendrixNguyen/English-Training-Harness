@@ -6,3 +6,4 @@ dist/
 .env*
 harness/.lock
 .DS_Store
+.worktrees/
