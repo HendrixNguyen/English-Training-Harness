@@ -7,3 +7,5 @@ dist/
 harness/.lock
 .DS_Store
 .worktrees/
+__pycache__/
+*.pyc
