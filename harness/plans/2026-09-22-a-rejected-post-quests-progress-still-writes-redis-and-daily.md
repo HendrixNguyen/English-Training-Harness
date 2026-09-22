@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/a-rejected-post-quests-progress-still-writes-redis-and-daily.md
-status: draft
+status: approved
 priority: high
 merged: false
 amends: harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
