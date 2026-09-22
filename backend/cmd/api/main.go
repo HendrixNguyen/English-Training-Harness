@@ -5,9 +5,11 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
@@ -43,6 +45,19 @@ func main() {
 
 	r := gin.Default()
 	r.GET("/healthz", health.Handler(pg, rdb))
+
+	authSvc := auth.NewService(
+		auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
+		auth.NewPgUserRepo(pg.Pool),
+		auth.NewRedisSessionStore(rdb),
+		auth.NewTokenIssuer(cfg.JWTSecret, time.Now),
+	)
+
+	v1 := r.Group("/api/v1")
+	v1.POST("/auth/google", auth.Handler(authSvc))
+
+	// Later slices mount their routes on this group:
+	//   guarded := v1.Group("", auth.Require(tokens, sessions))
 
 	log.Printf("listening on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
