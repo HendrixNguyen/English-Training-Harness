@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 3
 branch: harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording
 worktree: .worktrees/quests-daily-quest-suite-and-progress-recording

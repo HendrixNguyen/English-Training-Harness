@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/a-rejected-post-quests-progress-still-writes-redis-and-daily.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
 branch: harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording
 worktree: .worktrees/quests-daily-quest-suite-and-progress-recording
