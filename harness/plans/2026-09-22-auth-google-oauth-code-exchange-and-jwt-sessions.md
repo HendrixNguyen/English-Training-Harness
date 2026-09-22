@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/auth-google-oauth-code-exchange-and-jwt-sessions.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 2
 branch: harness/2026-09-22-high-auth-google-oauth-code-exchange-and-jwt-sessions
 worktree: .worktrees/auth-google-oauth-code-exchange-and-jwt-sessions
