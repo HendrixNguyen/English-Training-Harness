@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 16:49. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:57. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,8 +9,7 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-- `harness/ideas/_inbox/docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — blocks `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md`
-- `harness/ideas/_inbox/go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — blocks `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md`
+_none_
 
 ## Inbox
 
@@ -49,8 +48,6 @@ _none_
 
 - `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high]
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high]
-- `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high]
-- `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high]
 
 ## Executing
 
@@ -59,6 +56,8 @@ _none_
 ## Done (last 10)
 
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed)
+- `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed)
 - `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
