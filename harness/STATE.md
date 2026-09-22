@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 18:01. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 18:02. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -52,12 +52,13 @@ _none_
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high]
+_none_
 
 ## Approved
 
 - `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high]
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high]
+- `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high]
 
 ## Executing
 

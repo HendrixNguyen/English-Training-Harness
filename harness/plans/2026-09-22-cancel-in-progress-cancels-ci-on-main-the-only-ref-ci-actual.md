@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md
-status: draft
+status: approved
 priority: high
 merged: false
 amends: harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md
