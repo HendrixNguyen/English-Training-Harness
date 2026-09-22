@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: Folded into harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md (Task 2 rewrites the CODEMAP CI section as this idea asks); the reviewer wanted the doc fixes to land with the trigger fix on the same branch.
 ---
 # CODEMAP CI section overstates the unit job and prescribes a racy local repro
 
@@ -57,3 +58,6 @@ The `## CI` section in `harness/CODEMAP.md`:
 - `backend/Makefile:15-16` — `up: docker compose up -d`, no `--wait`.
 - `harness/ideas/_inbox/integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — the
   one-directional gate proof.
+
+## Evaluation
+**Verdict: reject — folded into `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md`.** The three findings are real (the guard proves only that no service variable is exported; `make up` lacks `--wait`; the paragraph is a 210-word run-on), and the reviewer said the doc fixes belong with the trigger fix. That plan's Task 2 rewrites the `## CI` section exactly as this idea's *Expected output* asks — accurate guard description, `docker compose up -d --wait` as the reproduction, short lead-in plus one bullet per job — on the same branch. Rejected here only so the inbox does not carry a duplicate of work already planned.

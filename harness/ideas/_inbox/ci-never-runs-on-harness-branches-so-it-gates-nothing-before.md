@@ -1,10 +1,11 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
 blocks: harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md
+plan: harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md
 ---
 # CI never runs on harness/* branches so it gates nothing before merge
 
@@ -56,3 +57,12 @@ and merge steps read it (`gh run list --branch <branch>` works read-only on a pu
 - `AGENTS.md:23` — the rule the triggers cannot support.
 - That plan's `## Execution summary`, *Push / PR* — the recorded `must be a collaborator` failure.
 - `.agents/skills/harness-orchestrate/SKILL.md:29` — merge pushes `main` directly.
+
+## Evaluation
+**Verdict: select, priority high** — planned together with `cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md`; this idea's `plan:` points at that plan, `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md`, which amends the CI plan.
+
+**Why it is a blocker (recorded, not re-litigated).** The CI idea's *Expected output* requires a branch that builds only on the author's machine to fail visibly "before a human is asked to merge it". With `on.push.branches: [main]`, a `pull_request` trigger that cannot fire (this account cannot open PRs — `must be a collaborator` in the CI plan's execution summary) and `/harness merge` pushing `main` directly, CI first runs *after* the merge has landed, so that requirement is not delivered. The project owner's controller escalated the review's medium to a blocker on that basis.
+
+**Root cause.** `.github/workflows/ci.yml:4-5` — `push.branches: [main]` excludes the only namespace the executor pushes. Fix: `branches: [main, 'harness/**']`, keeping `pull_request` (free now, useful the moment a PR can exist). The `AGENTS.md:23` rule is rewritten so the pushed branch's run, not a PR check, is what the reviewer reads; `harness/CODEMAP.md`'s CI section is rewritten to match (folding in the reviewer's separate doc findings).
+
+**Wiring note.** One plan covers both blockers. `scan.blockers_for` today resolves a fix plan only through the plan's `idea:` field, so this idea's `plan:` back-link would be ignored and the blocker would never clear; the shared plan's Task 3 fixes that in `tools/harness/scan.py` with a regression test.

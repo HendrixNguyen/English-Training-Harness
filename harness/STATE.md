@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 17:52. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 18:01. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -52,7 +52,7 @@ _none_
 
 ## Planned (awaiting approval)
 
-_none_
+- `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high]
 
 ## Approved
 
