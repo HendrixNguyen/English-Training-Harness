@@ -1,0 +1,21 @@
+---
+name: harness-review
+description: Review a done harness plan — re-run verification in its worktree, compare code to plan and plan to idea, file bugs into the inbox, write a review file, comment on the PR. Use for /review and the review stage of /harness run.
+---
+
+# harness-review
+
+Adopt `.agents/roles/reviewer.md`. Input: a plan path, or nothing (then `PLAN=$(python3 tools/harness/cli.py next --stage review)`; if empty, report "nothing to review" and stop).
+
+## Procedure
+
+1. `python3 tools/harness/cli.py validate` — stop on failure.
+2. Read the plan (including its execution summary), its idea, its design if any, `harness/CODEMAP.md`. Note `branch`, `worktree`, `pr`.
+3. `cd <worktree>`; `git diff main...<branch> --stat`; run the project's build/tests and the plan's *Verification* commands. Record real output.
+4. Walk the diff against the plan tasks (code-review skill; typescript-review for Nuxt code). Walk the idea's Expected output against the result.
+5. For each bug found: `RUN=harness/ideas/_inbox` — `python3 tools/harness/cli.py new-idea --run harness/ideas/_inbox --title "<bug title>" --type bug --source reviewer --priority <high|medium|low>`, then `python3 tools/harness/cli.py set <file> run=_inbox` and fill the body (*Why* = impact, *Expected output* = correct behaviour, *Evidence* = plan path, file:line, failing command).
+6. Decide the verdict per the role. `REV=$(python3 tools/harness/cli.py new-review --plan $PLAN --verdict <v> --bugs <bug paths…>)`; fill the review body sections, paste verification output under *Code vs plan*.
+7. If CODEMAP needs correction: edit it in the worktree and commit on the branch.
+8. **PR** (skip with a note if the plan has no `pr`): `gh pr comment <pr> --body "<verdict + 3-line summary + path to review file>"`; on `pass` or `pass-with-bugs`: `gh pr ready <pr>`. On `fail` leave it Draft.
+9. `python3 tools/harness/cli.py validate && python3 tools/harness/cli.py state`; commit `harness/` with `harness: review <slug> (<verdict>)`.
+10. **Report:** verdict, bugs filed (paths), whether the PR is ready, and the merge command the human can run: `/harness merge $PLAN`.
