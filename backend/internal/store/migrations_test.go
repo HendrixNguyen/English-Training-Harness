@@ -1,7 +1,10 @@
 package store
 
 import (
+	"context"
+	"errors"
 	"io/fs"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -79,5 +82,88 @@ func TestMigration0001DownDropsEverything(t *testing.T) {
 	// exercises references roadmaps, so it must be dropped first.
 	if strings.Index(down, "DROP TABLE IF EXISTS exercises;") > strings.Index(down, "DROP TABLE IF EXISTS roadmaps;") {
 		t.Error("down migration must drop exercises before roadmaps")
+	}
+}
+
+type fakeMigrator struct {
+	ensured  int
+	applied  []string
+	appliedS []string // the SQL passed to Apply, in order
+	failOn   string
+}
+
+func (f *fakeMigrator) EnsureVersionTable(_ context.Context) error {
+	f.ensured++
+	return nil
+}
+
+func (f *fakeMigrator) AppliedVersions(_ context.Context) (map[string]bool, error) {
+	out := map[string]bool{}
+	for _, v := range f.applied {
+		out[v] = true
+	}
+	return out, nil
+}
+
+func (f *fakeMigrator) Apply(_ context.Context, version, sql string) error {
+	if version == f.failOn {
+		return errors.New("boom")
+	}
+	f.applied = append(f.applied, version)
+	f.appliedS = append(f.appliedS, sql)
+	return nil
+}
+
+func TestMigrateAppliesPendingVersions(t *testing.T) {
+	m := &fakeMigrator{}
+
+	got, err := Migrate(context.Background(), m, MigrationsFS)
+	if err != nil {
+		t.Fatalf("Migrate() = %v, want nil error", err)
+	}
+	if want := []string{"0001_init"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("applied = %v, want %v", got, want)
+	}
+	if m.ensured != 1 {
+		t.Errorf("EnsureVersionTable called %d times, want 1", m.ensured)
+	}
+	if !strings.Contains(m.appliedS[0], "CREATE TABLE users (") {
+		t.Error("Apply did not receive the up SQL")
+	}
+}
+
+func TestMigrateIsIdempotent(t *testing.T) {
+	m := &fakeMigrator{}
+
+	if _, err := Migrate(context.Background(), m, MigrationsFS); err != nil {
+		t.Fatalf("first Migrate: %v", err)
+	}
+	got, err := Migrate(context.Background(), m, MigrationsFS)
+	if err != nil {
+		t.Fatalf("second Migrate: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("second run applied %v, want nothing", got)
+	}
+}
+
+func TestMigrateIgnoresDownFiles(t *testing.T) {
+	m := &fakeMigrator{}
+
+	if _, err := Migrate(context.Background(), m, MigrationsFS); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	for _, sql := range m.appliedS {
+		if strings.Contains(sql, "DROP TABLE") {
+			t.Fatal("Migrate applied a .down.sql file")
+		}
+	}
+}
+
+func TestMigrateReportsApplyFailure(t *testing.T) {
+	m := &fakeMigrator{failOn: "0001_init"}
+
+	if _, err := Migrate(context.Background(), m, MigrationsFS); err == nil {
+		t.Fatal("expected an error when Apply fails, got nil")
 	}
 }
