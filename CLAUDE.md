@@ -5,11 +5,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-This repo currently contains **specification only** — no source code, no package manifests, no git history. The single file [1st-thinking-architecture-doc.md](1st-thinking-architecture-doc.md) is the system architecture & technical spec for an adaptive English-learning PWA.
+Two things live here today:
 
-There are no build, lint, or test commands yet. When the first code lands, add the real commands to this file and delete this note.
+- **The spec** — [1st-thinking-architecture-doc.md](1st-thinking-architecture-doc.md), the architecture & technical spec for an adaptive English-learning PWA. It was pasted from a rich-text editor, so it contains escaped markdown (`\+`, `\!=`, `\[`) and de-indented Go; do not treat the §6.2 snippets as compilable source.
+- **The agent harness** — the pipeline that builds the app. `AGENTS.md` (imported above) explains it; the design is in `docs/superpowers/specs/2026-09-22-agent-harness-design.md`. No app code exists yet; `frontend/` and `backend/` appear when the MVP slices are executed.
 
-The spec document was pasted from a rich-text editor, so it contains escaped markdown artifacts (`\+`, `\!=`, `\[`, `\#\#`) and Go code that lost its indentation. Read through the escaping; do not treat the Go snippets in §6.2 as compilable source.
+### Commands
+
+```bash
+python3 -m unittest discover -s tools/harness/tests -v   # harness tooling tests (stdlib only, no deps)
+python3 -m unittest tools.harness.tests.test_cli -v     # one module
+python3 tools/harness/cli.py validate                    # exit 1 on malformed harness artifacts
+python3 tools/harness/cli.py state                       # regenerate harness/STATE.md
+```
+
+Slash commands (`/ideate`, `/idea`, `/evaluate`, `/approve`, `/execute`, `/review`, `/harness`) are defined in `.claude/commands/` and are registered at session start.
 
 ## Planned architecture
 
