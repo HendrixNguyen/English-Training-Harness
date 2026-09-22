@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/auth-google-oauth-code-exchange-and-jwt-sessions.md
-status: executing
+status: done
 priority: high
 merged: false
 order: 2
@@ -1859,3 +1859,83 @@ git status --short
 - **No logout endpoint.** Revocation works (`SessionStore.Delete`), but §7 lists no logout route and this plan adds no API beyond the one §7 names.
 - **`prompt=consent` on every sign-in** guarantees a refresh token but shows the consent screen each time. If that proves annoying, the fix is to drop `prompt=consent` and rely on the upsert's `COALESCE` to keep the stored refresh token — which this plan already implements and tests.
 - **`redirect_uri` is supplied by the client.** Google validates it against the registered list, so this is safe, but it does mean the backend cannot enforce a single origin. If the human wants that, it becomes a config value and a 400 on mismatch — a small, separate change.
+
+## Execution summary
+
+Built exactly as the plan describes: `backend/internal/auth` (scopes, token, google, repo, session, service, handler, middleware) plus config additions, integration test, route wiring in `cmd/api/main.go`, and the CODEMAP `auth` paragraph. 13 commits on `harness/2026-09-22-high-auth-google-oauth-code-exchange-and-jwt-sessions` (10 plan tasks + 3 fix commits, two of which surfaced only in CI — see below).
+
+**Starting state:** this worktree/branch already existed with Tasks 1–2 committed and Task 3's `go get` staged (a prior partial run). Continued from there rather than re-doing that work.
+
+**Deviations from the plan, with reasons:**
+1. **Task 4 test bug fixed.** `google_test.go`'s `gotForm` was declared `map[string][]string` but the test calls `.Get()` on it, which only exists on `url.Values` (what `r.PostForm` actually is). Declared `gotForm` as `url.Values` instead — same assertions, compiles.
+2. **Task 9 integration test gate fixed — the important one.** The plan's `integration_test.go` as written reads `os.Getenv("DATABASE_URL")`, the *production* variable. `internal/store`'s own integration tests (and this repo's `AGENTS.md`/CODEMAP contract) establish `TEST_DATABASE_URL`/`TEST_REDIS_URL` as the only allowed gate, specifically because these tests DROP data and because CI's `backend-integration` job only exports `TEST_DATABASE_URL`/`TEST_REDIS_URL` — never `DATABASE_URL`. As written, the test would have silently `SKIP`ped in CI and failed the "no skips" gate in `.github/workflows/ci.yml`. Changed the gate to `TEST_DATABASE_URL`, matching `internal/store/integration_test.go`'s established pattern; updated the CODEMAP `auth` paragraph to say `TEST_DATABASE_URL` instead of the plan's suggested `DATABASE_URL`-gated wording. Committed separately (`54ee414`) so the mistake and the fix are both visible in history.
+
+**Plan documentation inaccuracy (no code change):** Task 3's verification command `go test ./internal/auth/... -run Token -v` is expected to print "six `--- PASS` lines", but Go's `-run` is a substring regex match against the test name — only `TestTokenExpiryMatchesTheRedisSessionTTL` and `TestVerifyRejectsAnExpiredToken` contain the literal substring "Token". All 6 tests in that task pass; verified with the full package run instead (`go test ./internal/auth/... -v`).
+
+### Plan's Verification section — output
+
+```
+$ go build ./... && go vet ./...
+(no output)
+
+$ go test ./...
+ok  	.../backend/internal/auth	0.744s
+ok  	.../backend/internal/config	(cached)
+ok  	.../backend/internal/health	(cached)
+ok  	.../backend/internal/store	(cached)
+
+$ env -u DATABASE_URL -u REDIS_URL -u GOOGLE_CLIENT_ID -u GOOGLE_CLIENT_SECRET -u JWT_SECRET go test ./... -count=1
+ok  	.../backend/internal/auth	2.663s
+ok  	.../backend/internal/config	1.338s
+ok  	.../backend/internal/health	2.005s
+ok  	.../backend/internal/store	0.724s
+
+$ go test ./internal/auth/... -v -count=1 2>&1 | grep -c -- '--- PASS'
+29   (>= 25 required)
+
+$ go test ./internal/auth/... -v -count=1 2>&1 | grep -- '--- SKIP'
+--- SKIP: TestIntegrationUpsertCreatesThenPreservesTheLearnerState (0.00s)
+
+$ grep -n 'access_type' internal/auth/scopes.go
+29:// AuthCodeURL builds the consent URL. access_type=offline plus prompt=consent
+37:		"access_type":   {"offline"},
+
+$ grep -n 'calendar.events\|auth/tasks' internal/auth/scopes.go
+22:	"https://www.googleapis.com/auth/calendar.events",
+23:	"https://www.googleapis.com/auth/tasks",
+
+$ grep -n 'cefr_current =\|target_goal =' internal/auth/repo.go
+(no hits — DO UPDATE clause never resets them)
+
+$ grep -n 'store.SessionKey\|store.SessionTTL' internal/auth/*.go
+hits in session.go and token.go (auth never hand-builds a §4 key)
+
+$ python3 tools/harness/cli.py validate; echo exit=$?
+exit=0
+
+$ git log --oneline main..HEAD
+13 commits (10 tasks + 3 fixes: the TEST_DATABASE_URL gate, the Migrate Locker, and CI's -p 1), each with the Co-Authored-By trailer
+
+$ git status --short
+(clean)
+```
+
+### Runtime proof (step 8)
+
+- **Build:** `go build ./...` and `go vet ./...` clean, no warnings.
+- **Whole suite, clean shell:** `env -u DATABASE_URL -u REDIS_URL -u GOOGLE_CLIENT_ID -u GOOGLE_CLIENT_SECRET -u JWT_SECRET go test ./... -count=1` → all four packages `ok`, no `FAIL`, no live services.
+- **Boot + real paths:** built `cmd/api` to a binary, brought up the dev stack via a scratch `backend/.env` (`POSTGRES_PORT=5433 REDIS_PORT=6380`, so the owner's `scio3-redis-1` on 6379 was never touched — confirmed `docker ps` before and after), ran `make up`, waited for `pg_isready`/`redis-cli ping`, then started the binary with `DATABASE_URL`/`REDIS_URL` pointed at those ports plus fake `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`JWT_SECRET`. Both routes registered (`GET /healthz`, `POST /api/v1/auth/google`).
+  - `GET /healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`
+  - `POST /api/v1/auth/google` with `{}` → `400 {"error":"invalid_request"}`
+  - `POST /api/v1/auth/google` with a bogus code → `401 {"error":"google_auth_failed"}` (the service actually reached Google's real token endpoint over the network — `GoogleClient`'s endpoints are hard-wired to `DefaultTokenURL`/`DefaultUserInfoURL` in `main.go`'s wiring, not configurable at the binary level, so this is the closest real-path exercise available without editing the plan's design; the injectable-endpoint design is exercised by the package's own `httptest` unit tests instead) and the handler correctly mapped Google's rejection to 401.
+  - Confirmed the safe-failure mode: running the binary with no env vars exported → `config: DATABASE_URL is required`, exit 1, no crash, no partial state.
+  - `make test-integration` against the live scratch stack: `TestIntegrationUpsertCreatesThenPreservesTheLearnerState` — `--- PASS`, alongside `internal/store`'s three integration tests, all `--- PASS`.
+  - Tore down: `make down`, deleted the scratch `backend/.env`; `docker ps` afterward shows only the pre-existing `scio3-redis-1`/`scio3-mongo-1`, confirming no disturbance.
+
+### CI
+
+Pushed `harness/2026-09-22-high-auth-google-oauth-code-exchange-and-jwt-sessions`. Two CI-only failures surfaced and were fixed, both out of the plan's named file list but a direct, necessary consequence of this plan adding the *second* package (`auth`, after `store`) with its own `TestIntegration*`:
+
+1. **Run [35740944612](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35740944612) — FAIL.** `backend-integration` failed: `ensuring version table: ERROR: duplicate key value violates unique constraint "pg_type_typname_nsp_index"`. Root cause: `internal/store`'s and `internal/auth`'s integration-test binaries run in parallel against one shared `TEST_DATABASE_URL`/database (CI's single Postgres service container), and both call `store.Migrate`; Postgres's `CREATE TABLE/TYPE IF NOT EXISTS` is check-then-act, not atomic, under concurrency. Fixed in `4c704ba` (`store: serialize Migrate against concurrent callers on the same database`): an additive `store.Locker` interface, taken via type assertion in `Migrate` (the existing `Migrator` interface and store's fakes are unchanged), and `PgMigrator.Lock`, a Postgres advisory lock on one pinned connection for the whole migration run. Covered by new unit tests (`fakeLockingMigrator`) and `TestIntegrationConcurrentMigrateDoesNotRace` (8 concurrent callers against a real database).
+2. **Run [35742036352](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35742036352) — FAIL, after fix 1.** `backend-integration` failed differently: `TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent` got `first run applied [], want [0001_init]`. The Locker fix stops concurrent *Migrate* calls from racing each other, but `internal/store`'s own tests also destructively `DROP`/recreate the schema around each of their own tests (`reset()`), uncoordinated with any other package — so `auth`'s test running concurrently with `store`'s `reset()` produced order-dependent results. Fixed in `75b56d3` (`ci: run integration tests with -p 1, one package at a time`): added `-p 1` to both the CI workflow's and `make test-integration`'s `go test ... -run Integration` invocation, so packages' test binaries run one at a time against the shared database (intra-package test order/parallelism is unaffected). Verified stable across three local runs against a live Postgres before pushing. (This commit's message lost a `make test-integration` reference to an unintended shell backtick expansion while writing it — the diff itself is unaffected; not amended per the repo's no-amend rule.)
+3. **Run [35742567690](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35742567690) — SUCCESS.** All three jobs (`backend-unit`, `backend-integration`, `harness-tooling`) green at `75b56d3` (branch HEAD). `gh pr create` was attempted once and failed with "must be a collaborator" (the authenticated `gh` account has no write access to this repo), as expected — recorded here and skipped; the branch is pushed and ready for a human to open the PR.
