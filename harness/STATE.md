@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 18:02. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 18:08. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,6 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-- `harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — blocks `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md`
 - `harness/ideas/_inbox/ci-never-runs-on-harness-branches-so-it-gates-nothing-before.md` — CI never runs on harness/* branches so it gates nothing before merge — blocks `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md`
 
 ## Inbox
@@ -58,7 +57,6 @@ _none_
 
 - `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high]
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high]
-- `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high]
 
 ## Executing
 
@@ -70,6 +68,7 @@ _none_
 - `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high] (unreviewed)
 - `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed

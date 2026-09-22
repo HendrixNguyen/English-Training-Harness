@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md
-status: approved
+status: done
 priority: high
 merged: false
 amends: harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md
+branch: harness/2026-09-22-high-ci-on-github-actions-for-backend-and-harness-tooling
+worktree: .worktrees/ci-on-github-actions-for-backend-and-harness-tooling
 ---
 # cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan
 
@@ -349,3 +351,28 @@ Expected: clean tree; three new commits (Tasks 1-3) on top of `8f5dbf9`.
 - **In scope from the inbox:** the two blockers; the three doc findings from `codemap-ci-section-overstates-the-unit-job-and-prescribes-a-.md` (rejected with `rejected_reason` pointing here); the `timeout-minutes` half of `ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md`. **Not in scope:** that idea's `python-version` pin/matrix (left open in the inbox), `golangci-lint`, any change to `uses:` tags, any change under `backend/`.
 - The trigger blocker's *Expected output* also asked that "the review and merge steps read" the branch check. `AGENTS.md:23` now names `gh run list --branch <branch>`; the skill files under `.agents/skills/` are not edited by this plan — if the orchestrator wants a hard precondition on a green branch run, that is a follow-up idea, because reading Actions results has not been part of any role's verified evidence so far.
 - The reviewer of this plan should re-run section 1 and 4 above; sections 2-3 are cheap enough to always run. Re-running the Docker-backed integration job is unnecessary because section 1 proves the job bodies are unchanged from the reviewed commit.
+
+## Execution summary
+
+Executed in the existing worktree `.worktrees/ci-on-github-actions-for-backend-and-harness-tooling` on branch `harness/2026-09-22-high-ci-on-github-actions-for-backend-and-harness-tooling` (head at start `8f5dbf9`), per the `amends:` instruction — no new branch or worktree was created. No deviations from the plan; all three tasks landed exactly as specified.
+
+**Commits (on top of `8f5dbf9`):**
+- `61cce5c` ci: run on harness/** pushes, never cancel runs on main, cap jobs at 10 min
+- `87dcfb6` docs: describe CI as gating harness/** pushes, never cancelling on main
+- `9376d2b` harness: let blockers resolve a shared fix plan through the idea's plan back-link
+
+**Verification (run from the worktree root):**
+
+Section 1 (workflow): `actionlint exit=0`; the YAML structural asserts all passed (`on: {'push': {'branches': ['main', 'harness/**']}, 'pull_request': None}`); the diff-vs-`8f5dbf9` job-body check passed (`job bodies unchanged since 8f5dbf9` — steps, services, env identical for all three jobs); the six structural greps matched exactly one `branches:`, one `group:`, one `cancel-in-progress:`, three `timeout-minutes: 10`; all six `uses:` lines are still `@v7`, untouched.
+
+Section 2 (docs): `harness/**` present in both `AGENTS.md` and `harness/CODEMAP.md`; `outer verification loop` still at `AGENTS.md:23`; stale wording (`never drops tables`, `` make up` with ``, `run on every PR and push to `main` ``) absent from both files. Note: the plan's own Task 2 Step 3 mid-task grep (`^- \*\*`backend-`) counts only 2 lines by construction (it excludes the `harness-tooling` bullet) even though its prose says "3 job bullets" — that is a mismatch in the plan's own mid-task check text, not a defect in the docs; the final Verification section's grep (`backend-\|harness-`) correctly counts all 3 and returned `3`.
+
+Section 3 (harness suite): `python3 -m unittest discover -s tools/harness/tests` → `Ran 31 tests ... OK` (30 before this plan, +1 regression test as specified); `python3 tools/harness/cli.py validate` → `validate exit=0`.
+
+Section 4 (blocker wiring, scratch copy): copied `harness/`, `.agents/`, and this worktree's `tools/` (i.e. with the Task 3 fix) into a scratch dir, drove this plan through `approved`→`executing`→`done` there, then `python3 tools/harness/cli.py blockers --plan harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` → `blockers exit=0` with no blocker lines printed — confirms `scan.py`'s fix correctly resolves both blockers (including the trigger blocker reached only via its `plan:` back-link) once this plan is done.
+
+Section 5 (tree/history): `git status --short` clean; `git log --oneline -4` shows the three new commits above `8f5dbf9`.
+
+**Runtime proof / scope note:** this plan touches only `.github/workflows/ci.yml`, two docs, and `tools/harness/scan.py` + its test — "Nothing under `backend/` changes" per the plan's own File structure table, and the plan explicitly states nothing in it needs Docker, the network, or a push to verify. No backend build/boot/integration run was performed, consistent with the plan's stated scope and verification (which itself substitutes the diff-vs-`8f5dbf9` job-body check for re-running the Docker-backed integration job). The harness tooling itself was proven to run via section 3 above (its own test suite, exercising the real `cli.py`/`scan.py` code paths end to end, is the "boot and answer" proof for this plan's actual deliverable).
+
+**Post-hoc check on the real ROOT state (not a prediction):** after this plan's own status was set to `done` in the main checkout via `cli.py`, `python3 tools/harness/cli.py blockers --plan harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` run from `ROOT` still reports the second blocker unresolved (exit 1), because the `scan.py` fix (Task 3) lives only on this plan's branch/worktree and has not been merged to `main` — `ROOT`'s `tools/harness/scan.py` is still the pre-fix version. This is expected: the scratch-copy test in Section 4 proves the *logic* is correct once the branch's `scan.py` is in effect; the *actual* CI-plan blocker list on `main` only clears after a human merges this branch (`/harness merge`), which is out of scope for an executor. See the literal command output quoted in this session's final report.
