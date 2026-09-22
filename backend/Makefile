@@ -24,6 +24,10 @@ down:
 #   export TEST_DATABASE_URL=postgres://english:english@localhost:5432/english?sslmode=disable
 #   export TEST_REDIS_URL=redis://localhost:6379/0
 # Without them every Integration test skips.
+# -p 1: every package's integration tests share one physical database, and
+# internal/store destructively drops/recreates the schema around its own
+# tests, so running packages' test binaries in parallel (go test's default)
+# races. See .github/workflows/ci.yml's backend-integration job.
 .PHONY: test-integration
 test-integration:
-	go test ./... -count=1 -v -run Integration
+	go test ./... -count=1 -v -run Integration -p 1

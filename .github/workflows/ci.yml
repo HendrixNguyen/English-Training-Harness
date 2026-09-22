@@ -84,7 +84,16 @@ jobs:
       - name: Integration tests must run, not skip
         run: |
           set -o pipefail
-          go test ./... -count=1 -v -run Integration 2>&1 | tee integration.log
+          # -p 1: every package's integration tests share one physical
+          # database (this job's single Postgres service container), and
+          # some packages (internal/store) destructively drop and recreate
+          # the schema around each of their own tests. Running packages'
+          # test binaries in parallel (go test's default) races: one
+          # package's schema reset/migrate can run concurrently with
+          # another's, so results become order- and timing-dependent. -p 1
+          # runs one package's test binary at a time; within a package,
+          # tests still run in their own declared order/parallelism.
+          go test ./... -count=1 -v -run Integration -p 1 2>&1 | tee integration.log
           want=$(grep -rho '^func TestIntegration[A-Za-z0-9_]*' --include='*_test.go' . | wc -l | tr -d ' ')
           got=$(grep -c '^--- PASS: TestIntegration' integration.log || true)
           if grep -q '^--- SKIP' integration.log; then
