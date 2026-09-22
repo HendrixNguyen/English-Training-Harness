@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 16:08. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:13. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -22,7 +22,6 @@ _none_
 - `harness/ideas/2026-09-22-run-02/notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue
 - `harness/ideas/2026-09-22-run-02/onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation
 - `harness/ideas/2026-09-22-run-02/pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive
-- `harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
 - `harness/ideas/2026-09-22-run-02/spec-never-states-when-the-pet-states-row-is-created.md` — Spec never states when the pet_states row is created [low]
 
@@ -34,6 +33,7 @@ _none_
 
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high]
 - `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high]
+- `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high]
 
 ## Approved
 
