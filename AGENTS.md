@@ -8,7 +8,7 @@ An adaptive English-learning PWA (spec: `project-base/1st-thinking-architecture-
 
 ## The harness in one paragraph
 
-Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pass markdown artifacts through `harness/`. The ideator proposes features, the reviewer files bugs, and the **evaluator alone chooses and ranks across both**; the executor builds what was approved. Status lives in each file's frontmatter; `harness/STATE.md` is a generated dashboard. All state changes go through `python3 tools/harness/cli.py` — never hand-edit frontmatter. Read `harness/CODEMAP.md` before exploring code.
+Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pass markdown artifacts through `harness/`. The ideator proposes features, the reviewer files bugs, and the **evaluator alone chooses and ranks across both**; the executor builds what was approved. **Standing priority (owner, 2026-09-22): finish the MVP slices in `order` first; inbox bugs wait unless they are blockers.** Status lives in each file's frontmatter; `harness/STATE.md` is a generated dashboard. All state changes go through `python3 tools/harness/cli.py` — never hand-edit frontmatter. Read `harness/CODEMAP.md` before exploring code.
 
 ## Reading the spec
 
