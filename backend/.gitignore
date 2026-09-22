@@ -1,1 +1,5 @@
 /api
+.env
+# The repo-root .gitignore has `.env*`, which would swallow the committed
+# example too. This deeper file wins, so re-include it explicitly.
+!.env.example

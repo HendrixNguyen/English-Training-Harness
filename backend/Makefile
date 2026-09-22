@@ -9,6 +9,9 @@ run:
 tidy:
 	go mod tidy
 
+# Ports come from .env (copy .env.example). Set REDIS_PORT / POSTGRES_PORT there
+# if 6379 or 5432 is already taken on this machine; `down` keeps the postgres
+# volume, `docker compose down -v` discards it.
 up:
 	docker compose up -d
 
