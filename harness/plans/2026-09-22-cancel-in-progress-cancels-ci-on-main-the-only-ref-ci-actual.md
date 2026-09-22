@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md
 branch: harness/2026-09-22-high-ci-on-github-actions-for-backend-and-harness-tooling
 worktree: .worktrees/ci-on-github-actions-for-backend-and-harness-tooling

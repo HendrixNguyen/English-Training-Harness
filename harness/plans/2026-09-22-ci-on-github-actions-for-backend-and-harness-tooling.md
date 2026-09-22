@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/ci-on-github-actions-for-backend-and-harness-tooling.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-22-high-ci-on-github-actions-for-backend-and-harness-tooling
 worktree: .worktrees/ci-on-github-actions-for-backend-and-harness-tooling
 ---
