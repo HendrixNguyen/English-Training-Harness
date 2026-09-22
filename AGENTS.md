@@ -12,6 +12,14 @@ Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pa
 
 ## Reading the spec
 
+Three documents in `project-base/`, all canonical:
+
+- `1st-thinking-architecture-doc.md` — the original whole-system spec: goals (§1), stack (§2), DDL (§3.2), Redis keys (§4), sequence flows (§5), AI router (§6), endpoint list (§7), deployment (§8).
+- `Adaptive English Learning Platform - Backend Technical Specification.md` — extends it for the backend: **REST DTO contracts per endpoint (§6.1–6.4)**, security & token lifecycle (§7), **virtual-plant math and the hourly cron (§8)**, Railway checklist (§9). When planning or reviewing a backend slice, its §6 request/response shapes are the contract.
+- `Adaptive English Learning Platform - Frontend Technical Specification.md` — extends it for the Nuxt PWA: service-worker caching (§3), Pinia stores (§4), API→UI mapping (§5), design system (§6), and five wireframes (§7). Frontend ideas, designs and plans start here.
+
+Where the documents disagree, the backend/frontend specs win for their own layer; say so in the plan. The filenames contain spaces — quote them in shell.
+
 `project-base/1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `grep -n 'Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
 
 ## Rules every role follows
