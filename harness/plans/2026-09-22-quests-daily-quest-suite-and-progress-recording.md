@@ -1,9 +1,12 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 3
+branch: harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording
+worktree: .worktrees/quests-daily-quest-suite-and-progress-recording
+pr: skipped-not-a-collaborator
 ---
 # Quests: daily quest suite and progress recording — Plan
 
@@ -2145,3 +2148,81 @@ citation:
 - `title` / `duration_minutes` sourced from `content_json` keys of the same name — the onboarding/AI generator must agree on those key names.
 
 The idea file (`## Evaluation`, *Reconciliation note*) records that this plan's DTOs supersede the field names in its *Expected output*.
+
+## Execution summary
+
+Built exactly as planned: `backend/internal/quests` (`day.go`, `counter.go`, `repo.go`, `pet.go`,
+`service.go`, `handler.go`, plus `*_test.go`/`fakes_test.go`/`integration_test.go`),
+`backend/internal/store/seed.go` + `seed_test.go`, `cmd/api/main.go` wired behind `auth.Require()`,
+and `harness/CODEMAP.md` updated. Nine commits, one per task, each with the
+`Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` trailer. No deviations from the plan — every
+file matched the plan's listing verbatim, including the §6.2 field names.
+
+**Plan Verification output** (all commands run from the worktree root / `backend/`, as specified):
+
+```sh
+go build ./... && go vet ./...        # no output
+go test ./... -count=1                 # ok: auth, config, health, quests, store
+env -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1   # still ok, no service needed
+go test ./internal/quests/... -run 'IncrementsRedisBeforeWritingPostgres' -v   # --- PASS
+go test ./internal/quests/... -run 'CrossingExactly1800|FurtherProgress' -v   # 2x --- PASS
+go test ./internal/quests/... -run 'Timezone|Boundary|Clamps|LocalDate' -v    # 6x --- PASS
+go test ./internal/quests/... -run 'Handler|Spec62|Task' -v                   # 8x --- PASS
+grep -n '"accumulated_seconds"\|"total_minutes_required"\|"tasks"' internal/quests/service.go        # 3 hits
+grep -n '"daily_seconds_spent"\|"daily_minutes_spent"\|"pet_health"\|"streak_count"' internal/quests/service.go   # 4 hits
+grep -n '"duration_seconds"\|"user_answers"' internal/quests/handler.go       # 2 hits
+grep -rn --include='*.go' --exclude='*_test.go' '"total_seconds"\|"target_met"\|"newly_met"\|"exercises"\|"seconds"' internal/quests/   # no hits
+grep -n 'store.DailyAccumulatedKey\|store.DailyAccumulatedTTL' internal/quests/counter.go   # 2 hits
+grep -n 'TargetSeconds = 1800' internal/quests/day.go   # 1 hit
+grep -n 'TEMPORARY' internal/store/seed.go   # 1 hit
+grep -rn 'Getenv("DATABASE_URL")\|Getenv("REDIS_URL")' internal/quests/ internal/store/seed*.go   # no hits
+grep -c '^func TestIntegration' internal/quests/integration_test.go   # 1
+grep -n 'auth.Require(tokens, sessions)' cmd/api/main.go   # 1 hit
+cd .. && python3 tools/harness/cli.py validate; echo exit=$?   # exit=0
+git log --oneline main..HEAD   # 9 commits, each with the trailer
+git status --short   # clean
+```
+
+**Live integration test** (`POSTGRES_PORT=5433 REDIS_PORT=6381 docker compose up -d --wait`, per the
+environment note that 5432/6379/6380 are held by the owner's unrelated containers):
+
+```sh
+export TEST_DATABASE_URL='postgres://english:english@localhost:5433/english?sslmode=disable'
+export TEST_REDIS_URL='redis://localhost:6381/0'
+make test-integration      # go test ./... -count=1 -v -run Integration -p 1
+```
+
+Result: `--- PASS` for every `TestIntegration*` across `auth`, `store` and `quests` (including
+`TestIntegrationDailyAndProgressAgainstRealServices`), no `--- SKIP`. `docker compose down` afterward;
+the scratch `backend/.env` was deleted; the owner's `scio3-redis-1` / `mls-demo-redis` containers were
+never touched (host ports 6379/6380 stayed free of this work).
+
+**Runtime proof** — booted the real binary against the same Postgres/Redis (port 18099, chosen because
+another concurrent agent already held 8099 on this machine), minted a real HS256 JWT with
+`auth.NewTokenIssuer` and `JWT_SECRET`, wrote the matching Redis session with
+`auth.NewRedisSessionStore`, and seeded a demo roadmap with `store.SeedDemoRoadmap` — all through a
+throwaway `cmd/devtoken` program deleted before pushing (not part of the plan's file structure):
+
+- `GET /healthz` → 200.
+- `GET /api/v1/quests/daily` with no `Authorization` header → `401 {"error":"unauthorized"}`.
+- `GET /api/v1/quests/daily` with the real bearer token → `200`, day 1, 3 tasks (vocabulary/reading/practice),
+  `accumulated_seconds:0`, `is_target_met:false`.
+- `POST /api/v1/quests/progress` `{"exercise_id":"<vocabulary task>","duration_seconds":600}` → `200
+  {"daily_seconds_spent":600,"daily_minutes_spent":10,"is_target_met":false,"pet_health":100,"streak_count":0}`.
+- `POST /api/v1/quests/progress` `{"exercise_id":"<vocabulary task>","duration_seconds":1200}` (crosses
+  1800s) → `200 {"daily_seconds_spent":1800,"daily_minutes_spent":30,"is_target_met":true,"pet_health":100,"streak_count":0}`
+  (pet fields are `NopPet`'s §3.2 defaults, as expected — no pet slice yet).
+- `GET /api/v1/quests/daily` again → `accumulated_seconds:1800`, `is_target_met:true`, the vocabulary
+  task now `is_completed:true`, the other two still `false`.
+
+Binary shut down and the throwaway `cmd/devtoken` directory removed afterward; `git status --short` in
+the worktree was clean before every commit and after cleanup.
+
+Pushed `harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording`.
+
+**PR:** `gh pr create` failed as expected (`GraphQL: must be a collaborator (createPullRequest)`), and
+label creation also failed with `HTTP 404: Not Found`, consistent with the same access restriction. Skip
+recorded (`pr=skipped-not-a-collaborator`).
+
+**CI:** green on the pushed branch — <https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35749993289>
+(`backend-unit` 18s, `backend-integration` 34s, `harness-tooling` 7s, all `✓`).
