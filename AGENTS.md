@@ -10,6 +10,10 @@ An adaptive English-learning PWA (spec: `1st-thinking-architecture-doc.md`) buil
 
 Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pass markdown artifacts through `harness/`. Status lives in each file's frontmatter; `harness/STATE.md` is a generated dashboard. All state changes go through `python3 tools/harness/cli.py` — never hand-edit frontmatter. Read `harness/CODEMAP.md` before exploring code.
 
+## Reading the spec
+
+`1st-thinking-architecture-doc.md` was pasted from a rich-text editor: headings and symbols are backslash-escaped (`\#\# 7\.` is §7, `\+` is `+`) and Go code lost its indentation. §7 (REST endpoints) and §8 (deployment) exist — search with `rg -n '7\\\. Core REST'` or by content, not by `^## `. Treat §6.2 Go as pseudocode.
+
 ## Rules every role follows
 
 - Never modify the main checkout's app code; executors work in `.worktrees/<slug>` on `harness/*` branches.
