@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/_inbox/a-rejected-post-quests-progress-still-writes-redis-and-daily.md
-status: approved
+status: done
 priority: high
 merged: false
 amends: harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
+branch: harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording
+worktree: .worktrees/quests-daily-quest-suite-and-progress-recording
 ---
 # Quests amend: validate before writing, bound duration_seconds, DST-safe day_number — Plan
 
@@ -1101,3 +1103,87 @@ harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording` shows `
 - **The blocked plan's `## Notes`** ("Server-side plausibility limits … would be a separate, product-level decision") is now
   decided by this plan: 3600 per call, 86400 per day. The executor should not edit the original plan; the amend relation is in
   this plan's frontmatter.
+
+## Execution summary
+
+Executed in the amended plan's existing worktree/branch as instructed — no new branch or worktree. All five tasks landed exactly
+as written, no deviations, five commits on top of `ef4b9fa`:
+
+```
+4d4b00c quests: integration-test the review's reproductions; CODEMAP
+89dd878 quests: test the Redis-down and upsert-failure paths
+551770a quests: bound duration_seconds per call (3600) and per day (86400)
+4f39f85 quests: check exercise ownership and day before any progress write
+3c760b3 quests: DayNumber counts calendar days, not elapsed hours
+```
+
+One process note, not a plan deviation: the harness's single global lock (`harness/.lock`) was held by a concurrent
+executor (the airouter plan) when this task started; execution was paused and resumed once it was released, per the
+skill's "another executor is running; report and stop" rule.
+
+**Plan Verification output** (run from the worktree; all matched the plan's expected values):
+
+```
+go build ./... && go vet ./...                     # no output
+env -u TEST_DATABASE_URL -u TEST_REDIS_URL -u DATABASE_URL -u REDIS_URL go test ./... -count=1
+  # ok: auth, config, health, quests, store — no service needed
+go test ./internal/quests/... -run 'DSTTransitions' -v | grep -c -- '--- PASS'                          # 17
+go test ./internal/quests/... -run 'RejectsAnExerciseOutsideTheActiveRoadmap|RejectsAnExerciseFromAnotherDay|Returns404ForAnUnknownExercise' -v | grep -c -- '--- PASS'   # 3
+go test ./internal/quests/... -run 'OutOfRangeDuration|MaximumPerCallDuration|DailyCeiling|RejectsABadBody' -v | grep -c -- '--- PASS'   # 4
+go test ./internal/quests/... -run 'IncrementsRedisBeforeWritingPostgres|CrossingExactly1800|FurtherProgress' -v | grep -c -- '--- PASS'  # 3
+go test ./internal/quests/... -run 'RedisFailureWritesNothing|UpsertFailureAfterTheIncrby' -v | grep -c -- '--- PASS'   # 2
+grep -n 'MaxDurationSeconds = 3600\|MaxDailySeconds = 86400' internal/quests/day.go     # 2 hits
+grep -c 'CheckExercise' internal/quests/repo.go internal/quests/service.go             # repo.go:3 service.go:3
+grep -n 'ErrInvalidDuration' internal/quests/handler.go                                # 1 hit
+grep -c 'len(h.log.calls) != 0' internal/quests/service_test.go internal/quests/handler_test.go   # service_test.go:5 handler_test.go:2
+grep -n 'markErr' internal/quests/*_test.go                                            # no hits
+grep -n 'Hours()/24' internal/quests/day.go                                            # no hits
+grep -n '"duration_seconds"\|"user_answers"' internal/quests/handler.go                # 2 hits
+grep -n '"daily_seconds_spent"\|"daily_minutes_spent"\|"pet_health"\|"streak_count"' internal/quests/service.go   # 4 hits
+grep -rn --include='*.go' --exclude='*_test.go' '"total_seconds"\|"target_met"\|"newly_met"\|"exercises"\|"seconds"' internal/quests/   # no hits
+python3 tools/harness/cli.py validate; echo exit=$?     # exit=0
+git log --oneline ef4b9fa..HEAD    # 5 commits, each carrying the trailer
+git status --short                 # clean
+```
+
+**Integration (service level, real Postgres/Redis on scratch ports POSTGRES_PORT=5434 REDIS_PORT=6382 — 5433/6381 and
+8099/18099 were in use by another concurrent agent; 6379/6380 are the owner's unrelated containers and were never touched):**
+
+```
+POSTGRES_PORT=5434 REDIS_PORT=6382 docker compose up -d --wait
+TEST_DATABASE_URL='postgres://english:english@localhost:5434/english?sslmode=disable'
+TEST_REDIS_URL='redis://localhost:6382/0'
+make test-integration
+```
+Result: `--- PASS` for every `TestIntegration*` (auth, quests — including `TestIntegrationDailyAndProgressAgainstRealServices`
+with both review reproductions, store), no `--- SKIP`, no `FAIL`.
+
+**Runtime proof** (real binary on port 18201, real HS256 bearer + Redis session via a throwaway `cmd/devtoken` seeding two
+users' demo roadmaps, deleted before committing — mirrors the review's reproductions live):
+
+- `GET /healthz` → `200`.
+- `POST /quests/progress` (user A's own day-1 exercise, 1800s) → `200 {"daily_seconds_spent":1800,"daily_minutes_spent":30,"is_target_met":true,"pet_health":100,"streak_count":0}`.
+- **Blocker 1** — `POST /quests/progress` against user B's real exercise → `404`; `GET /quests/daily` still shows
+  `"accumulated_seconds":1800`; `redis-cli GET daily:accumulated:<uid>:<day>` → `"1800"`; `psql … daily_progress` →
+  `30|t` — all unchanged (the review had seen `2799` / `46|t` here).
+- **Blocker 2** — `duration_seconds` 3601, 1e9, 1e14 → three `400 {"error":"invalid_request"}`; Redis still `"1800"`
+  afterward; a following ordinary 60s report → `200 {"daily_seconds_spent":1860,"daily_minutes_spent":31,"is_target_met":true,...}`
+  (the review had seen `500` here — the day was bricked).
+
+Server and scratch stack shut down afterward (`docker compose down`); `backend/.env` and `backend/cmd/devtoken/` deleted;
+also verified `make up`/`make down` (the documented commands, not just raw `docker compose`) work correctly against the
+scratch ports. `git status --short` in the worktree was clean before every commit and after cleanup.
+
+**PR:** skipped per the amending-plan rule (branch already carries the original slice's PR relationship;
+`pr=skipped-not-a-collaborator` on the original plan).
+
+**CI:** pushed `harness/2026-09-22-high-quests-daily-quest-suite-and-progress-recording`
+(`ee99b1a..4d4b00c`). Green: <https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35755768316>
+(`backend-unit` 19s ✓, `backend-integration` 33s ✓, `harness-tooling` 6s ✓, conclusion `success`).
+
+**Blockers check** (after `status=done`):
+
+```
+$ python3 tools/harness/cli.py blockers --plan harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md
+exit=0
+```
