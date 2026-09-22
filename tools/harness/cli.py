@@ -133,11 +133,29 @@ def _coerce(v):
     return v
 
 
+def cmd_blockers(a):
+    res = scan(".")
+    plans = [p for p in res.plans if not a.plan or p.rel == a.plan]
+    found = False
+    for plan in plans:
+        for b in res.blockers_for(plan.rel):
+            found = True
+            print(f"{b.rel}\tblocks\t{plan.rel}")
+    return 1 if found else 0
+
+
 def cmd_set(a):
     kind = kind_of(a.file)
     if not kind:
         print("error: not a harness artifact"); return 1
     fm, body = read(a.file)
+    if kind == "plan" and any(kv == "merged=true" for kv in a.pairs):
+        blockers = scan(".").blockers_for(a.file)
+        if blockers:
+            print("error: cannot mark merged — unresolved blockers:")
+            for b in blockers:
+                print(f"  {b.rel}")
+            return 1
     for kv in a.pairs:
         k, _, v = kv.partition("=")
         v = _coerce(v)
@@ -210,6 +228,7 @@ def main(argv=None):
     p = sub.add_parser("set"); p.add_argument("file"); p.add_argument("pairs", nargs="+"); p.set_defaults(fn=cmd_set)
     p = sub.add_parser("next"); p.add_argument("--stage", required=True, choices=["evaluate", "execute", "review"])
     p.add_argument("--all", action="store_true"); p.set_defaults(fn=cmd_next)
+    p = sub.add_parser("blockers"); p.add_argument("--plan"); p.set_defaults(fn=cmd_blockers)
     p = sub.add_parser("lock"); p.add_argument("plan"); p.set_defaults(fn=cmd_lock)
     sub.add_parser("unlock").set_defaults(fn=cmd_unlock)
     sub.add_parser("stale-worktrees").set_defaults(fn=cmd_stale_worktrees)

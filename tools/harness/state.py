@@ -24,6 +24,11 @@ def render_state(res):
         out.extend(items if items else [empty])
 
     section("Invalid", [f"- `{a.rel}` — " + "; ".join(a.errors) for a in res.invalid])
+    blocked = []
+    for plan in res.plans:
+        for b in res.blockers_for(plan.rel):
+            blocked.append(f"- `{b.rel}` — {b.title} — blocks `{plan.rel}`")
+    section("Blockers (merge refused until fixed)", blocked)
     section("Inbox", [_line(a) for a in res.ideas if "/_inbox/" in a.rel])
     section("Proposed", [_line(a) for a in res.ideas if a.fm["status"] == "proposed" and "/_inbox/" not in a.rel])
     section("Selected", [_line(a) for a in res.ideas if a.fm["status"] == "selected"])

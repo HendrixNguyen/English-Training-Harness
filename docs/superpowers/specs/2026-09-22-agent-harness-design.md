@@ -77,6 +77,26 @@ design: harness/designs/<slug>.md    # UI features only
 ```
 Body is the `writing-plans` format: bite-sized tasks with verification steps. On completion the executor appends `## Execution summary` (built, deviations + why, verification evidence). On failure it appends `## Failure` (tried, blocker).
 
+### 3.2b Blockers — the fast path for merge-blocking review findings
+
+Most reviewer-filed bugs wait for the next ideation run, so bugs and features get ranked together (§4). A **blocker** is the exception: a finding that means the branch under review must not merge as it stands — data loss, a broken developer workflow, a security hole, a dishonest test.
+
+A blocker is an ordinary bug idea with two extra constraints, enforced by `schema.py`:
+
+```yaml
+type: bug
+priority: high                       # required for a blocker
+blocks: harness/plans/<blocked>.md   # the plan whose branch it holds up
+```
+
+It changes three things:
+
+1. **It skips the ideation queue.** The evaluator takes blockers first (`cli.py blockers`), because an unmerged branch is waiting on them.
+2. **Its plan amends the branch, not `main`.** The evaluator sets `amends: <blocked plan>` on the fix plan; the executor then works in that plan's *existing* worktree and branch instead of creating new ones, so the fix lands in the history the reviewer blocked.
+3. **It stops the merge mechanically.** `cli.py set <plan> merged=true` refuses while `blockers_for(plan)` is non-empty, and `/harness merge` checks the same thing. A blocker is resolved when its own fix plan reaches `done`.
+
+`STATE.md` lists unresolved blockers in their own section above Inbox.
+
 ### 3.3 Review — `harness/reviews/<date>-<slug>.md`
 
 ```yaml
@@ -121,7 +141,8 @@ Checks code against plan **and** plan against idea. Each bug becomes an idea fil
 | `selected` → `planned`; plan created `draft` | evaluator |
 | plan `draft` → `approved` | human (`/approve`); orchestrator `--auto-approve` for `priority: high` bugs and `mvp-slice` only |
 | `approved` → `executing` → `done` / `failed` | executor |
-| review written; bugs → `_inbox/` | reviewer |
+| review written; bugs → `_inbox/`; blockers get `blocks:` | reviewer |
+| blocker → fix plan with `amends:`, executed on the same branch | evaluator, then executor |
 | `failed` → `approved` (after human edit) or idea `rejected` | human only |
 
 ## 6. Commands and orchestration
@@ -139,6 +160,7 @@ Checks code against plan **and** plan against idea. Each bug becomes an idea fil
 | `/harness status` | Regenerate + print `STATE.md`, list stale worktrees |
 | `/harness merge <plan>` | Human-only: merge branch into `main` (`--no-ff`), push `main`, remove worktree, delete branch, set `merged: true` |
 | `/harness prune` | Remove worktrees of merged plans |
+| `cli.py blockers [--plan P]` | List unresolved blockers; exit 1 if any (used by merge and by the orchestrator) |
 
 **Orchestrator:** `/harness run [--auto-approve] [--stages a,b,c]`
 
@@ -159,7 +181,7 @@ One execute per run bounds each scheduled tick to a reviewable diff. The orchest
 | Failure | Handling |
 |---|---|
 | Executor blocked | Plan `failed` + `## Failure`. Branch and worktree kept. Never auto-retried; surfaces in STATE.md until human acts. |
-| Review `fail` | Plan stays `done`, unmerged; worktree kept for inspection; high-priority bug in `_inbox/` referencing the plan. |
+| Review `fail` | Plan stays `done`, unmerged; worktree kept for inspection; at least one **blocker** (§3.2b) filed against the plan, which mechanically prevents the merge. |
 | Malformed frontmatter | Listed under Invalid in STATE.md, skipped. Never consumed silently. |
 | No GitHub remote / `gh` not authenticated | Push and PR steps skipped, noted in execution summary; pipeline continues locally. |
 | Concurrent executors | `harness/.lock` holds plan path; second executor exits. Lock older than 2h is stale. Separate worktrees mean a stale lock never corrupts another plan's files. |

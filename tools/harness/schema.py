@@ -63,6 +63,14 @@ def validate(kind, fm):
         if k in fm and fm[k] is not None and fm[k] not in allowed:
             errs.append(f"{k}: '{fm[k]}' not in {allowed}")
     if kind == "idea":
+        if fm.get("blocks"):
+            # A blocker is a review finding that must be fixed before its plan's
+            # branch may be merged. It takes the fast path: straight to the
+            # evaluator, never waiting for the next ideation run.
+            if fm.get("type") != "bug":
+                errs.append("blocks is only valid on a bug")
+            if fm.get("priority") != "high":
+                errs.append("a blocker must be priority high")
         if fm.get("status") == "rejected" and not fm.get("rejected_reason"):
             errs.append("rejected idea needs rejected_reason")
         if fm.get("type") == "mvp-slice" and not isinstance(fm.get("order"), int):

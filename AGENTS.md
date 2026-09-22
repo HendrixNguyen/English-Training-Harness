@@ -18,6 +18,7 @@ Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pa
 
 - Never modify the main checkout's app code; executors work in `.worktrees/<slug>` on `harness/*` branches.
 - Never merge to `main`. Only a human runs `/harness merge`.
+- A review finding that must be fixed before its branch can merge is a **blocker**: `type: bug`, `priority: high`, `blocks: <plan>`. Blockers skip the ideation queue and go straight to the evaluator; their plan sets `amends: <plan>` and lands on the same branch. `cli.py` refuses `merged=true` while any are unresolved.
 - Pushing `harness/*` branches and opening Draft PRs is allowed without asking. Pushing `main` is not.
 - Token discipline: CODEMAP → `rg`/`grep -n` with tight patterns → read only matched ranges. Never `cat` a directory.
 - Tooling caveats on this machine: `rg` is **not installed** — use `grep -n` / `grep -c`. An output-rewriting proxy (rtk) wraps shell commands and can mangle `ls` output — capture directory names with shell globs, `find`, or `python3`, never `$(ls …)`.
@@ -39,6 +40,7 @@ python3 tools/harness/cli.py new-plan --idea FILE     # -> harness/plans/<date>-
 python3 tools/harness/cli.py new-review --plan FILE --verdict pass|pass-with-bugs|fail
 python3 tools/harness/cli.py set FILE key=value ...   # frontmatter update with validation
 python3 tools/harness/cli.py next --stage evaluate|execute|review
+python3 tools/harness/cli.py blockers [--plan FILE]     # exit 1 if any unresolved
 python3 tools/harness/cli.py lock PLAN | unlock
 python3 tools/harness/cli.py slug "Title"
 python3 tools/harness/cli.py stale-worktrees

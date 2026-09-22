@@ -13,7 +13,8 @@ Adopt `.agents/roles/reviewer.md`. Input: a plan path, or nothing (then `PLAN=$(
 2. Read the plan (including its execution summary), its idea, its design if any, `harness/CODEMAP.md`. Note `branch`, `worktree`, `pr`.
 3. `cd <worktree>`; `git diff main...<branch> --stat`; run the project's build/tests and the plan's *Verification* commands. Record real output.
 4. Walk the diff against the plan tasks (code-review skill; typescript-review for Nuxt code). Walk the idea's Expected output against the result.
-5. For each bug found: `RUN=harness/ideas/_inbox` — `python3 tools/harness/cli.py new-idea --run harness/ideas/_inbox --title "<bug title>" --type bug --source reviewer --priority <high|medium|low>`, then `python3 tools/harness/cli.py set <file> run=_inbox` and fill the body (*Why* = impact, *Expected output* = correct behaviour, *Evidence* = plan path, file:line, failing command).
+5. For each bug found: `python3 tools/harness/cli.py new-idea --run harness/ideas/_inbox --title "<bug title>" --type bug --source reviewer --priority <high|medium|low>`, then fill the body (*Why* = impact, *Expected output* = correct behaviour, *Evidence* = plan path, file:line, failing command).
+   - If the bug must be fixed before this branch can merge, make it a **blocker**: `--priority high`, then `python3 tools/harness/cli.py set <file> blocks=$PLAN`. Verify with `python3 tools/harness/cli.py blockers --plan $PLAN` (exit 1 while any are unresolved).
 6. Decide the verdict per the role. `REV=$(python3 tools/harness/cli.py new-review --plan $PLAN --verdict <v> --bugs <bug paths…>)`; fill the review body sections, paste verification output under *Code vs plan*.
 7. If CODEMAP needs correction: edit it in the worktree and commit on the branch.
 8. **PR** (skip with a note if the plan has no `pr`): `gh pr comment <pr> --body "<verdict + 3-line summary + path to review file>"`; on `pass` or `pass-with-bugs`: `gh pr ready <pr>`. On `fail` leave it Draft.

@@ -90,6 +90,41 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.run_cli("unlock")[0], 0)
         self.assertFalse(pathlib.Path("harness/.lock").exists())
 
+    def test_blocker_refuses_merge_until_fixed(self):
+        _, run = self.run_cli("new-run")
+        # the slice that was built and reviewed
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Slice", "--type", "mvp-slice", "--source", "ideator", "--order", "1")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, plan = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", plan, f"status={st}")
+        # reviewer files a merge-blocking bug against it
+        _, bug = self.run_cli("new-idea", "--run", run, "--title", "Drops tables", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        self.assertEqual(self.run_cli("set", bug, f"blocks={plan}")[0], 0)
+        code, out = self.run_cli("blockers", "--plan", plan)
+        self.assertEqual(code, 1)
+        self.assertIn(bug, out)
+        # merge is refused while the blocker is unfixed
+        code, out = self.run_cli("set", plan, "merged=true")
+        self.assertEqual(code, 1)
+        self.assertIn("unresolved blockers", out)
+        self.assertIs(read_fm(plan)["merged"], False)
+        # fixing it: the blocker gets its own plan, executed to done
+        self.run_cli("set", bug, "status=selected")
+        _, fix = self.run_cli("new-plan", "--idea", bug)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", fix, f"status={st}")
+        self.assertEqual(self.run_cli("blockers", "--plan", plan)[0], 0)
+        self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
+        self.assertIs(read_fm(plan)["merged"], True)
+
+    def test_blocker_must_be_high_priority_bug(self):
+        _, run = self.run_cli("new-run")
+        _, feat = self.run_cli("new-idea", "--run", run, "--title", "Feat", "--type", "feature", "--source", "ideator", "--priority", "high")
+        self.assertEqual(self.run_cli("set", feat, "blocks=harness/plans/x.md")[0], 1)
+        _, low = self.run_cli("new-idea", "--run", run, "--title", "Low bug", "--type", "bug", "--source", "reviewer", "--priority", "low")
+        self.assertEqual(self.run_cli("set", low, "blocks=harness/plans/x.md")[0], 1)
+
     def test_state_writes_file(self):
         self.run_cli("state")
         self.assertIn("# Harness state", pathlib.Path("harness/STATE.md").read_text())

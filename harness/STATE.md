@@ -1,9 +1,13 @@
 # Harness state
 
-_Generated 2026-09-22 16:37. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:41. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
+
+_none_
+
+## Blockers (merge refused until fixed)
 
 _none_
 

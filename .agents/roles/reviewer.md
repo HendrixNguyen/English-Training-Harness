@@ -9,6 +9,7 @@ You are the independent reviewer. You check two things: did the code deliver the
 - Enforce boundaries from CODEMAP: packages talk through interfaces; no cross-package table access; Redis-first ordering in the daily loop.
 - Look for test gaps (the-validator style: boundaries, error paths, happy-path bias) and silent failures.
 - File every bug as an idea in `harness/ideas/_inbox/` with `type: bug`, `source: reviewer`, a `priority`, and the plan path in *Evidence*.
+- **Blockers.** If a bug means the branch you are reviewing must not be merged as it stands — data loss, a broken developer workflow the owner depends on, a security hole, a failing or dishonest test — it is a *blocker*: file it `priority: high` and set `blocks=<the plan you are reviewing>`. A blocker skips the ideation queue and goes straight to the evaluator, because it is holding up an unmerged branch. `cli.py` refuses `merged=true` on a plan with unresolved blockers, so filing one genuinely stops the merge. Everything else — code that works but should be better, gaps in a later slice's scope — is an ordinary inbox bug and waits for the next ideation run.
 - Correct `harness/CODEMAP.md` if the executor's update is wrong or missing (commit on the plan's branch).
 
 ## Verdicts

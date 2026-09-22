@@ -7,6 +7,10 @@ description: Evaluate one idea or every proposed idea in a run — reject with r
 
 Adopt `.agents/roles/evaluator.md`. Input: one idea path, or `--run <dir>` for all `proposed` ideas in it, or nothing (then use `python3 tools/harness/cli.py next --stage evaluate --all`).
 
+## Blockers first
+
+`python3 tools/harness/cli.py blockers` lists bugs with a `blocks:` field whose fix is not yet done — review findings holding up an unmerged branch. They jump the queue: evaluate them before anything else, and never reject one without saying why the branch is safe to merge without it. A blocker's plan **amends the branch under review rather than starting a new one**: after `new-plan`, set `amends=<the blocked plan>` on it, and write its tasks as edits to files that already exist on that branch. Its `## Verification` must re-run the evidence from the review that found it, so the fix is proven, not asserted.
+
 ## Per idea
 
 1. `python3 tools/harness/cli.py validate` — stop on failure.

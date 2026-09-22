@@ -27,6 +27,20 @@ class ScanResult:
     def reviews_for(self, plan_rel):
         return [r for r in self.reviews if r.fm.get("plan") == plan_rel]
 
+    def plan_for_idea(self, idea_rel):
+        return next((p for p in self.plans if p.fm.get("idea") == idea_rel), None)
+
+    def blockers_for(self, plan_rel):
+        """Blocker ideas for plan_rel whose own fix plan is not yet done."""
+        out = []
+        for i in self.ideas:
+            if i.fm.get("blocks") != plan_rel:
+                continue
+            fix = self.plan_for_idea(i.rel)
+            if fix is None or fix.fm.get("status") != "done":
+                out.append(i)
+        return out
+
 
 def _title(body):
     for line in body.splitlines():
