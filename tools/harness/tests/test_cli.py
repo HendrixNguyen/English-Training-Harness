@@ -81,6 +81,20 @@ class CliTests(unittest.TestCase):
         self.assertEqual(read_fm(rev)["plan"], plan)
         self.assertEqual(self.run_cli("next", "--stage", "review")[1], "")
 
+    def test_new_review_does_not_overwrite_a_same_day_review(self):
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Slice", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, plan = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", plan, f"status={st}")
+        _, first = self.run_cli("new-review", "--plan", plan, "--verdict", "fail")
+        _, second = self.run_cli("new-review", "--plan", plan, "--verdict", "pass")
+        self.assertNotEqual(first, second)
+        self.assertTrue(pathlib.Path(first).exists())
+        self.assertEqual(read_fm(first)["verdict"], "fail")
+        self.assertEqual(read_fm(second)["verdict"], "pass")
+
     def test_lock_unlock_and_stale(self):
         self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 0)
         self.assertEqual(self.run_cli("lock", "harness/plans/b.md")[0], 1)

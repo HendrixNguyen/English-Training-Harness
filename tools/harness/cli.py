@@ -118,6 +118,12 @@ def cmd_new_review(a):
     title = next((l[2:].strip() for l in pbody.splitlines() if l.startswith("# ")), "untitled").replace(" — Plan", "")
     slug = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", pathlib.Path(a.plan).stem)
     path = pathlib.Path("harness/reviews") / f"{today()}-{slug}.md"
+    # A re-review of the same plan on the same day must not overwrite the first
+    # one: the earlier review is the record of what was found and fixed.
+    n = 2
+    while path.exists():
+        path = pathlib.Path("harness/reviews") / f"{today()}-{slug}-{n}.md"
+        n += 1
     fm = {"plan": a.plan, "verdict": a.verdict, "bugs": a.bugs or []}
     body = template("review", title=title, plan=a.plan, branch=pfm.get("branch") or "-", worktree=pfm.get("worktree") or "-")
     code = write(path, fm, body)
