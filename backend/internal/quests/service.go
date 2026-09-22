@@ -2,6 +2,7 @@ package quests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -111,5 +112,96 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 		PetHealth:         pet.Health,
 		StreakCount:       pet.Streak,
 		NewlyMet:          newlyMet,
+	}, nil
+}
+
+// DefaultTaskMinutes is the §6.2 task length ("3x 10-min tasks"), used when an
+// exercise's content_json carries no duration_minutes.
+const DefaultTaskMinutes = 10
+
+// Task is one entry of the GET /api/v1/quests/daily `tasks` array (backend spec
+// §6.2). title and duration_minutes are not §3.2 columns; toTask reads them
+// from content_json.
+type Task struct {
+	ID              string          `json:"id"`
+	TaskType        string          `json:"task_type"`
+	Title           string          `json:"title"`
+	DurationMinutes int             `json:"duration_minutes"`
+	IsCompleted     bool            `json:"is_completed"`
+	ContentJSON     json.RawMessage `json:"content_json"`
+}
+
+// DailySuite is the GET /api/v1/quests/daily 200 body — backend spec §6.2,
+// field for field.
+type DailySuite struct {
+	Date                 string `json:"date"`
+	DayNumber            int    `json:"day_number"`
+	TotalMinutesRequired int    `json:"total_minutes_required"`
+	AccumulatedSeconds   int64  `json:"accumulated_seconds"`
+	IsTargetMet          bool   `json:"is_target_met"`
+	Tasks                []Task `json:"tasks"`
+}
+
+// toTask maps a §3.2 exercises row onto the §6.2 task DTO. A missing title is
+// "", a missing or non-positive duration is DefaultTaskMinutes. Malformed
+// content_json is the generator's bug, not a reason to 500 the whole day, so the
+// unmarshal error is deliberately ignored and the defaults apply.
+func toTask(e Exercise) Task {
+	var meta struct {
+		Title           string `json:"title"`
+		DurationMinutes int    `json:"duration_minutes"`
+	}
+	_ = json.Unmarshal(e.ContentJSON, &meta)
+	if meta.DurationMinutes <= 0 {
+		meta.DurationMinutes = DefaultTaskMinutes
+	}
+	return Task{
+		ID:              e.ID,
+		TaskType:        e.TaskType,
+		Title:           meta.Title,
+		DurationMinutes: meta.DurationMinutes,
+		IsCompleted:     e.IsCompleted,
+		ContentJSON:     e.ContentJSON,
+	}
+}
+
+// Daily resolves the active roadmap, computes today's day_number in the user's
+// timezone and returns that day's tasks plus today's running total.
+func (s *Service) Daily(ctx context.Context, userID string) (DailySuite, error) {
+	profile, err := s.quests.Profile(ctx, userID)
+	if err != nil {
+		return DailySuite{}, err
+	}
+	roadmap, err := s.quests.ActiveRoadmap(ctx, userID)
+	if err != nil {
+		return DailySuite{}, err
+	}
+
+	loc := Location(profile.Timezone)
+	now := s.now()
+	date := LocalDate(now, loc)
+	day := DayNumber(roadmap.CreatedAt, now, loc)
+
+	exercises, err := s.quests.ExercisesForDay(ctx, roadmap.ID, day)
+	if err != nil {
+		return DailySuite{}, err
+	}
+	total, err := s.counter.Total(ctx, userID, date)
+	if err != nil {
+		return DailySuite{}, err
+	}
+
+	tasks := make([]Task, 0, len(exercises)) // never nil: serialises as []
+	for _, e := range exercises {
+		tasks = append(tasks, toTask(e))
+	}
+
+	return DailySuite{
+		Date:                 date,
+		DayNumber:            day,
+		TotalMinutesRequired: TargetSeconds / 60,
+		AccumulatedSeconds:   total,
+		IsTargetMet:          total >= TargetSeconds,
+		Tasks:                tasks,
 	}, nil
 }

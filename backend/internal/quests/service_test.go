@@ -2,6 +2,7 @@ package quests
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -230,5 +231,129 @@ func TestRecordProgressWithoutAnActiveRoadmap(t *testing.T) {
 
 	if _, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 600); !errors.Is(err, ErrNoActiveRoadmap) {
 		t.Fatalf("err = %v, want ErrNoActiveRoadmap", err)
+	}
+}
+
+func TestDailyReturnsTodaysThreeTasksAndTheRunningTotal(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	// Roadmap created 24h ago → day 2.
+	if _, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 900); err != nil {
+		t.Fatalf("seeding progress: %v", err)
+	}
+
+	got, err := h.svc.Daily(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("Daily() = %v", err)
+	}
+	if got.Date != "2026-09-22" {
+		t.Errorf("Date = %q, want 2026-09-22", got.Date)
+	}
+	if got.DayNumber != 2 {
+		t.Errorf("DayNumber = %d, want 2", got.DayNumber)
+	}
+	if got.TotalMinutesRequired != 30 {
+		t.Errorf("TotalMinutesRequired = %d, want 30 (§6.2)", got.TotalMinutesRequired)
+	}
+	if len(got.Tasks) != 3 {
+		t.Fatalf("len(Tasks) = %d, want 3", len(got.Tasks))
+	}
+	if got.AccumulatedSeconds != 900 || got.IsTargetMet {
+		t.Errorf("accumulated = %d isTargetMet = %t, want 900/false", got.AccumulatedSeconds, got.IsTargetMet)
+	}
+	seen := map[string]bool{}
+	for _, task := range got.Tasks {
+		seen[task.TaskType] = true
+		if task.DurationMinutes != DefaultTaskMinutes {
+			t.Errorf("task %s DurationMinutes = %d, want the %d-minute default", task.ID, task.DurationMinutes, DefaultTaskMinutes)
+		}
+	}
+	for _, want := range []string{"vocabulary", "reading", "practice"} {
+		if !seen[want] {
+			t.Errorf("missing the %s task", want)
+		}
+	}
+}
+
+func TestDailyDateIsTheUsersLocalDate(t *testing.T) {
+	// 18:30Z is already the 23rd in Ho Chi Minh City; §6.2's `date` must agree
+	// with the day the counter and daily_progress are keyed on.
+	h := newHarness(t, time.Date(2026, time.September, 22, 18, 30, 0, 0, time.UTC))
+	h.quests.timezone = "Asia/Ho_Chi_Minh"
+
+	got, err := h.svc.Daily(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("Daily() = %v", err)
+	}
+	if got.Date != "2026-09-23" {
+		t.Errorf("Date = %q, want 2026-09-23", got.Date)
+	}
+}
+
+func TestDailyWithoutAnActiveRoadmap(t *testing.T) {
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+	h.quests.roadmap = nil
+
+	if _, err := h.svc.Daily(context.Background(), "u1"); !errors.Is(err, ErrNoActiveRoadmap) {
+		t.Fatalf("err = %v, want ErrNoActiveRoadmap", err)
+	}
+}
+
+func TestDailyClampsPastDay28(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	h.quests.roadmap = &Roadmap{ID: "rm-1", CreatedAt: now.Add(-90 * 24 * time.Hour)}
+	h.quests.exercises[28] = demoExercises(28)
+
+	got, err := h.svc.Daily(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("Daily() = %v", err)
+	}
+	if got.DayNumber != 28 {
+		t.Errorf("DayNumber = %d, want 28 (clamped)", got.DayNumber)
+	}
+	if len(got.Tasks) != 3 {
+		t.Errorf("len(Tasks) = %d, want 3", len(got.Tasks))
+	}
+}
+
+func TestDailyWithNoRowsForTheDayReturnsAnEmptyList(t *testing.T) {
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+	delete(h.quests.exercises, 2)
+
+	got, err := h.svc.Daily(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("Daily() = %v", err)
+	}
+	if got.Tasks == nil || len(got.Tasks) != 0 {
+		t.Errorf("Tasks = %#v, want an empty non-nil slice (serialises as [])", got.Tasks)
+	}
+}
+
+func TestTaskTitleAndDurationComeFromContentJSON(t *testing.T) {
+	// §6.2 puts title and duration_minutes on each task; §3.2 has no such
+	// columns, so they ride inside content_json.
+	rich := toTask(Exercise{
+		ID: "ex-1", TaskType: "vocabulary", IsCompleted: true,
+		ContentJSON: json.RawMessage(`{"title":"10 Key Business Email Phrasings","duration_minutes":15,"words":[]}`),
+	})
+	if rich.ID != "ex-1" || rich.TaskType != "vocabulary" || !rich.IsCompleted {
+		t.Errorf("identity fields not copied: %+v", rich)
+	}
+	if rich.Title != "10 Key Business Email Phrasings" || rich.DurationMinutes != 15 {
+		t.Errorf("title/duration = %q/%d, want the content_json values", rich.Title, rich.DurationMinutes)
+	}
+	if string(rich.ContentJSON) != `{"title":"10 Key Business Email Phrasings","duration_minutes":15,"words":[]}` {
+		t.Errorf("ContentJSON was altered: %s", rich.ContentJSON)
+	}
+
+	bare := toTask(Exercise{ID: "ex-2", TaskType: "reading", ContentJSON: json.RawMessage(`{"passage":"..."}`)})
+	if bare.Title != "" || bare.DurationMinutes != DefaultTaskMinutes {
+		t.Errorf("bare task = %q/%d, want \"\"/%d", bare.Title, bare.DurationMinutes, DefaultTaskMinutes)
+	}
+
+	broken := toTask(Exercise{ID: "ex-3", TaskType: "practice", ContentJSON: json.RawMessage(`not json`)})
+	if broken.DurationMinutes != DefaultTaskMinutes {
+		t.Errorf("malformed content_json must still yield the default duration, got %d", broken.DurationMinutes)
 	}
 }
