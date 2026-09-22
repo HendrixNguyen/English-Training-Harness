@@ -20,6 +20,7 @@ Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pa
 - Never merge to `main`. Only a human runs `/harness merge`.
 - A review finding that must be fixed before its branch can merge is a **blocker**: `type: bug`, `priority: high`, `blocks: <plan>`. Blockers skip the ideation queue and go straight to the evaluator; their plan sets `amends: <plan>` and lands on the same branch. `cli.py` refuses `merged=true` while any are unresolved.
 - Pushing `harness/*` branches and opening Draft PRs is allowed without asking. Pushing `main` is not.
+- CI (`.github/workflows/ci.yml`) is the outer verification loop and must stay green: `backend-unit`, `backend-integration` and `harness-tooling` run on every PR and push to `main`. A red check on a `harness/*` PR is a review blocker. Never make a job pass by skipping, loosening or deleting a check — fix the code or the artifact it flagged.
 - Token discipline: CODEMAP → `rg`/`grep -n` with tight patterns → read only matched ranges. Never `cat` a directory.
 - Tooling caveats on this machine: `rg` is **not installed** — use `grep -n` / `grep -c`. An output-rewriting proxy (rtk) wraps shell commands and can mangle `ls` output — capture directory names with shell globs, `find`, or `python3`, never `$(ls …)`.
 - Files under `.agents/` and `harness/` are tool-neutral: say "spawn the evaluator role" or "load skill harness-evaluate", never name a specific tool.
