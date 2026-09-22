@@ -6,13 +6,16 @@ import (
 	"testing"
 )
 
-// requirePostgres skips the test when no database is configured. This is
-// deliberate: the default `go test ./...` run must not need live services.
+// requirePostgres skips the test unless the developer has explicitly nominated a
+// disposable database in TEST_DATABASE_URL. It deliberately does NOT read
+// DATABASE_URL: that is the production variable from spec §8, and these tests
+// drop every table (see reset). A plain `go test ./...` must never be
+// destructive, whatever the shell has exported.
 func requirePostgres(t *testing.T) *Postgres {
 	t.Helper()
-	url := os.Getenv("DATABASE_URL")
+	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("DATABASE_URL is unset; run `make up` and export it to run integration tests")
+		t.Skip("TEST_DATABASE_URL is unset; these tests DROP every table, so they only run against a database you nominate (see backend/.env.example)")
 	}
 	pg, err := NewPostgres(context.Background(), url)
 	if err != nil {
@@ -22,10 +25,27 @@ func requirePostgres(t *testing.T) *Postgres {
 	return pg
 }
 
+// requireRedisURL skips the test unless TEST_REDIS_URL nominates a disposable
+// Redis. Same reasoning as requirePostgres.
+func requireRedisURL(t *testing.T) string {
+	t.Helper()
+	url := os.Getenv("TEST_REDIS_URL")
+	if url == "" {
+		t.Skip("TEST_REDIS_URL is unset; run `make up` and export it to run integration tests")
+	}
+	return url
+}
+
 // reset drops everything 0001 creates plus the bookkeeping table, so each test
 // starts from an empty database.
 func reset(t *testing.T, pg *Postgres) {
 	t.Helper()
+	// Belt and braces: reset is the destructive step. Even if a future test
+	// reaches it by another path, it must not run against a database the
+	// developer did not nominate as disposable.
+	if os.Getenv("TEST_DATABASE_URL") == "" {
+		t.Fatal("reset called without TEST_DATABASE_URL; refusing to drop tables")
+	}
 	down, err := MigrationsFS.ReadFile("migrations/0001_init.down.sql")
 	if err != nil {
 		t.Fatalf("reading down migration: %v", err)
@@ -102,10 +122,7 @@ func TestIntegrationPetStatesRejectsASecondRowForTheSameUser(t *testing.T) {
 }
 
 func TestIntegrationRedisRoundTrip(t *testing.T) {
-	url := os.Getenv("REDIS_URL")
-	if url == "" {
-		t.Skip("REDIS_URL is unset; run `make up` and export it to run integration tests")
-	}
+	url := requireRedisURL(t)
 	rdb, err := NewRedis(context.Background(), url)
 	if err != nil {
 		t.Fatalf("NewRedis: %v", err)
