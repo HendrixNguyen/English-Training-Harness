@@ -3,7 +3,8 @@ type: bug
 status: proposed
 source: reviewer
 run: _inbox
-priority: medium
+priority: high
+blocks: harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md
 ---
 # cancel-in-progress cancels CI on main, the only ref CI actually runs on
 

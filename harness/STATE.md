@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 17:51. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 17:52. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,14 +9,15 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — blocks `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md`
+- `harness/ideas/_inbox/ci-never-runs-on-harness-branches-so-it-gates-nothing-before.md` — CI never runs on harness/* branches so it gates nothing before merge — blocks `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md`
 
 ## Inbox
 
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
-- `harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on [medium]
+- `harness/ideas/_inbox/cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on [high]
 - `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
-- `harness/ideas/_inbox/ci-never-runs-on-harness-branches-so-it-gates-nothing-before.md` — CI never runs on harness/* branches so it gates nothing before merge [medium]
+- `harness/ideas/_inbox/ci-never-runs-on-harness-branches-so-it-gates-nothing-before.md` — CI never runs on harness/* branches so it gates nothing before merge [high]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
 - `harness/ideas/_inbox/codemap-ci-section-overstates-the-unit-job-and-prescribes-a-.md` — CODEMAP CI section overstates the unit job and prescribes a racy local repro [low]
 - `harness/ideas/_inbox/docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally [high]
