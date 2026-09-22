@@ -13,6 +13,11 @@ const (
 	PlacementQuizTTL    = 2 * time.Hour
 	DailyAccumulatedTTL = 48 * time.Hour
 	AIRateLimitTTL      = time.Minute
+
+	// PetReviveTTL bounds the pet:revive hash. Not in spec §4 — chosen by the
+	// pet slice: the challenge is bound to the local day it started, and 24h is
+	// shorter than DailyAccumulatedTTL, whose counter the pass check reads.
+	PetReviveTTL = 24 * time.Hour
 )
 
 // WebPushDelayQueueKey is the single ZSET of scheduled reminders (spec §4).
@@ -33,3 +38,8 @@ func DailyAccumulatedKey(userID string, day time.Time) string {
 
 // AIRateLimitKey is ratelimit:ai:{user_id} (TTL AIRateLimitTTL, max 5 req/min).
 func AIRateLimitKey(userID string) string { return fmt.Sprintf("ratelimit:ai:%s", userID) }
+
+// PetReviveKey is pet:revive:{user_id} — the active 15-minute revival
+// challenge (Hash: started_at, local_date, start_seconds; TTL PetReviveTTL).
+// Not in spec §4; added by the pet slice and documented in CODEMAP.
+func PetReviveKey(userID string) string { return fmt.Sprintf("pet:revive:%s", userID) }
