@@ -5,10 +5,12 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
@@ -41,6 +43,13 @@ func main() {
 	}
 	if len(applied) > 0 {
 		log.Printf("migrations applied: %v", applied)
+	}
+
+	aiRouter := airouter.NewRouter(airouter.ConfigFromEnv(os.Getenv))
+	if providers := aiRouter.Providers(); len(providers) == 0 {
+		log.Printf("airouter: no provider API keys set; AI-backed routes will answer 503")
+	} else {
+		log.Printf("airouter: providers %v", providers)
 	}
 
 	r := gin.Default()
