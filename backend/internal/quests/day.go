@@ -33,11 +33,18 @@ func LocalDate(now time.Time, loc *time.Location) string {
 // DayNumber is the 1-based day of the roadmap, counted in calendar days in the
 // user's own timezone and clamped to 1..RoadmapDays. Clamping at the top means a
 // learner past day 28 keeps seeing day 28 — see the plan's open questions.
+//
+// It counts calendar days, not elapsed hours: the two local midnights are
+// re-expressed as UTC dates before subtracting, so a 23-hour spring-forward day
+// or a 25-hour fall-back day is still exactly one day. Dividing time.Sub by 24h
+// lost a day at every spring-forward (reviewer 2026-09-22).
 func DayNumber(createdAt, now time.Time, loc *time.Location) int {
 	start := startOfDay(createdAt, loc)
 	today := startOfDay(now, loc)
 
-	days := int(today.Sub(start).Hours()/24) + 1
+	su := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, time.UTC)
+	tu := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	days := int(tu.Sub(su)/(24*time.Hour)) + 1
 	if days < 1 {
 		return 1
 	}
