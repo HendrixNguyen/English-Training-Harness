@@ -2,7 +2,7 @@
 type: bug
 status: proposed
 source: reviewer
-run: _inbox
+run: 2026-09-22-run-02
 priority: low
 ---
 # Spec never states when the pet_states row is created

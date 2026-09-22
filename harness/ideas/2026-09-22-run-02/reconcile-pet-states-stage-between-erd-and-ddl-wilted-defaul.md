@@ -2,7 +2,7 @@
 type: bug
 status: proposed
 source: reviewer
-run: _inbox
+run: 2026-09-22-run-02
 priority: low
 ---
 # Reconcile pet_states stage between ERD and DDL (wilted, default)
