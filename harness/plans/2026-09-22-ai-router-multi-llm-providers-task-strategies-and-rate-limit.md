@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/ai-router-multi-llm-providers-task-strategies-and-rate-limit.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 5
 branch: harness/2026-09-22-high-ai-router-multi-llm-providers-task-strategies-and-rate-limit
 worktree: .worktrees/ai-router-multi-llm-providers-task-strategies-and-rate-limit

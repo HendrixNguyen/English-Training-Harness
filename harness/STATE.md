@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 23:43. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 23:45. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -89,7 +89,7 @@ _none_
 - `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-ai-router-multi-llm-providers-task-strategies-and-rate-limit.md` — AI Router: multi-LLM providers, task strategies and rate limit — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-22-ai-router-multi-llm-providers-task-strategies-and-rate-limit.md` — AI Router: multi-LLM providers, task strategies and rate limit — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-a-rejected-post-quests-progress-still-writes-redis-and-daily.md` — Quests amend: validate before writing, bound duration_seconds, DST-safe day_number — Plan [high] (unreviewed)
 
