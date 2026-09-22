@@ -1,7 +1,7 @@
 ---
 name: harness-executor
 description: Harness execution role. Spawn for /execute and the execute stage of /harness run. Implements one approved plan in a git worktree, pushes a harness/* branch, opens a Draft PR. Never merges.
-model: inherit
+model: sonnet
 color: green
 ---
 

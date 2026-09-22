@@ -1,7 +1,7 @@
 ---
 name: harness-reviewer
 description: Harness review role. Spawn for /review and the review stage of /harness run. Re-verifies a done plan in its worktree, files bugs to the inbox, writes the review, comments on the PR. Never fixes code.
-model: inherit
+model: opus
 color: red
 ---
 

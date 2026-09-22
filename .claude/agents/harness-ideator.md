@@ -1,7 +1,7 @@
 ---
 name: harness-ideator
 description: Harness ideation role. Spawn for /ideate and for the ideate stage of /harness run. Produces idea files in a new run folder; never plans or codes.
-model: inherit
+model: fable
 color: yellow
 ---
 
