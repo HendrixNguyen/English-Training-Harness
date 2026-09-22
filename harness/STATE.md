@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-22 16:26. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-22 16:37. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,14 @@ _none_
 
 ## Inbox
 
-_none_
+- `harness/ideas/_inbox/docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally [high]
+- `harness/ideas/_inbox/go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at [high]
+- `harness/ideas/_inbox/healthz-leaks-postgres-and-redis-driver-error-strings-public.md` — healthz leaks Postgres and Redis driver error strings publicly [medium]
+- `harness/ideas/_inbox/healthz-shares-one-2s-deadline-across-two-sequential-pings.md` — healthz shares one 2s deadline across two sequential pings [low]
+- `harness/ideas/_inbox/migrate-is-only-tested-against-the-single-embedded-migration.md` — Migrate is only tested against the single embedded migration [medium]
+- `harness/ideas/_inbox/migrations-run-on-every-boot-with-no-advisory-lock.md` — migrations run on every boot with no advisory lock [medium]
+- `harness/ideas/_inbox/no-ci-runs-the-integration-suite-so-pgmigrator-is-never-veri.md` — no CI runs the integration suite so PgMigrator is never verified [medium]
+- `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
 
 ## Proposed
 
@@ -44,7 +51,7 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (unreviewed)
+- `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-22-add-unique-user-id-to-pet-states-ddl.md` — Add UNIQUE user_id to pet_states DDL — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
