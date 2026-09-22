@@ -14,6 +14,7 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -55,18 +56,30 @@ func main() {
 	r := gin.Default()
 	r.GET("/healthz", health.Handler(pg, rdb))
 
+	tokens := auth.NewTokenIssuer(cfg.JWTSecret, time.Now)
+	sessions := auth.NewRedisSessionStore(rdb)
 	authSvc := auth.NewService(
 		auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
 		auth.NewPgUserRepo(pg.Pool),
-		auth.NewRedisSessionStore(rdb),
-		auth.NewTokenIssuer(cfg.JWTSecret, time.Now),
+		sessions,
+		tokens,
+	)
+
+	questRepo := quests.NewPgRepo(pg.Pool) // satisfies both QuestRepo and ProgressRepo
+	questSvc := quests.NewService(
+		quests.NewRedisCounter(rdb),
+		questRepo,
+		questRepo,
+		quests.NopPet{}, // the pet slice replaces this
+		time.Now,
 	)
 
 	v1 := r.Group("/api/v1")
 	v1.POST("/auth/google", auth.Handler(authSvc))
 
-	// Later slices mount their routes on this group:
-	//   guarded := v1.Group("", auth.Require(tokens, sessions))
+	guarded := v1.Group("", auth.Require(tokens, sessions))
+	guarded.GET("/quests/daily", quests.DailyHandler(questSvc))
+	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
 
 	log.Printf("listening on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
