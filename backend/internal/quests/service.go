@@ -3,10 +3,15 @@ package quests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 )
+
+// ErrInvalidDuration means duration_seconds is outside 1..MaxDurationSeconds
+// or would push the day past MaxDailySeconds. The handler maps it to 400.
+var ErrInvalidDuration = errors.New("quests: invalid duration_seconds")
 
 // ProgressResult is the POST /api/v1/quests/progress 200 body — backend spec
 // §6.2, field for field.
@@ -50,7 +55,9 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pe
 //     the exercise must be on the caller's active roadmap and on today's
 //     day_number, or the call is rejected with ErrExerciseNotFound before a
 //     single write. A rejected request leaves Redis and daily_progress
-//     untouched (reviewer 2026-09-22).
+//     untouched (reviewer 2026-09-22). Then read the counter and reject with
+//     ErrInvalidDuration if seconds is outside 1..MaxDurationSeconds or the
+//     day would pass MaxDailySeconds.
 //  1. INCRBY the Redis counter (+ EXPIRE) and read the running total back.
 //  2. Upsert daily_progress from that total — Redis is the single source of
 //     truth for the day, so bursts of calls cannot disagree.
@@ -61,8 +68,8 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pe
 // The ordering is a contract, not an implementation detail: see the call-log
 // test in service_test.go.
 func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string, seconds int64) (ProgressResult, error) {
-	if seconds <= 0 {
-		return ProgressResult{}, fmt.Errorf("quests: duration_seconds must be positive, got %d", seconds)
+	if seconds <= 0 || seconds > MaxDurationSeconds {
+		return ProgressResult{}, fmt.Errorf("%w: must be in 1..%d, got %d", ErrInvalidDuration, MaxDurationSeconds, seconds)
 	}
 
 	profile, err := s.quests.Profile(ctx, userID)
@@ -83,7 +90,17 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 		return ProgressResult{}, err
 	}
 
-	total, err := s.counter.Add(ctx, userID, date, seconds)
+	// Still a read: the running total decides whether this report fits under
+	// the daily ceiling. Only then does the §5.2 write sequence start.
+	total, err := s.counter.Total(ctx, userID, date)
+	if err != nil {
+		return ProgressResult{}, err
+	}
+	if total+seconds > MaxDailySeconds {
+		return ProgressResult{}, fmt.Errorf("%w: %d + %d would exceed the daily ceiling of %d", ErrInvalidDuration, total, seconds, MaxDailySeconds)
+	}
+
+	total, err = s.counter.Add(ctx, userID, date, seconds)
 	if err != nil {
 		return ProgressResult{}, err
 	}

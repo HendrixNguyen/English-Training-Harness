@@ -141,10 +141,22 @@ func TestProgressHandlerRejectsABadBody(t *testing.T) {
 		`{"exercise_id":"ex-2-reading","duration_seconds":-5}`,
 		`{"exercise_id":"ex-2-reading","seconds":600}`, // the pre-§6.2 field name is not an alias
 		`nonsense`,
+		// Above MaxDurationSeconds (3600) — a task is 10 minutes:
+		`{"exercise_id":"ex-2-reading","duration_seconds":3601}`,
+		`{"exercise_id":"ex-2-reading","duration_seconds":1000000000}`,
+		`{"exercise_id":"ex-2-reading","duration_seconds":100000000000000}`, // the reviewer's 48h brick
+		`{"exercise_id":"ex-2-reading","duration_seconds":99999999999999999999}`, // does not fit int64
 	} {
-		if w := postJSON(r, "/api/v1/quests/progress", body); w.Code != http.StatusBadRequest {
+		w := postJSON(r, "/api/v1/quests/progress", body)
+		if w.Code != http.StatusBadRequest {
 			t.Errorf("body %q → status %d, want 400", body, w.Code)
 		}
+		if !strings.Contains(w.Body.String(), `"error":"invalid_request"`) {
+			t.Errorf("body %q → %s, want the invalid_request error", body, w.Body.String())
+		}
+	}
+	if len(h.log.calls) != 0 {
+		t.Errorf("a 400 touched Redis/Postgres: %v", h.log.calls)
 	}
 }
 

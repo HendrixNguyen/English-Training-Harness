@@ -62,6 +62,10 @@ func ProgressHandler(svc *Service) gin.HandlerFunc {
 
 		out, err := svc.RecordProgress(c.Request.Context(), userID, req.ExerciseID, req.DurationSeconds)
 		switch {
+		case errors.Is(err, ErrInvalidDuration):
+			// Same code as a binding failure: the request is malformed, not
+			// the state. Wire shape per §6.2 is unchanged.
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
 		case errors.Is(err, ErrNoActiveRoadmap):
 			c.JSON(http.StatusNotFound, gin.H{"error": "no_active_roadmap"})
 		case errors.Is(err, ErrExerciseNotFound):

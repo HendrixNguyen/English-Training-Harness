@@ -230,17 +230,63 @@ func TestRecordProgressRejectsAnExerciseFromAnotherDay(t *testing.T) {
 	}
 }
 
-func TestRecordProgressRejectsNonPositiveSeconds(t *testing.T) {
+func TestRecordProgressRejectsAnOutOfRangeDuration(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
 
-	for _, seconds := range []int64{0, -1, -600} {
-		if _, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", seconds); err == nil {
-			t.Errorf("seconds = %d: err = nil, want an error", seconds)
+	for _, seconds := range []int64{0, -1, -600, MaxDurationSeconds + 1, 1_000_000_000, 100_000_000_000_000} {
+		_, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", seconds)
+		if !errors.Is(err, ErrInvalidDuration) {
+			t.Errorf("seconds = %d: err = %v, want ErrInvalidDuration", seconds, err)
 		}
 	}
 	if len(h.log.calls) != 0 {
 		t.Errorf("a rejected call touched Redis/Postgres: %v", h.log.calls)
+	}
+}
+
+func TestRecordProgressAcceptsTheMaximumPerCallDuration(t *testing.T) {
+	// The bound is inclusive: one full hour in a single report is allowed.
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", MaxDurationSeconds)
+	if err != nil {
+		t.Fatalf("RecordProgress(%d) = %v, want nil", MaxDurationSeconds, err)
+	}
+	if out.DailySecondsSpent != MaxDurationSeconds || out.DailyMinutesSpent != MaxDurationSeconds/60 {
+		t.Errorf("out = %+v, want %ds/%dm", out, MaxDurationSeconds, MaxDurationSeconds/60)
+	}
+}
+
+func TestRecordProgressRejectsCrossingTheDailyCeiling(t *testing.T) {
+	// minutes_spent is INT (§3.2); the ceiling keeps the counter far from it
+	// and is checked against the running total BEFORE the INCRBY.
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	h.counter.totals["u1|2026-09-22"] = MaxDailySeconds - 100
+
+	_, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 101)
+	if !errors.Is(err, ErrInvalidDuration) {
+		t.Fatalf("101s over the ceiling: err = %v, want ErrInvalidDuration", err)
+	}
+	if len(h.log.calls) != 0 {
+		t.Fatalf("a rejected call touched Redis/Postgres: %v", h.log.calls)
+	}
+
+	// Landing exactly on the ceiling is allowed …
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 100)
+	if err != nil {
+		t.Fatalf("100s to reach the ceiling exactly: %v", err)
+	}
+	if out.DailySecondsSpent != MaxDailySeconds {
+		t.Errorf("DailySecondsSpent = %d, want %d", out.DailySecondsSpent, MaxDailySeconds)
+	}
+	// … and one more second is not.
+	if _, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-practice", 1); !errors.Is(err, ErrInvalidDuration) {
+		t.Errorf("1s past the ceiling: err = %v, want ErrInvalidDuration", err)
+	}
+	if got := h.counter.totals["u1|2026-09-22"]; got != MaxDailySeconds {
+		t.Errorf("counter = %d after the rejection, want it untouched at %d", got, MaxDailySeconds)
 	}
 }
 
