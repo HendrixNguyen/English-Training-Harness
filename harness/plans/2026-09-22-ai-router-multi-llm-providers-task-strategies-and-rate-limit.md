@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/ai-router-multi-llm-providers-task-strategies-and-rate-limit.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 5
+branch: harness/2026-09-22-high-ai-router-multi-llm-providers-task-strategies-and-rate-limit
+worktree: .worktrees/ai-router-multi-llm-providers-task-strategies-and-rate-limit
 ---
 # AI Router: multi-LLM providers, task strategies and rate limit — Plan
 
@@ -1763,3 +1765,99 @@ After pushing: `gh run list --branch <branch>` must show all three jobs green; `
 - **One rate-limit slot = one `Allow`.** Whether an assessment (two LLM calls, possibly a retry) consumes one slot or one per call is onboarding's decision (its plan: one per request).
 - **No placement prompt here.** Grading needs the question bank, which is onboarding's; only the roadmap prompt is shared infrastructure.
 - **`Route` logs fallbacks with `log.Printf`** — same as the rest of the backend; structured logging is a cross-cutting change not for this slice.
+
+## Execution summary
+
+Built exactly as planned; all 9 tasks landed as 9 commits on `harness/2026-09-22-high-ai-router-multi-llm-providers-task-strategies-and-rate-limit`, each preceded by a red run of its new test (`undefined: X` build failures) and followed by a green one.
+
+**Deviations:** none from the plan's code. One verification-command note: the plan's grep `grep -rn 'Getenv' internal/airouter/ --include='*.go'` (expecting no hits) does not exclude `_test.go`, but Task 5's own `ratelimit_test.go` (written verbatim from the plan) reads `os.Getenv("TEST_REDIS_URL")` directly — matching the established convention in `internal/store/integration_test.go` and `internal/auth/integration_test.go`, which do the same for `TEST_DATABASE_URL`/`TEST_REDIS_URL`. Excluding test files, the invariant holds: `grep -rn 'os\.Getenv' internal/airouter/ --include='*.go' --exclude='*_test.go'` finds only a comment in `config.go` referencing "os.Getenv in main", no actual call. Production code reads env only through the injected `lookup func(string) string`.
+
+### Verification output (from `backend/`, worktree root)
+
+```
+$ go build ./... && go vet ./...
+(clean, no output)
+
+$ env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1
+ok  	.../backend/internal/airouter	0.814s
+ok  	.../backend/internal/auth	1.420s
+ok  	.../backend/internal/config	0.844s
+ok  	.../backend/internal/health	1.844s
+ok  	.../backend/internal/store	2.236s
+
+$ go test ./internal/airouter/... -run 'Route|Strategies|Providers' -v   → all --- PASS (11 tests)
+$ go test ./internal/airouter/... -run 'Gemini|OpenAI' -v                → all --- PASS (8 tests, incl. subtests)
+$ go test ./internal/airouter/... -run 'Config|NewRouter' -v             → all --- PASS (4 tests)
+$ go test ./internal/airouter/... -run 'Roadmap|Exercises|Prompt' -v     → all --- PASS (7 tests, incl. 15 TestParseRoadmapRejects subtests)
+
+$ grep -rn --include='*.go' --exclude='*_test.go' 'https://\|http://' internal/airouter/
+internal/airouter/gemini.go:20:  DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com"
+internal/airouter/openai.go:13:  DefaultOpenAIBaseURL   = "https://api.openai.com/v1"
+internal/airouter/openai.go:15:  DefaultDeepSeekBaseURL = "https://api.deepseek.com/v1"
+(exactly the three Default*BaseURL constants)
+
+$ grep -rn --include='*_test.go' 'googleapis.com\|api.openai.com\|api.deepseek.com' internal/airouter/ | grep -v 'Default'
+(no hits)
+
+$ grep -n 'store.AIRateLimitKey\|store.AIRateLimitTTL\|ExpireNX' internal/airouter/ratelimit.go
+(3 hits: AIRateLimitKey, ExpireNX, AIRateLimitTTL)
+
+$ grep -n 'x-goog-api-key' internal/airouter/gemini.go && grep -c 'key=' internal/airouter/gemini.go
+1 hit; then 0
+
+$ grep -n '"response_mime_type": "application/json"' internal/airouter/gemini.go
+$ grep -n '"type": "json_object"' internal/airouter/openai.go
+(one hit each)
+
+$ grep -c 'Output ONLY valid JSON' internal/airouter/prompt.go
+1
+
+$ grep -rn 'os\.Getenv' internal/airouter/ --include='*.go' --exclude='*_test.go'
+internal/airouter/config.go:27: (comment only, references os.Getenv in main — no call)
+
+$ grep -c '^func TestIntegration' internal/airouter/ratelimit_test.go
+1
+
+$ cd .. && python3 tools/harness/cli.py validate; echo exit=$?
+exit=0
+
+$ git log --oneline main..HEAD
+e3120ca codemap: airouter — providers, strategies, fallback, limiter, roadmap schema
+ef19135 airouter: build the router from the environment at boot
+641fad7 env: document the optional AI provider variables
+d6b110f airouter: §6.1 system prompt, roadmap schema, strict 4x7x3 parser and 84-row flattener
+7415570 airouter: ratelimit:ai:{user_id} — INCR + EXPIRE NX, 5/min, ErrRateLimited
+07f838f airouter: env-driven Config; providers register only when their API key is set
+338b45c airouter: OpenAI-compatible provider shared by OpenAI and DeepSeek
+85392f5 airouter: Gemini provider over an injectable base URL, key in header, JSON mode
+cfcf9bc airouter: task/provider types and Router with deterministic fallback
+(9 commits, one per task, each with the Co-Authored-By trailer)
+
+$ git status --short
+(clean)
+```
+
+### Runtime proof
+
+1. **Build:** `go build ./...` clean, no warnings.
+2. **Whole suite, clean shell:** `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1` — every package `ok`, matching CI's `backend-unit` guard.
+3. **Boots and answers:** built the binary (`go build -o /tmp/airouter-api-test ./cmd/api`), ran it against a scratch Postgres/Redis (`POSTGRES_PORT=5433 REDIS_PORT=6381` via a scratch `.env`, torn down afterwards) with `DATABASE_URL`, `REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `JWT_SECRET` set and **no AI provider keys**. Log output:
+   ```
+   2026/09/22 23:19:18 airouter: no provider API keys set; AI-backed routes will answer 503
+   ...
+   2026/09/22 23:19:18 listening on :18099
+   ```
+   `curl http://localhost:18099/healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`. Process killed afterwards; a follow-up curl confirmed the port was down.
+4. **Router end-to-end against an `httptest` fake provider** (throwaway `go run` snippet under `backend/cmd/e2e-check-tmp/`, deleted after the run — not committed): built a `GeminiProvider` over an `httptest.Server`, routed `TaskRoadmapGen` through a real `Router`, and fed the output through `ParseRoadmap`:
+   ```
+   PASS: valid roadmap routed end-to-end and validated: 4 modules, 84 exercises
+   PASS: 3x7x3 roadmap correctly rejected by the validator: airouter: invalid roadmap: 3 modules, want 4
+   ```
+5. **Every documented command**, in a clean environment: `make test` (clean shell, all `ok`); `make test-integration` against the scratch stack (`TestIntegrationRateLimiterAllowsFiveThenBlocks` plus every other package's `TestIntegration*` — all `--- PASS`, no `--- SKIP`); `make up`/`make down` (stack came up healthy, went down cleanly, `postgres_data` volume convention respected); `make tidy` (no `go.mod`/`go.sum` drift). The unit-job guard was exercised for real via the `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL` runs above. Scratch `backend/.env` deleted afterwards; host ports 5433/6381 chosen to avoid the owner's `scio3-redis-1` on 6379.
+6. **Harness tooling:** `python3 -m unittest discover -s tools/harness/tests` → 32 tests OK; `python3 tools/harness/cli.py validate` → exit 0.
+
+### CI
+
+Branch pushed: `harness/2026-09-22-high-ai-router-multi-llm-providers-task-strategies-and-rate-limit`. Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35753914102 — conclusion **success**. All three jobs green: `backend-unit`, `backend-integration`, `harness-tooling`.
+
+`gh pr create` failed with `must be a collaborator` (known environment limitation) — attempted once, no Draft PR opened. The branch is pushed and CI is green; a human can open the PR from the branch.
