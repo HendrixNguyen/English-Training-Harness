@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 16:16. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 16:28. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -71,9 +71,7 @@ _none_
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high]
 - `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan [high]
-- `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high]
 
 ## Approved
 
@@ -81,10 +79,11 @@ _none_
 
 ## Executing
 
-_none_
+- `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high]
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (unreviewed)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs) (merged)
@@ -94,7 +93,6 @@ _none_
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
 - `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed) (merged)
 
 ## Failed
 

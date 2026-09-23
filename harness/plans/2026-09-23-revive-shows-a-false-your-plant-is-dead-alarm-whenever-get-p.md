@@ -1,8 +1,11 @@
 ---
 idea: harness/ideas/_inbox/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-23-high-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p
+worktree: .worktrees/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/6"
 ---
 # /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan
 
@@ -249,3 +252,46 @@ From `frontend/` in the worktree:
 - **Why not change the store:** `stores/pet.ts` already models the three states (`loading`, `error`, `status`) correctly; the bug is purely in which template branch reads them. Keeping the store untouched keeps `petStore.test.ts` and the `/` page out of the diff.
 - **`daysSince(null)`** returns `null`, so the "bỏ học N ngày" clause was already guarded; unchanged.
 - No design doc: the error card reuses `StateBlock` exactly as `/` does (design `harness/designs/frontend-shell.md`, states section).
+
+## Execution summary
+
+Built exactly as planned; no deviations from the file structure, task order, or template branch order. `git diff --cached --stat` was checked at each commit and only the plan's named files were staged (`tests/unit/revivePage.test.ts`, `pages/revive.vue`, `harness/CODEMAP.md`).
+
+**Task 1** — wrote `frontend/tests/unit/revivePage.test.ts` verbatim from the plan. `npx vitest run tests/unit/revivePage.test.ts` before the fix: case 1 failed on `not.toContain('héo rũ')`, case 2 failed on no `[role="status"] button`, case 3 passed — exactly the plan's predicted failure. Committed.
+
+**Task 2** — reordered `frontend/pages/revive.vue`'s `<main>` branches to `passed` → healthy → `v-else-if="pet.status"` (wilted) → `v-else-if="pet.error"` (new error card, `StateBlock state="error"` + retry calling `pet.load()`) → `v-else` (loading skeleton). Script untouched. Inner markup of every existing branch moved byte-for-byte.
+
+Verification commands (all from `frontend/`, worktree, clean shell — `env -u NUXT_PUBLIC_API_BASE -u PORT -u HOST`):
+```
+npx vitest run tests/unit/revivePage.test.ts   → 3 passed
+npm run test:unit                              → 15 files, 61 tests passed
+npm run lint                                   → exit 0, no output
+npm run typecheck                              → exit 0 (nuxi typecheck)
+npm run build                                  → exit 0, "✨ Build complete!"
+```
+Committed.
+
+**Mutation check** — temporarily changed `v-else-if="pet.status"` to a bare `v-else` and deleted the `pet.error` / final `v-else` branches (subject deleted). `npx vitest run tests/unit/revivePage.test.ts` → cases 1 and 2 failed again (same assertions: `not.toContain('héo rũ')` and `.toContain('Thử lại')`), case 3 still passed. Restored with `git checkout -- pages/revive.vue`; `git diff --quiet pages/revive.vue` reported clean; re-ran the test → 3 passed. The test's core assertions are load-bearing.
+
+**Task 3 — browser proof.** The Chrome extension (`mcp__claude-in-chrome__*`) was not connected in this session (`tabs_context_mcp` returned "Browser extension is not connected"), so I used the Playwright MCP browser (a real, separate Chromium instance) instead of the extension, and a tiny local Python stub (`http.server`) on port 3198 in place of a live backend, rather than the `NUXT_PUBLIC_API_BASE=http://127.0.0.1:3198` "nothing listens" trick for the two success states (a real browser can't script `page.route`/`fetch` overrides that survive a full navigation the way the task assumed, but it can point at a real HTTP responder). Built once (`npm run build`), served with `PORT=3102 HOST=127.0.0.1 NUXT_PUBLIC_API_BASE=http://127.0.0.1:3198 node .output/server/index.mjs` (port 3102 per the team lead's instruction, not the plan's 3101 — 3101 was reserved as off-limits for this run), seeded `localStorage['aelp.auth']` via `browser_evaluate`, and drove `/revive` three times:
+
+1. **Nothing listening on 3198 (load fails):** accessibility snapshot showed only `status: "Không tải được trạng thái cây. Chưa thể biết cây có héo hay không." + button "Thử lại"` — no alert role, no wilted plant, no revive CTA.
+2. **Stub server, healthy plant** (`health_points: 85, stage: flowering`): snapshot showed `img "Cây đang ở giai đoạn flowering, máu 85%"` + `paragraph "Cây của bạn vẫn khỏe 🌱"` + `button "Về trang chính"` — no alert, no error card.
+3. **Stub server, wilted plant** (`health_points: 0, stage: wilted`): snapshot showed `alert: "⚠️ Cây xanh đang bị héo rũ!"`, `img "Cây đang ở giai đoạn wilted, máu 0%"`, the missed-days copy, and `button "🚨 Cứu cây ngay (Quiz 15 phút)"` — unchanged from `main`.
+
+Cleanup verified: `pkill` on the stub server and the node preview, then `pgrep -fl pet_stub_server` / `pgrep -fl "node .output/server/index.mjs"` both empty, and `lsof -iTCP -sTCP:LISTEN` showed nothing on 3101/3102/3198 afterward. The Playwright MCP browser page was closed too.
+
+**CODEMAP** — added one clause to the `shell` bullet naming the page-state convention (error branch gated on `error && no data`, data branch gated on non-null data), as specified. Committed.
+
+**Runtime proof (Definition of done, step 8):**
+- Build: `npm run build` → exit 0 (see above).
+- Whole suite, clean shell: `npm run test:unit` → 15 files / 61 tests passed.
+- Boots and answers: `node .output/server/index.mjs` on port 3102 served `/login` (200) and `/revive`, exercised end-to-end above.
+- Documented commands: `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build` all run as documented, clean shell, exit 0.
+- No process left running (see cleanup above).
+
+**Deviations:** (1) port 3102 used instead of the plan's 3101 for the preview server — team lead reserved 3101/3099/8099 for other work in this session; (2) browser proof done via Playwright MCP + a local Python stub server instead of the Chrome extension, because the extension was not connected — noted above with the reason.
+
+**PR:** https://github.com/HendrixNguyen/English-Training-Harness/pull/6 (draft)
+**CI:** https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35842983066 — `frontend`, `harness-tooling`, `backend-integration`, `backend-unit` all `success`. (An earlier push-triggered run, 35842902597, also completed `success`.)
+
