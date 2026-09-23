@@ -125,21 +125,7 @@ func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, erro
 // Errors on one pet are collected and the rest are still processed; the
 // count returned is the number of pets penalised.
 func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
-	zones, err := s.repo.Timezones(ctx)
-	if err != nil {
-		return 0, err
-	}
-	var atMidnight []string
-	for _, tz := range zones {
-		if now.In(quests.Location(tz)).Hour() == 0 {
-			atMidnight = append(atMidnight, tz)
-		}
-	}
-	if len(atMidnight) == 0 {
-		return 0, nil
-	}
-
-	cands, err := s.repo.SweepCandidates(ctx, atMidnight)
+	cands, err := s.repo.SweepCandidates(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -162,7 +148,7 @@ func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
 		if total >= quests.TargetSeconds {
 			continue
 		}
-		if err := s.repo.Save(ctx, c.UserID, ApplyMiss(c.State, now, yesterday)); err != nil {
+		if _, err := s.repo.PenaliseMiss(ctx, c.UserID, yesterday, now); err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", c.UserID, err))
 			continue
 		}
