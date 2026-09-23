@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -44,3 +44,8 @@ against one due member, and the fake sender records exactly one send.
 - `backend/internal/notify/service.go:102` (`s.queue.Due`) then `service.go:110` (`repo.Preferences`) then `service.go:127` (`s.queue.Schedule`) — the claim window spans a Postgres round trip.
 - `backend/internal/notify/worker.go:13-14` — the doc comment that carries the whole constraint.
 - Spec §2.1 / §8 describe a single binary, but nothing in the repo pins the replica count, and no deployment manifest exists (`find . -iname 'Dockerfile*' -o -iname 'railway*' -o -iname 'nixpacks*'` returns nothing).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Real user impact on Railway even at one replica: a rolling deploy overlaps old and new containers, and any reminder due in that window fires twice. Smallest correct fix is the leader lock (`SET notify:worker:leader NX EX 60`, refreshed each tick) — a few lines in `worker.go`/`queue.go` plus an integration test with two `Service` values over one Redis. Wait for the notify branch to merge (it is `done`, unmerged) before planning; the plan edits files that do not exist on `main` yet.

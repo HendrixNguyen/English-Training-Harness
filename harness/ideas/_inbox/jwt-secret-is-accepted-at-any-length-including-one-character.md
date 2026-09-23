@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -44,3 +44,8 @@ follow-up spec bug about adding `JWT_SECRET` to §8 should carry the minimum len
 - `backend/internal/auth/token.go:23-28` — `NewTokenIssuer(secret string, ...)` accepts any string as HMAC key material.
 - Verified in the plan's worktree: `JWT_SECRET=x` (one character) booted the API and served both routes.
 - RFC 7518 §3.2 — HS256 keys MUST be at least the size of the hash output (256 bits / 32 bytes).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: `config.Load` is presence-only; `JWT_SECRET=x` boots. HS256 with a short secret is offline-brute-forceable from one captured token, and the variable is absent from the spec's env list so it will be typed by hand. Fix is a length check (≥ 32 bytes) with a generate-hint message and a boundary table test. Folds in `jwt-verify-does-not-require-exp-or-bind-iss-aud-and-bearer-i.md` (same package, same plan: `WithExpirationRequired`, `iss`/`aud`, case-insensitive `Bearer`). Touches `config` — schedule after the cmd/api plan (which adds `GIN_MODE` to the same file).

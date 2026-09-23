@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # Two RecordProgress error branches are uncovered and the Redis-down test's comment overstates it
 
@@ -57,3 +57,8 @@ ordering, and one test's comment misdescribes what it proves.
 - Reproduction: in a copy of `backend/`, drop `if f.err != nil { return 0, f.err }` from
   `fakeCounter.Add`, then `go test ./internal/quests/... -count=1` -> `ok`. Separately, replace the
   `MarkComplete` error check with `_ = s.quests.MarkComplete(...)`, then `go test ./internal/quests/... -count=1` -> `ok`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Test-only; the code is right. Take `addErr`/`markErr` and the corrected comment in the pet day-judgement plan, which changes `RecordProgress`'s hook derivation and must re-cover these branches anyway.

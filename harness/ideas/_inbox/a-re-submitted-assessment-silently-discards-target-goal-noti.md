@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -63,3 +63,8 @@ reporting success for it — is a separate, undesigned behaviour.
 - Test gap: `TestAssessIsIdempotentWhileARoadmapIsActive`
   (`service_test.go:86-104`) asserts `len(h.repo.saved) != 0` is a failure — it
   pins the discard as intended rather than questioning it.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: `onboarding/service.go:48-60` returns `status: success` without writing `timezone`/`notification_time`/`target_goal` when a roadmap is active. Not the first-run happy path, but `timezone` drives `day_number` and the pet sweep, and `POST /settings/notifications` (notify branch, unmerged) will become the second writer of `notification_time`/`timezone` — the plan should update the three profile fields on re-submit (keeping roadmap and CEFR) and pin it with a test, coordinated with notify's `UpdateSettings` so the two writers validate identically.

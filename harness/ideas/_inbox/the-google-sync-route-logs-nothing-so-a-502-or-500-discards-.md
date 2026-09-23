@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -42,3 +42,8 @@ feature operable at all; that is a judgement call for the owner.
 - `backend/internal/google/client.go:25-33` — `UpstreamError{Service, Status, Body}`, the diagnostic that is discarded.
 - `grep -rn 'log\.' backend/internal/google/*.go | grep -v _test` → no matches; the same grep on `internal/quests` → 2, `internal/pet` → 3, `internal/airouter` → 1.
 - `harness/CODEMAP.md` → `quests`: "Hook and state errors are logged, never returned" — the convention this package does not follow.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: `handler.go:31-44` switches on `err` and drops it; `UpstreamError.Body` — the only diagnostic — never reaches a log. Operability of the one third-party integration. Two `log.Printf` lines plus a test that the tokens are absent; pair with the 403-mapping plan (same handler/client files).

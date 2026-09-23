@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -40,3 +40,8 @@ missing-row branch has any coverage.
 - `backend/internal/google/service.go:39-45` — only `ErrNoRefreshToken` becomes `ErrReauthRequired`.
 - `backend/internal/google/handler.go:40-41` — everything else becomes `500 internal_error`.
 - `backend/internal/google/integration_test.go:35-37,54-56` — the only exercise of this code, happy path only.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Correct: `pgx.ErrNoRows` → 500 instead of 409 for a deleted user with a live session. Rare (needs a deleted `users` row inside the 24 h session) and a three-line fix. Ride along with the refresh-token encryption plan, which replaces `PgRefreshTokenSource` anyway.

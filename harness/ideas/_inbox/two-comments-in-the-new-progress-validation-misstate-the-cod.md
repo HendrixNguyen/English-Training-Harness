@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: Two wrong code comments with correct code behind them; fix them in the next quests change (the pet day-judgement plan edits quests/service.go) rather than on their own branch.
 ---
 # Two comments in the new progress validation misstate the code they describe
 
@@ -51,3 +52,8 @@ comment asserting the opposite of what half the branch does is.
 - Live, real binary + real Redis/Postgres: `SET daily:accumulated:<uid>:<date> 86300`, then
   `POST /api/v1/quests/progress {"exercise_id":"<own day-1 task>","duration_seconds":200}`
   -> `400 {"error":"invalid_request"}`, counter unchanged at 86300.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** Cosmetic. Noted in the pet day-judgement survivor so the next `quests` edit corrects both comments.

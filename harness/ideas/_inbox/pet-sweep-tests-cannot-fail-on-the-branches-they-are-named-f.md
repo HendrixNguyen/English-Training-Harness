@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -77,3 +77,8 @@ Each named branch can fail:
   (`defaultState(now)` called with `time.Time{}`), `:122-138` (all-or-nothing `fakeStudy.err`).
 - `backend/internal/store/migrations/0001_init.up.sql:41` — the real `updated_at` default.
 - `backend/internal/pet/handler_test.go:18-25` — `newPetRouter` always sets `auth.ContextUserID`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Test-only, but the sweep is the one piece of §8 nobody observes until a plant wilts, and the pet "durable day judgement" plan will rewrite `Sweep` and its fakes anyway — take these tests (per-user fake errors, realistic `updated_at`, zone table) in that plan.

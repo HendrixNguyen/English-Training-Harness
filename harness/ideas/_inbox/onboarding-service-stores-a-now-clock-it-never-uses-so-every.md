@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Tidiness: removing an unused constructor parameter changes no behaviour and would touch cmd/api/main.go, the file with the most merge friction in the repo; drop the parameter when onboarding.Service next changes for a real reason."
 ---
 # onboarding Service stores a now clock it never uses so every caller passes a dead dependency
 
@@ -37,3 +38,8 @@ constructor parameter also survives refactors by being copied forward.
 - Callers that supply it: `backend/cmd/api/main.go:123` (`time.Now`),
   `backend/internal/onboarding/service_test.go:34` and
   `backend/internal/onboarding/handler_test.go:86` (`fixedClock(sept22)`).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** Dead parameter, no behaviour, and the removal edits `main.go`. Not worth a branch.

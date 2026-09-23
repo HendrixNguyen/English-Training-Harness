@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -68,3 +68,8 @@ any second caller:
 - Backend spec §8 Success Logic; §6.2 `pet_health` / `streak_count`.
 - Related: `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md`
   — the opposite failure of the same inference (the hook never firing).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: `pet/service.go` bumps on every call; once-per-day lives only in quests' counter edge, which is volatile Redis. Fix is nearly free (`LastPracticedAt` local date == `localDate` → no-op). Part of the pet "durable day judgement" plan with the sweep/Redis and lost-hook findings.

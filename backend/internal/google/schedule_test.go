@@ -2,6 +2,7 @@ package google
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +105,40 @@ func TestDayDueIsTheRoadmapDayAsADate(t *testing.T) {
 	}
 	if got := DayDue(created, 1, hcm); got.Location() != time.UTC || got.Hour() != 0 {
 		t.Errorf("due must be UTC midnight (Tasks API keeps only the date), got %v", got)
+	}
+}
+
+func TestPracticeEventIDIsDeterministicBase32Hex(t *testing.T) {
+	const uuid = "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"
+	id := PracticeEventID(uuid)
+	if id != PracticeEventID(uuid) {
+		t.Fatal("not deterministic")
+	}
+	// Calendar v3 events.insert: id is 5–1024 chars of base32hex, i.e. [a-v0-9].
+	// (Length checked separately: Go's RE2 rejects a {5,1024} repeat count.)
+	if !regexp.MustCompile(`^[a-v0-9]+$`).MatchString(id) {
+		t.Fatalf("id %q is not base32hex", id)
+	}
+	if len(id) < 5 || len(id) > 1024 {
+		t.Fatalf("id length = %d, want 5-1024", len(id))
+	}
+	if id != "aelpa0eebc999c0b4ef8bb6d6bb9bd380a11" {
+		t.Fatalf("id = %q", id)
+	}
+	if PracticeEventID("u1") == PracticeEventID("u2") {
+		t.Fatal("two users share an id")
+	}
+}
+
+func TestEventPayloadCarriesIDAndConfirmedStatus(t *testing.T) {
+	ev := sampleEvent()
+	if _, has := ev.payload()["id"]; has {
+		t.Fatal("payload sends an id when none is set")
+	}
+	ev.ID = "aelpu1"
+	p := ev.payload()
+	if p["id"] != "aelpu1" || p["status"] != "confirmed" {
+		t.Fatalf("payload = %v", p)
 	}
 }
 

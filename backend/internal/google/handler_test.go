@@ -1,7 +1,9 @@
 package google
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -43,7 +45,7 @@ func TestSyncHandlerAnswersTheSpec64Body(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "synced" || body["calendar_event_id"] != "evt_new" || body["tasks_created_count"] != float64(28) {
+	if body["status"] != "synced" || body["calendar_event_id"] != PracticeEventID("u1") || body["tasks_created_count"] != float64(28) {
 		t.Errorf("body = %v", body)
 	}
 	if len(body) != 3 {
@@ -74,5 +76,23 @@ func TestSyncHandlerRequiresAUser(t *testing.T) {
 	w := post(t, router(h.svc, ""))
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("status = %d, want 401", w.Code)
+	}
+}
+
+func TestSyncHandlerMapsPlainErrorsTo500(t *testing.T) {
+	h := newHarness()
+	h.repo.errs = map[string]error{"Profile": errors.New("pg: connection reset")}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusInternalServerError || w.Body.String() != `{"error":"internal_error"}` {
+		t.Fatalf("status %d body %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSyncHandlerMapsADeadlineTo502(t *testing.T) {
+	h := newHarness()
+	h.repo.errs = map[string]error{"Profile": context.DeadlineExceeded}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
+		t.Fatalf("status %d body %s", w.Code, w.Body.String())
 	}
 }

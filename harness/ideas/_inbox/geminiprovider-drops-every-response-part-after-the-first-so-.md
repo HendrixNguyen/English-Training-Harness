@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -49,3 +49,8 @@ truncation is prevented rather than only detected.
 - `backend/internal/airouter/gemini.go:64-79` — the response struct decodes `parts` as a slice, then indexes `[0]`.
 - `backend/internal/airouter/gemini_test.go:13-54,56-82` — every fake response has exactly one part; no case covers two.
 - Reviewer probe (scratch test, removed): a fake returning `parts:[{"text":"{\"a\":1,"},{"text":"\"b\":2}"}]` yields `{"a":1,` — the second part is dropped and the result is not valid JSON.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium (top 10).** Confirmed at `gemini.go:79`: `Parts[0].Text` only; `finishReason` and `promptFeedback.blockReason` never read. When it bites it bites the user's very first interaction (onboarding → `ai_bad_output` after a paid retry). Frequency is uncertain — the reviewer reproduced it against a fake, not against Gemini — so medium rather than high; the fix (join parts, surface `finishReason`, set `maxOutputTokens`) is small and makes the failure diagnosable. Folds in `gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md`.

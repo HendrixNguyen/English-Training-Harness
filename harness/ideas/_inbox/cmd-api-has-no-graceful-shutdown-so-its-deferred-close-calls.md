@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Duplicate of main-go-installs-a-signal-handler-with-no-server-shutdown-so.md (the survivor, priority high): same file, same fix (http.Server + Shutdown), and the survivor describes the current, worse symptom now that signal.NotifyContext is installed without a Shutdown."
 ---
 # cmd/api has no graceful shutdown so its deferred Close calls are unreachable
 
@@ -60,3 +61,8 @@ send `SIGTERM`, and observe the shutdown line and a zero exit status.
   the `log.Fatalf` that skips them.
 - `grep -rn 'signal\|Shutdown\|http.Server' backend/cmd backend/internal` → no matches.
 - Spec §8 — Railway container deployment; `SIGTERM` is how the platform stops a revision.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — duplicate.** Superseded in severity and scope by `main-go-installs-a-signal-handler-with-no-server-shutdown-so.md`, whose plan implements exactly this file's *Expected output* (http.Server, bounded Shutdown, defers reached, "shutting down" log line).

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md
 ---
 # A failed SaveSyncState orphans the Google object just created, and CODEMAP claims it cannot
 
@@ -48,3 +49,8 @@ sync does not produce a second event.
 - `backend/internal/google/handler.go:28` — `context.WithTimeout(c.Request.Context(), SyncTimeout)`, so a client disconnect cancels the in-flight `SaveSyncState`.
 - `harness/CODEMAP.md` → `google` — the false "a failure never orphans a Google object" sentence.
 - `backend/internal/google/fakes_test.go:130-135` — `fakeRepo.SaveSyncState` always returns nil, so no test can reach this window today (see the sibling bug on missing fake error fields).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — high (top 3).** Root cause confirmed on `main`: `service.go:78-87` inserts the Calendar event and only then `SaveSyncState`; the insert carries no `id` (`schedule.go:77-85`), and the handler's context is the request context (`handler.go:28`), so a client disconnect during the 60 s sync cancels the save and leaves a 28-day recurring event the app can never find or delete. The next sync inserts another. Data-integrity bug on the user's own Google account, and the merged plan's *Architecture* paragraph and CODEMAP `google` both assert the opposite — the false invariant is the more dangerous half. Fix is one plan: deterministic client-supplied event id (Calendar v3 `events.insert` accepts `id`, base32hex), 409 → patch, honest documentation for the Tasks half (no client id exists), fakes with error hooks so the window is testable. Folds in `the-google-fakes-have-no-error-field-for-eleven-of-sync-s-er.md` and `no-test-asserts-the-calendar-patch-body-so-an-empty-patch-pa.md`. Plan: `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md`.

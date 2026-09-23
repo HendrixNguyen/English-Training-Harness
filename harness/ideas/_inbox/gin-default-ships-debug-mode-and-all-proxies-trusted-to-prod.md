@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Folded into harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md (GIN_MODE via config, default release; SetTrustedProxies(nil); boot prints no [GIN-debug] lines) — same file, one main.go merge instead of two."
 ---
 # gin.Default ships debug mode and all-proxies-trusted to production
 
@@ -64,3 +65,8 @@ library defaults:
   `POSTGRES_PORT=5433 / REDIS_PORT=6380`; both `[GIN-debug] [WARNING]` lines above appear at boot,
   and `curl /healthz` returned `200 {"postgres":"ok","redis":"ok","status":"ok"}`.
 - Spec §8 — Railway deployment, stdout is the log stream and a platform proxy fronts the app.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** Still true (`main.go` builds `gin.Default()` with no `SetMode`/`SetTrustedProxies`). It is a real production-hygiene defect, but it lives in the one file the owner keeps hitting conflicts on, so it ships inside the cmd/api hardening plan rather than as a second `main.go` branch.

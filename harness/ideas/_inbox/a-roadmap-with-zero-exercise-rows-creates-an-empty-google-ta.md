@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Overtaken: the only producer of a partial roadmap (store.SeedDemoRoadmap) was deleted by the onboarding slice, and onboarding inserts the roadmap and its 84 exercises in one transaction, so an active roadmap with zero exercise rows needs a hand-edited database."
 ---
 # A roadmap with zero exercise rows creates an empty Google Tasks list recorded as fully synced
 
@@ -45,3 +46,8 @@ and asserts no tasklist is created *and* that a second sync, after the titles ap
 - `backend/internal/google/repo.go:117-140` — `DayTitles` returns an empty result, not an error, for a roadmap with no exercises.
 - No test covers it: `service_test.go` has `TestSyncWithoutARoadmapPushesOnlyTheEvent` (the `ErrNoActiveRoadmap` branch) and nothing for a roadmap with zero days.
 - Related, already filed: `harness/ideas/_inbox/seeddemoroadmap-is-not-transactional-and-can-leave-a-partial.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** The reachable path is gone: `SeedDemoRoadmap` no longer exists (`find backend -name 'seed*'` → nothing) and `onboarding.PgRepo.SaveAssessment` writes roadmap + 84 exercises in one transaction (CODEMAP `onboarding`). A zero-exercise active roadmap now requires manual SQL. Not worth a defensive branch and a test.

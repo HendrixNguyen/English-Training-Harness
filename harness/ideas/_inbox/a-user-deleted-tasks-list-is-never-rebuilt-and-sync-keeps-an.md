@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # A user-deleted Tasks list is never rebuilt and sync keeps answering synced with a stale count
 
@@ -46,3 +46,8 @@ asserts the list is rebuilt.
 - `backend/internal/google/service.go:68-77` — the Calendar path that *does* recover from a user deletion, for contrast.
 - `backend/internal/google/service_test.go:96-118` (`TestResyncSameRoadmapPatchesEventAndCreatesNothing`) — pins the no-op as correct with no coverage of a missing list.
 - Backend spec §6.4: the 200 body is `{"status": "synced", …}`; a `synced` that is not synced is a contract violation.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Real: a user who deletes the Tasks list in Google gets `synced, 28` forever. But it needs a deliberate user action on Google's side, the Calendar half already recovers, and the fix is one `tasklists.get` on the same-roadmap path. Ride along with the next `google` plan after the orphan fix lands (same `fakeTasks`/`TasksClient` surface).

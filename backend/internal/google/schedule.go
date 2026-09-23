@@ -71,17 +71,43 @@ type Event struct {
 	Description string
 	Start, End  time.Time
 	TimeZone    string // IANA name, sent alongside dateTime so Google recurs in the user's zone
+	ID          string // client-supplied Calendar id; empty lets Google assign one
 }
 
 // payload is the Calendar v3 events resource body for insert and patch.
 func (e Event) payload() map[string]any {
-	return map[string]any{
+	p := map[string]any{
 		"summary":     e.Summary,
 		"description": e.Description,
 		"start":       map[string]string{"dateTime": e.Start.Format(time.RFC3339), "timeZone": e.TimeZone},
 		"end":         map[string]string{"dateTime": e.End.Format(time.RFC3339), "timeZone": e.TimeZone},
 		"recurrence":  []string{Recurrence},
+		// A PATCH with status confirmed restores an event the user deleted
+		// (Google keeps it as "cancelled" and reserves its id).
+		"status": "confirmed",
 	}
+	if e.ID != "" {
+		p["id"] = e.ID
+	}
+	return p
+}
+
+// PracticeEventID is the client-supplied Calendar id of a user's recurring
+// practice block: "aelp" + the user id lower-cased with every character
+// outside base32hex ([a-v0-9]) dropped — a UUID's 32 hex digits are a subset.
+// Calendar v3 events.insert accepts 5–1024 such characters. Deterministic per
+// user, so a repeat insert (after a SaveSyncState failure or a client
+// disconnect) is a 409 from Google rather than a second event: that is what
+// makes the insert idempotent.
+func PracticeEventID(userID string) string {
+	var b strings.Builder
+	b.WriteString("aelp")
+	for _, r := range strings.ToLower(userID) {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'v') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // PracticeEvent builds the 30-minute daily block starting at the next

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Overtaken: the only caller (onboarding/handler.go) maps every airouter error to an opaque code (ai_unavailable / ai_bad_output / ai_upstream_failed / internal_error) and never returns err.Error(); what remains is log hygiene for a body that already travels only into the server log."
 ---
 # Route returns upstream provider error bodies verbatim to its caller
 
@@ -59,3 +60,8 @@ Related: the same joined string is what makes the error unusable for classificat
 - `backend/internal/airouter/router.go:72,88,93` — `errors.Join(ErrAllProvidersFailed, per-provider errors…)`.
 - Reviewer probe (scratch test, removed): a fake 400 body containing `PROMPT-ECHO-SECRETISH` appears verbatim in `Route`'s returned error; the base URL does not appear on the 400 path but does on the transport-failure path via `*url.Error`.
 - Prior art in this repo: `harness/ideas/_inbox/healthz-leaks-postgres-and-redis-driver-error-strings-public.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** The finding's own condition — "before a caller exists" — has passed and the caller did the safe thing. Learner text in provider error bodies reaching the *log* is acceptable for an operator-only stream.

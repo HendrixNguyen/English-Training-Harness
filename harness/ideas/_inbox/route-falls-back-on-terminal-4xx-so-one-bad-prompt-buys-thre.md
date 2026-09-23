@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # Route falls back on terminal 4xx so one bad prompt buys three paid provider calls
 
@@ -56,3 +56,8 @@ using the call-counting `httptest` fakes the package already has.
 - `backend/internal/airouter/gemini.go:106-108` — every non-2xx becomes the same opaque `fmt.Errorf("status %d: %s", …)`, so no classification is even possible today.
 - `backend/internal/airouter/router_test.go:68-80,82-99` — the two fallback tests use `errors.New("503 overloaded")` / `errors.New("gemini down")`; nothing exercises a 4xx.
 - Reviewer probe (scratch test, removed): three fakes answering 400 → one request each, `Route` returns `ErrAllProvidersFailed` joined with all three.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Real but bounded: 3× cost only on deterministic failures, capped by the 5/min limiter, no user-visible symptom. Worth doing when `airouter` errors become typed (the Gemini multi-part plan introduces `finishReason` errors — a natural moment to add `*ProviderError{Status}` and stop the loop on 4xx).

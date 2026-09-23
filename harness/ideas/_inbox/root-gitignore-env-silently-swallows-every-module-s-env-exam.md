@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Overtaken: the root .gitignore now carries a !.env.example negation and both backend/.env.example and frontend/.env.example are tracked (git ls-files), so templates are no longer swallowed anywhere in the tree."
 ---
 # Root .gitignore .env* silently swallows every module's .env.example
 
@@ -61,3 +62,8 @@ per-module workarounds. Concretely:
 - `backend/.gitignore:3-5` — the per-module `!.env.example` negation and its explanatory comment.
 - Reviewer reproduction, repo root: `git check-ignore -v frontend/.env.example` →
   `.gitignore:6:.env*	frontend/.env.example` (exit 0 = ignored).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** `.gitignore` line 7 is `!.env.example`; `git ls-files` lists both templates. The `*.env.example` variant the finding also asked for has no consumer.

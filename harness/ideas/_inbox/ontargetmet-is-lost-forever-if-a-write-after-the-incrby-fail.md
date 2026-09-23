@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -47,3 +47,8 @@ CODEMAP's "self-heals" sentence is narrowed to `minutes_spent`.
 - `backend/internal/quests/service.go:82-98`.
 - `harness/CODEMAP.md` — `quests` paragraph, "Known accepted gap: a crash between the INCRBY and the upsert …".
 - `backend/internal/quests/fakes_test.go:96,107-109` — `fakeProgressRepo.err` exists and is set by no test.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed in `quests/service.go`: `newly_met` is a one-shot edge on the Redis counter, so a failed upsert/`MarkComplete` on the crossing call silently costs the user that day's +20 and streak. CODEMAP already records the gap. Fix belongs in the pet "durable day judgement" plan with `the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md`, `service-ontargetmet-ignores-localdate…` and `a-passed-revival-is-knocked…`: derive the hook from `daily_progress.is_target_met` flipping false→true (`RETURNING`), which also gives pet its own once-per-day guard.

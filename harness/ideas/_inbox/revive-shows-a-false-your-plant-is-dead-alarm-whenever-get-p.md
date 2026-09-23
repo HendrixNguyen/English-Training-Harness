@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md
 ---
 # /revive shows a false "your plant is dead" alarm whenever GET /pet/status fails
 
@@ -26,3 +27,8 @@ This is the offline path the PWA is sold on (Frontend spec §3): if `/pet/status
      `localStorage.setItem('aelp.auth', JSON.stringify({accessToken:'t', expiresAt: Date.now()+86400000, user:{id:'u1',email:'a@b.c',full_name:'Review User',cefr_current:'B1'}}))`
   4. Navigate to `/revive`.
   Observed (accessibility snapshot): `alert: ⚠️ Cây xanh đang bị héo rũ!`, `img "Cây đang ở giai đoạn wilted, máu 0%"`, `paragraph: Cây héo - 0%`, `button "🚨 Cứu cây ngay (Quiz 15 phút)"`. The same run at `/` correctly shows three "Không tải được…" error blocks with "Thử lại" buttons, and `/roadmap` shows "Không tải được lộ trình."
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — high (top 3, #2).** Confirmed on `main`: `pages/revive.vue` has loading / passed / healthy branches and a final `v-else` that renders the wilted banner, a 0 % wilted plant and the revival CTA — reached whenever `pet.load()` failed (`pet.error` set, `pet.status` null). `/` and `/roadmap` handle the same failure with `StateBlock state="error"`; `/revive` is the outlier. The pet is the retention mechanism and this is the worst false message the app can show, on the offline path the PWA is sold on. Fix: an error branch with retry, and the wilted branch gated on real data (`pet.status && pet.isWilted`); regression test mounts the page with a rejected `/pet/status`. Plan: `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md`.

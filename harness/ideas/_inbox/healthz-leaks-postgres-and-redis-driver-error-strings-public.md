@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -37,3 +37,8 @@ user or database name reaches the response body. The existing tests that assert 
 - `backend/cmd/api/main.go:45` — the route is mounted with no auth middleware, as it must be.
 - Spec §8 — `DATABASE_URL` / `REDIS_URL` are injected by Railway, so the leaked identity is the
   production one.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed at `health.go:31-38`: `body["postgres"] = err.Error()` on an unauthenticated route, disclosing the production DB user/name/host when it is down. Fix: fixed `"unavailable"` markers, log the error server-side, per-dependency deadlines. Folds in `healthz-shares-one-2s-deadline-across-two-sequential-pings.md` — same 20-line handler, same tests.

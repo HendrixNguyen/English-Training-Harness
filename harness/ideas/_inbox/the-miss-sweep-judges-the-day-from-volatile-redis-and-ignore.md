@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -77,3 +77,8 @@ The sweep judges a day from durable state, still without pet reading quests' tab
 - `backend/internal/quests/service.go:113` — the durable `daily_progress` upsert that exists today.
 - `backend/internal/store/keys.go:14` — `DailyAccumulatedTTL = 48 * time.Hour`.
 - Backend spec §8 Inactivity Logic; §3.2 `daily_progress`; §9 Railway Redis plugin.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium (survivor of the pet day-judgement group).** Confirmed: `Sweep` reads only `study.Total` and `redis.Nil` reads as 0, so any counter loss penalises a user who studied — silently, unrecoverably. Postgres already holds `daily_progress.is_target_met`. Plan: widen `StudyCounter` with `MetTarget(ctx, user, localDate)` implemented in `quests` over `daily_progress`; spare when either source says met; **same plan** also takes `service-ontargetmet-ignores-localdate…`, `ontargetmet-is-lost-forever…`, `a-passed-revival-is-knocked…`, the conditional miss `UPDATE` (`sweep-reads-updated-at…`), the zone-location map (`the-hourly-sweep…`) and the sweep tests (`pet-sweep-tests…`). One pet branch, one merge.

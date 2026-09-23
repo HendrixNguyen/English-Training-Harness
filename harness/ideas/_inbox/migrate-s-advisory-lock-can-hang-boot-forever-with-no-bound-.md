@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Folded into migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md (survivor): one PgMigrator plan makes the unlock context-independent, bounds the lock wait (pg_try_advisory_lock loop or lock_timeout), logs contention, and runs the migration statements on the pinned connection so pool_max_conns=1 cannot deadlock."
 ---
 # Migrate's advisory lock can hang boot forever with no bound and no log
 
@@ -51,3 +52,8 @@ Migration acquires its lock in bounded time and says what it is doing:
   then `Migrate` with a 5s deadline → `store: ensuring version table: context deadline exceeded`.
 - Spec §8 "Deploy compiled Go binary as lightweight Docker container on Railway."
 - Overlaps `harness/ideas/_inbox/migrations-run-on-every-boot-with-no-advisory-lock.md` (its secondary ask).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** Same struct, same plan as the unlock-leak finding; the two must land together (a bounded wait without the leak fix makes the leak live). Scope recorded in the survivor's Evaluation.

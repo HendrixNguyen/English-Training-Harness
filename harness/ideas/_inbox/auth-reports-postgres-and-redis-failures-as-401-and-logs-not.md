@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -53,3 +53,8 @@ reasons, so the convention it sets here is the one the remaining six slices will
 - `backend/internal/store/migrations/0001_init.up.sql` — `email VARCHAR(255) UNIQUE NOT NULL`, vs `ON CONFLICT (google_id)` in `backend/internal/auth/repo.go:36`.
 - Observed live in the plan's worktree: `POST /api/v1/auth/google` with a bogus code returned
   `401 {"error":"google_auth_failed"}` and the server log contained no line about the failure at all.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium (top 10).** Confirmed on `main`: `auth/handler.go` maps every `SignIn` error to 401 and `middleware.go` maps every `sessions.Get` error to 401, both without logging. A Redis blip signs out every active user with no operator trace, and the `users_email_key` collision is a permanent, undiagnosable lockout for that account. Plan: `ErrGoogleRejected` sentinel → 401, everything else 5xx + `log.Printf` (never the tokens); `Require` distinguishes `ErrNoSession` from transport errors (503); decide the email-collision response (409). Folds in `service-and-require-failure-paths-are-untested-the-fakes-err.md` — its three tests are this plan's regression tests.
