@@ -3,7 +3,7 @@ type: bug
 status: proposed
 source: reviewer
 run: _inbox
-priority: medium
+priority: high
 ---
 # A failed SaveSyncState orphans the Google object just created, and CODEMAP claims it cannot
 
