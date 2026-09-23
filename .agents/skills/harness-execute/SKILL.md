@@ -12,7 +12,7 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
 ## Procedure
 
 1. `python3 tools/harness/cli.py validate` — stop on failure.
-2. `python3 tools/harness/cli.py lock $PLAN` — if it fails, another executor is running; report and stop.
+2. `python3 tools/harness/cli.py lock $PLAN` — locks this plan only; if it fails, another executor is already running *this same plan*; report and stop.
 3. Read the plan, its idea, its design (if any), and `harness/CODEMAP.md`. Do not explore beyond what the plan names.
 4. Derive names: `SLUG=$(basename $PLAN .md | sed 's/^[0-9-]*-//')`; `PRIO` = plan frontmatter `priority`; `DATE=$(date +%F)`; `BRANCH=harness/$DATE-$PRIO-$SLUG`; `WT=.worktrees/$SLUG`.
 5. `git worktree add $WT -b $BRANCH main` (using-git-worktrees skill). Then `python3 tools/harness/cli.py set $PLAN status=executing branch=$BRANCH worktree=$WT`.
@@ -42,5 +42,5 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
    - Red: read the failing job's log (`gh run view <id> --log-failed`), fix the cause **within the plan's intent**, and push again. Never make CI pass by skipping, loosening or deleting a check.
    - Red for a reason the plan does not cover, or still red after a genuine attempt: set `status=failed` with the run URL and the failing output in `## Failure`. A branch whose CI is red is not `done`.
    - If `gh` cannot read runs (no access, no remote), say so in the summary and leave the plan `done` on your local evidence alone.
-11. `python3 tools/harness/cli.py unlock && python3 tools/harness/cli.py state`; in `ROOT`: `git add harness && git commit -m "harness: execute $SLUG ($STATUS)"`.
+11. `python3 tools/harness/cli.py unlock $PLAN && python3 tools/harness/cli.py state`; in `ROOT`: `git add harness && git commit -m "harness: execute $SLUG ($STATUS)"`.
 12. **Report:** status, branch, worktree, PR URL, verification result, deviations. Stop — do not review.

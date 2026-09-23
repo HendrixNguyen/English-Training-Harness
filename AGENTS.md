@@ -51,7 +51,7 @@ python3 tools/harness/cli.py new-review --plan FILE --verdict pass|pass-with-bug
 python3 tools/harness/cli.py set FILE key=value ...   # frontmatter update with validation
 python3 tools/harness/cli.py next --stage evaluate|execute|review
 python3 tools/harness/cli.py blockers [--plan FILE]     # exit 1 if any unresolved
-python3 tools/harness/cli.py lock PLAN | unlock
+python3 tools/harness/cli.py lock PLAN | unlock [PLAN]   # per-plan; different plans never collide
 python3 tools/harness/cli.py slug "Title"
 python3 tools/harness/cli.py stale-worktrees
 ```

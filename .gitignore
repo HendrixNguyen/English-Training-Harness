@@ -5,6 +5,7 @@ dist/
 *.env
 .env*
 harness/.lock
+harness/.locks/
 .DS_Store
 .worktrees/
 __pycache__/
