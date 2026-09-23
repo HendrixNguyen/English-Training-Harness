@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 10:56. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 11:10. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -56,7 +56,6 @@ _none_
 - `harness/ideas/_inbox/pet-sweep-tests-cannot-fail-on-the-branches-they-are-named-f.md` — Pet sweep tests cannot fail on the branches they are named for [low]
 - `harness/ideas/_inbox/pgrefreshtokensource-has-no-sentinel-for-a-missing-user-so-a.md` — PgRefreshTokenSource has no sentinel for a missing user, so a deleted user gets 500 not 409 [low]
 - `harness/ideas/_inbox/progress-request-validation-is-incomplete-outside-the-gin-bi.md` — Progress request validation is incomplete outside the Gin binding tags [low]
-- `harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — push_subscription.endpoint is an unvalidated user-supplied URL the reminder worker POSTs to (SSRF) [high]
 - `harness/ideas/_inbox/quests-reads-the-users-table-directly-for-the-timezone.md` — quests reads the users table directly for the timezone [medium]
 - `harness/ideas/_inbox/redisratelimiter-has-no-documented-behaviour-when-redis-is-d.md` — RedisRateLimiter has no documented behaviour when Redis is down and a zero Limit blocks everything [low]
 - `harness/ideas/_inbox/root-gitignore-env-silently-swallows-every-module-s-env-exam.md` — Root .gitignore .env* silently swallows every module's .env.example [medium]
@@ -99,7 +98,7 @@ _none_
 
 ## Planned (awaiting approval)
 
-_none_
+- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high]
 
 ## Approved
 
