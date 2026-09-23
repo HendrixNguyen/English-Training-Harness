@@ -1,0 +1,50 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RouteLocationNormalized } from 'vue-router'
+import { AUTH_STORAGE_KEY } from '~/stores/auth'
+import { API_STATE_CACHE } from '~/utils/session'
+import { installSeededCaches } from './fakeCaches'
+
+const navigateTo = vi.fn()
+vi.stubGlobal('defineNuxtRouteMiddleware', <T>(fn: T) => fn)
+vi.stubGlobal('navigateTo', navigateTo)
+
+const { default: guard } = await import('~/middleware/auth.global')
+
+const user = { id: 'u1', email: 'user@example.com', full_name: 'Nguyen Hendrix', cefr_current: 'B1' }
+const to = { path: '/', query: {} } as RouteLocationNormalized
+
+function persistSession(expiresAt: number) {
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ accessToken: 't', expiresAt, user }))
+}
+
+describe('middleware/auth.global — expired session (the daily sign-out path)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    navigateTo.mockReset()
+  })
+
+  it('drops the per-user api-state cache, keeps the assets cache, and redirects to /login', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    persistSession(Date.now() - 1) // expires_in elapsed since the last visit
+
+    guard(to, to)
+
+    await vi.waitFor(async () => expect(await caches.has(API_STATE_CACHE)).toBe(false))
+    expect(await caches.has('assets')).toBe(true)
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+    expect(navigateTo).toHaveBeenCalledWith('/login', { replace: true })
+  })
+
+  it('leaves the cache alone while the session is valid', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    persistSession(Date.now() + 60_000)
+
+    guard(to, to)
+    await Promise.resolve()
+
+    expect(await caches.has(API_STATE_CACHE)).toBe(true)
+    expect(navigateTo).not.toHaveBeenCalled()
+  })
+})

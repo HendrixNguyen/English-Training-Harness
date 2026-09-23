@@ -153,6 +153,11 @@ CREATE TABLE google_sync (
     tasks_created_count INT NOT NULL DEFAULT 0,
     synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Added by migration 0003 (pet day-judgement): the pet's own once-per-day verdict markers.
+ALTER TABLE pet_states
+    ADD COLUMN last_target_met_date DATE,
+    ADD COLUMN judged_through DATE;
 ```
 
 \---

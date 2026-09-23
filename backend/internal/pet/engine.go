@@ -4,7 +4,10 @@
 // through the quests hook; the hourly cron applies only the miss penalty.
 package pet
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Arithmetic from backend spec §8 and §6.3.
 const (
@@ -26,7 +29,7 @@ const (
 	StageWilted    = "wilted"
 )
 
-// State is the pet_states row (§3.2) minus its ids.
+// State is the pet_states row (§3.2 + migration 0003) minus its ids.
 type State struct {
 	PlantName       string
 	HealthPoints    int
@@ -34,6 +37,13 @@ type State struct {
 	CurrentStreak   int
 	LastPracticedAt *time.Time
 	UpdatedAt       time.Time
+	// LastTargetMetDate is the local YYYY-MM-DD whose §8 success was applied
+	// last — the pet's own once-per-day guard. nil until the first target is met.
+	LastTargetMetDate *string
+	// JudgedThrough is the latest local YYYY-MM-DD that can no longer be
+	// penalised: its miss was applied, it was spared, or a revival resolved it.
+	// nil for a pet the sweep has never seen.
+	JudgedThrough *string
 }
 
 // StageFor derives the stage from health and streak. The spec gives no
@@ -55,35 +65,66 @@ func StageFor(health, streak int) string {
 	}
 }
 
-// ApplyTargetMet is §8's success logic, run once per local day from the
-// quests hook: +20 capped at 100, streak+1, last_practiced_at = now.
-func ApplyTargetMet(s State, now time.Time) State {
+// ApplyTargetMet is §8's success logic for localDate, applied once per local
+// day (Repo.SaveTargetMet enforces the once): +20 capped at 100, streak+1,
+// last_practiced_at = now, last_target_met_date = localDate.
+func ApplyTargetMet(s State, now time.Time, localDate string) State {
 	s.HealthPoints = min(MaxHealth, s.HealthPoints+TargetMetHealthBonus)
 	s.CurrentStreak++
 	s.Stage = StageFor(s.HealthPoints, s.CurrentStreak)
 	t := now
 	s.LastPracticedAt = &t
+	s.LastTargetMetDate = &localDate
 	s.UpdatedAt = now
 	return s
 }
 
-// ApplyMiss is §8's inactivity logic, run by the hourly cron for a user whose
-// previous local day stayed under 1800s: -30 floored at 0, wilted at 0. §8 is
-// silent on the streak; a streak with a missed day in it is not a streak, so
-// it resets.
-func ApplyMiss(s State, now time.Time) State {
+// ApplyMiss is §8's inactivity logic for the local day judged, run by the
+// hourly sweep when that day stayed under 1800s: -30 floored at 0, wilted at
+// 0, streak reset (§8 is silent on the streak; a streak with a missed day in
+// it is not a streak), and judged_through advanced to judged. The real repo
+// performs this arithmetic in SQL (PgRepo.PenaliseMiss); this Go form is the
+// reference the fake repo and the integration test hold it to.
+func ApplyMiss(s State, now time.Time, judged string) State {
 	s.HealthPoints = max(0, s.HealthPoints-MissPenalty)
 	s.CurrentStreak = 0
 	s.Stage = StageFor(s.HealthPoints, s.CurrentStreak)
+	s.JudgedThrough = laterDate(s.JudgedThrough, judged)
 	s.UpdatedAt = now
 	return s
 }
 
-// ApplyRevive is the §6.3 pass: health 50, sprout, streak 0.
-func ApplyRevive(s State, now time.Time) State {
+// ApplyRevive is the §6.3 pass: health 50, sprout, streak 0 — and the local
+// day it was passed on is resolved (judged_through = localDate), so that
+// night's sweep does not take the §8 penalty out of the 50 (plan decision 4).
+// It is not a success: last_practiced_at and last_target_met_date are untouched,
+// so reaching 1800s later the same day still earns the +20.
+func ApplyRevive(s State, now time.Time, localDate string) State {
 	s.HealthPoints = ReviveHealth
 	s.CurrentStreak = 0
 	s.Stage = StageFor(s.HealthPoints, s.CurrentStreak)
+	s.JudgedThrough = laterDate(s.JudgedThrough, localDate)
 	s.UpdatedAt = now
 	return s
+}
+
+// laterDate keeps a verdict date monotonic. YYYY-MM-DD strings order lexically.
+func laterDate(cur *string, d string) *string {
+	if cur != nil && *cur > d {
+		return cur
+	}
+	return &d
+}
+
+// PreviousDate is the civil day before a YYYY-MM-DD. It is pure calendar
+// arithmetic — no timezone, no instant — so it is unaffected by a zone whose
+// local midnight does not exist (spring-forward at 00:00) or exists twice.
+func PreviousDate(date string) string {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		// Callers pass quests.LocalDate output; a bad value would judge the
+		// wrong day silently, so fail loudly.
+		panic(fmt.Sprintf("pet: PreviousDate got a malformed date %q", date))
+	}
+	return d.AddDate(0, 0, -1).Format("2006-01-02")
 }

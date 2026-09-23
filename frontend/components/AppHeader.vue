@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuthStore } from '~/stores/auth'
-import { clearApiCache } from '~/utils/session'
 
 defineProps<{ streak?: number | null }>()
 
@@ -9,8 +8,7 @@ const auth = useAuthStore()
 const menuOpen = ref(false)
 
 async function signOut() {
-  auth.signOut()
-  await clearApiCache()
+  await auth.signOut()
   await navigateTo('/login', { replace: true })
 }
 </script>

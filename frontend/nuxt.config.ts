@@ -22,16 +22,15 @@ export default defineNuxtConfig({
       ],
     },
   },
-  // NUXT_PUBLIC_API_BASE, NUXT_PUBLIC_GOOGLE_CLIENT_ID, NUXT_PUBLIC_VAPID_PUBLIC_KEY,
-  // NUXT_PUBLIC_STUB_ONBOARDING override these at runtime (Nuxt convention;
-  // the idea's bare API_BASE/GOOGLE_CLIENT_ID/VAPID_PUBLIC_KEY names are the
-  // same values under the NUXT_PUBLIC_ prefix).
+  // NUXT_PUBLIC_API_BASE, NUXT_PUBLIC_GOOGLE_CLIENT_ID, NUXT_PUBLIC_VAPID_PUBLIC_KEY
+  // override these at runtime (Nuxt convention; the idea's bare API_BASE/
+  // GOOGLE_CLIENT_ID/VAPID_PUBLIC_KEY names are the same values under the
+  // NUXT_PUBLIC_ prefix).
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:8080',
       googleClientId: '',
       vapidPublicKey: '',
-      stubOnboarding: 'true',
     },
   },
   pwa: {

@@ -50,7 +50,7 @@ func TestRecordProgressIncrementsRedisBeforeWritingPostgres(t *testing.T) {
 	want := []string{
 		"INCRBY u1|2026-09-22 600",
 		"EXPIRE u1|2026-09-22",
-		"UPSERT daily_progress u1|2026-09-22 minutes=10 target=false",
+		"UPSERT daily_progress u1|2026-09-22 minutes=10",
 		"MARK COMPLETE ex-2-reading",
 	}
 	if !reflect.DeepEqual(h.log.calls, want) {
@@ -139,6 +139,124 @@ func TestFurtherProgressTheSameDayDoesNotRefire(t *testing.T) {
 	}
 	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 40 {
 		t.Errorf("minutes_spent = %d, want 40 (2400s / 60)", row.minutes)
+	}
+}
+
+func TestTheCrossingCallLogsHookThenFlagThenExercise(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	if _, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 1800); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"INCRBY u1|2026-09-22 1800",
+		"EXPIRE u1|2026-09-22",
+		"UPSERT daily_progress u1|2026-09-22 minutes=30",
+		"ON TARGET MET u1|2026-09-22",
+		"MARK TARGET MET u1|2026-09-22",
+		"MARK COMPLETE ex-2-reading",
+	}
+	if !reflect.DeepEqual(h.log.calls, want) {
+		t.Errorf("calls = %q\nwant  %q", h.log.calls, want)
+	}
+}
+
+func TestTheHookFiresFromTheDurableFlagNotTheCounterEdge(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err != nil {
+		t.Fatal(err)
+	}
+	// The Redis key is lost mid-day (eviction, restart, FLUSHDB). The counter
+	// restarts at 0 and the next 1800s "cross" the edge a second time.
+	h.counter.totals = map[string]int64{}
+	out, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 1800)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.pet.fired != 1 {
+		t.Errorf("hook fired %d times, want 1 — daily_progress.is_target_met already says the pet was told", h.pet.fired)
+	}
+	if out.NewlyMet || !out.IsTargetMet {
+		t.Errorf("out = %+v, want NewlyMet false and IsTargetMet true (the durable row wins)", out)
+	}
+	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 30 || !row.targetMet {
+		t.Errorf("row = %+v, want minutes 30 (never lowered) and target met", row)
+	}
+}
+
+func TestAFailedUpsertOnTheCrossingCallIsRetriedByTheNextCall(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	h.progress.err = errors.New("pool exhausted")
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err == nil {
+		t.Fatal("want the upsert error surfaced")
+	}
+	if h.pet.fired != 0 {
+		t.Fatalf("hook fired %d times on a failed write, want 0", h.pet.fired)
+	}
+	h.progress.err = nil
+	out, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 60) // counter is at 1860: the old edge test says "not newly met"
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.pet.fired != 1 || !out.NewlyMet {
+		t.Errorf("fired=%d NewlyMet=%t; want 1 and true — the day was never handed to the pet", h.pet.fired, out.NewlyMet)
+	}
+}
+
+func TestAFailedMarkCompleteOnTheCrossingCallDoesNotLoseTheHook(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	h.quests.markCompleteErr = ErrExerciseNotFound
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); !errors.Is(err, ErrExerciseNotFound) {
+		t.Fatalf("err = %v, want ErrExerciseNotFound", err)
+	}
+	if h.pet.fired != 1 || !h.progress.rows["u1|2026-09-22"].targetMet {
+		t.Errorf("fired=%d targetMet=%t; want the pet told and the day flagged before the exercise write", h.pet.fired, h.progress.rows["u1|2026-09-22"].targetMet)
+	}
+	h.quests.markCompleteErr = nil
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 60); err != nil {
+		t.Fatal(err)
+	}
+	if h.pet.fired != 1 {
+		t.Errorf("hook fired %d times, want still 1", h.pet.fired)
+	}
+}
+
+func TestAPetHookFailureLeavesTheDayUnflaggedSoTheNextCallRetries(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	h.pet.hookErr = errors.New("pet is on fire")
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err != nil {
+		t.Fatalf("a hook failure must not fail the request: %v", err)
+	}
+	if h.pet.fired != 1 || h.progress.rows["u1|2026-09-22"].targetMet {
+		t.Fatalf("fired=%d targetMet=%t; want 1 and false — the flag means 'the pet was told'", h.pet.fired, h.progress.rows["u1|2026-09-22"].targetMet)
+	}
+	h.pet.hookErr = nil
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 60); err != nil {
+		t.Fatal(err)
+	}
+	if h.pet.fired != 2 || !h.progress.rows["u1|2026-09-22"].targetMet {
+		t.Errorf("fired=%d targetMet=%t; want 2 (pet's own marker makes the re-fire a no-op) and true", h.pet.fired, h.progress.rows["u1|2026-09-22"].targetMet)
+	}
+}
+
+func TestAFailedTargetMetFlagIsLoggedNotReturned(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	h.progress.markErr = errors.New("pool exhausted")
+	out, err := h.svc.RecordProgress(context.Background(), "u1", "ex-2-reading", 1800)
+	if err != nil {
+		t.Fatalf("a failed flag must not 500 the recorded session (a retry would INCRBY again): %v", err)
+	}
+	if h.pet.fired != 1 || !out.NewlyMet || !h.quests.completed["ex-2-reading"] {
+		t.Errorf("fired=%d out=%+v completed=%t; want the hook, the response and the exercise unaffected", h.pet.fired, out, h.quests.completed["ex-2-reading"])
 	}
 }
 

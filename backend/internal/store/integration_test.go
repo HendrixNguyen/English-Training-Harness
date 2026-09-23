@@ -48,6 +48,12 @@ func reset(t *testing.T, pg *Postgres) {
 		t.Fatal("reset called without TEST_DATABASE_URL; refusing to drop tables")
 	}
 	ctx := context.Background()
+	// 0003_pet_verdict_dates.up.sql only adds columns to pet_states, so
+	// 0001_init's DROP TABLE (which the loop below still runs) removes them
+	// too — unlike 0001/0002's statements, 0003's ALTER TABLE has no "IF
+	// EXISTS" on the table itself, so running it here would fail whenever
+	// reset() is called against an already-empty database (its first use in
+	// a test binary, or right after a sibling test's own cleanup).
 	for _, name := range []string{"migrations/0002_google_sync.down.sql", "migrations/0001_init.down.sql"} {
 		down, err := MigrationsFS.ReadFile(name)
 		if err != nil {
@@ -73,7 +79,7 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 	if err != nil {
 		t.Fatalf("first Migrate: %v", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync"}; !reflect.DeepEqual(first, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates"}; !reflect.DeepEqual(first, want) {
 		t.Fatalf("first run applied %v, want %v", first, want)
 	}
 
@@ -141,7 +147,7 @@ func TestIntegrationConcurrentMigrateDoesNotRace(t *testing.T) {
 		}
 		total += len(<-applied)
 	}
-	const versions = 2 // 0001_init, 0002_google_sync
+	const versions = 3 // 0001_init, 0002_google_sync, 0003_pet_verdict_dates
 	if total != versions {
 		t.Errorf("migrations were applied %d times across %d concurrent callers, want exactly %d", total, n, versions)
 	}

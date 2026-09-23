@@ -56,10 +56,17 @@ type QuestRepo interface {
 	MarkComplete(ctx context.Context, roadmapID, exerciseID string) error
 }
 
-// ProgressRepo owns the daily_progress upsert.
+// ProgressRepo owns daily_progress. The row is monotonic: minutes_spent never
+// lowers and is_target_met never returns to FALSE, so a Redis counter lost
+// mid-day cannot rewrite the durable record from a restarted total.
+// is_target_met means "the pet has been told about this day": Upsert reports
+// it, and MarkTargetMet sets it after Pet.OnTargetMet has returned nil.
 type ProgressRepo interface {
-	// Upsert writes minutes_spent and is_target_met for (userID, localDate).
-	Upsert(ctx context.Context, userID, localDate string, minutes int, targetMet bool) error
+	// Upsert writes minutes_spent for (userID, localDate) — never lowering it —
+	// and reports whether is_target_met is already TRUE on that row.
+	Upsert(ctx context.Context, userID, localDate string, minutes int) (alreadyMet bool, err error)
+	// MarkTargetMet flips is_target_met to TRUE. Idempotent.
+	MarkTargetMet(ctx context.Context, userID, localDate string) error
 }
 
 const (
@@ -89,13 +96,20 @@ SET is_completed = TRUE
 WHERE id = $1 AND roadmap_id = $2`
 
 	// daily_progress.date defaults to CURRENT_DATE, which is the *server's*
-	// date — always pass the user's local date explicitly.
+	// date — always pass the user's local date explicitly. A new row starts
+	// is_target_met = FALSE whatever the total: only MarkTargetMet sets it,
+	// after the pet hook, so the flag never gets ahead of the pet.
 	upsertProgressSQL = `
 INSERT INTO daily_progress (user_id, date, minutes_spent, is_target_met)
-VALUES ($1, $2::date, $3, $4)
+VALUES ($1, $2::date, $3, FALSE)
 ON CONFLICT (user_id, date) DO UPDATE SET
-    minutes_spent = EXCLUDED.minutes_spent,
-    is_target_met = EXCLUDED.is_target_met`
+    minutes_spent = GREATEST(COALESCE(daily_progress.minutes_spent, 0), EXCLUDED.minutes_spent)
+RETURNING COALESCE(is_target_met, FALSE)`
+
+	markTargetMetSQL = `
+UPDATE daily_progress
+SET is_target_met = TRUE
+WHERE user_id = $1 AND date = $2::date`
 )
 
 // PgRepo implements both QuestRepo and ProgressRepo over one pool.
@@ -165,9 +179,17 @@ func (r *PgRepo) MarkComplete(ctx context.Context, roadmapID, exerciseID string)
 	return nil
 }
 
-func (r *PgRepo) Upsert(ctx context.Context, userID, localDate string, minutes int, targetMet bool) error {
-	if _, err := r.Pool.Exec(ctx, upsertProgressSQL, userID, localDate, minutes, targetMet); err != nil {
-		return fmt.Errorf("quests: upserting daily_progress: %w", err)
+func (r *PgRepo) Upsert(ctx context.Context, userID, localDate string, minutes int) (bool, error) {
+	var alreadyMet bool
+	if err := r.Pool.QueryRow(ctx, upsertProgressSQL, userID, localDate, minutes).Scan(&alreadyMet); err != nil {
+		return false, fmt.Errorf("quests: upserting daily_progress: %w", err)
+	}
+	return alreadyMet, nil
+}
+
+func (r *PgRepo) MarkTargetMet(ctx context.Context, userID, localDate string) error {
+	if _, err := r.Pool.Exec(ctx, markTargetMetSQL, userID, localDate); err != nil {
+		return fmt.Errorf("quests: marking target met: %w", err)
 	}
 	return nil
 }
