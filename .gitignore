@@ -2,8 +2,11 @@ node_modules/
 dist/
 .nuxt/
 .output/
+test-results/
+playwright-report/
 *.env
 .env*
+!.env.example
 harness/.lock
 harness/.locks/
 .DS_Store

@@ -143,6 +143,16 @@ CREATE TABLE exercises (
     content_json JSONB NOT NULL,
     is_completed BOOLEAN DEFAULT FALSE
 );
+
+-- Added by migration 0002 (google slice): ids for idempotent Calendar/Tasks re-sync.
+CREATE TABLE google_sync (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    calendar_event_id TEXT,
+    tasklist_id TEXT,
+    roadmap_id UUID REFERENCES roadmaps(id) ON DELETE SET NULL,
+    tasks_created_count INT NOT NULL DEFAULT 0,
+    synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 \---

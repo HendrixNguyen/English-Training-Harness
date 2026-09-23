@@ -15,11 +15,26 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/google"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
+
+// petForOnboarding adapts *pet.Service to onboarding.Pet. onboarding defines
+// its own PetState so it never imports pet (pet imports quests; quests' tests
+// import onboarding — an import here would be a cycle).
+type petForOnboarding struct{ svc *pet.Service }
+
+func (p petForOnboarding) Ensure(ctx context.Context, userID string) (onboarding.PetState, error) {
+	st, err := p.svc.Ensure(ctx, userID)
+	if err != nil {
+		return onboarding.PetState{}, err
+	}
+	return onboarding.PetState{PlantName: st.PlantName, HealthPoints: st.HealthPoints, Stage: st.Stage}, nil
+}
 
 func main() {
 	// Cancellable so background work started with it (the pet hourly cron)
@@ -99,6 +114,26 @@ func main() {
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
 	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
 	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
+
+	googleSvc := google.NewService(
+		google.NewPgRefreshTokenSource(pg.Pool), // plaintext today; the §7 encryption fix replaces only this
+		google.NewOAuthClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
+		google.NewHTTPCalendarClient(),
+		google.NewHTTPTasksClient(),
+		google.NewPgRepo(pg.Pool),
+		time.Now,
+	)
+	guarded.POST("/integrations/google/sync", google.SyncHandler(googleSvc))
+	onboardingSvc := onboarding.NewService(
+		onboarding.NewPgRepo(pg.Pool),
+		onboarding.NewRedisQuizStore(rdb),
+		airouter.NewRedisRateLimiter(rdb),
+		aiRouter,
+		petForOnboarding{svc: petSvc},
+		time.Now,
+	)
+	guarded.GET("/onboarding/quiz", onboarding.QuizHandler())
+	guarded.POST("/onboarding/assessment", onboarding.AssessmentHandler(onboardingSvc))
 
 	log.Printf("listening on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
