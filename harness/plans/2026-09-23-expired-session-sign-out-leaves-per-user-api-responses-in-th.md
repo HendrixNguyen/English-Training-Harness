@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/expired-session-sign-out-leaves-per-user-api-responses-in-th.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-23-high-expired-session-sign-out-leaves-per-user-api-responses-in-th
+worktree: .worktrees/expired-session-sign-out-leaves-per-user-api-responses-in-th
 ---
 # Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan
 
@@ -292,3 +294,32 @@ From `frontend/` in the worktree, clean shell (`env -u NUXT_PUBLIC_API_BASE -u P
 - **`ExpirationPlugin` deliberately not included.** The idea suggests bounding `api-state` with `workbox-expiration` as a second line of defence. That is a new dependency plus a change to `service-worker/sw.ts`, which is excluded from `tsconfig.json`, not unit-tested, and blocked in Playwright (`serviceWorkers: 'block'`) — i.e. it would ship unverified. With `signOut()` owning the clear there is no sign-out path left that keeps the cache, so the expiry would only shrink a window that no longer exists. If the owner still wants a `maxAgeSeconds` bound (e.g. for a device that is never signed out), it should be its own small idea with a browser-level verification step.
 - **Why `void auth.signOut()` in the guard rather than `await`:** `defineNuxtRouteMiddleware` may return a promise, but the redirect must not wait on a `caches.delete` that a broken service worker could stall; the state reset that gates `isAuthenticated` is synchronous, and the cache delete is idempotent, so fire-and-forget is correct here.
 - **Behaviour on `/login` after a lapse** is unchanged: `/login` fetches nothing from `api-state` URLs, and by the time the next account's dashboard requests `/quests/daily` the delete has long completed.
+
+## Execution summary
+
+Executed 2026-09-23 in `.worktrees/expired-session-sign-out-leaves-per-user-api-responses-in-th` on branch `harness/2026-09-23-high-expired-session-sign-out-leaves-per-user-api-responses-in-th`. All three tasks implemented exactly as specified — no deviation from the plan's design (store-owned `signOut()`, no fourth `clearApiCache()` copy in the middleware).
+
+**Agree with the store-ownership design.** Distributing the clear across three callers is exactly how the middleware forgot it in the first place; putting it in `signOut()` means any future sign-out path (there is only one action to call) can't repeat the bug. The rejected one-liner would have fixed today's instance without fixing the pattern.
+
+**Commits:**
+- `ee92978` — regression test (fakeCaches.ts, authMiddleware.test.ts), committed failing
+- `4d89a81` — the fix: `stores/auth.ts` returns `clearApiCache()`; `AppHeader.vue`, `useApi.ts`, `middleware/auth.global.ts` updated; `authStore.test.ts` extended
+- `1b1503c` — CODEMAP shell bullet updated
+
+**Verification (all from `frontend/`, clean shell):**
+1. `npm ci && npm run lint && npm run typecheck` — exit 0 each.
+2. `npm run test:unit` — 16 files, 65 tests, all passed (includes `authMiddleware.test.ts` 2/2 and `authStore.test.ts` 7/7, i.e. the 2 new cases).
+3. **Mutation checks:**
+   - Revert (`return clearApiCache()` → `return Promise.resolve()`): both `authMiddleware` case 1 and `authStore` "deletes the service worker api-state cache" failed identically — `AssertionError: expected true to be false` at `expect(await caches.has(API_STATE_CACHE)).toBe(false)` / the equivalent `vi.waitFor` line. Restored; `git diff --quiet` clean; re-ran green.
+   - Wrong cache name (`utils/session.ts`: `caches.delete(API_STATE_CACHE)` → `caches.delete('api_state')`, `API_STATE_CACHE` constant left at `'api-state'`): the same two assertions failed the same way (seeded `api-state` entry survives). Restored; `git diff --quiet stores/auth.ts utils/session.ts` clean; re-ran green.
+   - **The `assets` entry surviving is genuinely asserted**, not incidental: `authMiddleware.test.ts` asserts `expect(await caches.has('assets')).toBe(true)` and `authStore.test.ts` asserts `expect(await caches.keys()).toEqual(['assets'])` — a clear that wiped every cache would fail `toEqual(['assets'])`, since `keys()` would be `[]`. Neither mutation above touched this assertion; it passed unchanged both times, confirming a global-wipe bug is a distinct failure this suite would catch.
+4. `grep -rn 'clearApiCache' ...` → 3 line-matches across the 2 expected files (`stores/auth.ts`: import + call; `utils/session.ts`: definition). No other caller remains.
+5. `npm run build` — exit 0; `grep -c 'api-state' .output/public/sw.js` → 1.
+6. `git diff --stat main..HEAD -- ../backend` → empty. Backend untouched.
+7. Pushed; CI run [35847512334](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35847512334) — `backend-integration`, `harness-tooling`, `frontend` (lint/typecheck/unit/build all ran), `backend-unit` all green.
+
+**Runtime proof:** Built app served via `node .output/server/index.mjs` on port 3106 (`NUXT_PUBLIC_STUB_ONBOARDING=true`). `curl http://localhost:3106/` → HTTP 200. Playwright: (a) fresh browser, no session, navigate to `/` → redirected to `/login`. (b) `localStorage.setItem('aelp.auth', {accessToken:'t', expiresAt: Date.now()-1000, user})` (an expired session), navigate to `/` → redirected to `/login`, confirming the guard's expired-session branch runs end to end against the built app, not just under Vitest. Server stopped afterward; `pgrep -fl "node .output/server/index.mjs"` empty; no other node dev-server processes were touched (verified against the full process list — only my own preview process existed under that command line).
+
+**Deviations:**
+- Plan step "Task 2 Step 1" predicted the "signOut still resolves where CacheStorage does not exist" case would pass before the fix (since `signOut()` returned `undefined` and `.resolves` "accepts" that). On this project's Vitest 3.2.7, `expect(nonPromise).resolves` throws a `TypeError` instead of passing. Cosmetic only — the test still failed pre-fix as intended and passed post-fix identically; no plan or test logic changed.
+- One observation, not a deviation: my final `browser_close` call in Playwright reported closing a page on `http://127.0.0.1:3105/login`, a port I never navigated to (I only used `localhost:3106`) and one the task instructions flagged as belonging to another agent. I did not inspect or manage anything on 3105 beyond that automatic tool report, and confirmed via full `pgrep` process listing that no server on that port was killed by my `pkill -f "node .output/server/index.mjs"` (scoped by exact command line, and no such other process existed at the time). Flagging for awareness in case the shared browser tooling is cross-agent.
