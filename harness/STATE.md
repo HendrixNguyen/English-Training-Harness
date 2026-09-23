@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 18:16. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 20:06. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -23,6 +23,7 @@ _none_
 - `harness/ideas/_inbox/get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — GET quests/daily still reads is_target_met from the volatile counter [medium]
 - `harness/ideas/_inbox/gofmt-l-has-been-failing-on-two-internal-quests-files-since-.md` — gofmt -l has been failing on two internal/quests files since before this branch [low]
 - `harness/ideas/_inbox/marktargetmet-ignores-rowsaffected-so-a-missing-row-silently.md` — MarkTargetMet ignores RowsAffected so a missing row silently succeeds [low]
+- `harness/ideas/_inbox/next-stage-review-re-queues-merged-amend-plans-whose-review-.md` — next --stage review re-queues merged amend plans whose review was filed under the parent plan [low]
 - `harness/ideas/_inbox/no-test-pins-the-stale-data-wins-branch-order-on-revive-so-a.md` — No test pins the stale-data-wins branch order on /revive, so a reorder silently regresses the cached-status case [low]
 - `harness/ideas/_inbox/nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` — Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400 [medium]
 - `harness/ideas/_inbox/onboarding-s-ai-error-copy-is-untested-deleting-the-whole-br.md` — Onboarding's ai_* error copy is untested — deleting the whole branch leaves the suite green [medium]
