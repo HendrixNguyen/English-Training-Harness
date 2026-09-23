@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/expired-session-sign-out-leaves-per-user-api-responses-in-th.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---

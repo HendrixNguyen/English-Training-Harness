@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---
