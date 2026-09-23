@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 17:36. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 17:59. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -23,7 +23,7 @@ _none_
 - `harness/ideas/_inbox/onboarding-s-ai-error-copy-is-untested-deleting-the-whole-br.md` — Onboarding's ai_* error copy is untested — deleting the whole branch leaves the suite green [medium]
 - `harness/ideas/_inbox/practiceeventid-is-a-lossy-filter-that-can-return-a-4-charac.md` — PracticeEventID is a lossy filter that can return a 4-character id and collide, with no guard and no test [low]
 - `harness/ideas/_inbox/the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered [medium]
-- `harness/ideas/_inbox/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — The API sends no CORS headers, so the deployed PWA on its own Railway domain cannot call a single endpoint [medium]
+- `harness/ideas/_inbox/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — The API sends no CORS headers, so the deployed PWA on its own Railway domain cannot call a single endpoint [high]
 - `harness/ideas/_inbox/the-api-state-cache-still-has-no-expiry-bound-so-a-stale-res.md` — The api-state cache still has no expiry bound so a stale response can be served indefinitely [low]
 - `harness/ideas/_inbox/the-revive-missed-days-line-renders-bo-hoc2-ngay-with-no-spa.md` — The /revive missed-days line renders "bỏ học2 ngày" with no space before the day count [low]
 
@@ -82,10 +82,11 @@ _none_
 
 ## Executing
 
-- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium]
+_none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
 - `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high] (review: pass-with-bugs)
@@ -95,7 +96,6 @@ _none_
 - `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 
