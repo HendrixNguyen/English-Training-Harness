@@ -66,6 +66,9 @@ func TestOnTargetMetAppliesSpec8SuccessOnceAndPersists(t *testing.T) {
 	if h.repo.saved != 1 {
 		t.Errorf("saved %d times, want 1", h.repo.saved)
 	}
+	if got.LastTargetMetDate == nil || *got.LastTargetMetDate != "2026-09-22" {
+		t.Errorf("LastTargetMetDate = %v, want 2026-09-22", got.LastTargetMetDate)
+	}
 }
 
 func TestOnTargetMetForAUserWithoutARowCreatesIt(t *testing.T) {
@@ -295,5 +298,93 @@ func TestSweepSkipsAUnreadableCounterAndContinues(t *testing.T) {
 	}
 	if n != 0 || h.repo.states["u1"].HealthPoints != 100 {
 		t.Errorf("a pet was penalised on an unreadable counter: n=%d health=%d", n, h.repo.states["u1"].HealthPoints)
+	}
+}
+
+func TestOnTargetMetTwiceForTheSameLocalDateBumpsOnce(t *testing.T) {
+	h := newHarness(sept22)
+	h.repo.states["u1"] = State{PlantName: "Fern", HealthPoints: 80, CurrentStreak: 4, Stage: StageSapling}
+
+	for i := 0; i < 2; i++ {
+		if err := h.svc.OnTargetMet(ctx, "u1", "2026-09-22"); err != nil {
+			t.Fatalf("call %d: %v — a repeat must be a silent no-op, not an error", i+1, err)
+		}
+	}
+	got := h.repo.states["u1"]
+	if got.HealthPoints != 100 || got.CurrentStreak != 5 {
+		t.Errorf("state = %+v, want 100/5 — the second call for the same day double-bumped", got)
+	}
+	if h.repo.saved != 1 {
+		t.Errorf("saved %d times, want 1", h.repo.saved)
+	}
+}
+
+func TestOnTargetMetForTheNextLocalDateBumpsAgain(t *testing.T) {
+	h := newHarness(sept22)
+	h.repo.states["u1"] = State{HealthPoints: 40, CurrentStreak: 4, Stage: StageSapling}
+
+	if err := h.svc.OnTargetMet(ctx, "u1", "2026-09-22"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.svc.OnTargetMet(ctx, "u1", "2026-09-23"); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.repo.states["u1"]; got.HealthPoints != 80 || got.CurrentStreak != 6 || *got.LastTargetMetDate != "2026-09-23" {
+		t.Errorf("state = %+v, want 80/6 marked 2026-09-23 — the guard must not simply never bump", got)
+	}
+}
+
+func TestOnTargetMetForAnEarlierLocalDateIsIgnored(t *testing.T) {
+	// A user who moves their timezone west can make "today" an earlier date
+	// than the one already counted; the marker is monotonic, so no re-earn.
+	h := newHarness(sept22)
+	d := "2026-09-23"
+	h.repo.states["u1"] = State{HealthPoints: 40, CurrentStreak: 1, Stage: StageSprout, LastTargetMetDate: &d}
+
+	if err := h.svc.OnTargetMet(ctx, "u1", "2026-09-22"); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.repo.states["u1"]; got.HealthPoints != 40 || h.repo.saved != 0 {
+		t.Errorf("state = %+v saved=%d, want untouched", got, h.repo.saved)
+	}
+}
+
+func TestRevivePassResolvesTheLocalDayItWasPassedOn(t *testing.T) {
+	h := newHarness(sept22)
+	h.repo.states["u1"] = State{HealthPoints: 0, Stage: StageWilted}
+	h.study.set("u1", "2026-09-22", 0)
+	if _, err := h.svc.Revive(ctx, "u1"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	h.study.set("u1", "2026-09-22", 900)
+	out, err := h.svc.Revive(ctx, "u1")
+	if err != nil || !out.Passed {
+		t.Fatalf("pass: out=%+v err=%v", out, err)
+	}
+	got := h.repo.states["u1"]
+	if got.JudgedThrough == nil || *got.JudgedThrough != "2026-09-22" {
+		t.Errorf("JudgedThrough = %v, want 2026-09-22 (plan decision 4: a passed revival resolves its day)", got.JudgedThrough)
+	}
+	if got.LastTargetMetDate != nil || got.LastPracticedAt != nil {
+		t.Error("a revival is not a met target")
+	}
+	// The +20 for a full 30 minutes the same day is still available.
+	if err := h.svc.OnTargetMet(ctx, "u1", "2026-09-22"); err != nil {
+		t.Fatal(err)
+	}
+	if got = h.repo.states["u1"]; got.HealthPoints != 70 || got.CurrentStreak != 1 {
+		t.Errorf("after revive then target met = %+v, want 70/1", got)
+	}
+}
+
+func TestReviveSurfacesATimezoneReadFailure(t *testing.T) {
+	h := newHarness(sept22)
+	h.repo.states["u1"] = State{HealthPoints: 0, Stage: StageWilted}
+	h.repo.timezoneErr = errBoom
+	if _, err := h.svc.Revive(ctx, "u1"); !errors.Is(err, errBoom) {
+		t.Fatalf("err = %v, want errBoom", err)
+	}
+	if h.challenges.started != 0 {
+		t.Error("a challenge was started without knowing the user's local day")
 	}
 }

@@ -46,15 +46,21 @@ func (s *Service) Ensure(ctx context.Context, userID string) (State, error) {
 	return s.repo.Get(ctx, userID)
 }
 
-// OnTargetMet is §8's success logic, applied once per local day: quests fires
-// it on the progress call that crosses 1800s (backend spec §6.2). localDate
-// is informational — the row is not keyed by day.
+// OnTargetMet is §8's success logic for the user's local day localDate:
+// quests fires it when the day's total first reaches 1800s (backend spec
+// §6.2), and may fire it again after a failure on the same call or after a
+// lost Redis counter. The pet owns the once: Repo.SaveTargetMet's predicate
+// on last_target_met_date refuses a second write for the same (or an
+// earlier) local date, and that refusal is a silent no-op — quests logs hook
+// errors, and "already counted" is not one. There is deliberately no Go-side
+// pre-check: one mechanism, in the database, is what the tests pin.
 func (s *Service) OnTargetMet(ctx context.Context, userID, localDate string) error {
 	st, err := s.Ensure(ctx, userID)
 	if err != nil {
 		return err
 	}
-	return s.repo.Save(ctx, userID, ApplyTargetMet(st, s.now(), localDate))
+	_, err = s.repo.SaveTargetMet(ctx, userID, ApplyTargetMet(st, s.now(), localDate))
+	return err
 }
 
 // Revive implements the 15-minute revival challenge behind POST /pet/revive.
@@ -63,8 +69,10 @@ func (s *Service) OnTargetMet(ctx context.Context, userID, localDate string) err
 // The first call on a local day starts a challenge, recording the daily
 // counter's current value; each later call the same day checks whether
 // ReviveSeconds more have been recorded through POST /quests/progress. On pass
-// the state becomes 50 / sprout / 0 (§6.3) and the challenge is cleared. A
-// challenge left over from an earlier local day is replaced.
+// the state becomes 50 / sprout / 0 (§6.3), the local day is resolved so that
+// night's sweep applies no miss for it (judged_through = today), and the
+// challenge is cleared. A challenge left over from an earlier local day is
+// replaced.
 func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, error) {
 	st, err := s.Ensure(ctx, userID)
 	if err != nil {
