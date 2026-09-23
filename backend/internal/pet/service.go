@@ -54,7 +54,7 @@ func (s *Service) OnTargetMet(ctx context.Context, userID, localDate string) err
 	if err != nil {
 		return err
 	}
-	return s.repo.Save(ctx, userID, ApplyTargetMet(st, s.now()))
+	return s.repo.Save(ctx, userID, ApplyTargetMet(st, s.now(), localDate))
 }
 
 // Revive implements the 15-minute revival challenge behind POST /pet/revive.
@@ -104,7 +104,7 @@ func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, erro
 		return ReviveResult{Passed: false, State: st}, nil
 	}
 
-	st = ApplyRevive(st, now)
+	st = ApplyRevive(st, now, today)
 	if err := s.repo.Save(ctx, userID, st); err != nil {
 		return ReviveResult{}, err
 	}
@@ -162,7 +162,7 @@ func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
 		if total >= quests.TargetSeconds {
 			continue
 		}
-		if err := s.repo.Save(ctx, c.UserID, ApplyMiss(c.State, now)); err != nil {
+		if err := s.repo.Save(ctx, c.UserID, ApplyMiss(c.State, now, yesterday)); err != nil {
 			errs = append(errs, fmt.Errorf("user %s: %w", c.UserID, err))
 			continue
 		}

@@ -87,7 +87,7 @@ func TestIntegrationEnsureCreatesExactlyOnePetRow(t *testing.T) {
 		t.Errorf("after target met = %+v, want 100/1 with last_practiced_at set", st)
 	}
 	for i := 0; i < 4; i++ {
-		if err := repo.Save(ctx, userID, ApplyMiss(st, time.Now())); err != nil {
+		if err := repo.Save(ctx, userID, ApplyMiss(st, time.Now(), "2026-09-22")); err != nil {
 			t.Fatalf("Save miss %d: %v", i+1, err)
 		}
 		st, _ = repo.Get(ctx, userID)
