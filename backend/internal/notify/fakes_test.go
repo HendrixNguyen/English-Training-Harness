@@ -115,9 +115,10 @@ func (f *fakeQueue) Remove(_ context.Context, userID string) error {
 }
 
 type fakeSender struct {
-	log  *callLog
-	gone map[string]bool // endpoint → answer ErrSubscriptionGone
-	fail map[string]bool // endpoint → answer a generic error
+	log       *callLog
+	gone      map[string]bool // endpoint → answer ErrSubscriptionGone
+	fail      map[string]bool // endpoint → answer a generic error
+	forbidden map[string]bool // endpoint → answer ErrForbiddenEndpoint
 
 	// mu guards sent: RunWorker's tests read it from the test goroutine while
 	// Tick runs in a background one (see worker_test.go). Every other test
@@ -127,13 +128,16 @@ type fakeSender struct {
 }
 
 func newFakeSender(log *callLog) *fakeSender {
-	return &fakeSender{log: log, gone: map[string]bool{}, fail: map[string]bool{}}
+	return &fakeSender{log: log, gone: map[string]bool{}, fail: map[string]bool{}, forbidden: map[string]bool{}}
 }
 
 func (f *fakeSender) Send(_ context.Context, sub Subscription, _ Payload) error {
 	f.log.add("sender.Send(%s)", sub.Endpoint)
 	if f.gone[sub.Endpoint] {
 		return ErrSubscriptionGone
+	}
+	if f.forbidden[sub.Endpoint] {
+		return fmt.Errorf("%w: refusing to dial 10.0.0.5", ErrForbiddenEndpoint)
 	}
 	if f.fail[sub.Endpoint] {
 		return fmt.Errorf("push service returned 429")

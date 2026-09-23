@@ -100,8 +100,9 @@ func (s *Service) UpdateSettings(ctx context.Context, userID string, req Setting
 // Tick is one worker pass at now: pop due users, re-slot each for tomorrow
 // FIRST (a crash mid-send then costs one reminder, not one every 30 s), skip
 // those who already met today's target, send to every subscription, prune
-// 404/410 ones, and drop users with nothing to send to. Per-user failures
-// are collected and returned joined; the pass never stops early.
+// 404/410 and forbidden-endpoint ones, and drop users with nothing to send
+// to. Per-user failures are collected and returned joined; the pass never
+// stops early.
 func (s *Service) Tick(ctx context.Context, now time.Time) (TickStats, error) {
 	var stats TickStats
 	due, err := s.queue.Due(ctx, now, DueBatchSize)
@@ -159,6 +160,12 @@ func (s *Service) Tick(ctx context.Context, now time.Time) (TickStats, error) {
 			switch {
 			case errors.Is(err, ErrSubscriptionGone):
 				stats.Pruned++
+				errs = appendIf(errs, s.repo.DeleteSubscription(ctx, sub.ID))
+			case errors.Is(err, ErrForbiddenEndpoint):
+				// Never deliverable and never should have been stored: drop it
+				// like a 410, but say so once in the log.
+				stats.Pruned++
+				errs = append(errs, fmt.Errorf("user %s: %w", userID, err))
 				errs = appendIf(errs, s.repo.DeleteSubscription(ctx, sub.ID))
 			case err != nil:
 				stats.Failed++

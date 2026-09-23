@@ -241,3 +241,30 @@ func TestUpdateSettingsRefusesHostileEndpointsBeforeWriting(t *testing.T) {
 		}
 	}
 }
+
+func TestTickPrunesAForbiddenEndpointAndReportsItOnce(t *testing.T) {
+	// A row stored before validation existed (or via a DNS name that now
+	// resolves privately) must be deleted on the first tick, not retried daily.
+	h := dueHarness()
+	h.sender.forbidden["https://push.example/ep1"] = true
+
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if !errors.Is(err, ErrForbiddenEndpoint) {
+		t.Errorf("err = %v, want the forbidden endpoint reported so the worker logs it", err)
+	}
+	if stats.Pruned != 1 || stats.Sent != 1 || stats.Failed != 0 {
+		t.Errorf("stats = %+v, want Pruned 1 Sent 1 Failed 0", stats)
+	}
+	if subs := h.repo.subs["u1"]; len(subs) != 1 || subs[0].ID != "s2" {
+		t.Errorf("subscriptions after prune = %+v, want only s2", subs)
+	}
+	var deleted bool
+	for _, c := range h.log.calls {
+		if c == "repo.DeleteSubscription(s1)" {
+			deleted = true
+		}
+	}
+	if !deleted {
+		t.Errorf("s1 was not deleted; calls = %v", h.log.calls)
+	}
+}
