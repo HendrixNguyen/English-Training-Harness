@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 20:06. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-24 04:39. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -43,6 +43,10 @@ _none_
 - `harness/ideas/2026-09-22-run-01/spaced-repetition-vocabulary-review-in-the-daily-quest.md` — Spaced Repetition Vocabulary Review in the Daily Quest
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
 - `harness/ideas/2026-09-22-run-02/spec-never-states-when-the-pet-states-row-is-created.md` — Spec never states when the pet_states row is created [low]
+- `harness/ideas/2026-09-24-run-01/ai-graded-writing-practice-through-the-essay-grading-route.md` — AI-graded writing practice through the essay_grading route
+- `harness/ideas/2026-09-24-run-01/day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint: CEFR re-assessment and the next roadmap
+- `harness/ideas/2026-09-24-run-01/settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen wires Web Push reminders and Google Calendar sync to the shipped backend
+- `harness/ideas/2026-09-24-run-01/typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content with answer keys so every quest renders and gives instant feedback
 
 ## Selected
 
