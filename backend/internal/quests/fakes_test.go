@@ -46,11 +46,12 @@ func (f *fakeCounter) Total(_ context.Context, userID, localDate string) (int64,
 }
 
 type fakeQuestRepo struct {
-	log       *callLog
-	timezone  string
-	roadmap   *Roadmap
-	exercises map[int][]Exercise // by day_number
-	completed map[string]bool
+	log             *callLog
+	timezone        string
+	roadmap         *Roadmap
+	exercises       map[int][]Exercise // by day_number
+	completed       map[string]bool
+	markCompleteErr error
 }
 
 func newFakeQuestRepo(l *callLog) *fakeQuestRepo {
@@ -87,6 +88,9 @@ func (f *fakeQuestRepo) CheckExercise(_ context.Context, _, exerciseID string, d
 }
 
 func (f *fakeQuestRepo) MarkComplete(_ context.Context, _, exerciseID string) error {
+	if f.markCompleteErr != nil {
+		return f.markCompleteErr
+	}
 	f.log.add("MARK COMPLETE %s", exerciseID)
 	f.completed[exerciseID] = true
 	return nil
@@ -98,7 +102,8 @@ type fakeProgressRepo struct {
 		minutes   int
 		targetMet bool
 	}
-	err error
+	err     error // Upsert fails
+	markErr error // MarkTargetMet fails
 }
 
 func newFakeProgressRepo(l *callLog) *fakeProgressRepo {
@@ -108,15 +113,29 @@ func newFakeProgressRepo(l *callLog) *fakeProgressRepo {
 	}{}}
 }
 
-func (f *fakeProgressRepo) Upsert(_ context.Context, userID, localDate string, minutes int, targetMet bool) error {
+// Upsert mirrors upsertProgressSQL: minutes never lower, and the row's
+// is_target_met is reported, never written here.
+func (f *fakeProgressRepo) Upsert(_ context.Context, userID, localDate string, minutes int) (bool, error) {
 	if f.err != nil {
-		return f.err
+		return false, f.err
 	}
-	f.log.add("UPSERT daily_progress %s|%s minutes=%d target=%t", userID, localDate, minutes, targetMet)
-	f.rows[userID+"|"+localDate] = struct {
-		minutes   int
-		targetMet bool
-	}{minutes, targetMet}
+	key := userID + "|" + localDate
+	row := f.rows[key]
+	row.minutes = max(row.minutes, minutes)
+	f.rows[key] = row
+	f.log.add("UPSERT daily_progress %s minutes=%d", key, row.minutes)
+	return row.targetMet, nil
+}
+
+func (f *fakeProgressRepo) MarkTargetMet(_ context.Context, userID, localDate string) error {
+	if f.markErr != nil {
+		return f.markErr
+	}
+	key := userID + "|" + localDate
+	row := f.rows[key]
+	row.targetMet = true
+	f.rows[key] = row
+	f.log.add("MARK TARGET MET %s", key)
 	return nil
 }
 

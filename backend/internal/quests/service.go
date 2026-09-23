@@ -22,9 +22,10 @@ type ProgressResult struct {
 	PetHealth         int   `json:"pet_health"`
 	StreakCount       int   `json:"streak_count"`
 
-	// NewlyMet is true only on the call that crossed TargetSeconds. It is the
-	// once-only trigger for Pet.OnTargetMet and is asserted by tests; §6.2 has
-	// no such field, so it never reaches the wire.
+	// NewlyMet is true only on a call that fired Pet.OnTargetMet — the total is
+	// at or past TargetSeconds and daily_progress did not yet say the pet was
+	// told. It is asserted by tests; §6.2 has no such field, so it never
+	// reaches the wire.
 	NewlyMet bool `json:"-"`
 }
 
@@ -59,11 +60,17 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pe
 //     ErrInvalidDuration if seconds is outside 1..MaxDurationSeconds or the
 //     day would pass MaxDailySeconds.
 //  1. INCRBY the Redis counter (+ EXPIRE) and read the running total back.
-//  2. Upsert daily_progress from that total — Redis is the single source of
-//     truth for the day, so bursts of calls cannot disagree.
-//  3. Mark the exercise complete.
-//  4. Fire Pet.OnTargetMet, but only on the call that crossed 1800s, then read
-//     Pet.State so the §6.2 response carries pet_health / streak_count.
+//  2. Upsert daily_progress.minutes_spent from that total (never lowering it)
+//     and learn whether the day's is_target_met is already set.
+//  3. If the total is at or past 1800s and the day is not yet flagged: fire
+//     Pet.OnTargetMet, and only when it returns nil flag the day with
+//     MarkTargetMet. A hook failure leaves the day unflagged so the next
+//     progress call fires again; pet's own last_target_met_date makes a
+//     re-fire a no-op once it has landed (at-least-once here, exactly-once
+//     there). A failed flag is logged, not returned: the session is recorded
+//     and a 500 would make the client retry and INCRBY again.
+//  4. Mark the exercise complete, then read Pet.State so the §6.2 response
+//     carries pet_health / streak_count.
 //
 // The ordering is a contract, not an implementation detail: see the call-log
 // test in service_test.go.
@@ -105,27 +112,32 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 		return ProgressResult{}, err
 	}
 
-	// newly_met is derived from the counter alone: this call crossed the target
-	// iff the new total is at or past it and the previous total was not.
-	targetMet := total >= TargetSeconds
-	newlyMet := targetMet && total-seconds < TargetSeconds
-
-	if err := s.progress.Upsert(ctx, userID, date, int(total/60), targetMet); err != nil {
+	alreadyMet, err := s.progress.Upsert(ctx, userID, date, int(total/60))
+	if err != nil {
 		return ProgressResult{}, err
 	}
-	// MarkComplete keeps its own ErrExerciseNotFound for the race where the
-	// row vanished between CheckExercise and here; the handler still maps it
-	// to 404.
-	if err := s.quests.MarkComplete(ctx, roadmap.ID, exerciseID); err != nil {
-		return ProgressResult{}, err
-	}
+	// The durable row wins over the counter for the response: a counter lost
+	// mid-day does not un-meet a met day.
+	targetMet := total >= TargetSeconds || alreadyMet
+	newlyMet := total >= TargetSeconds && !alreadyMet
 
 	if newlyMet {
-		// Best-effort: the study session is already recorded and must not be
-		// rolled back by a pet failure.
 		if err := s.pet.OnTargetMet(ctx, userID, date); err != nil {
-			log.Printf("quests: pet target-met hook failed for user %s on %s: %v", userID, date, err)
+			// Best-effort for this call: the study session is already recorded
+			// and must not be rolled back by a pet failure. The day stays
+			// unflagged, so the next call retries the hook.
+			log.Printf("quests: pet target-met hook failed for user %s on %s (will retry on the next progress call): %v", userID, date, err)
+		} else if err := s.progress.MarkTargetMet(ctx, userID, date); err != nil {
+			log.Printf("quests: flagging daily_progress.is_target_met for user %s on %s: %v", userID, date, err)
 		}
+	}
+
+	// MarkComplete keeps its own ErrExerciseNotFound for the race where the
+	// row vanished between CheckExercise and here; the handler still maps it
+	// to 404. It runs after the hook so a vanished exercise cannot cost the
+	// user the day's +20.
+	if err := s.quests.MarkComplete(ctx, roadmap.ID, exerciseID); err != nil {
+		return ProgressResult{}, err
 	}
 
 	// Also best-effort: the write is done, and a 500 here would make the client
