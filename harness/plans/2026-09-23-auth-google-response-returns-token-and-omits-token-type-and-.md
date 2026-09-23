@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/auth-google-response-returns-token-and-omits-token-type-and-.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---
