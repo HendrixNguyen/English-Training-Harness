@@ -1,9 +1,11 @@
 ---
 type: mvp-slice
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-22-run-02
 order: 7
+priority: high
+plan: harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md
 ---
 # Google: one-way Calendar and Tasks sync
 
@@ -27,3 +29,18 @@ Depends on: store (1), auth (2) — must have requested the `calendar.events` an
 - Spec §2.2 architecture diagram: Google APIs (Calendar & Tasks) as a direct dependency of the Go API server.
 - `harness/CODEMAP.md` → `google`: "one-way Calendar + Tasks sync".
 - Prior run `harness/ideas/2026-09-22-run-01/_run.md` Notes: two-way sync was considered and dropped as contradicting §5.1.
+
+## Evaluation
+**Verdict: select, `priority: high`** — MVP slice, `order: 7`; store (1), auth (2), quests (3) and airouter (5) are merged on `main`, pet (4) is executing and onboarding (6) is approved, so this is the next slice in `order`.
+
+**Is the *Why* real?** Yes. §5.1 steps 6–7 and §7 both name this endpoint; it is the only spec feature that reaches a learner with the PWA closed and no push subscription, and auth already collected the `calendar.events` + `tasks` scopes with `access_type=offline` (`auth.Scopes`), so no re-consent is needed.
+
+**Achievable in one plan?** Yes: one package (`backend/internal/google`), three small HTTP clients over injectable base URLs (token refresh, Calendar `events.insert/patch`, Tasks `tasklists.insert/delete` + `tasks.insert`), one migration, one route. ≤ 1 day.
+
+**Contract corrections against the backend spec §6.4 (which wins for the wire shape):** the response is `{"status":"synced","calendar_event_id":"…","tasks_created_count":N}` — not the idea's `{calendar_event_id, tasklist_id, tasks_created}`. §6.4 says "asynchronously" but its 200 body carries the ids, so the sync runs synchronously inside the request (bounded by a deadline); recorded in the plan.
+
+**Storage decision — `google_sync` table via migration `0002`, not JSONB on `roadmaps`:** (a) the Calendar event exists even when the user has no roadmap, so `roadmaps` is the wrong owner; (b) `roadmap_json` is the AI-generated document that onboarding writes and quests reads — writing integration state into it crosses the modular-monolith boundary and mixes concerns; (c) a row keyed `user_id UNIQUE` gives idempotent re-sync one `ON CONFLICT (user_id)` upsert and records which `roadmap_id` the tasks were pushed for, so a new roadmap triggers a fresh list while a same-roadmap re-sync creates nothing. Cost: `store`'s integration tests hard-code `0001_init` as the only version, so the plan also updates `reset()` and two assertions, and appends the DDL to the backend spec §3.2 block (AGENTS.md: spec DDL == migrations).
+
+**Refresh token:** read through one small interface (`google.RefreshTokenSource`) whose only implementation today is a plaintext `users.google_refresh_token` read; the inbox bug `google-refresh-token-is-stored-in-plaintext-…` (§7 AES-256-GCM) is **not** folded in — its fix replaces that one implementation.
+
+**Dependencies:** all merged. Reads `roadmaps`/`exercises` (onboarding writes them, quests reads them) through its own read-only repo interface, same as quests; the `content_json.title` key is the one quests' `toTask` and onboarding's plan fix.
