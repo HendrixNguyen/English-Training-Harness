@@ -17,7 +17,7 @@ type harness struct {
 }
 
 func newHarness(now time.Time) *harness {
-	h := &harness{repo: newFakeRepo(), challenges: newFakeChallenges(), study: newFakeStudy()}
+	h := &harness{repo: newFakeRepo(fixedClock(now)), challenges: newFakeChallenges(), study: newFakeStudy()}
 	h.svc = NewService(h.repo, h.challenges, h.study, fixedClock(now))
 	return h
 }

@@ -4,39 +4,57 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"sync"
 	"time"
 )
 
 type fakeRepo struct {
-	states    map[string]State  // by userID; present == row exists
-	timezones map[string]string // by userID; missing == "UTC"
-	ensured   int
-	saved     int
-	ensureErr error
-	saveErr   error
+	mu          sync.Mutex
+	states      map[string]State  // by userID; present == row exists
+	timezones   map[string]string // by userID; missing == "UTC"
+	now         func() time.Time  // stamps a fresh row's updated_at like the DDL's CURRENT_TIMESTAMP
+	ensured     int
+	saved       int // applied writes across Save, SaveTargetMet, PenaliseMiss, MarkJudged
+	ensureErr   error
+	saveErr     error
+	saveErrFor  map[string]error // per-user failure of any writer; nil == fine
+	timezoneErr error
 }
 
-func newFakeRepo() *fakeRepo {
-	return &fakeRepo{states: map[string]State{}, timezones: map[string]string{}}
+func newFakeRepo(now func() time.Time) *fakeRepo {
+	return &fakeRepo{states: map[string]State{}, timezones: map[string]string{}, now: now, saveErrFor: map[string]error{}}
 }
 
-// defaultState mirrors the §3.2 column defaults a fresh INSERT produces.
+// defaultState mirrors the §3.2 column defaults a fresh INSERT produces —
+// including updated_at = CURRENT_TIMESTAMP, which the sweep's first-contact
+// rule reads.
 func defaultState(now time.Time) State {
 	return State{PlantName: "My Green Buddy", HealthPoints: 100, Stage: StageSprout, UpdatedAt: now}
 }
 
+func (f *fakeRepo) writeErr(userID string) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	return f.saveErrFor[userID]
+}
+
 func (f *fakeRepo) Ensure(_ context.Context, userID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.ensureErr != nil {
 		return f.ensureErr
 	}
 	f.ensured++
 	if _, ok := f.states[userID]; !ok {
-		f.states[userID] = defaultState(time.Time{})
+		f.states[userID] = defaultState(f.now())
 	}
 	return nil
 }
 
 func (f *fakeRepo) Get(_ context.Context, userID string) (State, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	s, ok := f.states[userID]
 	if !ok {
 		return State{}, ErrNoPet
@@ -45,50 +63,94 @@ func (f *fakeRepo) Get(_ context.Context, userID string) (State, error) {
 }
 
 func (f *fakeRepo) Save(_ context.Context, userID string, s State) error {
-	if f.saveErr != nil {
-		return f.saveErr
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.writeErr(userID); err != nil {
+		return err
 	}
-	if _, ok := f.states[userID]; !ok {
+	cur, ok := f.states[userID]
+	if !ok {
 		return ErrNoPet
 	}
 	f.saved++
-	s.PlantName = f.states[userID].PlantName
+	s.PlantName = cur.PlantName
+	if s.JudgedThrough != nil {
+		s.JudgedThrough = laterDate(cur.JudgedThrough, *s.JudgedThrough) // GREATEST(judged_through, $8)
+	} else {
+		s.JudgedThrough = cur.JudgedThrough
+	}
 	f.states[userID] = s
 	return nil
 }
 
+// dateBefore is the SQL predicate `col IS NULL OR col < $d`.
+func dateBefore(col *string, d string) bool { return col == nil || *col < d }
+
+func (f *fakeRepo) SaveTargetMet(_ context.Context, userID string, s State) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.writeErr(userID); err != nil {
+		return false, err
+	}
+	cur, ok := f.states[userID]
+	if !ok || s.LastTargetMetDate == nil || !dateBefore(cur.LastTargetMetDate, *s.LastTargetMetDate) {
+		return false, nil
+	}
+	f.saved++
+	s.PlantName = cur.PlantName
+	s.JudgedThrough = cur.JudgedThrough
+	f.states[userID] = s
+	return true, nil
+}
+
+func (f *fakeRepo) PenaliseMiss(_ context.Context, userID, judged string, now time.Time) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.writeErr(userID); err != nil {
+		return false, err
+	}
+	cur, ok := f.states[userID]
+	if !ok || !dateBefore(cur.JudgedThrough, judged) {
+		return false, nil
+	}
+	f.saved++
+	f.states[userID] = ApplyMiss(cur, now, judged)
+	return true, nil
+}
+
+func (f *fakeRepo) MarkJudged(_ context.Context, userID, judged string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.writeErr(userID); err != nil {
+		return false, err
+	}
+	cur, ok := f.states[userID]
+	if !ok || !dateBefore(cur.JudgedThrough, judged) {
+		return false, nil
+	}
+	f.saved++
+	cur.JudgedThrough = &judged
+	f.states[userID] = cur
+	return true, nil
+}
+
 func (f *fakeRepo) Timezone(_ context.Context, userID string) (string, error) {
+	if f.timezoneErr != nil {
+		return "", f.timezoneErr
+	}
 	if tz, ok := f.timezones[userID]; ok {
 		return tz, nil
 	}
 	return "UTC", nil
 }
 
-func (f *fakeRepo) Timezones(context.Context) ([]string, error) {
-	seen := map[string]bool{}
-	for userID := range f.states {
-		tz, _ := f.Timezone(context.Background(), userID)
-		seen[tz] = true
-	}
-	out := make([]string, 0, len(seen))
-	for tz := range seen {
-		out = append(out, tz)
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
-func (f *fakeRepo) SweepCandidates(_ context.Context, timezones []string) ([]Candidate, error) {
-	want := map[string]bool{}
-	for _, tz := range timezones {
-		want[tz] = true
-	}
+func (f *fakeRepo) SweepCandidates(context.Context) ([]Candidate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var out []Candidate
 	for userID, s := range f.states {
 		tz, _ := f.Timezone(context.Background(), userID)
-		if want[tz] {
-			out = append(out, Candidate{UserID: userID, Timezone: tz, State: s})
-		}
+		out = append(out, Candidate{UserID: userID, Timezone: tz, State: s})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].UserID < out[j].UserID })
 	return out, nil
@@ -121,10 +183,11 @@ func (f *fakeChallenges) Clear(_ context.Context, userID string) error {
 
 type fakeStudy struct {
 	totals map[string]int64 // keyed by userID|localDate
-	err    error
+	err    error            // every read fails
+	errFor map[string]error // one user's reads fail; the rest are served
 }
 
-func newFakeStudy() *fakeStudy { return &fakeStudy{totals: map[string]int64{}} }
+func newFakeStudy() *fakeStudy { return &fakeStudy{totals: map[string]int64{}, errFor: map[string]error{}} }
 
 func (f *fakeStudy) set(userID, localDate string, seconds int64) {
 	f.totals[userID+"|"+localDate] = seconds
@@ -133,6 +196,9 @@ func (f *fakeStudy) set(userID, localDate string, seconds int64) {
 func (f *fakeStudy) Total(_ context.Context, userID, localDate string) (int64, error) {
 	if f.err != nil {
 		return 0, f.err
+	}
+	if err := f.errFor[userID]; err != nil {
+		return 0, err
 	}
 	return f.totals[userID+"|"+localDate], nil
 }
