@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/onboarding-placement-test-cefr-grading-and-roadmap-generatio.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 6
+branch: harness/2026-09-23-high-onboarding-placement-test-cefr-grading-and-roadmap-generatio
+worktree: .worktrees/onboarding-placement-test-cefr-grading-and-roadmap-generatio
 ---
 # Onboarding placement test CEFR grading and roadmap generation — Plan
 
@@ -1856,3 +1858,94 @@ After pushing: `gh run list --branch <branch>` must show all three jobs green; `
 - **`notification_time` and `timezone` are written here** because §6.1 puts them on this request; `POST /settings/notifications` (notify slice) will also write `notification_time`. Both writers, same column, last wins.
 - **Placement uses `TaskPlacementTest` → gemini; generation `TaskRoadmapGen` → gemini** — one provider outage still degrades gracefully via the router's fallback.
 - **Pet row creation timing.** `Pet.Ensure` runs after the roadmap commit, so a pet failure returns 500 after the roadmap exists; the next call is the idempotent path and returns both. The spec bug `spec-never-states-when-the-pet-states-row-is-created` can be closed with "on first `GET /pet/status` or at onboarding, idempotently".
+
+---
+
+## Execution summary
+
+Built and merged all 10 tasks exactly per the plan's file structure and DTOs, in a fresh worktree/branch off `main` (`.worktrees/onboarding-placement-test-cefr-grading-and-roadmap-generatio`, `harness/2026-09-23-high-onboarding-placement-test-cefr-grading-and-roadmap-generatio`), one commit per task with the Co-Authored-By trailer.
+
+### Pre-flight (per the task's "predates two merges" note)
+
+Read `harness/CODEMAP.md` and `backend/cmd/api/main.go`/`internal/quests/`/`internal/pet/`/`internal/airouter/` on `main` before starting. `main.go` already had `pet.QuestHook` (not `quests.NopPet`) and the `signal.NotifyContext` block, and already declared `aiRouter`, `petSvc`, `guarded` exactly where the plan's Task 9 expects them. All depended-on symbols (`store.PlacementQuizKey`/`PlacementQuizTTL`, `auth.Require`/`ContextUserID`/`UserID`, `pet.Service.Ensure`/`pet.State`, `airouter.Router`/`ParseRoadmap`/`Roadmap.Exercises()`/`RoadmapSystemPrompt`/`RedisRateLimiter`/`TaskPlacementTest`/`TaskRoadmapGen`/`Modules`/`DaysPerModule`/`TaskTypes`) matched the plan's expectations exactly. No adaptation of the plan's wiring intent was needed beyond noting this — see the Task 9 commit message.
+
+### Deviations from the plan (all logged in their task's commit message too)
+
+1. **Task 5's TTL assertion trips `go vet`'s "suspect or" check.** The plan's `service_test.go` has `if h.quiz.lastTTL != store.PlacementQuizTTL || h.quiz.lastTTL != 2*time.Hour`. Since the two right-hand sides are definitionally equal, `go vet` (run automatically by `go test`) flags this as the "x != a || x != b" tautology-bug pattern and fails the build. Split into two separate assertions with the same intent (TTL matches the store constant; the constant itself is 2h per §4). No test coverage was removed.
+2. **Task 8's Step 2 only shows one `store.SeedDemoRoadmap` call being replaced**, but `internal/quests/integration_test.go` (as merged from the quests plan) has two — one for `userID`, one for the "other user" fixture used in the 404 reproduction. Replaced both with `onboarding.NewPgRepo(pg.Pool).SaveAssessment` (same `integrationRoadmap()` fixture) since the plan's own Step 3 verification requires zero remaining `SeedDemoRoadmap` hits across the whole repo, which is only achievable by removing both.
+3. **A verification-grep line count nit**: Task 10's expected "two hits" for `grep -n 'petForOnboarding\|onboarding/quiz' harness/CODEMAP.md` assumed two separate matching lines; my CODEMAP paragraph (matching the plan's own paragraph text verbatim) puts both substrings on the same line, so `grep -n` reports 1 matching line even though both terms are present. Content is correct; this is a wording mismatch in the plan's verification comment, not a defect.
+
+### Plan's Verification section — full output
+
+```
+$ go build ./... && go vet ./...
+(no output)
+
+$ env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1
+ok  	.../backend/internal/airouter	0.442s
+ok  	.../backend/internal/auth	1.225s
+ok  	.../backend/internal/config	0.480s
+ok  	.../backend/internal/health	0.777s
+ok  	.../backend/internal/onboarding	1.553s
+ok  	.../backend/internal/pet	1.863s
+ok  	.../backend/internal/quests	2.421s
+ok  	.../backend/internal/store	2.024s
+
+$ go test ./internal/onboarding/... -run 'Assess' -v   → all --- PASS (14), one --- SKIP (the gated integration test)
+$ go test ./internal/onboarding/... -run 'Placement|Bank|Public' -v   → all --- PASS (6)
+$ go test ./internal/onboarding/... -run 'Quiz|Assessment|ErrorMapping' -v   → all --- PASS (4), one --- SKIP
+
+grep checks: §6.1 response fields (6 hits), §6.1 request fields (6 hits), store.PlacementQuizKey/TTL (4 hits — includes a doc comment, superset of the expected 3), airouter symbols (4 hits across 3 lines), tx markers Begin/Commit/SendBatch (3 hits), no pet/quests import in onboarding (0 hits, as expected), SeedDemoRoadmap fully gone (0 Go hits; internal/store/seed.go absent), onboarding.NewPgRepo in quests integration test (2 hits — see deviation 2), no DATABASE_URL/REDIS_URL getenv in onboarding (0 hits), exactly 1 TestIntegration func in onboarding's integration_test.go, main.go wiring (5 hits — includes the adapter type/comment block, superset of the expected 3).
+
+$ cd .. && python3 tools/harness/cli.py validate; echo exit=$?
+exit=0
+
+$ git log --oneline main..HEAD
+1b895ae codemap: onboarding — §6.1 flow, quiz endpoint addition, seed retired
+1a5e5cc onboarding: mount quiz and assessment routes; adapt pet.Service for the §6.1 pet_state
+98d4ac8 onboarding: retire store.SeedDemoRoadmap; quests integration test seeds through onboarding's repo
+42854f5 onboarding: integration test — one active roadmap, 84 exercises, users columns
+3f37ea7 onboarding: GET /onboarding/quiz and POST /onboarding/assessment with the §6.1 body and error mapping
+51752a6 onboarding: Assess — validate, idempotent, rate-limited, grade + generate with retry-once, single-tx persist
+83fd921 onboarding: fakes, scripted provider behind a real Router, roadmap fixture
+4143d87 onboarding: §6.1 DTOs, Pet/Generator seams, transactional repository and quiz:placement hash store
+a6f52e6 onboarding: placement grading prompt and strict cefr_level parser
+2eb0f59 onboarding: placement question bank and its answer-free public shape
+(10 commits, one per task, each with the Co-Authored-By trailer)
+
+$ git status --short
+(clean)
+```
+
+### `make test-integration` (Docker, `-p 1`) — twice, before and after the live E2E run
+
+Scratch stack: `COMPOSE_PROJECT_NAME=onb POSTGRES_PORT=5441 REDIS_PORT=6389` (both ports confirmed free with `lsof` first; the owner's unrelated containers on 6379/6380 were never touched). Both runs: all 8 `TestIntegration*` funcs `--- PASS`, zero `--- SKIP`:
+`TestIntegrationRateLimiterAllowsFiveThenBlocks`, `TestIntegrationUpsertCreatesThenPreservesTheLearnerState`, `TestIntegrationSaveAssessmentPersists84ExercisesAndDeactivatesPrevious`, `TestIntegrationEnsureCreatesExactlyOnePetRow`, `TestIntegrationDailyAndProgressAgainstRealServices` (the re-pointed quests test, now seeding through `onboarding.PgRepo`), `TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent`, `TestIntegrationConcurrentMigrateDoesNotRace`, `TestIntegrationPetStatesRejectsASecondRowForTheSameUser`, `TestIntegrationRedisRoundTrip`.
+
+### Runtime proof — live, real JWT, stubbed AI
+
+Stack: scratch Postgres/Redis (as above) + a local Python `http.server` fake standing in for Gemini's `generateContent` endpoint (`GEMINI_API_KEY=fake-gemini-key`, `GEMINI_BASE_URL=http://127.0.0.1:9871`; no real provider keys), returning a scripted `{"cefr_level":"B1"}` for the placement prompt (detected by `"CEFR examiner"` in the system instruction) and a valid 4×7×3 roadmap JSON otherwise. The API binary was built (`go build -o /tmp/onboarding_api_bin ./cmd/api`) and booted on a spare port (8199, confirmed free first) against this stack. A throwaway helper (`backend/cmd/tmpseedjwt`, deleted before finishing, never committed) inserted a real `users` row, minted a real JWT via `auth.NewTokenIssuer.Issue`, and wrote the matching `sess:{user_id}:token` Redis key via `store.SessionKey` **inside the Go helper**, not as a shell argument, per the plan's `<uuid>:token` shell-corruption caveat.
+
+1. `GET /api/v1/onboarding/quiz` with the real bearer token → 200, 10 questions, no `correct`/`level` fields.
+2. `POST /api/v1/onboarding/assessment` (first submit, all bank items answered correctly) → **201** `{"status":"success","assessed_level":"B1","roadmap_id":"6d67f8be-...","pet_state":{"plant_name":"My Green Buddy","health_points":100,"stage":"sprout"}}`.
+   - SQL: `users.cefr_current='B1'`, `target_goal='IELTS 7.0 Preparation'`, `timezone='Asia/Ho_Chi_Minh'`, `notification_time=20:00:00`.
+   - SQL: `roadmaps` — 1 row, `is_active` count = 1, total count = 1.
+   - SQL: `exercises` joined to that roadmap — **84** rows.
+3. **Idempotent re-submit** (different, partial answers) → **200**, identical `roadmap_id`; `roadmaps` count for the user still 1 (unchanged) — confirms no second roadmap/AI call altered state (the unit test `TestAssessIsIdempotentWhileARoadmapIsActive` additionally pins zero AI/limiter/repo-write calls for this path).
+4. **Malformed AI, second (fresh) user**: fake server set to return non-JSON prose for the placement task. `POST /api/v1/onboarding/assessment` → **502** `{"error":"ai_bad_output"}`. Fake server's request counter went from 0 → **2** (retry-once, as designed). SQL before/after: `roadmaps` count for that user = **0** both times; `users.cefr_current` still the default `A1`, `target_goal` still `''` — nothing written.
+5. `GET /api/v1/quests/daily` for the first (onboarded) user → **200** `{"date":"2026-09-23","day_number":1,"total_minutes_required":30,"accumulated_seconds":0,"is_target_met":false,"tasks":[3 tasks: vocabulary/reading/practice, each 10 minutes, titled "<type> task"]}` — sourced from the real AI-generated (fake-backed) roadmap, not a seed.
+
+Cleanup verified: `pkill -9` the API binary and the fake AI server, `docker compose down` the `onb` project, deleted the scratch `backend/.env`, deleted `backend/cmd/tmpseedjwt/`, deleted all `/tmp` scratch artifacts. Post-cleanup: `pgrep -fl exe/api` → none, `pgrep -fl onboarding_api_bin` → none, `pgrep -fl fake_gemini.py` → none, `docker ps` shows only the owner's pre-existing `scio3-redis-1`/`scio3-mongo-1` and an unrelated `nostalgic_galois` (mcp/grafana sidecar) that this session never started — no `onb-*` containers remain.
+
+### PR and CI
+
+`gh pr create --draft --base main --head harness/2026-09-23-high-onboarding-placement-test-cefr-grading-and-roadmap-generatio ...` failed as the task note predicted: `pull request create failed: GraphQL: must be a collaborator (createPullRequest)`. Attempted once (with labels, then again without after `gh label create` also 404'd for the same reason); no PR exists. Branch pushed successfully to `origin` (`git push -u origin harness/2026-09-23-high-onboarding-placement-test-cefr-grading-and-roadmap-generatio`), which is what triggers CI regardless of a PR.
+
+`gh run list --branch harness/2026-09-23-high-onboarding-placement-test-cefr-grading-and-roadmap-generatio` → run `35811737991`, conclusion **success**. All three required jobs green:
+- `backend-unit` — 24s, ✓
+- `harness-tooling` — 10s, ✓
+- `backend-integration` — 41s, ✓
+
+Run URL: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35811737991
+
+Plan is `done` on this branch's own merits: every Definition-of-done check in `.agents/roles/executor.md` passed (build, full suite, live boot with a real JWT and a stubbed AI end to end, every documented command run and correct, CI green, no orphan processes/containers), even though no Draft PR could be opened under this account's permissions.

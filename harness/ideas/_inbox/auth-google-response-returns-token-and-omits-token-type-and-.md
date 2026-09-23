@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md
 ---
 # auth/google response returns token and omits token_type and expires_in required by backend spec 6.1
 
@@ -46,3 +47,40 @@ The request body (`{"code", "redirect_uri"}`) already matches §6.1, so this is 
 - Frontend consumer: Frontend spec §4 — `useAuthStore: Manages JWT tokens, user profile metadata (full_name, cefr_current)`.
 - Plan that shipped it: `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md`
   (written against the 1st-thinking doc only, before the backend spec existed).
+
+## Evaluation
+**Verdict: select, `priority: high`** — this is MVP-enabling work, not an ordinary inbox bug. The
+frontend-shell plan (`harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md`,
+MVP order 9, approved) reads `access_token` / `expires_in` with **no** fallback to `token` (its header
+records the merge blocker; its `useAuthStore.signIn` returns early when `res.access_token` is not a
+string). Ranking rule 2 — an MVP slice would build on something broken — puts this ahead of the
+remaining slices; it must land on `main` before frontend-shell can merge.
+
+**Claims verified on `main` @ `60456e8` (2026-09-23), nothing has drifted:**
+- `backend/internal/auth/handler.go:31-39` — `c.JSON(http.StatusOK, gin.H{"token": out.Token, "user": gin.H{…}})`.
+- `backend/internal/auth/handler_test.go:47` — decoded struct field `Token string \`json:"token"\`` pins the wrong key.
+- `backend/internal/auth/token.go:14` — `const TokenTTL = store.SessionTTL`; `store/keys.go:12` — `SessionTTL = 24 * time.Hour` → `expires_in: 86400`.
+- Backend spec §6.1 (`Backend Technical Specification.md:251`), the 200 body being implemented:
+  `{"access_token": "eyJ…", "token_type": "Bearer", "expires_in": 86400, "user": {"id": "…", "email": "…", "full_name": "…", "cefr_current": "B1"}}`.
+- The request body `{code, redirect_uri}` (`handler.go:10-13`) already matches §6.1 — one-shape fix confirmed.
+
+**Root cause (systematic-debugging):** the auth plan
+(`harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md`) was written against the
+1st-thinking doc alone, whose §7 line 670 says only "OAuth code token swap & JWT issuance" with no body; the
+executor chose `token`, and the review (`harness/reviews/2026-09-22-auth-google-…md:22`) checked the handler
+against the *plan*, which it matched. The backend spec that defines the shape arrived afterwards. Contract
+drift, not a logic defect — `SignInResult{Token, User}` (`service.go:9-12`) carries everything needed.
+
+**Sibling-drift check (same class, same slice): none.** The auth slice registers one route
+(`backend/cmd/api/main.go:95`); spec §6 defines no refresh/logout/me endpoint. The only other
+`access_token` / `expires_in` / `token_type` in Go are Google's own token DTO (`google.go:25-28`), which is
+correct there. So this is one plan, one shape fix.
+
+**Dependencies / conflicts:** none unbuilt. `git log --all -- backend/internal/auth/handler.go` shows only
+the original commit; the one unmerged worktree (onboarding) does not touch it. Ordinary plan — no `amends:`,
+no `blocks:`, own worktree and branch.
+
+**Decisions:** no `token` alias (one contract, per spec); `expires_in` is derived from `TokenTTL`
+(`int(TokenTTL / time.Second)`) so it can never disagree with the JWT `exp` or the Redis TTL, while the test
+asserts the spec literal `86400` so a TTL change forces a spec conversation. Follow a typed response struct,
+as the later `pet` handler does (`pet/handler.go:16,42`).
