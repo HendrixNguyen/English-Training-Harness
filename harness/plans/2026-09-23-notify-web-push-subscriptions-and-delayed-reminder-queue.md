@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/notify-web-push-subscriptions-and-delayed-reminder-queue.md
-status: draft
+status: approved
 priority: high
 merged: false
 order: 8
