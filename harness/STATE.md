@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 17:59. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 18:16. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -14,14 +14,22 @@ _none_
 ## Inbox (reviewer bugs awaiting evaluation)
 
 - `harness/ideas/_inbox/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — A cleared reminder-time field dead-ends onboarding on an opaque error after ten answered questions [medium]
+- `harness/ideas/_inbox/a-multi-day-sweep-outage-collapses-every-missed-day-into-one.md` — A multi-day sweep outage collapses every missed day into one penalty [medium]
 - `harness/ideas/_inbox/a-stale-api-state-cache-survives-into-the-next-account-when-.md` — A stale api-state cache survives into the next account when /login is the first route [medium]
 - `harness/ideas/_inbox/authstore-test-ts-leaves-caches-stubbed-undefined-for-every-.md` — authStore.test.ts leaves caches stubbed undefined for every test added after it [low]
 - `harness/ideas/_inbox/every-google-409-now-becomes-500-internal-error-instead-of-5.md` — Every Google 409 now becomes 500 internal_error instead of 502 google_unavailable [medium]
 - `harness/ideas/_inbox/fakecalendar-returns-the-same-nextid-for-every-google-assign.md` — fakeCalendar returns the same nextID for every Google-assigned insert so a second auto-id insert is a false 409 [low]
+- `harness/ideas/_inbox/fakeprogressrepo-upsert-s-monotonic-max-is-not-covered-by-an.md` — fakeProgressRepo.Upsert's monotonic max is not covered by any unit test [low]
+- `harness/ideas/_inbox/get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — GET quests/daily still reads is_target_met from the volatile counter [medium]
+- `harness/ideas/_inbox/gofmt-l-has-been-failing-on-two-internal-quests-files-since-.md` — gofmt -l has been failing on two internal/quests files since before this branch [low]
+- `harness/ideas/_inbox/marktargetmet-ignores-rowsaffected-so-a-missing-row-silently.md` — MarkTargetMet ignores RowsAffected so a missing row silently succeeds [low]
 - `harness/ideas/_inbox/no-test-pins-the-stale-data-wins-branch-order-on-revive-so-a.md` — No test pins the stale-data-wins branch order on /revive, so a reorder silently regresses the cached-status case [low]
 - `harness/ideas/_inbox/nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` — Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400 [medium]
 - `harness/ideas/_inbox/onboarding-s-ai-error-copy-is-untested-deleting-the-whole-br.md` — Onboarding's ai_* error copy is untested — deleting the whole branch leaves the suite green [medium]
+- `harness/ideas/_inbox/ontargetmet-s-read-then-write-erases-a-concurrent-sweep-s-mi.md` — OnTargetMet's read-then-write erases a concurrent sweep's miss penalty [medium]
+- `harness/ideas/_inbox/pgrepo-save-resets-last-target-met-date-to-null-on-the-reviv.md` — PgRepo.Save resets last_target_met_date to NULL on the revive path [low]
 - `harness/ideas/_inbox/practiceeventid-is-a-lossy-filter-that-can-return-a-4-charac.md` — PracticeEventID is a lossy filter that can return a 4-character id and collide, with no guard and no test [low]
+- `harness/ideas/_inbox/testtwoconcurrentsweepspenaliseonce-misses-its-defect-in-1-r.md` — TestTwoConcurrentSweepsPenaliseOnce misses its defect in 1 run in 10 [low]
 - `harness/ideas/_inbox/the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered [medium]
 - `harness/ideas/_inbox/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — The API sends no CORS headers, so the deployed PWA on its own Railway domain cannot call a single endpoint [high]
 - `harness/ideas/_inbox/the-api-state-cache-still-has-no-expiry-bound-so-a-stale-res.md` — The api-state cache still has no expiry bound so a stale response can be served indefinitely [low]
@@ -86,7 +94,7 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
 - `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high] (review: pass-with-bugs)
