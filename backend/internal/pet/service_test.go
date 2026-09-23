@@ -502,11 +502,11 @@ func TestSweepJudgesEveryLocalDayExactlyOnceInEveryZone(t *testing.T) {
 	}{
 		{"UTC", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)},
 		{"Asia/Ho_Chi_Minh", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)},
-		{"Asia/Kolkata", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)},   // +05:30: midnight at :30
-		{"Asia/Kathmandu", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)}, // +05:45
+		{"Asia/Kolkata", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)},    // +05:30: midnight at :30
+		{"Asia/Kathmandu", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)},  // +05:45
 		{"Pacific/Chatham", time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)}, // +12:45 / +13:45, DST 2026-09-27
-		{"America/Havana", time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)},  // falls back 2026-11-01 01:00→00:00: local hour 0 twice
-		{"America/Santiago", time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)},  // springs forward 2026-09-06 00:00→01:00: no local hour 0
+		{"America/Havana", time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)}, // falls back 2026-11-01 01:00→00:00: local hour 0 twice
+		{"America/Santiago", time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)}, // springs forward 2026-09-06 00:00→01:00: no local hour 0
 	}
 	for _, z := range zones {
 		t.Run(z.tz, func(t *testing.T) {

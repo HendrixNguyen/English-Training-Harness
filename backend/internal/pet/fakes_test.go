@@ -187,7 +187,9 @@ type fakeStudy struct {
 	errFor map[string]error // one user's reads fail; the rest are served
 }
 
-func newFakeStudy() *fakeStudy { return &fakeStudy{totals: map[string]int64{}, errFor: map[string]error{}} }
+func newFakeStudy() *fakeStudy {
+	return &fakeStudy{totals: map[string]int64{}, errFor: map[string]error{}}
+}
 
 func (f *fakeStudy) set(userID, localDate string, seconds int64) {
 	f.totals[userID+"|"+localDate] = seconds
