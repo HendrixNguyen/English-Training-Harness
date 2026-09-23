@@ -15,6 +15,7 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/google"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
@@ -114,6 +115,15 @@ func main() {
 	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
 	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
 
+	googleSvc := google.NewService(
+		google.NewPgRefreshTokenSource(pg.Pool), // plaintext today; the §7 encryption fix replaces only this
+		google.NewOAuthClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
+		google.NewHTTPCalendarClient(),
+		google.NewHTTPTasksClient(),
+		google.NewPgRepo(pg.Pool),
+		time.Now,
+	)
+	guarded.POST("/integrations/google/sync", google.SyncHandler(googleSvc))
 	onboardingSvc := onboarding.NewService(
 		onboarding.NewPgRepo(pg.Pool),
 		onboarding.NewRedisQuizStore(rdb),
