@@ -1,6 +1,6 @@
 ---
 name: harness-execute
-description: Execute one approved harness plan in a dedicated git worktree, push the branch, open a Draft PR, and record the outcome. Use for /execute and the execute stage of /harness run.
+description: Execute one approved harness plan in a dedicated git worktree, push the branch, and record the outcome. Never opens a PR — the owner takes one PR per day. Use for /execute and the execute stage of /harness run.
 ---
 
 # harness-execute
@@ -16,7 +16,7 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
 3. Read the plan, its idea, its design (if any), and `harness/CODEMAP.md`. Do not explore beyond what the plan names.
 4. Derive names: `SLUG=$(basename $PLAN .md | sed 's/^[0-9-]*-//')`; `PRIO` = plan frontmatter `priority`; `DATE=$(date +%F)`; `BRANCH=harness/$DATE-$PRIO-$SLUG`; `WT=.worktrees/$SLUG`.
 5. `git worktree add $WT -b $BRANCH main` (using-git-worktrees skill). Then `python3 tools/harness/cli.py set $PLAN status=executing branch=$BRANCH worktree=$WT`.
-   - **Amending plan** (frontmatter has `amends: <other plan>`): do **not** create a branch or worktree. Read `branch` and `worktree` from that other plan and work in its existing worktree, on its existing branch — the fix has to land in the same history that the reviewer blocked. Set `status=executing branch=<inherited> worktree=<inherited>` on your own plan too, so `STATE.md` and the reviewer can find it. Skip step 9's `gh pr create`: the branch already has a PR, or none, either way one is enough.
+   - **Amending plan** (frontmatter has `amends: <other plan>`): do **not** create a branch or worktree. Read `branch` and `worktree` from that other plan and work in its existing worktree, on its existing branch — the fix has to land in the same history that the reviewer blocked. Set `status=executing branch=<inherited> worktree=<inherited>` on your own plan too, so `STATE.md` and the reviewer can find it. It lands on the same branch, so nothing extra is pushed or opened.
 6. `cd $WT`. Execute the plan with the executing-plans skill: for each task — write the failing test, run it, implement, run, commit with the plan's message. Use `rg`/`grep -n` to find code; read only matched ranges.
 7. After the last task, run the plan's *Verification* section. Update `harness/CODEMAP.md` for touched packages and commit it.
 8. **Prove it runs** (still in `$WT`) — the role's *Definition of done*. In order, capturing real output:
@@ -31,11 +31,9 @@ Let `ROOT` = main checkout (where you start). All `cli.py` calls run from `ROOT`
 9. **Record outcome** (back in `ROOT` — `cd $ROOT` first). The plan file under `harness/plans/` is **ROOT bookkeeping only**: append the summary to ROOT's copy and never edit or commit `harness/plans/*` inside the worktree, or the merge will conflict on it. The only `harness/` file the branch may change is `harness/CODEMAP.md`.
    - Success (every check in step 8 passed): append `## Execution summary` — built / deviations + why / the plan's verification output / a **Runtime proof** subsection with the step 8 output — then `python3 tools/harness/cli.py set $PLAN status=done`.
    - Blocked, or any step 8 check failed: append `## Failure` (what you ran, what happened, suggested plan change), then `python3 tools/harness/cli.py set $PLAN status=failed`. Skip steps 10–11.
-10. **Push + Draft PR** (skip with a note in the summary if `git remote get-url origin` fails or `gh auth status` fails):
-   `cd $WT && git push -u origin $BRANCH`, then
-   `gh pr create --draft --base main --head $BRANCH --title "[$DATE][P<n>] <Idea title>" --body-file <tmpfile> --label harness --label "type: <type>" --label "priority: $PRIO"`
-   where `P1/P2/P3` = high/medium/low, and for `mvp-slice` use `[MVP-<order>]` instead of `[P<n>]`. Create missing labels with `gh label create`. Body = idea *Why* + *Expected output*, links to plan and idea paths, the execution summary, then the attribution line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-   Then `python3 tools/harness/cli.py set $PLAN pr=<url>`.
+10. **Push the branch** (skip with a note in the summary if `git remote get-url origin` fails):
+   `cd $WT && git push -u origin $BRANCH`
+   **Do not open a PR.** The owner takes one PR per day, not one per plan (AGENTS.md); `/harness daily-pr` opens it once the day's plans are all done and reviewed. Opening a per-plan PR is a defect, not initiative.
 
    **Then wait for CI on your branch.** The push triggers `.github/workflows/ci.yml`. Watch it: `gh run list --branch $BRANCH --limit 1`, then `gh run watch <id> --exit-status`. CI is the only check that runs somewhere other than this machine, so it is the one that can catch an environment-specific pass.
    - Green: record the run URL in `## Execution summary`.

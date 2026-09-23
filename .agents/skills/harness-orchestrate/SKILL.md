@@ -1,11 +1,11 @@
 ---
 name: harness-orchestrate
-description: Drive the harness end to end — status, one bounded autonomous run, human merge, worktree prune. Use for /harness and for scheduled unattended runs.
+description: Drive the harness end to end — status, one bounded autonomous run, the daily PR, human merge, worktree prune. Use for /harness and for scheduled unattended runs.
 ---
 
 # harness-orchestrate
 
-Subcommands: `status`, `run [--auto-approve] [--stages ideate,evaluate,execute,review]`, `merge <plan>`, `prune`.
+Subcommands: `status`, `run [--auto-approve] [--stages ideate,evaluate,execute,review]`, `daily-pr`, `merge <plan>`, `prune`.
 
 ## status
 `python3 tools/harness/cli.py state`; then `python3 tools/harness/cli.py stale-worktrees` and append a "Stale worktrees" list. Print.
@@ -22,6 +22,31 @@ Idempotent; safe to call on a schedule. `LOG=harness/runs/$(date +%Y%m%dT%H%M%S)
 6. **review** if enabled: for each path in `next --stage review --all`: spawn the reviewer role. Log verdicts and bugs filed.
 7. `cli.py state`; append "Awaiting human: N draft plans, M passed reviews to merge" to `$LOG`; commit `harness/` with `harness: orchestrator run $(basename $LOG .log)`.
 8. Print the log.
+
+## daily-pr
+The owner takes **one PR per day, not one per plan** (AGENTS.md). Executors only push branches; this is what turns a day's work into something to review.
+
+Preconditions: every plan whose `branch` you are about to include is `status=done`, has a review whose verdict is `pass` or `pass-with-bugs`, has `merged=false`, and `cli.py blockers --plan <plan>` exits 0. A plan that is `done` but unreviewed, or whose review is `fail`, waits for tomorrow — say so rather than sweeping it in.
+
+```
+DATE=$(date +%Y-%m-%d); DAILY=harness/daily-$DATE
+git fetch origin main && git checkout -b $DAILY origin/main
+# then, oldest plan first:
+git merge --no-ff <branch> -m "Merge <branch>: <idea title>"
+```
+Resolve conflicts by hand. **`harness/CODEMAP.md` conflicts on almost every branch** — every slice edits it and the bullets sit adjacent, so git picks a side and both sides look valid. Read both and keep what is true of the merged tree; never accept the automatic resolution there.
+
+After each merge run the suite for the layers touched (`cd backend && go build ./... && go test ./...`, and/or `cd frontend && npm run lint && npm run typecheck && npm run test && npm run build`). A daily branch that does not build is worse than three branches that do — stop and report rather than pushing it.
+
+Then `git push -u origin $DAILY` and wait for CI (`gh run list --branch $DAILY`, `gh run watch <id> --exit-status`). Open one PR:
+```
+gh pr create --base main --head $DAILY \
+  --title "$DATE [<highest priority among included>] Daily: <n> fixes" \
+  --body-file <tmpfile> --label harness
+```
+Body: one section per included plan — idea title, what changed, the review verdict and the path to the review file — then the CI run URL, then `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. Record it on every included plan: `cli.py set <plan> pr=<url>`.
+
+The owner merges that PR. Afterwards, for each included plan: `cli.py set <plan> merged=true`, then `/harness prune`.
 
 ## merge <plan>  (human-invoked only)
 Preconditions: plan `status=done`, latest review verdict `pass` or `pass-with-bugs`, `merged=false`, and `python3 tools/harness/cli.py blockers --plan <plan>` exits 0. Refuse otherwise — `cli.py set … merged=true` enforces the blocker check independently, so a merge that skips it cannot be recorded.

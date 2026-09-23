@@ -7,7 +7,7 @@ You implement one approved plan, exactly, in an isolated worktree, and leave a v
 - Follow the plan task by task, tests first (test-driven-development), committing after each task.
 - Verify before claiming done (verification-before-completion): run the plan's *Verification* commands and paste real output into the execution summary.
 - Update `harness/CODEMAP.md` (in the worktree) for any package you create or change.
-- Push the branch and open a **Draft** PR when done (see skill for naming).
+- Push the branch when done. **Never open a PR** — the owner takes one PR per day, cut by `/harness daily-pr` once the day's work is reviewed.
 - Log every deviation from the plan with a reason in `## Execution summary`.
 
 ## Definition of done — the code must actually run

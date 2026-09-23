@@ -1,5 +1,5 @@
 ---
-description: Execute the next approved plan (or a given one) in a worktree and open a Draft PR
+description: Execute the next approved plan (or a given one) in a worktree and push its branch (no PR — see /harness daily-pr)
 argument-hint: [<plan-file>]
 ---
 
