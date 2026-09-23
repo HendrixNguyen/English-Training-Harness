@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 09:25. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 09:27. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -31,7 +31,7 @@ _none_
 - `harness/ideas/_inbox/integration-tests-share-one-database-and-p-1-is-a-workaround.md` — integration tests share one database and -p 1 is a workaround not isolation [medium]
 - `harness/ideas/_inbox/jwt-secret-is-accepted-at-any-length-including-one-character.md` — JWT_SECRET is accepted at any length including one character [medium]
 - `harness/ideas/_inbox/jwt-verify-does-not-require-exp-or-bind-iss-aud-and-bearer-i.md` — JWT verify does not require exp or bind iss/aud and Bearer is case-sensitive [low]
-- `harness/ideas/_inbox/main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — main.go installs a signal handler with no server shutdown so the API now ignores SIGINT and SIGTERM [medium]
+- `harness/ideas/_inbox/main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — main.go installs a signal handler with no server shutdown so the API now ignores SIGINT and SIGTERM [high]
 - `harness/ideas/_inbox/meeting-the-daily-target-during-a-revive-challenge-answers-4.md` — Meeting the daily target during a revive challenge answers 409 and leaks the Redis key for 24h [medium]
 - `harness/ideas/_inbox/migrate-is-only-tested-against-the-single-embedded-migration.md` — Migrate is only tested against the single embedded migration [medium]
 - `harness/ideas/_inbox/migrate-s-advisory-lock-can-hang-boot-forever-with-no-bound-.md` — Migrate's advisory lock can hang boot forever with no bound and no log [medium]
@@ -93,7 +93,7 @@ _none_
 
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
-- `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (review: pass-with-bugs) (merged)

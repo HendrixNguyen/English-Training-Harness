@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/pet-health-streak-and-stage-engine-with-revive.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 4
 branch: harness/2026-09-22-high-pet-health-streak-and-stage-engine-with-revive
 worktree: .worktrees/pet-health-streak-and-stage-engine-with-revive

@@ -3,7 +3,7 @@ type: bug
 status: proposed
 source: reviewer
 run: _inbox
-priority: medium
+priority: high
 ---
 # main.go installs a signal handler with no server shutdown so the API now ignores SIGINT and SIGTERM
 
