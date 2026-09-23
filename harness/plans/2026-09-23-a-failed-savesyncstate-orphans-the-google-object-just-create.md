@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/a-failed-savesyncstate-orphans-the-google-object-just-create.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---

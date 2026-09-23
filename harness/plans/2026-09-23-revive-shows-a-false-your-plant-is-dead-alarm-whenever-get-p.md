@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---
