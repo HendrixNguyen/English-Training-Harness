@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
-status: draft
+status: approved
 priority: medium
 merged: false
 ---
