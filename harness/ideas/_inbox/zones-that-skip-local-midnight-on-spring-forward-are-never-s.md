@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 ---
 # Zones that skip local midnight on spring-forward are never swept that day
 
@@ -77,3 +78,5 @@ exactly once per local day in every zone including ones with no midnight:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low (was medium).** Real and well-evidenced, but the effect is leniency (30 health kept) once a year in a handful of zones. Selecting on local date rather than `Hour() == 0` fits the pet day-judgement plan; include it there with the zone table test.
+
+**Planned (2026-09-23):** `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — decision 3, Task 6 (civil-date selection replaces `Hour() == 0`; zone table test incl. America/Santiago 2026-09-06).

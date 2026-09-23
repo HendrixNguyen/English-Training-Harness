@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 ---
 # Pet sweep tests cannot fail on the branches they are named for
 
@@ -82,3 +83,5 @@ Each named branch can fail:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low.** Test-only, but the sweep is the one piece of §8 nobody observes until a plant wilts, and the pet "durable day judgement" plan will rewrite `Sweep` and its fakes anyway — take these tests (per-user fake errors, realistic `updated_at`, zone table) in that plan.
+
+**Planned (2026-09-23):** `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — decision 5, Tasks 4, 6, 8 (per-user fake errors, clocked `Ensure`, zone table, 401 tests; mutation table in Verification).

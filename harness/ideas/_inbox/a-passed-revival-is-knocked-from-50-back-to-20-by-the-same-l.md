@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 ---
 # A passed revival is knocked from 50 back to 20 by the same local day's miss penalty
 
@@ -68,3 +69,5 @@ Passing the revival protects the plant for the local day it was passed:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Real and on the revive happy path: a user who revives in the evening sees 50 → 20 at their local midnight because the 15-minute challenge cannot also satisfy the 30-minute day. Both rules are spec-literal; the composition is undecided. Decision for the plan: a passed revival exempts that local day from `ApplyMiss` (`ApplyRevive` stamps `LastPracticedAt`; `Sweep` skips a pet whose `last_practiced_at` falls on the judged day). Belongs in the pet "durable day judgement" plan with `the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md`, `service-ontargetmet-ignores-localdate-so-pet-has-no-idempote.md` and `ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — all four change how pet decides whether a day was met.
+
+**Planned (2026-09-23):** `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — decision 4 — a passed revival resolves its local day (`judged_through = today`); Tasks 2, 5, 6.
