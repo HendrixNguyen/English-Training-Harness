@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 09:50. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 09:55. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -15,7 +15,7 @@ _none_
 
 - `harness/ideas/_inbox/a-passed-revival-is-knocked-from-50-back-to-20-by-the-same-l.md` — A passed revival is knocked from 50 back to 20 by the same local day's miss penalty [medium]
 - `harness/ideas/_inbox/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — A Pet.State failure reports pet_health 0 which means a dead plant [medium]
-- `harness/ideas/_inbox/auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response returns token and omits token_type and expires_in required by backend spec 6.1 [high]
+- `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
 - `harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth reports Postgres and Redis failures as 401 and logs nothing [medium]
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
 - `harness/ideas/_inbox/branch-carries-its-own-execution-summary-so-the-ai-router-pl.md` — Branch carries its own execution summary so the ai-router plan file conflicts on merge [high]
@@ -23,6 +23,7 @@ _none_
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
 - `harness/ideas/_inbox/gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md` — Gemini test assertion that the API key is not in the query string can never fail [low]
 - `harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider drops every response part after the first so a long roadmap arrives truncated [medium]
+- `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
 - `harness/ideas/_inbox/gin-default-ships-debug-mode-and-all-proxies-trusted-to-prod.md` — gin.Default ships debug mode and all-proxies-trusted to production [medium]
 - `harness/ideas/_inbox/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — google_refresh_token is stored in plaintext; backend spec 7 requires AES-256-GCM via ENCRYPTION_SECRET_KEY [high]
 - `harness/ideas/_inbox/healthz-leaks-postgres-and-redis-driver-error-strings-public.md` — healthz leaks Postgres and Redis driver error strings publicly [medium]
@@ -39,6 +40,8 @@ _none_
 - `harness/ideas/_inbox/migrations-run-on-every-boot-with-no-advisory-lock.md` — migrations run on every boot with no advisory lock [medium]
 - `harness/ideas/_inbox/module-week-is-never-validated-and-day-number-comes-from-arr.md` — Module.week is never validated and day_number comes from array position [medium]
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
+- `harness/ideas/_inbox/no-post-handler-bounds-the-request-body-so-one-jwt-can-decod.md` — No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory [medium]
+- `harness/ideas/_inbox/onboarding-service-stores-a-now-clock-it-never-uses-so-every.md` — onboarding Service stores a now clock it never uses so every caller passes a dead dependency [low]
 - `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — OnTargetMet is lost forever if a write after the INCRBY fails [medium]
 - `harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced [medium]
 - `harness/ideas/_inbox/pet-sweep-tests-cannot-fail-on-the-branches-they-are-named-f.md` — Pet sweep tests cannot fail on the branches they are named for [low]
@@ -60,6 +63,7 @@ _none_
 - `harness/ideas/_inbox/the-hourly-sweep-loads-every-pet-in-a-zone-into-memory-and-r.md` — The hourly sweep loads every pet in a zone into memory and reparses tzdata per user [medium]
 - `harness/ideas/_inbox/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — The miss sweep judges the day from volatile Redis and ignores the durable daily_progress row [medium]
 - `harness/ideas/_inbox/two-comments-in-the-new-progress-validation-misstate-the-cod.md` — Two comments in the new progress validation misstate the code they describe [low]
+- `harness/ideas/_inbox/two-concurrent-assessment-submits-double-spend-the-ai-and-or.md` — Two concurrent assessment submits double-spend the AI and orphan a roadmap with its 84 exercises [medium]
 - `harness/ideas/_inbox/two-recordprogress-error-branches-are-uncovered-and-the-redi.md` — Two RecordProgress error branches are uncovered and the Redis-down test's comment overstates it [medium]
 - `harness/ideas/_inbox/zones-that-skip-local-midnight-on-spring-forward-are-never-s.md` — Zones that skip local midnight on spring-forward are never swept that day [medium]
 
@@ -77,17 +81,16 @@ _none_
 
 ## Planned (awaiting approval)
 
-_none_
+- `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high]
 
 ## Approved
 
-- `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high]
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high]
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high]
 
 ## Executing
 
-_none_
+- `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high]
 
 ## Done (last 10)
 
