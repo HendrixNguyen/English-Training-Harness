@@ -69,6 +69,11 @@ func (s *Service) UpdateSettings(ctx context.Context, userID string, req Setting
 	if sub := req.Subscription; sub != nil && (sub.Endpoint == "" || sub.P256dh == "" || sub.Auth == "") {
 		return SettingsResult{}, fmt.Errorf("%w: push_subscription needs endpoint, p256dh and auth", ErrInvalidRequest)
 	}
+	if req.Subscription != nil {
+		if err := ValidateEndpoint(req.Subscription.Endpoint); err != nil {
+			return SettingsResult{}, fmt.Errorf("%w: %w", ErrInvalidRequest, err)
+		}
+	}
 
 	if err := s.repo.UpdatePreferences(ctx, userID, clock, req.Timezone); err != nil {
 		return SettingsResult{}, err

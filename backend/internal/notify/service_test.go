@@ -222,3 +222,22 @@ func TestTickDropsUsersWithNoSubscriptionsOrNoRow(t *testing.T) {
 		t.Error("a user with no row must leave the queue")
 	}
 }
+
+func TestUpdateSettingsRefusesHostileEndpointsBeforeWriting(t *testing.T) {
+	for name, raw := range hostileEndpoints {
+		h := newHarness()
+		_, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
+			NotificationTime: "20:00",
+			Subscription:     &Subscription{Endpoint: raw, P256dh: "BNc5T", Auth: "aX8v"},
+		})
+		if !errors.Is(err, ErrInvalidRequest) || !errors.Is(err, ErrForbiddenEndpoint) {
+			t.Errorf("%s: err = %v, want ErrInvalidRequest wrapping ErrForbiddenEndpoint", name, err)
+		}
+		if len(h.log.calls) != 0 {
+			t.Errorf("%s: rejected endpoint still made calls %v", name, h.log.calls)
+		}
+		if len(h.queue.scores) != 0 || len(h.repo.subs["u1"]) != 0 {
+			t.Errorf("%s: rejected endpoint was stored or scheduled", name)
+		}
+	}
+}
