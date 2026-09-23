@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md
-status: approved
+status: done
 priority: high
 merged: false
 amends: harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md
+branch: harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue
+worktree: .worktrees/notify-web-push-subscriptions-and-delayed-reminder-queue
 ---
 # Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan
 
@@ -857,3 +859,49 @@ Load-bearing evidence the reviewer should re-check (each was mutation-tested dur
 - **`Proxy: nil` is a real constraint.** If Railway ever requires an egress proxy for push, the guard must be re-thought (the proxy would do the connecting). Documented in CODEMAP so it is not undone casually.
 - **Not folded in:** `no-per-user-subscription-cap-and-no-length-bound-on-endpoint` — `MaxEndpointLength` incidentally gives the length bound because a URL check without one is incomplete, but the per-user cap stays in the inbox; do not add it here.
 - **Metadata services on other clouds** (`fd00:ec2::254`, `metadata.google.internal` → `169.254.169.254`) are covered by ULA and link-local respectively. NAT64 (`64:ff9b::/96`) and 6to4 are not special-cased; Railway is IPv4-egress and neither reaches a private v4 without a translator this backend does not run. Revisit only if egress changes.
+
+---
+
+## Execution summary
+
+Landed on the existing branch `harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue`, in the existing worktree `.worktrees/notify-web-push-subscriptions-and-delayed-reminder-queue` (no new branch or worktree created, per the plan). Started from HEAD `547c0ab`, added 5 commits, each with the `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` trailer, TDD throughout (failing test → implement → green → mutation-check → commit):
+
+1. `8d283bf` — `endpoint.go`/`endpoint_test.go`: `ErrForbiddenEndpoint`, `MaxEndpointLength`, `ValidateEndpoint` (https-only, no userinfo, ≤2048 bytes, IP-literal deny check), `forbiddenAddr` predicate covering loopback/private/link-local/multicast/CGNAT/IETF-protocol/benchmark/reserved/unspecified, with IPv4-mapped IPv6 unmapped first.
+2. `c761fe3` — `service.go`/`service_test.go`/`handler_test.go`: `UpdateSettings` calls `ValidateEndpoint` after the presence check and before any repo write; `spec64Body` swapped from the non-URL spec placeholder to a real FCM-shaped endpoint; new handler-level 400 table including the reviewer's exact reproduction.
+3. `1c647b3` — `endpoint.go`/`push.go`/`push_test.go`: `guardDial` (`net.Dialer.Control` hook, refuses on the resolved `ip:port`), `newPushHTTPClient` (`Proxy: nil`, `CheckRedirect` → `http.ErrUseLastResponse`), wired into `NewWebPushSender`; `Send` validates the endpoint before dialling; the three pre-existing request-shape tests converted to `httptest.NewTLSServer` addressed as `https://localhost:<port>` with `ServerName: "example.com"` override (httptest's cert covers 127.0.0.1/::1/example.com, not localhost) — hit the exact trap the plan flagged (`ecdsa`-unrelated: an x509 "certificate signed by unknown authority" the first time I ran the *live-proof* program with `GenerateVAPIDKeys()`'s two return values swapped, unrelated to the TLS trap itself; caught and fixed before it reached any committed code).
+4. `f7a02c1` — `service.go`/`service_test.go`/`fakes_test.go`: `Tick`'s send-loop gets an `ErrForbiddenEndpoint` case alongside the existing `ErrSubscriptionGone` one — prunes the row, reports it once via the joined error.
+5. `b85189a` — `harness/CODEMAP.md`: one paragraph appended to the `notify` bullet describing the SSRF boundary, matching the plan's exact wording.
+
+### Verification (all from the worktree's `backend/`, clean shell)
+
+- `go build ./...` / `go vet ./...` — silent, no errors or warnings.
+- `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -timeout 180s` — `ok` for every package (airouter, auth, config, health, notify, pet, quests, store; `cmd/api` has no tests).
+- `env -u DATABASE_URL -u REDIS_URL go test ./internal/notify/... -race -count=1 -timeout 180s` — `ok`, no races (this is the check the notify review noted CI does not run).
+- `go test ./internal/notify/... -run 'ValidateEndpoint|ForbiddenAddr|GuardDial|PushHTTPClient|WebPushSender|HostileEndpoints|TickPrunes' -v -count=1 -timeout 60s` — **17/17 PASS**, including `TestSettingsHandlerRejectsHostileEndpointsWith400AndWritesNothing` (the reviewer's exact `169.254.169.254` reproduction).
+- `git diff --stat 547c0ab..HEAD -- . ':!internal/notify' ':!../harness/CODEMAP.md'` — empty (nothing outside notify/CODEMAP touched).
+- `git log --oneline 547c0ab..HEAD | wc -l` → 5; `git log 547c0ab..HEAD --format=%B | grep -c 'Co-Authored-By'` → 5.
+- `python3 tools/harness/cli.py validate` — exit 0.
+
+### Mutation checks performed (all reverted before committing; every one broke the predicted assertion)
+
+- Task 1: commented out the `100.64.0.0/10` prefix → `TestForbiddenAddrBoundaries` + 2 CGNAT rows of `TestValidateEndpointRefusesHostileURLs` failed; changed `Scheme != "https"` to `Scheme == ""` → the `http scheme` row failed.
+- Task 2: moved `ValidateEndpoint` to after `s.repo.UpdatePreferences` → `TestUpdateSettingsRefusesHostileEndpointsBeforeWriting` failed on "rejected endpoint still made calls [repo.UpdatePreferences(...)]" for every hostile row.
+- Task 3 (three separate mutations, each reverted before the next): removed `Control: guardDial` → `TestPushHTTPClientRefusesANameResolvingToLoopback` and the `dns name, dial layer` row failed with a raw TLS x509 error instead of `ErrForbiddenEndpoint`, exactly as the plan warned ("a TLS/x509 error here means the dial went through"). Removed `CheckRedirect` → both redirect tests failed with "/redirected was hit 1 time(s)". Removed the `ValidateEndpoint` call from `Send` → the two URL-layer rows of `TestWebPushSenderRefusesAForbiddenEndpointBeforeDialling` failed because the dial guard still refused the loopback connect but the error text changed from `"not a public address"`/`"want https"` to `"refusing to dial"` — the per-row `want` substring is what made the mutation visible, as the plan predicted.
+- Task 4: deleted the `ErrForbiddenEndpoint` case from `Tick`'s switch → `TestTickPrunesAForbiddenEndpointAndReportsItOnce` failed with `stats = {... Failed:1 ...}` and "s1 was not deleted".
+
+### Live proof (beyond the unit tests)
+
+1. **Standalone Go program** (`backend/tmp_liveproof/main.go`, deleted before finishing, never committed) built the real `notify.Service` over in-memory `Repo`/`Queue`/`StudyCounter` fakes and a real `notify.WebPushSender` (real generated VAPID keys), pointed a subscription at a real `httptest.NewTLSServer` addressed as `https://localhost:<port>` (a hit counter on the handler), scheduled the user as already due, and called `Tick` directly. Result: `stats = {Due:1 Sent:0 Skipped:0 Pruned:1 Failed:0}`, error joined `ErrForbiddenEndpoint` ("refusing to dial ::1"), **listener hits: 0**, subscription list for the user: **empty (pruned)**. Re-ran with `Control: guardDial` transiently removed from `newPushHTTPClient`: `stats` dropped to `{Pruned:0 Failed:1}`, the error became a raw TLS x509 "certificate signed by unknown authority" (dial went through, TLS verification is what stopped it, not the guard), and the subscription was **not** pruned — confirming the dial-time denial is load-bearing, not incidental. Reverted; re-ran again to confirm the original passing result.
+2. **Real dev stack, real HTTP handler.** `COMPOSE_PROJECT_NAME=ssrf`, `POSTGRES_PORT=5448`, `REDIS_PORT=6396` (scratch `backend/.env`, deleted after), `docker compose up -d --wait --wait-timeout 120` (both healthy). Booted `go run ./cmd/api` on `PORT=8102` against that stack (no VAPID keys set — worker inactive, route still live); `GET /healthz` → `{"postgres":"ok","redis":"ok","status":"ok"}`. A throwaway seeding program (`backend/tmp_seed/main.go`, deleted before finishing, never committed) inserted a real user, minted a real JWT via `auth.NewTokenIssuer`, and wrote a real session via `auth.NewRedisSessionStore.Put`. `curl` with that token: **hostile** endpoint `https://169.254.169.254/latest/meta-data/` (the reviewer's exact reproduction) → `400 {"error":"invalid_request"}`, and `SELECT count(*) FROM push_subscriptions` → `0`. **Legitimate** endpoint `https://fcm.googleapis.com/fcm/send/...` → `200 {"status":"updated","notification_time":"20:00:00","next_reminder_at":"2026-09-23T20:00:00Z"}`, and the row was present with that exact endpoint.
+
+### CI
+
+Pushed `harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue` (5 new commits on top of the branch's existing 8). `gh pr create` attempted once (no PR existed for this branch): failed exactly as expected, `pull request create failed: GraphQL: must be a collaborator (createPullRequest)` — noted, moved on; no PR to comment on. New CI run triggered by this push: **all three jobs green** — `harness-tooling` (8s), `backend-integration` (33s, real Postgres+Redis service containers, `-p 1`), `backend-unit` (25s, `-count=1`, no service env vars). Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35819788843 (head SHA `b85189a`, conclusion: `success`). This is a distinct run from the branch's prior green run (`35815345858`, head SHA `547c0ab`) — verified by SHA, not assumed from a stale branch-level check.
+
+### Cleanup
+
+Deleted `backend/tmp_liveproof/` and `backend/tmp_seed/` (never committed) and the scratch `backend/.env`. Killed the seeded API server: the `go run` parent (PID 21222) and its compiled child (`exe/api`, PID 21245) — `kill` alone left the child running (same `main.go` gap the notify plan's own execution summary already noted: `signal.NotifyContext` isn't consulted by the blocking `r.Run()` listener), so `kill -9` was needed on the child; confirmed via `lsof -i :8102` afterward (free). `COMPOSE_PROJECT_NAME=ssrf docker compose down` (both containers stopped/removed) plus `docker volume rm ssrf_postgres_data` (compose `down` alone keeps named volumes). Final sweep: no `exe/api`/`cmd/api`/`tmp_seed`/`tmp_liveproof` processes, no `ssrf`-named containers or volumes, ports 8102/5448/6396 free, `git status --short` in the worktree clean.
+
+### Definition of done
+
+(1) builds — yes. (2) whole suite passes from a clean shell incl. `-race` on notify — yes. (3) boots and serves a real request, both a rejected hostile subscribe (400, zero rows) and a working legitimate one — yes. (4) every documented command (`docker compose up -d --wait`, `go run ./cmd/api`, `make`-equivalent test invocations) run exactly as written — yes. (5) CI green on the pushed branch, verified against this push's own SHA — yes (run linked above). (6) this summary, plus the amendment section added to the notify plan's own Execution summary. `python3 tools/harness/cli.py blockers --plan harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` exits 0 once this plan is marked `done` below. Setting `status=done`.

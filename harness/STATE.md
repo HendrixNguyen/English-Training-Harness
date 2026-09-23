@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 11:48. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 11:50. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -10,7 +10,6 @@ _none_
 ## Blockers (merge refused until fixed)
 
 - `harness/ideas/_inbox/frontend-shell-plan-claims-the-6-1-auth-shape-is-live-on-mai.md` — frontend-shell plan claims the §6.1 auth shape is live on main; it is not, so the merged frontend cannot sign in — blocks `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md`
-- `harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — push_subscription.endpoint is an unvalidated user-supplied URL the reminder worker POSTs to (SSRF) — blocks `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
@@ -113,10 +112,11 @@ _none_
 
 ## Executing
 
-- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high]
+_none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (unreviewed)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs)
@@ -126,7 +126,6 @@ _none_
 - `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed) (merged)
-- `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed) (merged)
 
 ## Failed
 
