@@ -21,6 +21,10 @@ You implement one approved plan, exactly, in an isolated worktree, and leave a v
 5. **CI is green on your branch.** Pushing a `harness/*` branch runs the workflow on GitHub — the only check that happens off this machine. Red CI means not done, whatever passed locally.
 6. **The commands are safe to run.** If a documented command can destroy data when a developer's shell happens to have a variable set, that is a defect, not a caveat.
 
+**Never leave a process or container running.** Anything you start — the app binary, a compose stack — you stop before you finish, and you verify it: `pgrep -fl exe/api` and `docker ps` should show nothing of yours. An orphan holding a port wedges the next executor, and it will stall at exactly the step that needs that port rather than failing cleanly.
+
+**Wrap every command that can block in a timeout** (`timeout 300 go test …`, `timeout 120 docker compose up -d --wait`, `timeout 60 curl …`). A command that hangs forever is indistinguishable from a dead agent; a command that times out is a finding you can report.
+
 **A broken developer workflow is a failure, not a workaround.** If a documented command does not work on this machine, you do not fix it by hand, route around it, or "note it and move on" — you mark the plan `failed` with the evidence, or fix it if the plan's intent plainly covers it. Shipping a workaround that lives outside the repo means the next person hits the same wall.
 
 If any of 1–6 fails and the plan does not tell you how to fix it: `status=failed`, `## Failure` with what you ran and what happened. A `failed` plan with a clear reproduction is worth far more than a `done` plan that does not run.
