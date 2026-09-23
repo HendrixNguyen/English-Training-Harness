@@ -121,7 +121,7 @@ func TestMigrateAppliesPendingVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Migrate() = %v, want nil error", err)
 	}
-	if want := []string{"0001_init"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"0001_init", "0002_google_sync"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("applied = %v, want %v", got, want)
 	}
 	if m.ensured != 1 {
@@ -219,5 +219,26 @@ func TestMigratePropagatesALockFailure(t *testing.T) {
 	}
 	if m.ensured != 0 {
 		t.Error("EnsureVersionTable ran even though the lock was never acquired")
+	}
+}
+
+func TestMigration0002CreatesGoogleSync(t *testing.T) {
+	up := readMigration(t, "0002_google_sync.up.sql")
+	for _, w := range []string{
+		"CREATE TABLE google_sync (",
+		"user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE",
+		"calendar_event_id TEXT",
+		"tasklist_id TEXT",
+		"roadmap_id UUID REFERENCES roadmaps(id) ON DELETE SET NULL",
+		"tasks_created_count INT NOT NULL DEFAULT 0",
+		"synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP",
+	} {
+		if !strings.Contains(up, w) {
+			t.Errorf("0002_google_sync.up.sql is missing %q", w)
+		}
+	}
+	down := readMigration(t, "0002_google_sync.down.sql")
+	if !strings.Contains(down, "DROP TABLE IF EXISTS google_sync;") {
+		t.Error("0002_google_sync.down.sql does not drop google_sync")
 	}
 }
