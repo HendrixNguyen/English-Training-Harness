@@ -97,3 +97,36 @@ func TestLoadRequiresGoogleAndJWTSecrets(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadReadsOptionalVAPIDKeys(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("GOOGLE_CLIENT_ID", "cid")
+	t.Setenv("GOOGLE_CLIENT_SECRET", "csecret")
+	t.Setenv("JWT_SECRET", "s3cret")
+	t.Setenv("VAPID_PUBLIC_KEY", "")
+	t.Setenv("VAPID_PRIVATE_KEY", "")
+	t.Setenv("VAPID_SUBJECT", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() without VAPID keys = %v, want nil (they are optional)", err)
+	}
+	if cfg.VAPIDPublicKey != "" || cfg.VAPIDPrivateKey != "" {
+		t.Errorf("VAPID keys = %q/%q, want empty", cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey)
+	}
+	if cfg.VAPIDSubject != DefaultVAPIDSubject {
+		t.Errorf("VAPIDSubject = %q, want the default %q", cfg.VAPIDSubject, DefaultVAPIDSubject)
+	}
+
+	t.Setenv("VAPID_PUBLIC_KEY", "BPub")
+	t.Setenv("VAPID_PRIVATE_KEY", "priv")
+	t.Setenv("VAPID_SUBJECT", "mailto:ops@example.com")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.VAPIDPublicKey != "BPub" || cfg.VAPIDPrivateKey != "priv" || cfg.VAPIDSubject != "mailto:ops@example.com" {
+		t.Errorf("cfg = %+v", cfg)
+	}
+}

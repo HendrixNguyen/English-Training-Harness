@@ -17,6 +17,7 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/google"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/notify"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"
@@ -106,6 +107,30 @@ func main() {
 	// Spec §8 hourly cron, in-process (§2.1). Sweeps at every :00 UTC.
 	go pet.RunHourly(ctx, petSvc)
 
+	// Spec §2.1 reminder worker, in-process, polling the §4 queue:webpush:delay
+	// ZSET every 30 s. It starts only when both VAPID keys (spec §9) are set;
+	// without them settings are stored but nothing is sent.
+	var pushSender notify.Sender
+	if cfg.VAPIDPublicKey != "" && cfg.VAPIDPrivateKey != "" {
+		sender, err := notify.NewWebPushSender(cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject)
+		if err != nil {
+			log.Fatalf("notify: %v", err)
+		}
+		pushSender = sender
+	}
+	notifySvc := notify.NewService(
+		notify.NewPgRepo(pg.Pool),
+		notify.NewRedisQueue(rdb),
+		pushSender,
+		studyCounter, // notify reads the daily counter only through this interface
+		time.Now,
+	)
+	if pushSender != nil {
+		go notify.RunWorker(ctx, notifySvc, notify.PollInterval)
+	} else {
+		log.Printf("notify: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY unset; reminder settings are stored but no Web Push is sent")
+	}
+
 	v1 := r.Group("/api/v1")
 	v1.POST("/auth/google", auth.Handler(authSvc))
 
@@ -114,6 +139,7 @@ func main() {
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
 	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
 	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
+	guarded.POST("/settings/notifications", notify.SettingsHandler(notifySvc))
 
 	googleSvc := google.NewService(
 		google.NewPgRefreshTokenSource(pg.Pool), // plaintext today; the §7 encryption fix replaces only this
