@@ -40,8 +40,9 @@ type Sender interface {
 }
 
 // WebPushSender is the real Sender (RFC 8291 encryption + RFC 8292 VAPID via
-// webpush-go). HTTPClient is an interface so tests can point it anywhere;
-// the subscription endpoint is the URL, so httptest needs no base-URL plumbing.
+// webpush-go). HTTPClient defaults to newPushHTTPClient (dial guard, no
+// redirects); tests may replace it. The subscription endpoint is the URL, so
+// httptest needs no base-URL plumbing.
 type WebPushSender struct {
 	PublicKey  string
 	PrivateKey string
@@ -59,12 +60,17 @@ func NewWebPushSender(publicKey, privateKey, subscriber string) (*WebPushSender,
 		PublicKey:  publicKey,
 		PrivateKey: privateKey,
 		Subscriber: subscriber,
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
+		HTTPClient: newPushHTTPClient(),
 		TTL:        PushTTL,
 	}, nil
 }
 
 func (s *WebPushSender) Send(ctx context.Context, sub Subscription, p Payload) error {
+	// Stored rows predate no validation in any deployed environment, but the
+	// URL layer is one call: never dial a non-https or IP-literal-private row.
+	if err := ValidateEndpoint(sub.Endpoint); err != nil {
+		return err
+	}
 	body, err := json.Marshal(p)
 	if err != nil {
 		return fmt.Errorf("notify: encoding payload: %w", err)

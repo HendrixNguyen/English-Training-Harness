@@ -2,8 +2,12 @@ package notify
 
 import (
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -101,5 +105,90 @@ func TestForbiddenAddrBoundaries(t *testing.T) {
 		if forbiddenAddr(netip.MustParseAddr(s)) {
 			t.Errorf("%s must be permitted", s)
 		}
+	}
+}
+
+func TestGuardDialRefusesPrivateAddresses(t *testing.T) {
+	// guardDial receives what net.Dialer is about to connect() to: the
+	// RESOLVED ip:port, after DNS. This is the layer that defeats rebinding.
+	for _, addr := range []string{
+		"127.0.0.1:443", "[::1]:443", "169.254.169.254:80", "[fe80::1]:443",
+		"10.0.0.5:443", "172.16.0.1:443", "192.168.1.1:443", "100.64.0.1:443",
+		"[fd00::1]:443", "0.0.0.0:443", "[::ffff:10.0.0.5]:443",
+	} {
+		if err := guardDial("tcp", addr, nil); !errors.Is(err, ErrForbiddenEndpoint) {
+			t.Errorf("%s: err = %v, want ErrForbiddenEndpoint", addr, err)
+		}
+	}
+	if err := guardDial("tcp", "not-an-ip:443", nil); !errors.Is(err, ErrForbiddenEndpoint) {
+		t.Errorf("unparseable dial address must be refused, got %v", err)
+	}
+}
+
+func TestGuardDialAllowsPublicAddresses(t *testing.T) {
+	for _, addr := range []string{"142.250.31.188:443", "[2a00:1450:4001:80b::200a]:443", "1.1.1.1:443"} {
+		if err := guardDial("tcp", addr, nil); err != nil {
+			t.Errorf("%s: unexpected %v", addr, err)
+		}
+	}
+}
+
+// A DNS name that resolves to a private address must be refused at the dial
+// even though it passes the URL layer. "localhost" is the one such name every
+// machine resolves without a network, and httptest gives us a live listener
+// on it; the handler counter proves no connection was completed.
+func TestPushHTTPClientRefusesANameResolvingToLoopback(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	_, port, _ := net.SplitHostPort(strings.TrimPrefix(srv.URL, "https://"))
+
+	client := newPushHTTPClient()
+	if err := ValidateEndpoint("https://localhost:" + port + "/x"); err != nil {
+		t.Fatalf("precondition: the URL layer must let a hostname through: %v", err)
+	}
+	_, err := client.Post("https://localhost:"+port+"/x", "application/octet-stream", nil)
+	if !errors.Is(err, ErrForbiddenEndpoint) {
+		t.Fatalf("err = %v, want ErrForbiddenEndpoint from the dial guard (a TLS/x509 error here means the dial went through)", err)
+	}
+	if hits.Load() != 0 {
+		t.Errorf("server handled %d request(s); the dial must be refused before any connection", hits.Load())
+	}
+}
+
+func TestPushHTTPClientDoesNotFollowRedirects(t *testing.T) {
+	var redirected atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/push", func(w http.ResponseWriter, r *http.Request) {
+		// A "permitted" origin bouncing to somewhere else. The target is
+		// same-origin only so a regression fails fast instead of dialling
+		// a real link-local address; the dial guard covers the target too.
+		http.Redirect(w, r, "/redirected", http.StatusFound)
+	})
+	mux.HandleFunc("/redirected", func(w http.ResponseWriter, _ *http.Request) {
+		redirected.Add(1)
+		w.WriteHeader(http.StatusCreated)
+	})
+	srv := httptest.NewTLSServer(mux)
+	defer srv.Close()
+
+	// Keep the client's redirect policy, swap only the transport for one that
+	// trusts the test CA and may dial loopback (the guard is tested above).
+	client := newPushHTTPClient()
+	client.Transport = srv.Client().Transport
+
+	resp, err := client.Post(srv.URL+"/push", "application/octet-stream", nil)
+	if err != nil {
+		t.Fatalf("Post: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Errorf("status = %d, want the 302 handed back unfollowed", resp.StatusCode)
+	}
+	if redirected.Load() != 0 {
+		t.Errorf("/redirected was hit %d time(s); redirects must not be followed", redirected.Load())
 	}
 }

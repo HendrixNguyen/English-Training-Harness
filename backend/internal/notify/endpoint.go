@@ -3,8 +3,12 @@ package notify
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"net/netip"
 	"net/url"
+	"syscall"
+	"time"
 )
 
 // ErrForbiddenEndpoint means a push endpoint is not something this server
@@ -73,4 +77,43 @@ func forbiddenAddr(ip netip.Addr) bool {
 		}
 	}
 	return false
+}
+
+// guardDial is the net.Dialer.Control hook: Go calls it with the address it
+// is about to connect() to — the RESOLVED ip:port, per attempt — so a name
+// that resolved somewhere public at subscribe time and somewhere private at
+// send time (DNS rebinding) is still refused here.
+func guardDial(_ string, address string, _ syscall.RawConn) error {
+	ap, err := netip.ParseAddrPort(address)
+	if err != nil {
+		return fmt.Errorf("%w: dial address %q: %v", ErrForbiddenEndpoint, address, err)
+	}
+	if forbiddenAddr(ap.Addr()) {
+		return fmt.Errorf("%w: refusing to dial %s", ErrForbiddenEndpoint, ap.Addr())
+	}
+	return nil
+}
+
+// pushClientTimeout is the whole-request bound the original slice chose.
+const pushClientTimeout = 10 * time.Second
+
+// newPushHTTPClient is the only HTTP client the sender may use for push
+// endpoints: every TCP connect passes guardDial, redirects are handed back
+// unfollowed (a permitted host must not be able to bounce us to a private
+// one), and Proxy is nil so the guard always sees the true destination —
+// with ProxyFromEnvironment it would see the proxy's address instead.
+func newPushHTTPClient() *http.Client {
+	dialer := &net.Dialer{Timeout: pushClientTimeout, Control: guardDial}
+	return &http.Client{
+		Timeout: pushClientTimeout,
+		Transport: &http.Transport{
+			Proxy:               nil,
+			DialContext:         dialer.DialContext,
+			ForceAttemptHTTP2:   true,
+			TLSHandshakeTimeout: pushClientTimeout,
+			MaxIdleConns:        10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }
