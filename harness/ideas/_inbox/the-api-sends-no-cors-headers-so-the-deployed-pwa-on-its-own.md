@@ -3,7 +3,7 @@ type: bug
 status: proposed
 source: reviewer
 run: _inbox
-priority: medium
+priority: high
 ---
 # The API sends no CORS headers, so the deployed PWA on its own Railway domain cannot call a single endpoint
 
