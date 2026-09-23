@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 16:53. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 17:02. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -41,7 +41,6 @@ _none_
 - `harness/ideas/_inbox/codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs [low]
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Every Google 403 becomes 409 reauth_required, so a quota error forces a pointless re-consent [medium]
-- `harness/ideas/_inbox/expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Expired-session sign-out leaves per-user API responses in the service worker cache [high]
 - `harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider drops every response part after the first so a long roadmap arrives truncated [medium]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
 - `harness/ideas/_inbox/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — google_refresh_token is stored in plaintext; backend spec 7 requires AES-256-GCM via ENCRYPTION_SECRET_KEY [high]
@@ -54,7 +53,6 @@ _none_
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
 - `harness/ideas/_inbox/no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — No per-user subscription cap and no length bound on endpoint p256dh auth [medium]
 - `harness/ideas/_inbox/no-post-handler-bounds-the-request-body-so-one-jwt-can-decod.md` — No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory [medium]
-- `harness/ideas/_inbox/nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — NUXT_PUBLIC_STUB_ONBOARDING defaults to true, so a deployment that forgets it ships the fake placement quiz [high]
 - `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — OnTargetMet is lost forever if a write after the INCRBY fails [medium]
 - `harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced [medium]
 - `harness/ideas/_inbox/pet-sweep-tests-cannot-fail-on-the-branches-they-are-named-f.md` — Pet sweep tests cannot fail on the branches they are named for [low]
@@ -77,7 +75,9 @@ _none_
 
 ## Planned (awaiting approval)
 
+- `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan [high]
 - `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan [high]
+- `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high]
 
 ## Approved
 
