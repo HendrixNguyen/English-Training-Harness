@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/google-one-way-calendar-and-tasks-sync.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 7
+branch: harness/2026-09-23-high-google-one-way-calendar-and-tasks-sync
+worktree: .worktrees/google-one-way-calendar-and-tasks-sync
 ---
 # Google: one-way Calendar and Tasks sync — Plan
 
@@ -2401,3 +2403,103 @@ With a dev stack (`COMPOSE_PROJECT_NAME=<slug>` and non-default `POSTGRES_PORT`/
 - **`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`** are already required by `config.Load`; no new env. No base-URL env overrides either — tests set struct fields; add `GOOGLE_*_BASE_URL` only if a staging Google ever exists.
 - **Refresh token rotation.** Google may return a new `refresh_token` on refresh; this plan ignores it (`OAuthClient` reads only `access_token`). Persisting a rotated token would be a write to `users.google_refresh_token`, which belongs to `auth`/the encryption fix — flagged for that bug's evaluation.
 - **Rate/abuse.** Nothing stops a client calling sync in a loop; each call is one Calendar patch (and, for the same roadmap, nothing else). If it matters, reuse `airouter.RedisRateLimiter`'s pattern under a new §4 key — a product decision, not in this slice.
+
+## Execution summary
+
+Executed in `.worktrees/google-one-way-calendar-and-tasks-sync` on branch `harness/2026-09-23-high-google-one-way-calendar-and-tasks-sync`, branched from `main` at `60456e8`. All 8 tasks completed exactly as written, test-first, one commit per task (8 commits, `git log --oneline main..HEAD` confirms). `git status --short` is clean.
+
+**Pre-flight checks (per the launch instructions):** confirmed `main` had only `0001_init.{up,down}.sql` before starting (Task 1's `0002_google_sync` uncontested). Re-read `backend/cmd/api/main.go` on `main` before Task 7: it matched the plan's quoted shape byte-for-byte (pet slice merged: `guarded` group ends with `POST /pet/revive`; onboarding not merged, as expected). No adaptation was needed — Task 7 added the `google` import and the `googleSvc`/route lines exactly as specified, immediately after the existing guarded routes and before `log.Printf("listening on :%s"...)`.
+
+### Deviations from the plan
+
+1. **Commit trailer.** The plan's own text specifies `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`. The session's current attribution instructions (issued after the plan was written) specify `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` for all commits created in this session. I followed the session instruction (it postdates and supersedes the plan's literal text per the harness's own precedence rules for live directives vs. a stored artifact) and used it consistently across all 8 commits, amending the first (unpushed, single-commit-old) commit once to fix it before continuing.
+2. **Three of the plan's own `grep` verification lines don't match literally**, because the plan's own code listings (which I transcribed verbatim) contain the very strings those greps say should be absent or singular:
+   - `grep -rn 'google_refresh_token' internal/google/` — plan expects "exactly one hit, in token.go". Actual: 5 hits (4 in `token.go` — 3 doc comments plus the one `refreshTokenSQL` constant — and 1 in `integration_test.go`'s fixture `INSERT`). The single **read** of the column (the SQL constant) is indeed unique; the extra hits are the plan's own explanatory prose and test fixture.
+   - `grep -rn 'aes\|cipher\|ENCRYPTION_SECRET_KEY' internal/google/` — plan expects no hits. Actual: 1 hit, `token.go`'s doc comment (as specified verbatim by the plan) referencing `ENCRYPTION_SECRET_KEY` to explain why encryption is out of scope. No cipher code exists anywhere in the package.
+   - `grep -n 'roadmap_json' internal/google/*.go` — plan expects no hits. Actual: 1 hit, in `integration_test.go`'s fixture `INSERT INTO roadmaps (...roadmap_json...)` (as specified verbatim by the plan), required because the column is `NOT NULL`. Production code (`service.go`, `repo.go`) never references `roadmap_json`.
+   None of these reflect a functional problem; they are artifacts of the plan's own verification commands being written slightly out of sync with its own code listings. Not resolved by altering the plan-specified code.
+3. **Extra, non-committed live-proof test.** Beyond the plan's own tests, I wrote a temporary `backend/internal/google/livecheck_test.go` to satisfy the launching agent's request for live proof of the sync route through real Postgres/Redis and fake Google `httptest` servers (see *Runtime proof* below). It was not part of the plan's task list, so it was deleted after capturing its output — the branch contains only the plan's 8 commits.
+4. **Synchronous vs. "asynchronously".** Implemented synchronously inside the request, exactly as the plan directs; the plan already records this as a deliberate discrepancy with the 1st-thinking doc's prose (see *Notes and open questions*). No further deviation.
+
+### Plan verification output
+
+```
+$ go build ./... && go vet ./...
+(no output — clean)
+
+$ env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -timeout 120s
+ok  	.../internal/airouter
+ok  	.../internal/auth
+ok  	.../internal/config
+ok  	.../internal/google
+ok  	.../internal/health
+ok  	.../internal/pet
+ok  	.../internal/quests
+ok  	.../internal/store
+(cmd/api: no test files)
+
+$ go test ./internal/google/... -run 'Sync|Resync' -v -count=1 -timeout 60s
+--- PASS x8: TestSyncFirstTimeInsertsEventListAnd28Tasks, TestSyncPersistsStateAfterTheEventAndAfterTheListBeforeTasks,
+    TestSyncFailureMidTasksKeepsTheListIDSoRetryDeletesIt, TestResyncSameRoadmapPatchesEventAndCreatesNothing,
+    TestResyncNewRoadmapDeletesOldListAndBuildsANewOne, TestResyncReinsertsTheEventWhenGoogleLostIt,
+    TestSyncWithoutARoadmapPushesOnlyTheEvent, TestSyncNeedsReauthWithoutARefreshTokenOrOnInvalidGrant
+
+$ go test ./internal/google/... -run 'OAuthClient|Calendar|Tasks' -v -count=1 -timeout 60s
+--- PASS x11 (4 OAuthClient + 3 Calendar + 4 Tasks), all via httptest
+
+$ go test ./internal/google/... -run 'NextOccurrence|PracticeEvent|DayDue' -v -count=1 -timeout 60s
+--- PASS x3, including the America/New_York fall-back case
+
+$ go test ./internal/store/... -run 'Migration0002|AppliesPendingVersions' -v -count=1 -timeout 60s
+--- PASS x2
+
+$ grep -rn 'googleapis.com\|oauth2.googleapis.com' internal/google/*_test.go   -> no hits
+$ grep -n '"status"\|"calendar_event_id"\|"tasks_created_count"' internal/google/service.go   -> 3 hits
+$ grep -rn --include='*.go' '"tasklist_id"\|"tasks_created"' internal/google/   -> no hits
+$ grep -n 'RRULE:FREQ=DAILY;COUNT=28' internal/google/schedule.go   -> 1 hit
+$ grep -rn 'Getenv("DATABASE_URL")\|Getenv("REDIS_URL")' internal/google/   -> no hits
+$ grep -c '^func TestIntegration' internal/google/integration_test.go   -> 1
+$ grep -n 'CREATE TABLE google_sync' internal/store/migrations/0002_google_sync.up.sql \
+    "../project-base/Adaptive English Learning Platform - Backend Technical Specification.md"   -> 1 hit each
+$ grep -n 'google.SyncHandler' cmd/api/main.go   -> 1 hit
+$ python3 tools/harness/cli.py validate; echo exit=$?   -> exit=0
+$ git log --oneline main..HEAD   -> 8 commits, one per task, each with the Co-Authored-By trailer
+$ git status --short   -> clean
+```
+(The three grep exceptions are covered under *Deviations* above.)
+
+With the dev stack up (`COMPOSE_PROJECT_NAME=goog`, `POSTGRES_PORT=5442`, `REDIS_PORT=6390`):
+```
+$ make test-integration
+--- PASS: TestIntegrationRateLimiterAllowsFiveThenBlocks (airouter)
+--- PASS: TestIntegrationUpsertCreatesThenPreservesTheLearnerState (auth)
+--- PASS: TestIntegrationSyncStateIsOneRowPerUser (google)
+--- PASS: TestIntegrationEnsureCreatesExactlyOnePetRow (pet)
+--- PASS: TestIntegrationDailyAndProgressAgainstRealServices (quests)
+--- PASS: TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent (store)
+--- PASS: TestIntegrationConcurrentMigrateDoesNotRace (store)
+--- PASS: TestIntegrationPetStatesRejectsASecondRowForTheSameUser (store)
+--- PASS: TestIntegrationRedisRoundTrip (store)
+```
+
+### Runtime proof
+
+1. **Build + full suite** — see above, clean.
+2. **Real binary boot:** built `cmd/api`, ran it against the dev stack with `DATABASE_URL`/`REDIS_URL` pointed at the unique-port compose stack and dummy `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`JWT_SECRET`. Gin's route dump showed `POST /api/v1/integrations/google/sync` mounted. `curl /healthz` returned `{"postgres":"ok","redis":"ok","status":"ok"}` (200). `curl -X POST /api/v1/integrations/google/sync` with no `Authorization` header returned `{"error":"unauthorized"}` (401), proving the route is correctly guarded by `auth.Require()`. Process killed and confirmed gone (`pgrep` exit 1) before moving on.
+3. **Live proof of the slice's central claim (one-way sync, idempotency, reauth)** — driven through the real route (`auth.Require` → `google.SyncHandler`, identical wiring to `main.go`) against the real dev-stack Postgres/Redis, with `OAuthClient.TokenURL`/`HTTPCalendarClient.BaseURL`/`HTTPTasksClient.BaseURL` pointed at in-process `httptest` fakes recording every outbound request body (temporary test, deleted after — see *Deviations*):
+   - **First sync** for a user with a 2-day roadmap (6 exercises): `200 {"status":"synced","calendar_event_id":"evt_live_1","tasks_created_count":2}`. Exactly one outbound Calendar `POST /calendars/primary/events` with body containing `"recurrence":["RRULE:FREQ=DAILY;COUNT=28"]` and `"summary":"English practice"`. Exactly one `POST /users/@me/lists` and exactly 2 `POST /lists/list_live_1/tasks`, with titles `"Day 1: Greetings · Short story · Order a coffee"` and `"Day 2: Numbers · Weather · Directions"`. SQL confirms `google_sync`: `exists=true event=evt_live_1 list=list_live_1 count=2`.
+   - **Second sync**, same user, no input changes: `200`, identical body (`evt_live_1`, count 2). Exactly one *new* Calendar call and it was a `PATCH` (not a duplicate insert). Zero new Tasks calls at all (same active roadmap ⇒ list untouched, confirmed by comparing the fake's call count before/after). SQL after: identical row, unchanged (`evt_live_1`/`list_live_1`/2) — the idempotency claim, verified by asserting the actual outbound requests, not just the response.
+   - **Invalid/expired refresh token**: a second user whose fake OAuth token endpoint answers `400 {"error":"invalid_grant",...}` got `409 {"error":"reauth_required"}` from the real route. Zero Calendar/Tasks calls were made (fakes had no registered routes and recorded none). SQL confirms **no** `google_sync` row was written for that user (`exists=false`) — no half-written state.
+4. **Cleanup:** `docker compose down` for the `goog` project (containers/network removed, confirmed via `docker ps` showing only unrelated pre-existing containers from another project), scratch `backend/.env` deleted, temporary `livecheck_test.go` deleted, no stray `exe/api`/`cmd/api` processes (`pgrep` exit 1).
+
+### CI
+
+`gh` in this environment is authenticated as the owner's work account, and this repo's collaborator model does not include it — `gh pr create` is expected to fail with 403. Per the launch instructions this was noted and skipped in favor of pushing the branch, which is what triggers CI. Branch push and `gh run` results are recorded next (or noted if unavailable).
+
+Branch pushed: `harness/2026-09-23-high-google-one-way-calendar-and-tasks-sync` (https://github.com/HendrixNguyen/English-Training-Harness/tree/harness/2026-09-23-high-google-one-way-calendar-and-tasks-sync).
+
+**Draft PR:** `gh pr create` failed as anticipated — `GraphQL: must be a collaborator (createPullRequest)` (the `gh` CLI here is authenticated as the owner's work account, `hendrixnguyen-optisigns`, which GitHub does not recognize as a collaborator on this repo). Creating the missing `harness`/`type: mvp-slice`/`priority: high` labels first also 404'd for the same reason. No PR exists; the pushed branch is the deliverable, as instructed.
+
+**CI:** green. Run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35813268849 — `harness-tooling` (7s), `backend-integration` (46s), `backend-unit` (25s), all ✓.
+
+**Status:** `done`. All six Definition-of-done items hold: builds clean; full suite (unit + integration via `make test-integration`) passes; the real `cmd/api` binary boots and answers `/healthz` and the new guarded route; every documented command (`go build`, `go vet`, `go test`, `make test-integration`, the plan's grep checks) was run as written; CI is green on the pushed branch; no destructive command surprises (the store `reset()` helper still hard-refuses without `TEST_DATABASE_URL`).

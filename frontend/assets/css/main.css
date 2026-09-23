@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-paper font-body text-ink antialiased;
+  }
+  @media (prefers-color-scheme: dark) {
+    html {
+      @apply bg-paper-dark text-paper;
+    }
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-growth ring-offset-2;
+  }
+}
