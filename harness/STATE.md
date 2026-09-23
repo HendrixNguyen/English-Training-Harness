@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 10:45. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 10:56. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,7 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — push_subscription.endpoint is an unvalidated user-supplied URL the reminder worker POSTs to (SSRF) — blocks `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
@@ -23,7 +23,9 @@ _none_
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
 - `harness/ideas/_inbox/branch-carries-its-own-execution-summary-so-the-ai-router-pl.md` — Branch carries its own execution summary so the ai-router plan file conflicts on merge [high]
 - `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
+- `harness/ideas/_inbox/ci-never-runs-go-test-race-so-background-goroutine-races-go-.md` — CI never runs go test -race so background goroutine races go undetected [medium]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
+- `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Every Google 403 becomes 409 reauth_required, so a quota error forces a pointless re-consent [medium]
 - `harness/ideas/_inbox/gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md` — Gemini test assertion that the API key is not in the query string can never fail [low]
 - `harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider drops every response part after the first so a long roadmap arrives truncated [medium]
@@ -44,14 +46,17 @@ _none_
 - `harness/ideas/_inbox/migrations-run-on-every-boot-with-no-advisory-lock.md` — migrations run on every boot with no advisory lock [medium]
 - `harness/ideas/_inbox/module-week-is-never-validated-and-day-number-comes-from-arr.md` — Module.week is never validated and day_number comes from array position [medium]
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
+- `harness/ideas/_inbox/no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — No per-user subscription cap and no length bound on endpoint p256dh auth [medium]
 - `harness/ideas/_inbox/no-post-handler-bounds-the-request-body-so-one-jwt-can-decod.md` — No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory [medium]
 - `harness/ideas/_inbox/no-test-asserts-the-calendar-patch-body-so-an-empty-patch-pa.md` — No test asserts the Calendar PATCH body, so an empty patch passes the whole suite [medium]
+- `harness/ideas/_inbox/nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` — Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400 [medium]
 - `harness/ideas/_inbox/onboarding-service-stores-a-now-clock-it-never-uses-so-every.md` — onboarding Service stores a now clock it never uses so every caller passes a dead dependency [low]
 - `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — OnTargetMet is lost forever if a write after the INCRBY fails [medium]
 - `harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced [medium]
 - `harness/ideas/_inbox/pet-sweep-tests-cannot-fail-on-the-branches-they-are-named-f.md` — Pet sweep tests cannot fail on the branches they are named for [low]
 - `harness/ideas/_inbox/pgrefreshtokensource-has-no-sentinel-for-a-missing-user-so-a.md` — PgRefreshTokenSource has no sentinel for a missing user, so a deleted user gets 500 not 409 [low]
 - `harness/ideas/_inbox/progress-request-validation-is-incomplete-outside-the-gin-bi.md` — Progress request validation is incomplete outside the Gin binding tags [low]
+- `harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — push_subscription.endpoint is an unvalidated user-supplied URL the reminder worker POSTs to (SSRF) [high]
 - `harness/ideas/_inbox/quests-reads-the-users-table-directly-for-the-timezone.md` — quests reads the users table directly for the timezone [medium]
 - `harness/ideas/_inbox/redisratelimiter-has-no-documented-behaviour-when-redis-is-d.md` — RedisRateLimiter has no documented behaviour when Redis is down and a zero Limit blocks everything [low]
 - `harness/ideas/_inbox/root-gitignore-env-silently-swallows-every-module-s-env-exam.md` — Root .gitignore .env* silently swallows every module's .env.example [medium]
@@ -73,6 +78,8 @@ _none_
 - `harness/ideas/_inbox/the-google-sync-route-logs-nothing-so-a-502-or-500-discards-.md` — The google sync route logs nothing, so a 502 or 500 discards Google's error reason entirely [medium]
 - `harness/ideas/_inbox/the-hourly-sweep-loads-every-pet-in-a-zone-into-memory-and-r.md` — The hourly sweep loads every pet in a zone into memory and reparses tzdata per user [medium]
 - `harness/ideas/_inbox/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — The miss sweep judges the day from volatile Redis and ignores the durable daily_progress row [medium]
+- `harness/ideas/_inbox/tick-sends-serially-with-a-10s-client-timeout-so-one-slow-pu.md` — Tick sends serially with a 10s client timeout so one slow push service delays every other reminder [medium]
+- `harness/ideas/_inbox/timezone-handling-depends-on-system-tzdata-with-no-time-tzda.md` — timezone handling depends on system tzdata with no time/tzdata import [low]
 - `harness/ideas/_inbox/two-comments-in-the-new-progress-validation-misstate-the-cod.md` — Two comments in the new progress validation misstate the code they describe [low]
 - `harness/ideas/_inbox/two-concurrent-assessment-submits-double-spend-the-ai-and-or.md` — Two concurrent assessment submits double-spend the AI and orphan a roadmap with its 84 exercises [medium]
 - `harness/ideas/_inbox/two-recordprogress-error-branches-are-uncovered-and-the-redi.md` — Two RecordProgress error branches are uncovered and the Redis-down test's comment overstates it [medium]
@@ -96,15 +103,15 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high]
+_none_
 
 ## Executing
 
-_none_
+- `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high]
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass)
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
