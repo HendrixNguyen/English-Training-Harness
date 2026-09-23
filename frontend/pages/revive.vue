@@ -38,13 +38,7 @@ async function revive() {
 
 <template>
   <main class="mx-auto max-w-md px-4 pb-8">
-    <template v-if="pet.loading && !pet.status">
-      <AppCard class="mt-4">
-        <StateBlock state="loading" />
-      </AppCard>
-    </template>
-
-    <template v-else-if="passed">
+    <template v-if="passed">
       <AppCard class="mt-4 text-center">
         <PlantSvg :stage="pet.status?.stage ?? 'sprout'" :health="pet.status?.health_points ?? 50" />
         <p class="mt-3 font-display text-2xl text-growth">
@@ -71,7 +65,8 @@ async function revive() {
       </AppCard>
     </template>
 
-    <template v-else>
+    <!-- Real data, and it says wilted: the only way into the alarm. -->
+    <template v-else-if="pet.status">
       <div class="mt-4 rounded-card bg-alert px-4 py-3 text-center font-semibold uppercase tracking-wide text-white" role="alert">
         ⚠️ Cây xanh đang bị héo rũ!
       </div>
@@ -107,6 +102,21 @@ async function revive() {
       <p v-if="error" class="mt-3 rounded-card border border-alert/40 bg-alert/10 px-4 py-3 text-sm text-alert" role="alert">
         {{ error }}
       </p>
+    </template>
+
+    <!-- The load failed and nothing is cached: say the state is unknown, offer a retry
+         (same shape as / and /roadmap). Never guess "dead". -->
+    <template v-else-if="pet.error">
+      <AppCard class="mt-4">
+        <StateBlock state="error" message="Không tải được trạng thái cây. Chưa thể biết cây có héo hay không." action="Thử lại" @action="pet.load()" />
+      </AppCard>
+    </template>
+
+    <!-- No status, no error: the load is in flight (or onMounted has not run yet). -->
+    <template v-else>
+      <AppCard class="mt-4">
+        <StateBlock state="loading" />
+      </AppCard>
     </template>
   </main>
 </template>
