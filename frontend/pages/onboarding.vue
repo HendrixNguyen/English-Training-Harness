@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useOnboardingApi } from '~/composables/useOnboardingApi'
+import { useOnboardingApi, type AssessmentResponse, type QuizQuestion } from '~/composables/useOnboardingApi'
 import { useQuestStore } from '~/stores/quest'
-import type { AssessmentResponse, QuizQuestion } from '~/stubs/onboarding'
+import { ApiError } from '~/utils/apiClient'
 
 const GOALS = [
   { label: 'IELTS 7.0', emoji: '🎓', value: 'IELTS 7.0 Preparation' },
   { label: 'Business English', emoji: '💼', value: 'Business English' },
 ]
+
+/** Honest copy per backend error code (handler.go); answers are kept in every case. */
+function assessErrorMessage(e: unknown): string {
+  if (e instanceof ApiError && e.code === 'rate_limited') return 'Bạn vừa gửi quá nhiều lần. Đợi một phút rồi thử lại.'
+  if (e instanceof ApiError && e.code.startsWith('ai_')) return 'Máy chủ AI đang bận, chưa chấm được bài. Thử lại sau ít phút.'
+  return 'Không tạo được lộ trình. Thử lại.'
+}
 
 const api = useOnboardingApi()
 const quest = useQuestStore()
@@ -59,8 +66,8 @@ async function next() {
       answers: Object.entries(answers.value).map(([question_id, selected_option]) => ({ question_id, selected_option })),
     })
     step.value = 'result'
-  } catch {
-    error.value = 'Không tạo được lộ trình. Thử lại.' // answers are kept
+  } catch (e) {
+    error.value = assessErrorMessage(e) // answers are kept
   } finally {
     loading.value = false
   }
@@ -90,9 +97,6 @@ async function finish() {
       <AppButton class="mt-6" block :disabled="!goal" :loading="loading" @click="startQuiz">
         Bắt đầu bài kiểm tra đầu vào
       </AppButton>
-      <p v-if="api.isStub" class="mt-3 text-center text-xs text-mute">
-        Bản thử: bài kiểm tra và lộ trình là dữ liệu mẫu cho đến khi máy chủ onboarding sẵn sàng.
-      </p>
     </AppCard>
 
     <AppCard v-else-if="step === 'quiz'" class="mt-2">
