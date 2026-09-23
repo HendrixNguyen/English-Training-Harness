@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 11:26. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 11:48. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,6 +9,7 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
+- `harness/ideas/_inbox/frontend-shell-plan-claims-the-6-1-auth-shape-is-live-on-mai.md` — frontend-shell plan claims the §6.1 auth shape is live on main; it is not, so the merged frontend cannot sign in — blocks `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md`
 - `harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — push_subscription.endpoint is an unvalidated user-supplied URL the reminder worker POSTs to (SSRF) — blocks `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
@@ -20,13 +21,17 @@ _none_
 - `harness/ideas/_inbox/a-roadmap-with-zero-exercise-rows-creates-an-empty-google-ta.md` — A roadmap with zero exercise rows creates an empty Google Tasks list recorded as fully synced [low]
 - `harness/ideas/_inbox/a-user-deleted-tasks-list-is-never-rebuilt-and-sync-keeps-an.md` — A user-deleted Tasks list is never rebuilt and sync keeps answering synced with a stale count [medium]
 - `harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth reports Postgres and Redis failures as 401 and logs nothing [medium]
+- `harness/ideas/_inbox/authstore-test-does-not-accept-the-pre-spec-token-shape-pass.md` — authStore test "does not accept the pre-spec {token} shape" passes even when the store reads res.token [low]
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
 - `harness/ideas/_inbox/branch-carries-its-own-execution-summary-so-the-ai-router-pl.md` — Branch carries its own execution summary so the ai-router plan file conflicts on merge [high]
 - `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
 - `harness/ideas/_inbox/ci-never-runs-go-test-race-so-background-goroutine-races-go-.md` — CI never runs go test -race so background goroutine races go undetected [medium]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
+- `harness/ideas/_inbox/codemap-ci-section-still-says-three-parallel-jobs-after-the-.md` — CODEMAP CI section still says three parallel jobs after the frontend job made it four [low]
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Every Google 403 becomes 409 reauth_required, so a quota error forces a pointless re-consent [medium]
+- `harness/ideas/_inbox/expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Expired-session sign-out leaves per-user API responses in the service worker cache [medium]
+- `harness/ideas/_inbox/frontend-shell-plan-claims-the-6-1-auth-shape-is-live-on-mai.md` — frontend-shell plan claims the §6.1 auth shape is live on main; it is not, so the merged frontend cannot sign in [high]
 - `harness/ideas/_inbox/gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md` — Gemini test assertion that the API key is not in the query string can never fail [low]
 - `harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider drops every response part after the first so a long roadmap arrives truncated [medium]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
@@ -50,6 +55,7 @@ _none_
 - `harness/ideas/_inbox/no-post-handler-bounds-the-request-body-so-one-jwt-can-decod.md` — No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory [medium]
 - `harness/ideas/_inbox/no-test-asserts-the-calendar-patch-body-so-an-empty-patch-pa.md` — No test asserts the Calendar PATCH body, so an empty patch passes the whole suite [medium]
 - `harness/ideas/_inbox/nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` — Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400 [medium]
+- `harness/ideas/_inbox/nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — NUXT_PUBLIC_STUB_ONBOARDING defaults to true, so a deployment that forgets it ships the fake placement quiz [medium]
 - `harness/ideas/_inbox/onboarding-service-stores-a-now-clock-it-never-uses-so-every.md` — onboarding Service stores a now clock it never uses so every caller passes a dead dependency [low]
 - `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — OnTargetMet is lost forever if a write after the INCRBY fails [medium]
 - `harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced [medium]
@@ -58,6 +64,7 @@ _none_
 - `harness/ideas/_inbox/progress-request-validation-is-incomplete-outside-the-gin-bi.md` — Progress request validation is incomplete outside the Gin binding tags [low]
 - `harness/ideas/_inbox/quests-reads-the-users-table-directly-for-the-timezone.md` — quests reads the users table directly for the timezone [medium]
 - `harness/ideas/_inbox/redisratelimiter-has-no-documented-behaviour-when-redis-is-d.md` — RedisRateLimiter has no documented behaviour when Redis is down and a zero Limit blocks everything [low]
+- `harness/ideas/_inbox/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive shows a false "your plant is dead" alarm whenever GET /pet/status fails [high]
 - `harness/ideas/_inbox/root-gitignore-env-silently-swallows-every-module-s-env-exam.md` — Root .gitignore .env* silently swallows every module's .env.example [medium]
 - `harness/ideas/_inbox/route-falls-back-on-terminal-4xx-so-one-bad-prompt-buys-thre.md` — Route falls back on terminal 4xx so one bad prompt buys three paid provider calls [medium]
 - `harness/ideas/_inbox/route-has-no-overall-deadline-so-one-call-can-take-90-second.md` — Route has no overall deadline so one call can take 90 seconds [low]
@@ -102,17 +109,17 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high]
+_none_
 
 ## Executing
 
-_none_
+- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high]
 
 ## Done (last 10)
 
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs)
-- `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass)
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
