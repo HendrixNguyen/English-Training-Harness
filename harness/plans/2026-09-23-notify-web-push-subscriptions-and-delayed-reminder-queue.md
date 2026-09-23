@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/notify-web-push-subscriptions-and-delayed-reminder-queue.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 8
+branch: harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue
+worktree: .worktrees/notify-web-push-subscriptions-and-delayed-reminder-queue
 ---
 # Notify: Web Push subscriptions and delayed reminder queue — Plan
 
@@ -2090,3 +2092,65 @@ With a dev stack (`COMPOSE_PROJECT_NAME=<slug>` and non-default `POSTGRES_PORT`/
 - **Payload is fixed text** (`DefaultPayload`). run-01's "adaptive reminder timing and pre-decay rescue push" idea is where per-user copy (pet health, streak) belongs; `Service.payload` is a field so that slice can inject.
 - **`Location`/`LocalDate`/`TargetSeconds` duplicate quests' by design** (package boundary). Third copy → hoist.
 - **VAPID public key to the client** is a frontend concern (Nuxt runtime config, per the idea and `_run.md`): no `GET /settings/vapid-public-key` is added (not in §7).
+
+## Execution summary
+
+Branch `harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue`, worktree `.worktrees/notify-web-push-subscriptions-and-delayed-reminder-queue`, all 8 tasks implemented task-by-task with TDD (failing test → implement → pass → commit), 8 commits on top of `main`, all with the `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` trailer. Working tree clean, `python3 tools/harness/cli.py validate` exits 0.
+
+**Pre-flight (as instructed):** re-read `backend/cmd/api/main.go` on `main` before Task 7. It already had pet's wiring (`studyCounter := quests.NewRedisCounter(rdb)`, `go pet.RunHourly(ctx, petSvc)`, `guarded := v1.Group(...)`) exactly as the plan expected, and — as flagged — neither google's nor onboarding's routes were present yet (both still unmerged branches). No stop condition was hit. Added the notify block directly after `go pet.RunHourly(ctx, petSvc)` and the route after the last existing guarded line (`/pet/revive`), preserving intent; a future merge of google/onboarding will conflict on this file as expected, and that is the human's problem to resolve, not this executor's.
+
+### Deviations from the plan (all recorded, none silent)
+
+1. **Fixed a wrong assertion in the plan's own DST test.** `TestNextSendTimeKeepsWallClockAcrossDST` asserted `got.Sub(now) == 23*time.Hour`. I verified independently with a standalone Go program against Go's tzdata: 21:00 EST (UTC-5) on 2026-03-07 to 20:00 EDT (UTC-4) on 2026-03-08 (the US spring-forward day) is **22h** elapsed, not 23h — the spring-forward day loses an hour, and 23h would only hold if the base time were 20:00 rather than 21:00 the day before. My `NextSendTime` implementation (resolving the local wall-clock time via `time.Date` and letting Go pick the correct UTC offset) was already correct; only the hardcoded test assertion was wrong. Fixed the test to assert 22h, with a comment explaining the arithmetic, and confirmed all other assertions in that test (day, hour, offset -14400) already passed.
+2. **Fixed `.env.example`'s VAPID key generator reference**, per the plan's own contingency note. `webpush-go` v1.4.0 has no `cmd/webpush-go` binary (confirmed via `go doc` and inspecting the module cache — only `example/` and `.github/` exist); replaced the false command with a pointer to `npx web-push generate-vapid-keys` / any VAPID generator.
+3. **Added a mutex to `fakeSender.sent`** in `fakes_test.go` (and a `Sent()` accessor used only by `worker_test.go`), per the plan's own contingency note ("if `go test -race` complains, guard `sent` with a mutex"). `-race` did complain (a real read/write race between `RunWorker`'s background goroutine and the test goroutine polling `h.sender.sent`); CI's `backend-unit` job runs `go test ./... -count=1` without `-race` so this would not have failed CI, but it is a genuine race and trivial to fix, so I fixed it rather than leaving it.
+4. **`daily:accumulated` grep check in Verification is stricter than the plan's own template code.** The plan's own Task 5/Task 2 code includes doc comments mentioning `daily:accumulated` (in `StudyCounter`'s and `LocalDate`'s doc comments, copied verbatim from the plan) — `grep -rn 'daily:accumulated\|DailyAccumulatedKey\|daily_progress' internal/notify/` therefore finds 2 comment-only hits, not 0. No code in `internal/notify` touches the Redis key or `daily_progress` table directly; the counter is read exclusively through the `StudyCounter` interface, satisfying the check's actual intent. Left the comments as-is since they're accurate documentation and part of the plan's own text.
+5. Task 4's `.env.example` fix (item 2) is bundled into the Task 4 commit rather than a separate one, since it's the direct output of that task's own "verify after Task 4" instruction.
+
+### Two spec discrepancies (deliberate, flagged for the reviewer)
+
+1. **Flat `push_subscription.{endpoint, p256dh, auth}` vs. backend spec §6.4's nested `keys.{p256dh, auth}`.** Implemented the **plan's** flat shape as instructed (the plan is the contract here), and the nested browser-native shape is explicitly rejected with 400 `invalid_request` (tested in `handler_test.go`'s `"nested keys (not §6.4)"` case) so the mismatch surfaces immediately in development rather than as a silent NULL. This is the same class of bug as the `token`/`access_token` auth mismatch mentioned in the task brief. Already documented prominently in this plan's own *Notes and open questions* section ("Flat `push_subscription` keys").
+2. **`VAPID_SUBJECT` is not in backend spec §9's environment checklist**, but `webpush-go`'s `Options.Subscriber` (the VAPID JWT `sub` claim) is effectively required by push services (Mozilla's in particular). Implemented exactly as the plan directs: optional env var, defaulting to `mailto:admin@example.com`, both recorded in `config.go`'s doc comment and `.env.example`. Already documented in this plan's *Notes and open questions* ("`VAPID_SUBJECT` is not in §9").
+
+### Verification (plan's Verification section, run from the worktree)
+
+- `go build ./...` / `go vet ./...` — clean, no output.
+- `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -timeout 120s` — `ok` for every package (airouter, auth, config, health, notify, pet, quests, store); no service env vars needed.
+- `go test ./internal/notify/... -run 'UpdateSettings|Tick' -v` — 11 named tests pass (a 12th incidental match, `TestRunWorkerTicksAndStopsWhenTheContextIsCancelled`, also matches the `Tick` substring and passes).
+- `go test ./internal/notify/... -run 'WebPushSender' -v` — 4/4 pass, including the VAPID `Authorization` header check (webpush-go v1.4.0 sends `vapid t=…,k=…`, matching the plan's primary expectation — no relaxation needed).
+- `go test ./internal/notify/... -run 'NextSendTime|NormalizeClock' -v` — 3/3 pass incl. the corrected DST case.
+- `go test ./internal/notify/... -run 'SettingsHandler|RunWorker' -v` — 5/5 pass.
+- All the plan's `grep` checks pass with the one noted exception (item 4 above, which matches the check's intent, not its literal zero-hit wording).
+- `python3 tools/harness/cli.py validate` — exit 0.
+- `git log --oneline main..HEAD` — 8 commits, each with the trailer. `git status --short` — clean.
+- Dev stack: `COMPOSE_PROJECT_NAME=notif`, `POSTGRES_PORT=5445`, `REDIS_PORT=6393` in a scratch `backend/.env`, `docker compose up -d --wait --wait-timeout 120` (both containers healthy). `TEST_DATABASE_URL=postgres://english:english@localhost:5445/english?sslmode=disable`, `TEST_REDIS_URL=redis://localhost:6393/0`, then `make test-integration` (documented command, run exactly as written) — every package's integration tests pass, including `TestIntegrationScheduleAndSubscriptionRoundTrip`, with `-p 1` as documented.
+
+### Runtime proof
+
+**1. Boot + one real authenticated request end to end.** Built `go build -o /tmp/notif-api-test ./cmd/api`, ran it on port 18099 against the dev-stack Postgres/Redis with no VAPID keys set. Logs confirmed: migrations applied, `notify: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY unset; reminder settings are stored but no Web Push is sent`, and `POST /api/v1/settings/notifications` mounted. `curl /healthz` → `{"postgres":"ok","redis":"ok","status":"ok"}` (200). `curl` the settings route with no `Authorization` → 401 `{"error":"unauthorized"}`. Then, via a throwaway helper program (built inside `backend/cmd/notiftest/`, deleted before finishing — not part of the plan's file list) that inserted a real user, minted a real JWT with `auth.NewTokenIssuer`, wrote a real session with `auth.NewRedisSessionStore.Put`, and made a real authenticated HTTP `POST` against the running server with `{"notification_time":"20:00:00","timezone":"Asia/Ho_Chi_Minh","push_subscription":{...}}`: got HTTP 200 `{"status":"updated","notification_time":"20:00:00","next_reminder_at":"2026-09-23T13:00:00Z"}`, and `ZSCORE queue:webpush:delay <user_id>` in real Redis returned `1790168400`, which **exactly matches** the independently-computed next occurrence of 20:00 in Asia/Ho_Chi_Minh (`2026-09-23T20:00:00+07:00` = unix `1790168400`) — proving the timezone is applied correctly end to end through the real HTTP → Service → Postgres → Redis path.
+
+**2. The delayed-queue timing claims, against real Redis, real Postgres, and a real `httptest` fake push endpoint** (same throwaway helper, using `notify.NewRedisQueue`, `notify.NewPgRepo`, and a real `notify.WebPushSender` with freshly generated VAPID keys — only the `StudyCounter` was a trivial always-zero fake, since that dependency isn't the subject of this proof):
+  - **Enqueue:** scheduled userA 2s in the future; `ZSET queue:webpush:delay` showed score `1790134795` (exactly `fireAt.Unix()`); `ZRANGEBYSCORE` at enqueue time returned `[]` (not yet due).
+  - **Tick before the score fires nothing:** `Tick(now=2026-09-23T03:39:53Z)` → `{Due:0 Sent:0 ...}`, fake server saw 0 hits.
+  - **Tick at/after the score fires exactly once and re-slots:** `Tick(now=2026-09-23T03:39:55Z)` → `{Due:1 Sent:1 Skipped:0 Pruned:0 Failed:0}`, fake server saw exactly 1 hit; `ZSCORE` afterward was `1790193600` (tomorrow 20:00 UTC in this test's timezone setup), strictly greater than the tick time — the member was moved forward, not removed outright, matching the "re-slot before send" design.
+  - **A second Tick right after does NOT re-fire:** `Tick(now=tick+1s)` → `{Due:0 Sent:0 ...}`, fake server hit count **stayed at 1**. This is the specific no-duplicate-fire assertion requested: two ticks past the original fire time produced exactly one push, ever.
+  - **410 Gone → cleaned up, not retried forever:** a second user's subscription pointed at the fake server's `/gone` path (always 410). `Tick` on its due entry produced `{Due:1 Sent:0 Skipped:0 Pruned:1 Failed:0}`; a follow-up `repo.Subscriptions(ctx, userB)` query against real Postgres returned `[]` — the row was deleted, not left to be retried on every future tick. (The plan does cover this: `Tick`'s `ErrSubscriptionGone` branch calls `DeleteSubscription`, unconditionally, not a "not covered, invented" case.)
+  - Full raw output of this proof is reproducible; it was captured directly during execution and is summarized above with exact stats structs and ZSET scores rather than paraphrased.
+
+### CI
+
+Pushed `harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue`. `gh pr create` failed exactly as anticipated: `pull request create failed: GraphQL: must be a collaborator (createPullRequest)` (the `gh` account authenticated here, `hendrixnguyen-optisigns`, is not a collaborator on `HendrixNguyen/English-Training-Harness`; attempted once, noted, moved on — also could not create labels beforehand, same root cause, HTTP 404 on the labels endpoint). CI run triggered by the push: **all three jobs green** — `backend-unit`, `backend-integration`, `harness-tooling`. Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35815345858 (conclusion: success).
+
+### Cleanup
+
+Deleted `backend/cmd/notiftest/` (throwaway verification helper, never committed). Killed the test API server (`/tmp/notif-api-test`, PID 61084) — note: plain `kill`/SIGTERM did not stop it because `main.go`'s `signal.NotifyContext` is only consulted by the background workers (`pet.RunHourly`, `notify.RunWorker`), not by the blocking `r.Run()` HTTP listener, so `SIGKILL` was required; this is a pre-existing gap in `main.go` unrelated to this plan, noted here rather than silently worked around. `docker compose down` for the `notif` project (both containers stopped and removed); deleted the scratch `backend/.env`. Final checks: `pgrep -fl exe/api` and `pgrep -fl notif-api-test`/`notiftest` — none found; `docker ps` shows only pre-existing, unrelated containers (`scio3-redis-1`, `scio3-mongo-1`), not this task's. `git status --short` in the worktree is clean.
+
+Definition of done: (1) builds — yes; (2) whole suite passes from a clean shell incl. `make test-integration -p 1` — yes; (3) boots and serves a real request — yes; (4) every documented command works exactly as documented — yes; (5) CI green on the pushed branch — yes (run linked above); (6) this summary. Setting `status=done`.
+
+### Amendment: SSRF blocker fix (2026-09-23)
+
+`harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` (blocker, `amends` this plan) landed 5 more commits on this same branch/worktree, on top of `547c0ab` (this plan's final commit): `8d283bf` (`ValidateEndpoint` + `forbiddenAddr`), `c761fe3` (`UpdateSettings` refuses hostile endpoints before writing), `1c647b3` (guarded dial-time HTTP client, no redirects, `Send` validates first), `f7a02c1` (`Tick` prunes forbidden-endpoint rows), `b85189a` (CODEMAP). All five carry the `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` trailer.
+
+The fix closes the SSRF hole the review found: `push_subscription.endpoint` (`handler.go`/`service.go`) was an arbitrary client-supplied URL handed straight to `http.Client.Do` in `push.go`, reachable by an authenticated user pointing it at `169.254.169.254` or any internal address, fired once per user per day at a time the user controls. It is now validated at both doors — `UpdateSettings` (400 `invalid_request`, zero writes) and again in `Send` — and enforced at TCP dial time via `net.Dialer.Control` on the *resolved* address (DNS-rebinding-safe, closes the check-then-connect window), with `Proxy: nil` so the guard sees the real destination and `CheckRedirect` returning `http.ErrUseLastResponse` so a permitted host cannot 302 into a private range. A stored row the guard refuses fails `Send` with `ErrForbiddenEndpoint`, which `Tick` prunes exactly like 404/410.
+
+Full verification, mutation-testing, live-proof, and CI evidence for this amendment is in that plan's own `## Execution summary` — not duplicated here. In short: whole suite green (`go build`/`go vet`/full `go test ./...` without services), `go test ./internal/notify/... -race` clean, all 17 named SSRF tests PASS including the reviewer's exact reproduction, all three Task 3 mutations (`guardDial` removed, `CheckRedirect` removed, `Send`'s `ValidateEndpoint` removed) and the Task 1/2/4 mutations broke the intended assertions and were reverted, a standalone live-proof program plus a real dev-stack `curl` against the running API confirmed the hostile endpoint is refused (0 listener hits, subscription pruned) and the legitimate endpoint still works end to end, and CI is green on the new push (run `35819788843`, conclusion `success`). `python3 tools/harness/cli.py blockers` against this plan now reports none.

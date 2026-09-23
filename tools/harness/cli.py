@@ -10,7 +10,8 @@ from tools.harness.scan import scan, load
 from tools.harness.state import render_state, plan_sort_key, PRIO_RANK
 
 TEMPLATES = pathlib.Path(".agents/templates")
-LOCK = pathlib.Path("harness/.lock")
+LOCK = pathlib.Path("harness/.lock")          # pre-2026-09-23 single lock, migrated on first use
+LOCK_DIR = pathlib.Path("harness/.locks")
 LOCK_STALE_SECONDS = 2 * 3600
 
 
@@ -198,15 +199,54 @@ def cmd_next(a):
     return 0
 
 
+def _lock_path(plan):
+    """One lock per plan. Executors work in separate worktrees, so only same-plan runs collide."""
+    return LOCK_DIR / (re.sub(r"[^A-Za-z0-9._-]", "_", plan) + ".lock")
+
+
+def _migrate_legacy_lock():
+    if not LOCK.exists():
+        return
+    plan, mtime = LOCK.read_text().strip(), LOCK.stat().st_mtime
+    if plan:
+        LOCK_DIR.mkdir(parents=True, exist_ok=True)
+        dest = _lock_path(plan)
+        if not dest.exists():
+            dest.write_text(plan + "\n")
+            os.utime(dest, (mtime, mtime))
+    LOCK.unlink()
+
+
+def _held_locks():
+    if not LOCK_DIR.exists():
+        return []
+    return sorted(f for f in LOCK_DIR.iterdir() if f.suffix == ".lock")
+
+
 def cmd_lock(a):
-    if LOCK.exists() and time.time() - LOCK.stat().st_mtime < LOCK_STALE_SECONDS:
-        print(f"error: locked by {LOCK.read_text().strip()}"); return 1
-    LOCK.write_text(a.plan + "\n"); print("locked"); return 0
+    _migrate_legacy_lock()
+    path = _lock_path(a.plan)
+    if path.exists() and time.time() - path.stat().st_mtime < LOCK_STALE_SECONDS:
+        print(f"error: locked by {path.read_text().strip()}"); return 1
+    LOCK_DIR.mkdir(parents=True, exist_ok=True)
+    path.write_text(a.plan + "\n"); print("locked"); return 0
 
 
 def cmd_unlock(a):
-    if LOCK.exists():
-        LOCK.unlink()
+    _migrate_legacy_lock()
+    if a.plan:
+        path = _lock_path(a.plan)
+        if not path.exists():
+            print(f"error: not locked: {a.plan}"); return 1
+        path.unlink(); print("unlocked"); return 0
+    held = _held_locks()
+    if len(held) > 1:
+        print("error: several plans are locked — name the one to release:")
+        for f in held:
+            print(f"  {f.read_text().strip()}")
+        return 1
+    for f in held:
+        f.unlink()
     print("unlocked"); return 0
 
 
@@ -241,7 +281,7 @@ def main(argv=None):
     p.add_argument("--all", action="store_true"); p.set_defaults(fn=cmd_next)
     p = sub.add_parser("blockers"); p.add_argument("--plan"); p.set_defaults(fn=cmd_blockers)
     p = sub.add_parser("lock"); p.add_argument("plan"); p.set_defaults(fn=cmd_lock)
-    sub.add_parser("unlock").set_defaults(fn=cmd_unlock)
+    p = sub.add_parser("unlock"); p.add_argument("plan", nargs="?"); p.set_defaults(fn=cmd_unlock)
     sub.add_parser("stale-worktrees").set_defaults(fn=cmd_stale_worktrees)
     a = ap.parse_args(argv)
     return a.fn(a)

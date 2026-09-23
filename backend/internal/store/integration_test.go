@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -36,8 +37,8 @@ func requireRedisURL(t *testing.T) string {
 	return url
 }
 
-// reset drops everything 0001 creates plus the bookkeeping table, so each test
-// starts from an empty database.
+// reset drops everything every migration creates (newest first), plus the
+// bookkeeping table, so each test starts from an empty database.
 func reset(t *testing.T, pg *Postgres) {
 	t.Helper()
 	// Belt and braces: reset is the destructive step. Even if a future test
@@ -46,13 +47,15 @@ func reset(t *testing.T, pg *Postgres) {
 	if os.Getenv("TEST_DATABASE_URL") == "" {
 		t.Fatal("reset called without TEST_DATABASE_URL; refusing to drop tables")
 	}
-	down, err := MigrationsFS.ReadFile("migrations/0001_init.down.sql")
-	if err != nil {
-		t.Fatalf("reading down migration: %v", err)
-	}
 	ctx := context.Background()
-	if _, err := pg.Pool.Exec(ctx, string(down)); err != nil {
-		t.Fatalf("down migration: %v", err)
+	for _, name := range []string{"migrations/0002_google_sync.down.sql", "migrations/0001_init.down.sql"} {
+		down, err := MigrationsFS.ReadFile(name)
+		if err != nil {
+			t.Fatalf("reading %s: %v", name, err)
+		}
+		if _, err := pg.Pool.Exec(ctx, string(down)); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
 	}
 	if _, err := pg.Pool.Exec(ctx, `DROP TABLE IF EXISTS schema_migrations`); err != nil {
 		t.Fatalf("dropping schema_migrations: %v", err)
@@ -70,8 +73,8 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 	if err != nil {
 		t.Fatalf("first Migrate: %v", err)
 	}
-	if len(first) != 1 || first[0] != "0001_init" {
-		t.Fatalf("first run applied %v, want [0001_init]", first)
+	if want := []string{"0001_init", "0002_google_sync"}; !reflect.DeepEqual(first, want) {
+		t.Fatalf("first run applied %v, want %v", first, want)
 	}
 
 	second, err := Migrate(ctx, pg.Migrator(), MigrationsFS)
@@ -82,7 +85,7 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 		t.Errorf("second run applied %v, want nothing", second)
 	}
 
-	for _, table := range []string{"users", "push_subscriptions", "pet_states", "daily_progress", "roadmaps", "exercises"} {
+	for _, table := range []string{"users", "push_subscriptions", "pet_states", "daily_progress", "roadmaps", "exercises", "google_sync"} {
 		var exists bool
 		err := pg.Pool.QueryRow(ctx,
 			`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $1)`, table).Scan(&exists)
@@ -138,8 +141,9 @@ func TestIntegrationConcurrentMigrateDoesNotRace(t *testing.T) {
 		}
 		total += len(<-applied)
 	}
-	if total != 1 {
-		t.Errorf("0001_init was applied %d times across %d concurrent callers, want exactly 1", total, n)
+	const versions = 2 // 0001_init, 0002_google_sync
+	if total != versions {
+		t.Errorf("migrations were applied %d times across %d concurrent callers, want exactly %d", total, n, versions)
 	}
 }
 

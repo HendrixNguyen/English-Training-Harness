@@ -104,14 +104,37 @@ class CliTests(unittest.TestCase):
         _, out = self.run_cli("next", "--stage", "evaluate", "--all")
         self.assertEqual(out.splitlines(), [blocker, bug, feat])
 
+    def _lock_file(self, plan):
+        return pathlib.Path("harness/.locks") / (plan.replace("/", "_") + ".lock")
+
+    def test_lock_is_per_plan_not_global(self):
+        # Executors work in separate worktrees, so different plans must not block each other.
+        self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 0)
+        self.assertEqual(self.run_cli("lock", "harness/plans/b.md")[0], 0)
+        self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 1)   # same plan still refused
+        code, out = self.run_cli("unlock")
+        self.assertEqual(code, 1)                                            # ambiguous: two held
+        self.assertIn("several plans are locked", out)
+        self.assertEqual(self.run_cli("unlock", "harness/plans/a.md")[0], 0)
+        self.assertFalse(self._lock_file("harness/plans/a.md").exists())
+        self.assertEqual(self.run_cli("unlock")[0], 0)                       # one left: no name needed
+        self.assertFalse(self._lock_file("harness/plans/b.md").exists())
+
     def test_lock_unlock_and_stale(self):
         self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 0)
-        self.assertEqual(self.run_cli("lock", "harness/plans/b.md")[0], 1)
+        self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 1)
         old = time.time() - 3 * 3600
-        os.utime("harness/.lock", (old, old))
-        self.assertEqual(self.run_cli("lock", "harness/plans/b.md")[0], 0)   # stale lock taken over
-        self.assertEqual(self.run_cli("unlock")[0], 0)
+        os.utime(self._lock_file("harness/plans/a.md"), (old, old))
+        self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 0)   # stale lock taken over
+        self.assertEqual(self.run_cli("unlock", "harness/plans/a.md")[0], 0)
+        self.assertEqual(self.run_cli("unlock", "harness/plans/a.md")[0], 1)  # already released
+
+    def test_legacy_global_lock_is_migrated(self):
+        pathlib.Path("harness/.lock").write_text("harness/plans/a.md\n")
+        self.assertEqual(self.run_cli("lock", "harness/plans/a.md")[0], 1)   # still held after migration
         self.assertFalse(pathlib.Path("harness/.lock").exists())
+        self.assertEqual(self.run_cli("lock", "harness/plans/b.md")[0], 0)   # other plans now free
+        self.assertEqual(self.run_cli("unlock", "harness/plans/a.md")[0], 0)
 
     def test_blocker_refuses_merge_until_fixed(self):
         _, run = self.run_cli("new-run")
@@ -140,6 +163,27 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.run_cli("blockers", "--plan", plan)[0], 0)
         self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
         self.assertIs(read_fm(plan)["merged"], True)
+
+    def test_rejected_blocker_stops_blocking(self):
+        # Some findings are resolved by reality (a dependency merging), not by a fix.
+        _, feat = self.run_cli("new-idea", "--run", "harness/ideas/_inbox", "--title",
+                               "Frontend shell", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", feat, "status=selected", "priority=high")
+        _, plan = self.run_cli("new-plan", "--idea", feat)
+        self.run_cli("set", plan, "status=approved")
+        self.run_cli("set", plan, "status=executing")
+        self.run_cli("set", plan, "status=done")
+
+        _, bug = self.run_cli("new-idea", "--run", "harness/ideas/_inbox", "--title",
+                              "Plan claims X is live on main", "--type", "bug", "--source", "reviewer")
+        self.assertEqual(self.run_cli("set", bug, "priority=high")[0], 0)
+        self.assertEqual(self.run_cli("set", bug, "blocks=" + plan)[0], 0)
+        self.assertEqual(self.run_cli("blockers", "--plan", plan)[0], 1)
+        self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 1)
+
+        self.run_cli("set", bug, "status=rejected", "rejected_reason=resolved by the auth merge")
+        self.assertEqual(self.run_cli("blockers", "--plan", plan), (0, ""))
+        self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
 
     def test_two_blockers_can_share_one_fix_plan_via_the_plan_backlink(self):
         _, run = self.run_cli("new-run")

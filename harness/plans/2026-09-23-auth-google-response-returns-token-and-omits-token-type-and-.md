@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/auth-google-response-returns-token-and-omits-token-type-and-.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-23-high-auth-google-response-returns-token-and-omits-token-type-and-
 worktree: .worktrees/auth-google-response-returns-token-and-omits-token-type-and-
 pr: none

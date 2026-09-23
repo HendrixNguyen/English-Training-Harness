@@ -44,6 +44,10 @@ class ScanResult:
         for i in self.ideas:
             if i.fm.get("blocks") != plan_rel:
                 continue
+            # A rejected finding is not a blocker: some are resolved by reality
+            # (a dependency merging) rather than by a fix plan.
+            if i.fm.get("status") == "rejected":
+                continue
             fix = self.plan_for_idea(i.rel) or self.plan_by_rel(i.fm.get("plan"))
             if fix is None or fix.fm.get("status") != "done":
                 out.append(i)
