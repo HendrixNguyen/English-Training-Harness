@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -41,3 +41,8 @@ deserves the same review. Migration 0001 is left untouched.
 - `backend/internal/store/migrations/0001_init.up.sql:26`, `:46`, `:50` (`UNIQUE(user_id, date)`), `:55`.
 - `backend/internal/store/migrations_test.go:59-61` — the test asserts exactly three plain
   `user_id UUID REFERENCES …` columns, i.e. the nullability is currently pinned by a test.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Spec correction; `UNIQUE(user_id, date)` genuinely stops protecting `daily_progress` if a NULL ever lands. Ships in the `0003` migration plan with the indexes and the one-active-roadmap constraint (backend spec DDL updated in the same change, per AGENTS.md).

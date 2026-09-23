@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -53,3 +53,8 @@ resumes at 13 rather than at 1.
 - `backend/internal/google/service.go:122-132` — the sequential insert loop; `:133` — `RoadmapID` written only after it completes.
 - `backend/internal/google/service.go:100-106` — the retry path that deletes the partially built list.
 - Existing, referenced, not duplicated: `harness/ideas/_inbox/route-has-no-overall-deadline-so-one-call-can-take-90-second.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Real non-convergence under a slow Google, but the fix (resume from `tasks_created_count`) changes the retry semantics the orphan plan documents; do it as a follow-up in `google` once the orphan fix and 403 mapping are in.

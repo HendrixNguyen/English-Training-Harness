@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -61,3 +61,8 @@ PROBE empty roadmap/module/day titles accepted: true
 - `backend/internal/airouter/roadmap_test.go:66-95` — 15 rejection cases, none about the day budget; `"absurd duration"` uses 120, which the `1..30` range catches, so the band is never probed at its edge.
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md:2002` — `total_minutes_required: 30` and `is_target_met = total >= 1800`.
 - Reviewer probes (scratch test, removed): a day of three 30-minute tasks and a roadmap with empty roadmap/module/day titles both parse without error.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium (top 10).** Confirmed: per-task `1..30` only, no day sum, no non-task title checks. A model that drifts to longer tasks yields a day the learner cannot finish under a header that says 30 minutes, and the pet decays for it — the product's core promise broken with no error. Plan together with `module-week-is-never-validated…` as one `ParseRoadmap` validation plan (named constants with the §6.1 quote, day-sum band, week == position, title checks, CODEMAP wording).

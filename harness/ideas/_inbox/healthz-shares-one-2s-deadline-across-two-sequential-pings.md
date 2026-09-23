@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into healthz-leaks-postgres-and-redis-driver-error-strings-public.md (survivor): same handler, one plan gives each ping its own pingTimeout budget and adds the both-down and slow-dependency tests."
 ---
 # healthz shares one 2s deadline across two sequential pings
 
@@ -35,3 +36,8 @@ that sets `healthy = false` twice and reports both errors in one body is unverif
   `:31-38` (the two sequential pings).
 - `backend/internal/health/health_test.go:16` (fake ignores ctx), `:32-62` (three cases, none with
   both down, none with a slow dependency).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** Correct but low; the health-leak plan rewrites the same handler and takes the per-ping deadline and the missing tests with it.

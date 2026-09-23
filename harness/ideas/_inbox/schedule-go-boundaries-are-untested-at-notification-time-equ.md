@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Test-only with no demonstrated defect: time.Date normalises month/year rollover correctly and the reviewer confirmed the behaviour is right; pinning it is tidiness."
 ---
 # schedule.go boundaries are untested at notification_time equals now and month year rollover
 
@@ -46,3 +47,8 @@ day 28 due in February and one created in December with a due date in January; a
 - `backend/internal/google/schedule.go:104-111` — `DayDue`, the `l.Day()+n-1` rollover.
 - `backend/internal/google/schedule_test.go:26-40, 50-65, 95-107` — the three existing cases and their limits.
 - Same class, different package, already filed: `harness/ideas/_inbox/daynumber-loses-a-calendar-day-at-every-spring-forward-dst-t.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** By its own account "none of these is a demonstrated defect". Add the table cases opportunistically when `schedule.go` next changes.

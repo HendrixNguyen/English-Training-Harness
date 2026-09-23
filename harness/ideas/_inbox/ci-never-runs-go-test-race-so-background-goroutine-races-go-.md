@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -38,3 +38,8 @@ introduced on a `harness/*` branch fails a check before merge instead of after.
 - `backend/cmd/api/main.go:93` (`go pet.RunHourly(ctx, petSvc)`) and `main.go:118` (`go notify.RunWorker(ctx, notifySvc, notify.PollInterval)`) — two background goroutines now in the production binary.
 - Reviewer re-ran `env -u DATABASE_URL -u REDIS_URL go test ./internal/notify/... -race -count=1 -timeout 180s` on the branch → `ok … 1.957s`.
 - Related CI-quality findings already in the inbox: `ci-never-runs-on-harness-branches-so-it-gates-nothing-before.md`, `ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md`, `codemap-ci-section-overstates-the-unit-job-and-prescribes-a-.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: `grep -n race .github/workflows/ci.yml` → no match, and the production binary will run two long-lived goroutines once notify merges (pet cron + notify worker). Developer-workflow bug: the one class of defect those goroutines can have is invisible to CI. Plan together with `ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — same job in the same file; one branch, one merge. Scope `-race` to the packages with goroutines if the full suite is slow.

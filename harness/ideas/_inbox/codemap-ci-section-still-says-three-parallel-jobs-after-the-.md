@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into codemap-does-not-document-the-config-and-health-packages-and.md, which carries this one-word fix alongside the missing config and health paragraphs."
 ---
 # CODEMAP CI section still says three parallel jobs after the frontend job made it four
 
@@ -18,3 +19,8 @@ priority: low
 - `harness/CODEMAP.md:28` — "Three parallel GitHub Actions jobs…"; the bullet list at lines 30-34 enumerates `backend-unit`, `backend-integration`, `harness-tooling` and `frontend`.
 - `.github/workflows/ci.yml` on the branch defines four jobs (`frontend` at line 122).
 - The reviewer prepared this one-word fix on the branch but the sandbox denied the commit; filed here instead of left unrecorded.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** Still true on `main` (CODEMAP CI section opens "Three parallel" above four bullets). Too small for its own branch; the new CODEMAP-gaps idea lists it as its third item.

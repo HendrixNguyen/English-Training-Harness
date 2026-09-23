@@ -48,3 +48,8 @@ they write the call:
 - `backend/internal/notify/handler_test.go:77` — the `"nested keys (not §6.4)"` case asserts `400 {"error":"invalid_request"}` for the browser-native body.
 - `project-base/Adaptive English Learning Platform - Frontend Technical Specification.md` — `grep -in 'pushManager|subscribe|push_subscription|notification_time'` matches nothing; only `p256dh` in the DDL (line 208) and the ER diagram (line 126). The frontend contract for this endpoint does not exist.
 - MDN: `PushSubscription.toJSON()` serialises to `{endpoint, expirationTime, keys: {p256dh, auth}}`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Leave proposed — a genuine later.** The frontend has no notifications settings screen yet (`pages/settings.vue` is a placeholder), so there is no code to fix on either side today; the backend's 400 is loud and tested. This belongs in the idea for the frontend settings/notifications slice: whoever writes it must flatten `PushSubscription.toJSON()` (or the handler should accept the nested alias). The ideator should carry this file's *Expected output* into that feature idea, then this can be rejected as folded.

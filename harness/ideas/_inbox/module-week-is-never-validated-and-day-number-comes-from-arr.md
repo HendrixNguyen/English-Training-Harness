@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -51,3 +51,8 @@ declaring `week: 2`. `harness/CODEMAP.md`'s `ParseRoadmap` sentence lists the ne
 - `backend/internal/airouter/prompt.go:29` — `RoadmapSchema` shows `"week": 1`, so the model is told the field matters.
 - `backend/internal/airouter/roadmap_test.go:12-34` — the fixture always sets `Week: m`, so the happy path can never notice.
 - Reviewer probe (scratch test, removed): weeks `4,3,2,1` and weeks `1,1,1,1` both parse without error; the first module still receives `day_number` 1.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: `roadmap.go` decodes `week` and never checks it; `Exercises()` uses array position. A model emitting modules out of order produces a roadmap whose stored JSON and `exercises.day_number` disagree, silently, for 28 days. Plan together with `parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — one `ParseRoadmap` validation plan, one `roadmap_test.go` table.

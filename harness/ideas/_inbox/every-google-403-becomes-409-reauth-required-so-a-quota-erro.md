@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -43,3 +43,8 @@ drives a 403 `rateLimitExceeded` body and asserts `*UpstreamError`, alongside th
 - `backend/internal/google/oauth.go:65-73` — the contrasting, correct treatment: the body is decoded and only `invalid_grant` (or a 401) is reauth.
 - `backend/internal/google/calendar_test.go:104-113` — the only 403 test uses an `insufficient scopes` body, so the throttling case is neither covered nor distinguished.
 - Backend spec §6.4 gives no error catalogue for this route, so the mapping is ours to get right.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed at `client.go:74-75`: every 401/403 → `ErrReauthRequired` → 409 and a pointless full re-consent; Google's quota errors are 403s. A user who syncs twice quickly (28 Tasks inserts each) can hit this. Fix: decode `error.errors[].reason` and map the rate/quota reasons (and 429) to `*UpstreamError` → 502; keep `insufficientPermissions`/401 → reauth. Small `google` plan; can share a branch with the orphan fix if the owner prefers fewer `google` merges, but it is independent.

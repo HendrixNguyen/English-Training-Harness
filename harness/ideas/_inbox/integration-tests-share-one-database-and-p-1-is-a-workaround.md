@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Internal tidiness: -p 1 is documented in ci.yml, the Makefile and CODEMAP, the suite passes, and per-package schemas are a refactor of a working test harness with no user or developer-visible failure today."
 ---
 # integration tests share one database and -p 1 is a workaround not isolation
 
@@ -52,3 +53,8 @@ pass.
 - CI run 35740944612 (`pg_type_typname_nsp_index` duplicate key) and 35742036352
   (`first run applied [], want [0001_init]`) on branch
   `harness/2026-09-22-high-auth-google-oauth-code-exchange-and-jwt-sessions`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** The workaround is correct, documented in three places, and the failure it prevents has not recurred. Isolation-by-construction would be nice; it is not a bug.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md
 ---
 # main.go installs a signal handler with no server shutdown so the API now ignores SIGINT and SIGTERM
 
@@ -71,3 +72,8 @@ this one describes a process that cannot be stopped by a signal (operational).
 - Spec §9 — Railway container deployment; SIGTERM is how the platform stops a revision.
 - Supersedes in severity: `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md`
   (priority low) — the two should be fixed by one amendment.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — high (top 3, #1).** Confirmed on `main`: `signal.NotifyContext(…, os.Interrupt, syscall.SIGTERM)` is installed and `r.Run` still blocks, so the process ignores SIGINT/SIGTERM — local `Ctrl-C` does nothing and every Railway deploy burns the full grace window serving traffic with a dead cron. Found by the reviewer and hit independently by the notify executor. Plan: serve through an `http.Server`, `Shutdown` on `ctx.Done()` within a bounded grace, return so the defers run; the same plan takes every other pending `main.go` change so the file is merged once: `GIN_MODE` + `SetTrustedProxies(nil)` (`gin-default-ships-debug-mode…`), server timeouts, `_ "time/tzdata"` (`timezone-handling-depends-on-system-tzdata…`), the stale header comment and doubled `config:` prefix (`stale-main-go-header-comment…`), `.env.example`'s missing app section (`backend-env-example-omits…`). Supersedes `cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md`. **Conflict note:** the unmerged notify branch also edits `main.go` — merge notify first. Plan: `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md`.

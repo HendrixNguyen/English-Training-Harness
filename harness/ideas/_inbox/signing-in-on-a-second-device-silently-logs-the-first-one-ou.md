@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -48,3 +48,8 @@ rather than only the current `TestRequireRejectsASupersededToken`.
 - `backend/internal/auth/middleware_test.go:95-105` — `TestRequireRejectsASupersededToken` pins the single-device behaviour.
 - `backend/internal/store/keys.go:21-22` — `SessionKey(userID) = sess:{userID}:token`, one key per user.
 - Spec §4 line 262 — describes the key, does not require a single active session.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** A real user with a phone and a laptop hits this on day one and reports it as a login bug. Deliberate design, but taken for revocation, not product reasons. Decision: multi-device via `jti`-keyed sessions (`sess:{user_id}:{jti}`, TTL unchanged; revoke-all deletes the prefix). Plan after the auth error-mapping plan so `auth` is touched in order.

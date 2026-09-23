@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -45,3 +45,8 @@ because the pet slice will otherwise have to guess.
 - `backend/internal/quests/service.go:100-106`.
 - `backend/internal/quests/service_test.go:187-201`.
 - Backend spec §8 (plant math, 0 = dead, revive challenge) and §6.3.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Still true on `main`: `quests/service.go:133-137` substitutes `PetState{}` on error, and the frontend's `pet.applyProgress` writes `pet_health: 0` straight into the plant hub — a transient `pet_states` read failure shows a dead plant right after a successful session. Fix: `pet_health`/`streak_count` become `*int` with `omitempty` (frontend `applyProgress` already tolerates missing fields by guarding on `this.status`; verify and adjust the store to skip `undefined`). Pet is the retention mechanism; a false death is the worst message we can show. Small, self-contained plan in `quests` + one store guard.

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -48,3 +48,8 @@ fakes that never answer, a `Route` on `context.Background()`, and an elapsed tim
 - `backend/internal/airouter/router.go:56-93` — sequential loop, no `context.WithTimeout`, no total budget; `:78-80` honours a caller-supplied deadline.
 - `backend/internal/airouter/router_test.go:111-124` — covers a *cancelled* context, not a missing deadline.
 - Reviewer probe (scratch test, removed): three slow fakes behind a 100 ms client → `Route` returned after ~300 ms having made 3 attempts.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Real: onboarding's handler sets no deadline (`grep -n WithTimeout internal/onboarding/*.go` → none), so a slow-then-failing provider chain can hold the assessment request for 90 s per `Route` call. Failure-path only. A `Router.Timeout` default is a few lines; take it in the same `airouter` plan as the 4xx classification.

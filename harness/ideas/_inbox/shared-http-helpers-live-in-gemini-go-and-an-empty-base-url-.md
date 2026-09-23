@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Tidiness: file layout and constructor defaults with no behaviour defect; every path through ConfigFromEnv → NewRouter is correct and tested."
 ---
 # Shared HTTP helpers live in gemini.go and an empty base URL silently means OpenAI
 
@@ -51,3 +52,8 @@ Gemini **Pro** as well as Flash, and essay grading and exercise generation are s
 - `backend/internal/airouter/openai.go:39,54` — consumes both from the Gemini file.
 - `backend/internal/airouter/openai.go:31-37` — empty `baseURL`/`model` default to OpenAI's.
 - `backend/internal/airouter/config.go:60-72` — asymmetric OpenAI/DeepSeek branches compensating for it.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** Refactor with no bug behind it.

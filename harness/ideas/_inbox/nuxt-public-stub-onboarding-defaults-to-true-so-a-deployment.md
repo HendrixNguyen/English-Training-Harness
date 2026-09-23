@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: high
 ---
 # NUXT_PUBLIC_STUB_ONBOARDING defaults to true, so a deployment that forgets it ships the fake placement quiz
 
@@ -21,3 +21,8 @@ A stub that ships silently is worse than one that fails loudly: nothing in the U
 - `frontend/composables/useOnboardingApi.ts:6` — `const stub = useRuntimeConfig().public.stubOnboarding === 'true'` (strict, correct comparison).
 - `frontend/stubs/onboarding.ts:37-47` — `STUB_KEY`, the client-side level ladder, and the fixed `roadmap_id`.
 - No unit test covers the flag boundary: `tests/unit/onboardingStub.test.ts` asserts the stub payload shapes only, never that `'false'`/unset selects the real client. `grep -rn "stubOnboarding" frontend/tests` → no hits.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — high (was medium; top 10).** Now that the onboarding backend is merged, the stub is dead code with a loaded default: `nuxt.config.ts:34` still says `'true'`, `frontend/.env.example` tells a deployer to set it `true`, and a build without the variable runs every new user through a fake quiz, creates no roadmap, and strands them on `no_active_roadmap` forever. Deterministic total onboarding failure whenever one env var is missing or copied from the template. The shell plan said to delete the flag and `stubs/onboarding.ts` when onboarding merged — that is now due. Plan: remove the flag, the stub module, the `isStub` UI note and `onboardingStub.test.ts`; `useOnboardingApi` calls the real endpoints unconditionally; Playwright stubs `/onboarding/*` via `page.route` like it stubs the rest. Close #4 behind the orphan fix; if a deployment is imminent it should jump ahead.

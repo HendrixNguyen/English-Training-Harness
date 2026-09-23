@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -71,3 +71,8 @@ is already `is_active = FALSE` by the time the client reads it — so the client
   (`service_test.go:86`) is sequential, and
   `TestIntegrationSaveAssessmentPersists84ExercisesAndDeactivatesPrevious`
   (`integration_test.go:44-51`) calls `SaveAssessment` twice in series.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium (survivor of the 0003 migration group).** Confirmed: check-then-act across two AI calls with no constraint; the invariant survives only because `UPDATE users` happens to run first. Plan: migration `0003` with `CREATE UNIQUE INDEX … ON roadmaps (user_id) WHERE is_active`, the quests indexes (`no-index-supports…`), `NOT NULL user_id` on the three child tables (`spec-3-2-leaves-user-id-nullable…`), backend spec DDL updated; `ActiveRoadmapID` read `FOR UPDATE` inside the transaction, unique-violation → the existing-roadmap 200; `store.reset()` derives the down list from the FS (`store-reset-hard-codes…`) and `Migrate` gets `fstest.MapFS` tests (`migrate-is-only-tested…`). One store+onboarding branch.

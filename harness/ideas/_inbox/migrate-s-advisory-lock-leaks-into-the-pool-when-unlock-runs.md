@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: high
+priority: medium
 ---
 # Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context
 
@@ -52,3 +52,8 @@ second caller acquires the lock within a short deadline (or that
   `PgMigrator.Lock` with a 3s deadline returned
   `store: acquiring the migration lock: timeout: context deadline exceeded`.
 - Related open idea: `harness/ideas/_inbox/migrations-run-on-every-boot-with-no-advisory-lock.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium (was high).** No longer latent: `main.go` now passes the `signal.NotifyContext` context to `store.Migrate`, so a SIGTERM during a boot migration runs `unlock` on a cancelled context and leaves the advisory lock in the pool for up to an hour — though only for that narrow window, which is why medium rather than high. Plan scope (folding `migrate-s-advisory-lock-can-hang-boot-forever-with-no-bound-.md`): unlock on `context.WithoutCancel`, destroy the connection if unlock fails, log it; bounded lock wait with a contention log line; statements on the pinned connection; regression test against a live Postgres. **Ordering:** the cmd/api hardening plan deliberately does *not* add a migration deadline; add it here, after the leak is fixed.

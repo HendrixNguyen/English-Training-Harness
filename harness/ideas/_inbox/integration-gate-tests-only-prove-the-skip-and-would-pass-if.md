@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # Integration gate tests only prove the skip and would pass if the gate always skipped
 
@@ -67,3 +67,8 @@ confirm the gate still lets a nominated run through.
   `POSTGRES_PORT=5433 REDIS_PORT=6380 make up`, then `make test-integration` with
   `TEST_DATABASE_URL`/`TEST_REDIS_URL` exported, gave `--- PASS` for all three integration tests.
   Nothing in the repo performs that check automatically.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Test-only, but the gate is the thing that keeps `go test` from dropping a production database, so a positive-direction test is worth having. CI's `backend-integration` job now fails on any `--- SKIP`, which is the outer guard the reviewer wanted; the unit-level assertion is the remaining half. Batch with the 0003 migration plan (same package, same test files).

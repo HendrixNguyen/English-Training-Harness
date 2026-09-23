@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Folded into harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md: its first task gives fakeCalendar, fakeTasks and fakeRepo per-method error hooks, because the SaveSyncState-failure window it fixes is unreachable without them."
 ---
 # The google fakes have no error field for eleven of Sync's error branches
 
@@ -49,3 +50,8 @@ case and a `context.DeadlineExceeded` → 502 case.
 - `backend/internal/google/fakes_test.go:38-50, 62-90, 100-135` — the fakes and their (absent) error fields.
 - `backend/internal/google/handler_test.go` — four cases; no 500, no deadline.
 - Same class as the merged-auth finding `service-and-require-failure-paths-are-untested-the-fakes-err.md`, filed against a different package.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** The orphan plan cannot test its fix without these hooks; it adds them for every method, not just `SaveSyncState`, and covers the handler's 500 and deadline cases.

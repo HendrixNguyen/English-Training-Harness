@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Accepted convention, not drift: pet and google read users.timezone / users.notification_time through their own read-only SQL the same way, and CODEMAP records it for all three ('reads users.timezone like quests does'); the owner's recorded exception the finding asked for exists."
 ---
 
 # quests reads the users table directly for the timezone
@@ -43,3 +44,8 @@ rather than an undetected drift.
 - `backend/internal/quests/repo.go:61,97-103`.
 - `harness/CODEMAP.md` — `auth` paragraph (sole writer of `users`); intro rule "packages talk through interfaces".
 - `harness/ideas/2026-09-22-run-02/quests-daily-quest-suite-and-progress-recording.md` — *Expected output*, "Tables: `roadmaps`, `exercises` …, `daily_progress`".
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** The finding offered two outcomes — move the read behind `auth`, or record the exception in CODEMAP. The second happened, three times over (`quests`, `pet`, `google` bullets). A profile package can come when a fourth reader appears.
