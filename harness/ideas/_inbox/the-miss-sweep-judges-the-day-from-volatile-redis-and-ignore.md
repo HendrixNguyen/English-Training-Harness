@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 ---
 # The miss sweep judges the day from volatile Redis and ignores the durable daily_progress row
 
@@ -82,3 +83,5 @@ The sweep judges a day from durable state, still without pet reading quests' tab
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium (survivor of the pet day-judgement group).** Confirmed: `Sweep` reads only `study.Total` and `redis.Nil` reads as 0, so any counter loss penalises a user who studied — silently, unrecoverably. Postgres already holds `daily_progress.is_target_met`. Plan: widen `StudyCounter` with `MetTarget(ctx, user, localDate)` implemented in `quests` over `daily_progress`; spare when either source says met; **same plan** also takes `service-ontargetmet-ignores-localdate…`, `ontargetmet-is-lost-forever…`, `a-passed-revival-is-knocked…`, the conditional miss `UPDATE` (`sweep-reads-updated-at…`), the zone-location map (`the-hourly-sweep…`) and the sweep tests (`pet-sweep-tests…`). One pet branch, one merge.
+
+**Planned (2026-09-23):** `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — head idea; design decisions 1 and 3, Tasks 3 and 6 (the sweep judges from pet's own `last_target_met_date`; Redis is a leniency-only fallback).

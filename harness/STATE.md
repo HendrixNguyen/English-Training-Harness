@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 17:02. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 17:19. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -31,7 +31,6 @@ _none_
 
 ## Selected
 
-- `harness/ideas/_inbox/a-passed-revival-is-knocked-from-50-back-to-20-by-the-same-l.md` — A passed revival is knocked from 50 back to 20 by the same local day's miss penalty [medium]
 - `harness/ideas/_inbox/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — A Pet.State failure reports pet_health 0 which means a dead plant [medium]
 - `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
 - `harness/ideas/_inbox/a-user-deleted-tasks-list-is-never-rebuilt-and-sync-keeps-an.md` — A user-deleted Tasks list is never rebuilt and sync keeps answering synced with a stale count [low]
@@ -53,31 +52,24 @@ _none_
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
 - `harness/ideas/_inbox/no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — No per-user subscription cap and no length bound on endpoint p256dh auth [medium]
 - `harness/ideas/_inbox/no-post-handler-bounds-the-request-body-so-one-jwt-can-decod.md` — No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory [medium]
-- `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — OnTargetMet is lost forever if a write after the INCRBY fails [medium]
 - `harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced [medium]
-- `harness/ideas/_inbox/pet-sweep-tests-cannot-fail-on-the-branches-they-are-named-f.md` — Pet sweep tests cannot fail on the branches they are named for [low]
 - `harness/ideas/_inbox/pgrefreshtokensource-has-no-sentinel-for-a-missing-user-so-a.md` — PgRefreshTokenSource has no sentinel for a missing user, so a deleted user gets 500 not 409 [low]
 - `harness/ideas/_inbox/route-falls-back-on-terminal-4xx-so-one-bad-prompt-buys-thre.md` — Route falls back on terminal 4xx so one bad prompt buys three paid provider calls [low]
 - `harness/ideas/_inbox/route-has-no-overall-deadline-so-one-call-can-take-90-second.md` — Route has no overall deadline so one call can take 90 seconds [low]
-- `harness/ideas/_inbox/service-ontargetmet-ignores-localdate-so-pet-has-no-idempote.md` — Service.OnTargetMet ignores localDate so pet has no idempotency of its own [medium]
 - `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
 - `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
 - `harness/ideas/_inbox/store-reset-hard-codes-the-down-migration-list-so-migration-.md` — store reset hard-codes the down-migration list so migration 0003 will silently not roll back [low]
-- `harness/ideas/_inbox/sweep-reads-updated-at-then-writes-unconditionally-so-two-sw.md` — Sweep reads updated_at then writes unconditionally so two sweeps in one local hour double the miss penalty [low]
 - `harness/ideas/_inbox/synctimeout-gives-thirty-sequential-google-calls-a-two-secon.md` — SyncTimeout gives thirty sequential Google calls a two-second mean budget and no resumption [low]
 - `harness/ideas/_inbox/the-google-sync-route-logs-nothing-so-a-502-or-500-discards-.md` — The google sync route logs nothing, so a 502 or 500 discards Google's error reason entirely [medium]
 - `harness/ideas/_inbox/the-hourly-sweep-loads-every-pet-in-a-zone-into-memory-and-r.md` — The hourly sweep loads every pet in a zone into memory and reparses tzdata per user [low]
-- `harness/ideas/_inbox/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — The miss sweep judges the day from volatile Redis and ignores the durable daily_progress row [medium]
 - `harness/ideas/_inbox/tick-sends-serially-with-a-10s-client-timeout-so-one-slow-pu.md` — Tick sends serially with a 10s client timeout so one slow push service delays every other reminder [medium]
 - `harness/ideas/_inbox/two-concurrent-assessment-submits-double-spend-the-ai-and-or.md` — Two concurrent assessment submits double-spend the AI and orphan a roadmap with its 84 exercises [medium]
 - `harness/ideas/_inbox/two-recordprogress-error-branches-are-uncovered-and-the-redi.md` — Two RecordProgress error branches are uncovered and the Redis-down test's comment overstates it [low]
-- `harness/ideas/_inbox/zones-that-skip-local-midnight-on-spring-forward-are-never-s.md` — Zones that skip local midnight on spring-forward are never swept that day [low]
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan [high]
 - `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan [high]
-- `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high]
+- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium]
 
 ## Approved
 
@@ -91,14 +83,14 @@ _none_
 
 - `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
+- `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high] (unreviewed)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan [high] (unreviewed)
 - `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
-- `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 

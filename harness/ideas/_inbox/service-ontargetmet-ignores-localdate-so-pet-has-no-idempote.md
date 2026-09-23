@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 ---
 # Service.OnTargetMet ignores localDate so pet has no idempotency of its own
 
@@ -73,3 +74,5 @@ any second caller:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: `pet/service.go` bumps on every call; once-per-day lives only in quests' counter edge, which is volatile Redis. Fix is nearly free (`LastPracticedAt` local date == `localDate` → no-op). Part of the pet "durable day judgement" plan with the sweep/Redis and lost-hook findings.
+
+**Planned (2026-09-23):** `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — decision 2, Tasks 1–5 (`pet_states.last_target_met_date`, migration 0003, conditional `SaveTargetMet`).

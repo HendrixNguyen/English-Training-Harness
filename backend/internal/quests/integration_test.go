@@ -206,6 +206,31 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	if again.AccumulatedSeconds != 1860 || !again.IsTargetMet || !again.Tasks[0].IsCompleted || !again.Tasks[1].IsCompleted {
 		t.Errorf("second Daily = %+v, want 1860s accumulated, target met, tasks[0] and [1] completed", again)
 	}
+
+	// Monotonic: a lost counter cannot lower minutes_spent or unset
+	// is_target_met. Runs last and uses the still-unconsumed Tasks[2] so it
+	// does not disturb the (1800s, 30, true) state the "Review reproduction"
+	// assertions above depend on. Accumulated is 1860s/31m going in (from
+	// out2 above); +600s here makes it 2460s/41m before the counter is lost.
+	if _, err := svc.RecordProgress(ctx, userID, suite.Tasks[2].ID, 600); err != nil {
+		t.Fatalf("third RecordProgress: %v", err)
+	}
+	rdb.Client.Del(ctx, store.DailyAccumulatedKey(userID, now)) // the eviction / restart / FLUSHDB case
+	out3, err := svc.RecordProgress(ctx, userID, suite.Tasks[2].ID, 60)
+	if err != nil {
+		t.Fatalf("RecordProgress after the counter was lost: %v", err)
+	}
+	if !out3.IsTargetMet || out3.NewlyMet {
+		t.Errorf("out = %+v after the counter was lost, want IsTargetMet true (durable row) and NewlyMet false", out3)
+	}
+	if err := pg.Pool.QueryRow(ctx,
+		`SELECT minutes_spent, is_target_met FROM daily_progress WHERE user_id = $1 AND date = $2::date`,
+		userID, LocalDate(now, time.UTC)).Scan(&minutes, &met); err != nil {
+		t.Fatalf("reading daily_progress: %v", err)
+	}
+	if minutes != 41 || !met {
+		t.Errorf("daily_progress = (%d, %t) after the counter was lost, want (41, true) — never lowered", minutes, met)
+	}
 }
 
 // integrationRoadmap is a valid 4x7x3 roadmap whose tasks carry the title and

@@ -121,7 +121,7 @@ func TestMigrateAppliesPendingVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Migrate() = %v, want nil error", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("applied = %v, want %v", got, want)
 	}
 	if m.ensured != 1 {
@@ -240,5 +240,24 @@ func TestMigration0002CreatesGoogleSync(t *testing.T) {
 	down := readMigration(t, "0002_google_sync.down.sql")
 	if !strings.Contains(down, "DROP TABLE IF EXISTS google_sync;") {
 		t.Error("0002_google_sync.down.sql does not drop google_sync")
+	}
+}
+
+func TestMigration0003AddsPetVerdictDates(t *testing.T) {
+	up := readMigration(t, "0003_pet_verdict_dates.up.sql")
+	for _, w := range []string{
+		"ALTER TABLE pet_states",
+		"ADD COLUMN last_target_met_date DATE",
+		"ADD COLUMN judged_through DATE",
+	} {
+		if !strings.Contains(up, w) {
+			t.Errorf("0003_pet_verdict_dates.up.sql is missing %q", w)
+		}
+	}
+	down := readMigration(t, "0003_pet_verdict_dates.down.sql")
+	for _, w := range []string{"DROP COLUMN IF EXISTS last_target_met_date", "DROP COLUMN IF EXISTS judged_through"} {
+		if !strings.Contains(down, w) {
+			t.Errorf("0003_pet_verdict_dates.down.sql is missing %q", w)
+		}
 	}
 }

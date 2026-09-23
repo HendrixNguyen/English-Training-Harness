@@ -13,3 +13,6 @@ harness/.locks/
 .worktrees/
 __pycache__/
 *.pyc
+.playwright-mcp/
+test-results/
+playwright-report/

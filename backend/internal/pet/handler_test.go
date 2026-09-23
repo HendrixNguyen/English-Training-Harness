@@ -14,11 +14,17 @@ import (
 )
 
 // newPetRouter stands in for auth.Require() by injecting the user id under
-// auth.ContextUserID (Require itself is covered in the auth slice).
+// auth.ContextUserID (Require itself is covered in the auth slice). An empty
+// userID injects nothing, which is what the handlers' own 401 guard sees.
 func newPetRouter(svc *Service, userID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	g := r.Group("/api/v1", func(c *gin.Context) { c.Set(auth.ContextUserID, userID); c.Next() })
+	g := r.Group("/api/v1", func(c *gin.Context) {
+		if userID != "" {
+			c.Set(auth.ContextUserID, userID)
+		}
+		c.Next()
+	})
 	g.GET("/pet/status", StatusHandler(svc))
 	g.POST("/pet/revive", ReviveHandler(svc))
 	return r
@@ -133,5 +139,19 @@ func TestHandlersReturn500OnRepoFailure(t *testing.T) {
 	}
 	if w := do(r, http.MethodPost, "/api/v1/pet/revive", ""); w.Code != http.StatusInternalServerError {
 		t.Errorf("revive: %d, want 500", w.Code)
+	}
+}
+
+func TestHandlersAnswer401WithoutAnAuthenticatedUser(t *testing.T) {
+	h := newHarness(sept22)
+	r := newPetRouter(h.svc, "")
+	for _, tc := range []struct{ method, path string }{{"GET", "/api/v1/pet/status"}, {"POST", "/api/v1/pet/revive"}} {
+		w := do(r, tc.method, tc.path, "")
+		if w.Code != http.StatusUnauthorized || strings.TrimSpace(w.Body.String()) != `{"error":"unauthorized"}` {
+			t.Errorf("%s %s = %d %s, want 401 {\"error\":\"unauthorized\"}", tc.method, tc.path, w.Code, w.Body.String())
+		}
+	}
+	if h.repo.ensured != 0 {
+		t.Error("an unauthenticated request touched the repo")
 	}
 }

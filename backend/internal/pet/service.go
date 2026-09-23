@@ -46,15 +46,21 @@ func (s *Service) Ensure(ctx context.Context, userID string) (State, error) {
 	return s.repo.Get(ctx, userID)
 }
 
-// OnTargetMet is §8's success logic, applied once per local day: quests fires
-// it on the progress call that crosses 1800s (backend spec §6.2). localDate
-// is informational — the row is not keyed by day.
+// OnTargetMet is §8's success logic for the user's local day localDate:
+// quests fires it when the day's total first reaches 1800s (backend spec
+// §6.2), and may fire it again after a failure on the same call or after a
+// lost Redis counter. The pet owns the once: Repo.SaveTargetMet's predicate
+// on last_target_met_date refuses a second write for the same (or an
+// earlier) local date, and that refusal is a silent no-op — quests logs hook
+// errors, and "already counted" is not one. There is deliberately no Go-side
+// pre-check: one mechanism, in the database, is what the tests pin.
 func (s *Service) OnTargetMet(ctx context.Context, userID, localDate string) error {
 	st, err := s.Ensure(ctx, userID)
 	if err != nil {
 		return err
 	}
-	return s.repo.Save(ctx, userID, ApplyTargetMet(st, s.now()))
+	_, err = s.repo.SaveTargetMet(ctx, userID, ApplyTargetMet(st, s.now(), localDate))
+	return err
 }
 
 // Revive implements the 15-minute revival challenge behind POST /pet/revive.
@@ -63,8 +69,10 @@ func (s *Service) OnTargetMet(ctx context.Context, userID, localDate string) err
 // The first call on a local day starts a challenge, recording the daily
 // counter's current value; each later call the same day checks whether
 // ReviveSeconds more have been recorded through POST /quests/progress. On pass
-// the state becomes 50 / sprout / 0 (§6.3) and the challenge is cleared. A
-// challenge left over from an earlier local day is replaced.
+// the state becomes 50 / sprout / 0 (§6.3), the local day is resolved so that
+// night's sweep applies no miss for it (judged_through = today), and the
+// challenge is cleared. A challenge left over from an earlier local day is
+// replaced.
 func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, error) {
 	st, err := s.Ensure(ctx, userID)
 	if err != nil {
@@ -104,7 +112,7 @@ func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, erro
 		return ReviveResult{Passed: false, State: st}, nil
 	}
 
-	st = ApplyRevive(st, now)
+	st = ApplyRevive(st, now, today)
 	if err := s.repo.Save(ctx, userID, st); err != nil {
 		return ReviveResult{}, err
 	}
@@ -115,58 +123,76 @@ func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, erro
 	return ReviveResult{Passed: true, State: st}, nil
 }
 
-// Sweep is the body of the §8 hourly cron. It runs at :00 UTC; a user "hits
-// local midnight" when now in their timezone is in hour 0. For each such pet
-// whose previous local day recorded fewer than 1800s it applies ApplyMiss.
+// Sweep is the body of the §8 hourly cron. It runs at every :00 UTC and looks
+// at every pet: for each, the local day that most recently ended is
+// judged = PreviousDate(LocalDate(now, tz)), and there is work only while
+// judged_through is before it. That replaces "local hour is 0": a zone whose
+// clocks jump 23:59:59 → 01:00 is judged at 01:00, a zone whose hour 0
+// happens twice is judged once, and a tick the process slept through is
+// caught up at the next one. No midnight instant is ever constructed.
 //
-// Idempotency: a pet whose updated_at is already at or after that local
-// midnight has been touched this local day (by an earlier run of this same
-// sweep after a restart, or by a target met after midnight) and is skipped.
-// Errors on one pet are collected and the rest are still processed; the
-// count returned is the number of pets penalised.
+// A day is spared when the pet's own marker says its target was met
+// (last_target_met_date == judged) or — leniency fallback only — the Redis
+// counter for it reads >= 1800s; a spared day is recorded (MarkJudged) so it
+// is never re-read. Otherwise PenaliseMiss applies §8's inactivity logic in
+// one conditional UPDATE, so N concurrent sweepers penalise once and the
+// count returned is the number of writes that applied.
+//
+// First contact: a pet with no judged_through yet is judged only for days it
+// existed (LocalDate(updated_at) <= judged — updated_at is the creation stamp
+// until something writes the row); otherwise its marker is initialised.
+//
+// Errors on one pet are collected and the rest are still processed.
 func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
-	zones, err := s.repo.Timezones(ctx)
-	if err != nil {
-		return 0, err
-	}
-	var atMidnight []string
-	for _, tz := range zones {
-		if now.In(quests.Location(tz)).Hour() == 0 {
-			atMidnight = append(atMidnight, tz)
-		}
-	}
-	if len(atMidnight) == 0 {
-		return 0, nil
-	}
-
-	cands, err := s.repo.SweepCandidates(ctx, atMidnight)
+	cands, err := s.repo.SweepCandidates(ctx)
 	if err != nil {
 		return 0, err
 	}
 
 	penalised := 0
 	var errs []error
+	fail := func(userID string, err error) { errs = append(errs, fmt.Errorf("user %s: %w", userID, err)) }
+
 	for _, c := range cands {
 		loc := quests.Location(c.Timezone)
-		local := now.In(loc)
-		midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
-		if !c.State.UpdatedAt.Before(midnight) {
-			continue // already handled this local day
+		judged := PreviousDate(quests.LocalDate(now, loc))
+
+		switch {
+		case c.State.JudgedThrough != nil && *c.State.JudgedThrough >= judged:
+			continue // nothing has ended since the last judgement
+		case c.State.JudgedThrough == nil && quests.LocalDate(c.State.UpdatedAt, loc) > judged:
+			// Never judged and not yet alive on the judged day: nothing to
+			// judge, but record the day so the row stops depending on updated_at.
+			if _, err := s.repo.MarkJudged(ctx, c.UserID, judged); err != nil {
+				fail(c.UserID, err)
+			}
+			continue
 		}
-		yesterday := midnight.AddDate(0, 0, -1).Format("2006-01-02")
-		total, err := s.study.Total(ctx, c.UserID, yesterday)
+
+		met := c.State.LastTargetMetDate != nil && *c.State.LastTargetMetDate == judged
+		if !met {
+			total, err := s.study.Total(ctx, c.UserID, judged)
+			if err != nil {
+				fail(c.UserID, err)
+				continue
+			}
+			met = total >= quests.TargetSeconds
+		}
+		if met {
+			if _, err := s.repo.MarkJudged(ctx, c.UserID, judged); err != nil {
+				fail(c.UserID, err)
+			}
+			continue
+		}
+
+		applied, err := s.repo.PenaliseMiss(ctx, c.UserID, judged, now)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("user %s: %w", c.UserID, err))
+			fail(c.UserID, err)
 			continue
 		}
-		if total >= quests.TargetSeconds {
-			continue
+		if applied {
+			penalised++
 		}
-		if err := s.repo.Save(ctx, c.UserID, ApplyMiss(c.State, now)); err != nil {
-			errs = append(errs, fmt.Errorf("user %s: %w", c.UserID, err))
-			continue
-		}
-		penalised++
 	}
 	return penalised, errors.Join(errs...)
 }
