@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-23-high-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p
 worktree: .worktrees/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/6"

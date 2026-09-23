@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/a-failed-savesyncstate-orphans-the-google-object-just-create.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-23-high-a-failed-savesyncstate-orphans-the-google-object-just-create
 worktree: .worktrees/a-failed-savesyncstate-orphans-the-google-object-just-create
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/7"
