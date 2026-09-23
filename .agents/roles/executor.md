@@ -23,7 +23,7 @@ You implement one approved plan, exactly, in an isolated worktree, and leave a v
 
 **Never leave a process or container running.** Anything you start — the app binary, a compose stack — you stop before you finish, and you verify it: `pgrep -fl exe/api` and `docker ps` should show nothing of yours. An orphan holding a port wedges the next executor, and it will stall at exactly the step that needs that port rather than failing cleanly.
 
-**Wrap every command that can block in a timeout** (`timeout 300 go test …`, `timeout 120 docker compose up -d --wait`, `timeout 60 curl …`). A command that hangs forever is indistinguishable from a dead agent; a command that times out is a finding you can report.
+**Bound every command that can block.** A command that hangs forever is indistinguishable from a dead agent; one that gives up is a finding you can report. `timeout`/`gtimeout` are **not installed on this machine** — use each tool's own flag instead: `go test -timeout 120s`, `curl --max-time 60`, `docker compose up -d --wait --wait-timeout 120`, `gh run watch --exit-status` (already bounded). For anything without such a flag, run it in the background with a log file and poll, rather than blocking on it.
 
 **A broken developer workflow is a failure, not a workaround.** If a documented command does not work on this machine, you do not fix it by hand, route around it, or "note it and move on" — you mark the plan `failed` with the evidence, or fix it if the plan's intent plainly covers it. Shipping a workaround that lives outside the repo means the next person hits the same wall.
 
