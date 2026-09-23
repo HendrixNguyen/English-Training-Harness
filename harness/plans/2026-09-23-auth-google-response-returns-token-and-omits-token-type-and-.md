@@ -1,8 +1,11 @@
 ---
 idea: harness/ideas/_inbox/auth-google-response-returns-token-and-omits-token-type-and-.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-23-high-auth-google-response-returns-token-and-omits-token-type-and-
+worktree: .worktrees/auth-google-response-returns-token-and-omits-token-type-and-
+pr: none
 ---
 # auth/google response: answer the backend spec §6.1 sign-in body — Plan
 
@@ -282,3 +285,89 @@ CI: after pushing, `gh run list --branch <branch>` must show `backend-unit`, `ba
 **Follow-up for the reviewer / orchestrator, not for this executor:** once this merges to `main`, the *Merge blocker* paragraph at the top of `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` and its matrix row ("live on `main`, wrong shape") are stale — that plan's row should read "live on `main`" before frontend-shell is reviewed.
 
 ## Execution summary
+
+**Status: done.** Executed exactly as written, both tasks, no scope changes, no plan deviations.
+
+Branch: `harness/2026-09-23-high-auth-google-response-returns-token-and-omits-token-type-and-`
+Worktree: `.worktrees/auth-google-response-returns-token-and-omits-token-type-and-`
+Commits: `67b1597` (auth: spec §6.1 body), `6566205` (codemap update).
+
+### Task 1 — handler + test
+
+Replaced `TestHandlerReturnsTokenAndUser` with `TestHandlerReturnsTheSpecSignInBody` exactly as specified. Ran it before the handler change and confirmed it failed for the documented reasons — `token` key present, `access_token`/`token_type`/`expires_in` missing, 2 top-level keys not 4, and (unfiltered `go test -v` output, since the `rtk` proxy hook condenses `go test`'s default output) `access_token does not verify as the session JWT: ... token contains an invalid number of segments`. Then replaced the handler body with the typed `signInResponse`/`signInUser` structs per the plan, added the `time` import. `TokenTTL` (`internal/auth/token.go:14`, `= store.SessionTTL = 24h`) was used as specified — not hard-coded.
+
+### Task 2 — CODEMAP
+
+Extended the anchor sentence exactly as specified; `git diff --stat` showed `1 file changed, 1 insertion(+), 1 deletion(-)` as expected.
+
+### Verification (plan's section, `backend/`)
+
+```
+$ gofmt -l ./internal/auth                                   # (no output)
+$ go build ./... && go vet ./...                             # exit=0
+$ go test ./internal/auth/... -count=1 -timeout 120s -run 'TestHandler' -v 2>&1 | grep -c -- '--- PASS'
+3
+$ go test ./... -count=1 -timeout 300s 2>&1 | grep -c '^FAIL'
+0
+$ grep -n '"token"' internal/auth/handler.go        # (no output)
+$ grep -n 'json:"access_token"\|json:"token_type"\|json:"expires_in"' internal/auth/handler.go
+21:	AccessToken string     `json:"access_token"`
+22:	TokenType   string     `json:"token_type"`
+23:	ExpiresIn   int        `json:"expires_in"`
+```
+
+Worktree root:
+
+```
+$ grep -n 'access_token, token_type' harness/CODEMAP.md     # one hit, the auth bullet
+$ git diff --stat main -- backend harness/CODEMAP.md
+ backend/internal/auth/handler.go      | 40 +++++++++++++++++++++-------
+ backend/internal/auth/handler_test.go | 50 +++++++++++++++++++++++++++++------
+ harness/CODEMAP.md                    |  2 +-
+ 3 files changed, 74 insertions(+), 18 deletions(-)
+$ python3 tools/harness/cli.py validate; echo exit=$?
+exit=0
+```
+
+### Runtime proof (executor role's Definition of done)
+
+1. **Builds** — `go build ./...` exit 0 (above).
+2. **Whole suite** — unit suite: `go test ./... -count=1 -timeout 300s` → all 7 packages `ok`, 0 `FAIL` (above). Integration suite: brought up a scratch Postgres/Redis stack (`COMPOSE_PROJECT_NAME=authfix`, `POSTGRES_PORT=5443`, `REDIS_PORT=6391`, scratch `backend/.env`), ran `make test-integration` (which is `go test ./... -count=1 -v -run Integration -p 1`) against it:
+   ```
+   --- PASS: TestIntegrationRateLimiterAllowsFiveThenBlocks
+   --- PASS: TestIntegrationUpsertCreatesThenPreservesTheLearnerState   (auth)
+   --- PASS: TestIntegrationEnsureCreatesExactlyOnePetRow
+   --- PASS: TestIntegrationDailyAndProgressAgainstRealServices
+   --- PASS: TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent
+   --- PASS: TestIntegrationConcurrentMigrateDoesNotRace
+   --- PASS: TestIntegrationPetStatesRejectsASecondRowForTheSameUser
+   --- PASS: TestIntegrationRedisRoundTrip
+   ```
+   All PASS, none skipped. Then `docker compose -p authfix down` and deleted the scratch `.env`; `docker ps` afterward showed only pre-existing, unrelated containers (`scio3-redis-1`, `scio3-mongo-1`).
+3. **Boots and answers a real request** — the full `cmd/api` binary needs live Postgres/Redis plus real Google OAuth credentials (`GOOGLE_CLIENT_ID`/`SECRET`), none available here, and `SignIn` calls Google for real, so it can't demonstrate a *successful* sign-in body. Instead built and ran a temporary, uncommitted program (`backend/cmd/verifyauth_tmp/main.go`, deleted before finishing) that wires the real, unmodified `auth.Handler`/`auth.NewService`/`auth.NewTokenIssuer` into a real `gin` server bound to `:18080`, with in-memory fakes for `Exchanger`/`UserRepo`/`SessionStore` (same shape as the test fakes, but exported types so they compile from outside the package). Started it as a background process, then ran a real `curl` against it:
+   ```
+   $ curl -sS --max-time 10 -X POST http://localhost:18080/api/v1/auth/google \
+       -H 'Content-Type: application/json' \
+       -d '{"code":"the-code","redirect_uri":"https://app/cb"}'
+   HTTP/1.1 200 OK
+   {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJpZC1nb29nbGUtMSIsImV4cCI6MTc5MDIxOTg0NiwiaWF0IjoxNzkwMTMzNDQ2fQ.suV6TxNxxu626UvVp_Js8sL9JVThBP603GoqXb9xjsI","token_type":"Bearer","expires_in":86400,"user":{"id":"id-google-1","email":"a@example.com","full_name":"A Person","cefr_current":"A1"}}
+   ```
+   Decoded the JWT payload: `{"sub": "id-google-1", "exp": 1790219846, "iat": 1790133446}` — subject matches `user.id`. Exactly four top-level keys, no `token`. Killed the process, deleted the temp binary, log files, and the `backend/cmd/verifyauth_tmp/` directory; `git status --short` was clean afterward and `pgrep -fl verifyauth_tmp_bin` found nothing.
+4. **Every documented command works as documented** — every command above (`gofmt`, `go build`, `go vet`, `go test`, `make test-integration`, `docker compose up -d --wait`/`down`) was run exactly as written and behaved as documented.
+5. **Reverted-handler check** — copied the pre-fix `handler.go` (commit `f37175a`) back in, ran `TestHandlerReturnsTheSpecSignInBody`: it failed with the same six diagnostics as the original TDD red run (`FAIL`, exit 1). Confirms the test is load-bearing on wire keys and the JWT subject, not just Go struct tags. Restored the fixed `handler.go` afterward; `git status --short` showed no diff and the test passed again.
+6. **No leftover process or container** — confirmed via `pgrep -fl verifyauth_tmp_bin` (empty) and `docker ps` (only pre-existing `scio3-*` containers, no `authfix-*`).
+
+### PR
+
+`gh pr create` failed as anticipated: `pull request create failed: GraphQL: must be a collaborator (createPullRequest)` — the `gh` CLI here is authenticated as `hendrixnguyen-optisigns` (a work account), not a collaborator on this personal GitHub repo. Attempted once, noted, moved on; branch is pushed so a human with repo access can open the PR.
+
+### CI
+
+Pushed `harness/2026-09-23-high-auth-google-response-returns-token-and-omits-token-type-and-`; watched the triggered run to completion:
+
+Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35813839556 — **all green**: `backend-unit` (19s), `backend-integration` (46s), `harness-tooling` (6s).
+
+### Deviations from the plan
+
+- The plan's Verification section did not include a live-request boot check or `make test-integration`; both were added to satisfy the executor role's Definition of done (items 2 and 3), using a temporary uncommitted verification program since the real `cmd/api` binary cannot complete a Google sign-in without live external credentials. No repo files besides the two named in the plan were touched.
+- No PR opened (see above) — branch pushed only.

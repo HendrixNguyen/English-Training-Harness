@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 10:11. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 10:20. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,14 +13,18 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/a-failed-savesyncstate-orphans-the-google-object-just-create.md` — A failed SaveSyncState orphans the Google object just created, and CODEMAP claims it cannot [medium]
 - `harness/ideas/_inbox/a-passed-revival-is-knocked-from-50-back-to-20-by-the-same-l.md` — A passed revival is knocked from 50 back to 20 by the same local day's miss penalty [medium]
 - `harness/ideas/_inbox/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — A Pet.State failure reports pet_health 0 which means a dead plant [medium]
 - `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
+- `harness/ideas/_inbox/a-roadmap-with-zero-exercise-rows-creates-an-empty-google-ta.md` — A roadmap with zero exercise rows creates an empty Google Tasks list recorded as fully synced [low]
+- `harness/ideas/_inbox/a-user-deleted-tasks-list-is-never-rebuilt-and-sync-keeps-an.md` — A user-deleted Tasks list is never rebuilt and sync keeps answering synced with a stale count [medium]
 - `harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth reports Postgres and Redis failures as 401 and logs nothing [medium]
 - `harness/ideas/_inbox/backend-env-example-omits-the-app-s-own-database-url-redis-u.md` — backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT [low]
 - `harness/ideas/_inbox/branch-carries-its-own-execution-summary-so-the-ai-router-pl.md` — Branch carries its own execution summary so the ai-router plan file conflicts on merge [high]
 - `harness/ideas/_inbox/ci-jobs-have-no-timeout-minutes-and-the-harness-job-floats-p.md` — CI jobs have no timeout-minutes and the harness job floats python-version 3.x [low]
 - `harness/ideas/_inbox/cmd-api-has-no-graceful-shutdown-so-its-deferred-close-calls.md` — cmd/api has no graceful shutdown so its deferred Close calls are unreachable [low]
+- `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Every Google 403 becomes 409 reauth_required, so a quota error forces a pointless re-consent [medium]
 - `harness/ideas/_inbox/gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md` — Gemini test assertion that the API key is not in the query string can never fail [low]
 - `harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider drops every response part after the first so a long roadmap arrives truncated [medium]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
@@ -41,10 +45,12 @@ _none_
 - `harness/ideas/_inbox/module-week-is-never-validated-and-day-number-comes-from-arr.md` — Module.week is never validated and day_number comes from array position [medium]
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
 - `harness/ideas/_inbox/no-post-handler-bounds-the-request-body-so-one-jwt-can-decod.md` — No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory [medium]
+- `harness/ideas/_inbox/no-test-asserts-the-calendar-patch-body-so-an-empty-patch-pa.md` — No test asserts the Calendar PATCH body, so an empty patch passes the whole suite [medium]
 - `harness/ideas/_inbox/onboarding-service-stores-a-now-clock-it-never-uses-so-every.md` — onboarding Service stores a now clock it never uses so every caller passes a dead dependency [low]
 - `harness/ideas/_inbox/ontargetmet-is-lost-forever-if-a-write-after-the-incrby-fail.md` — OnTargetMet is lost forever if a write after the INCRBY fails [medium]
 - `harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced [medium]
 - `harness/ideas/_inbox/pet-sweep-tests-cannot-fail-on-the-branches-they-are-named-f.md` — Pet sweep tests cannot fail on the branches they are named for [low]
+- `harness/ideas/_inbox/pgrefreshtokensource-has-no-sentinel-for-a-missing-user-so-a.md` — PgRefreshTokenSource has no sentinel for a missing user, so a deleted user gets 500 not 409 [low]
 - `harness/ideas/_inbox/progress-request-validation-is-incomplete-outside-the-gin-bi.md` — Progress request validation is incomplete outside the Gin binding tags [low]
 - `harness/ideas/_inbox/quests-reads-the-users-table-directly-for-the-timezone.md` — quests reads the users table directly for the timezone [medium]
 - `harness/ideas/_inbox/redisratelimiter-has-no-documented-behaviour-when-redis-is-d.md` — RedisRateLimiter has no documented behaviour when Redis is down and a zero Limit blocks everything [low]
@@ -52,6 +58,7 @@ _none_
 - `harness/ideas/_inbox/route-falls-back-on-terminal-4xx-so-one-bad-prompt-buys-thre.md` — Route falls back on terminal 4xx so one bad prompt buys three paid provider calls [medium]
 - `harness/ideas/_inbox/route-has-no-overall-deadline-so-one-call-can-take-90-second.md` — Route has no overall deadline so one call can take 90 seconds [low]
 - `harness/ideas/_inbox/route-returns-upstream-provider-error-bodies-verbatim-to-its.md` — Route returns upstream provider error bodies verbatim to its caller [medium]
+- `harness/ideas/_inbox/schedule-go-boundaries-are-untested-at-notification-time-equ.md` — schedule.go boundaries are untested at notification_time equals now and month year rollover [low]
 - `harness/ideas/_inbox/seeddemoroadmap-is-not-transactional-and-can-leave-a-partial.md` — SeedDemoRoadmap is not transactional and can leave a partial active roadmap [low]
 - `harness/ideas/_inbox/service-and-require-failure-paths-are-untested-the-fakes-err.md` — Service and Require failure paths are untested; the fakes' err fields are never set [low]
 - `harness/ideas/_inbox/service-ontargetmet-ignores-localdate-so-pet-has-no-idempote.md` — Service.OnTargetMet ignores localDate so pet has no idempotency of its own [medium]
@@ -59,7 +66,11 @@ _none_
 - `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
 - `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
 - `harness/ideas/_inbox/stale-main-go-header-comment-and-a-double-prefixed-config-er.md` — stale main.go header comment and a double-prefixed config error [low]
+- `harness/ideas/_inbox/store-reset-hard-codes-the-down-migration-list-so-migration-.md` — store reset hard-codes the down-migration list so migration 0003 will silently not roll back [low]
 - `harness/ideas/_inbox/sweep-reads-updated-at-then-writes-unconditionally-so-two-sw.md` — Sweep reads updated_at then writes unconditionally so two sweeps in one local hour double the miss penalty [medium]
+- `harness/ideas/_inbox/synctimeout-gives-thirty-sequential-google-calls-a-two-secon.md` — SyncTimeout gives thirty sequential Google calls a two-second mean budget and no resumption [low]
+- `harness/ideas/_inbox/the-google-fakes-have-no-error-field-for-eleven-of-sync-s-er.md` — The google fakes have no error field for eleven of Sync's error branches [medium]
+- `harness/ideas/_inbox/the-google-sync-route-logs-nothing-so-a-502-or-500-discards-.md` — The google sync route logs nothing, so a 502 or 500 discards Google's error reason entirely [medium]
 - `harness/ideas/_inbox/the-hourly-sweep-loads-every-pet-in-a-zone-into-memory-and-r.md` — The hourly sweep loads every pet in a zone into memory and reparses tzdata per user [medium]
 - `harness/ideas/_inbox/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — The miss sweep judges the day from volatile Redis and ignores the durable daily_progress row [medium]
 - `harness/ideas/_inbox/two-comments-in-the-new-progress-validation-misstate-the-cod.md` — Two comments in the new progress validation misstate the code they describe [low]
@@ -87,7 +98,6 @@ _none_
 
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high]
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high]
-- `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high]
 
 ## Executing
 
@@ -96,6 +106,7 @@ _none_
 ## Done (last 10)
 
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (unreviewed)
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
 - `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
@@ -104,7 +115,6 @@ _none_
 - `harness/plans/2026-09-22-docker-compose-hard-codes-host-ports-so-make-up-fails-locall.md` — docker-compose hard-codes host ports so make up fails locally — Plan [high] (unreviewed) (merged)
 - `harness/plans/2026-09-22-ci-on-github-actions-for-backend-and-harness-tooling.md` — CI on GitHub Actions for backend and harness tooling — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-cancel-in-progress-cancels-ci-on-main-the-only-ref-ci-actual.md` — cancel-in-progress cancels CI on main, the only ref CI actually runs on — Plan [high] (unreviewed) (merged)
-- `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md` — Auth: Google OAuth code exchange and JWT sessions — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 
