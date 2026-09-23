@@ -1,10 +1,11 @@
 ---
 type: mvp-slice
-status: selected
+status: planned
 source: ideator
 run: 2026-09-22-run-02
 order: 9
 priority: high
+plan: harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md
 ---
 # Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens
 

@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 09:27. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 09:47. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -81,13 +81,12 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high]
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high]
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high]
 
 ## Executing
 
-_none_
+- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high]
 
 ## Done (last 10)
 
