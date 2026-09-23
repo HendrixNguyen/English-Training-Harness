@@ -21,6 +21,10 @@ var ErrReauthRequired = errors.New("google: re-authentication required")
 // longer exists at Google (404/410). Service re-creates it.
 var ErrNotFound = errors.New("google: resource not found")
 
+// ErrAlreadyExists means Google already holds a resource with the id we sent
+// (Calendar events.insert with a client id → 409). Sync treats it as ours.
+var ErrAlreadyExists = errors.New("google: resource already exists")
+
 // UpstreamError is any other non-2xx from Google. The handler maps it to 502.
 type UpstreamError struct {
 	Service string // "oauth" | "calendar" | "tasks"
@@ -75,6 +79,8 @@ func doJSON(ctx context.Context, client *http.Client, service, method, url, acce
 		return fmt.Errorf("%w: %s returned %d", ErrReauthRequired, service, resp.StatusCode)
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return fmt.Errorf("%w: %s returned %d", ErrNotFound, service, resp.StatusCode)
+	case resp.StatusCode == http.StatusConflict:
+		return fmt.Errorf("%w: %s returned 409", ErrAlreadyExists, service)
 	case resp.StatusCode < 200 || resp.StatusCode > 299:
 		return &UpstreamError{Service: service, Status: resp.StatusCode, Body: string(raw)}
 	}
