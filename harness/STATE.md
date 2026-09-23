@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 11:50. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 12:00. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -116,7 +116,7 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs)
