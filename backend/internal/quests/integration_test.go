@@ -2,11 +2,15 @@ package quests
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -50,8 +54,13 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid) })
 
-	if _, err := store.SeedDemoRoadmap(ctx, pg.Pool, userID); err != nil {
-		t.Fatalf("SeedDemoRoadmap: %v", err)
+	// Seeded the way production does it: through onboarding's repository, so
+	// this test breaks if onboarding stops writing title/duration_minutes.
+	if _, err := onboarding.NewPgRepo(pg.Pool).SaveAssessment(ctx, userID, onboarding.Assessment{
+		CEFRLevel: "B1", TargetGoal: "integration", Timezone: "UTC", NotificationTime: "20:00:00",
+		Roadmap: integrationRoadmap(),
+	}); err != nil {
+		t.Fatalf("SaveAssessment: %v", err)
 	}
 
 	now := time.Now().UTC()
@@ -125,8 +134,14 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 		t.Fatalf("inserting the other user: %v", err)
 	}
 	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, otherGid) })
-	if _, err := store.SeedDemoRoadmap(ctx, pg.Pool, otherID); err != nil {
-		t.Fatalf("SeedDemoRoadmap(other): %v", err)
+	// Same onboarding-repo seeding as above, for the "other user" fixture; the
+	// plan's Task 8 only shows the first call being replaced, but the old
+	// store-package demo seed helper must be fully retired, so this one goes too.
+	if _, err := onboarding.NewPgRepo(pg.Pool).SaveAssessment(ctx, otherID, onboarding.Assessment{
+		CEFRLevel: "B1", TargetGoal: "integration", Timezone: "UTC", NotificationTime: "20:00:00",
+		Roadmap: integrationRoadmap(),
+	}); err != nil {
+		t.Fatalf("SaveAssessment(other): %v", err)
 	}
 	otherSuite, err := svc.Daily(ctx, otherID)
 	if err != nil {
@@ -191,4 +206,22 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	if again.AccumulatedSeconds != 1860 || !again.IsTargetMet || !again.Tasks[0].IsCompleted || !again.Tasks[1].IsCompleted {
 		t.Errorf("second Daily = %+v, want 1860s accumulated, target met, tasks[0] and [1] completed", again)
 	}
+}
+
+// integrationRoadmap is a valid 4x7x3 roadmap whose tasks carry the title and
+// duration_minutes the §6.2 daily response exposes.
+func integrationRoadmap() airouter.Roadmap {
+	r := airouter.Roadmap{Title: "Integration", CEFRLevel: "B1"}
+	for m := 1; m <= airouter.Modules; m++ {
+		mod := airouter.Module{Week: m, Title: fmt.Sprintf("Week %d", m), Focus: "integration"}
+		for d := 1; d <= airouter.DaysPerModule; d++ {
+			day := airouter.Day{Title: fmt.Sprintf("Day %d", (m-1)*airouter.DaysPerModule+d)}
+			for _, tt := range airouter.TaskTypes {
+				day.Tasks = append(day.Tasks, airouter.Task{Type: tt, Title: "Day task: " + tt, DurationMinutes: 10, Content: json.RawMessage(`{}`)})
+			}
+			mod.Days = append(mod.Days, day)
+		}
+		r.Modules = append(r.Modules, mod)
+	}
+	return r
 }
