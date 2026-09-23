@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/google-one-way-calendar-and-tasks-sync.md
-status: approved
+status: executing
 priority: high
 merged: false
 order: 7
+branch: harness/2026-09-23-high-google-one-way-calendar-and-tasks-sync
+worktree: .worktrees/google-one-way-calendar-and-tasks-sync
 ---
 # Google: one-way Calendar and Tasks sync — Plan
 
