@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-02/pet-health-streak-and-stage-engine-with-revive.md
-status: approved
+status: done
 priority: high
 merged: false
 order: 4
+branch: harness/2026-09-22-high-pet-health-streak-and-stage-engine-with-revive
+worktree: .worktrees/pet-health-streak-and-stage-engine-with-revive
 ---
 # Pet: health, streak and stage engine with revive — Plan
 
@@ -2073,3 +2075,73 @@ After pushing: `gh run list --branch <branch>` must show `backend-unit`, `backen
 - **A wilted plant also recovers through a full 30-minute day** without the revive route (`ApplyTargetMet` on health 0 → 20 / sprout / streak 1). Intentional — revive is the faster path to 50.
 - **`pet_states.updated_at` is set by Go, not `now()`**, so the idempotency guard and the tests share one clock. The DDL default still covers the INSERT.
 - **`users.timezone` read by pet** — same as quests' `Profile`. If the owner wants a single owner for `users` reads, an `auth.ProfileReader` would serve both; not done here.
+
+## Execution summary
+
+Finishing session (2026-09-23), picking up a code-complete branch after two prior sessions died to infrastructure (hung orphan process, then a network outage). All 10 task commits were already present at `f6e27b1` in `.worktrees/pet-health-streak-and-stage-engine-with-revive`; this session ran verification, the runtime proof, and push/CI only — no source changes.
+
+**Stale lock recovered.** `harness/.lock` held this plan's own path from a dead session (~49 min old). Confirmed the worktree HEAD matched exactly what this plan describes (10 commits, clean tree) before clearing it and re-locking.
+
+**Deviation (not fixed): 3 of 10 commits lack the Co-Authored-By trailer.** `873615f` ("pet: integration test — concurrent Ensure yields one pet_states row"), `d598cd8` ("pet: register the quests hook, mount /pet routes, start the hourly sweep") and `f6e27b1` ("codemap: pet — ...") have no trailer at all, unlike the other 7 commits. The Verification section's "each with the Co-Authored-By trailer" expectation is not met for these three. Per the executor role and this task's explicit instruction, existing commits are never rewritten/amended/re-committed, so this is logged rather than fixed.
+
+### Build and full suite (clean shell, from the worktree)
+
+```
+$ go build ./... && go vet ./... && echo BUILD_VET_OK
+BUILD_VET_OK
+
+$ env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1
+ok  	.../internal/airouter	0.260s
+ok  	.../internal/auth	0.391s
+ok  	.../internal/config	0.545s
+ok  	.../internal/health	0.785s
+ok  	.../internal/pet	1.088s
+ok  	.../internal/quests	1.381s
+ok  	.../internal/store	1.710s
+```
+
+### Plan Verification section — run exactly, from the worktree
+
+All named `go test ./internal/pet/... -run '...' -v` groups (ApplyMiss|ApplyTargetMet|ApplyRevive|StageFor|Spec8, Sweep, Revive, QuestHook, Status|Handler) passed every subtest. All grep checks matched their documented expectation:
+- §6.3 field names: 8 hits (`plant_name`, `health_points`, `current_streak`, `last_practiced_at`, `revival_passed`, `pet_state`) — ≥6 expected.
+- `MissPenalty = 30` / `TargetMetHealthBonus = 20` / `ReviveHealth = 50`: 3 hits, all in `engine.go` — §8/§6.3 numbers, not the idea's −20/20.
+- `ApplyTargetMet`: definition in `engine.go` plus exactly one call site, `service.go:57` inside `Service.OnTargetMet` — never in `Sweep`.
+- `store.PetReviveKey`/`store.PetReviveTTL`: 3 hits in `revive.go` — pet never hand-builds the key.
+- `daily:accumulated`/`DailyAccumulatedKey` in `internal/pet/`: 0 hits.
+- `Getenv("DATABASE_URL"|"REDIS_URL")` in `internal/pet/`: 0 hits.
+- `^func TestIntegration` in `integration_test.go`: 1.
+- `NopPet` in `cmd/api/main.go`: 0 hits.
+
+`python3 tools/harness/cli.py validate; echo exit=$?` → `exit=0`. `git log --oneline main..HEAD` → 10 commits (listed above; trailer deviation noted). `git status --short` → clean.
+
+### Runtime proof (skill step 8c/8d) — live stack
+
+Scratch `backend/.env`: `COMPOSE_PROJECT_NAME=pet3 POSTGRES_PORT=5439 REDIS_PORT=6387` with matching `TEST_DATABASE_URL`/`TEST_REDIS_URL`. `docker compose up -d --wait --wait-timeout 120` → both `pet3-postgres-1` and `pet3-redis-1` healthy. Host ports 6379/6380 (owner's `scio3-*` containers) were never touched — confirmed with `docker ps` before and after. API built to `/tmp/pet3-api` and run on port 8090 (confirmed free via `lsof` first) with `DATABASE_URL`/`REDIS_URL` pointed at the pet3 stack and scratch `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`JWT_SECRET`; migrations applied automatically at boot (`migrations applied: [0001_init]`).
+
+Two real users were inserted directly via SQL (`docker compose exec postgres psql`), and a real HS256 JWT was minted per user via a throwaway `cmd/minttoken` program calling `auth.NewTokenIssuer(...).Issue(userID)` (deleted after use, along with a throwaway `cmd/seedsession` helper that wrote the matching `sess:{user_id}:token` Redis session through `auth.RedisSessionStore.Put` — the same call `auth.Service.SignIn` makes). **Note:** raw `redis-cli`/shell commands containing a literal `<uuid>:token` string were silently corrupted by this environment's command-rewriting layer (confirmed the corruption landed in Redis itself, not just terminal display, by round-tripping through files); routing the session write through the real Go client sidestepped it entirely, and no such corruption reached the actual verification calls below (all confirmed via curl/psql output written to files and re-read).
+
+1. **`GET /pet/status` twice on a fresh user (u1) → exactly one `pet_states` row.** Both calls returned identically `{"plant_name":"My Green Buddy","stage":"sprout","health_points":100,"current_streak":0,"last_practiced_at":null}`. `SELECT count(*) FROM pet_states WHERE user_id='<u1>'` → `1`.
+
+2. **`POST /quests/progress` across 1800s → `pet_health` 100 (capped) and `streak_count` 0→1**, in both the response and `GET /pet/status`. (Required inserting a real `roadmaps`/`exercises` row for u1 so `RecordProgress` had an active roadmap and a day-1 exercise to check against — not part of the pet slice itself.)
+   - Call 1 (900s): `{"daily_seconds_spent":900,"daily_minutes_spent":15,"is_target_met":false,"pet_health":100,"streak_count":0}`
+   - Call 2 (900s, crosses 1800): `{"daily_seconds_spent":1800,"daily_minutes_spent":30,"is_target_met":true,"pet_health":100,"streak_count":1}`
+   - `GET /pet/status` after: `{"plant_name":"My Green Buddy","stage":"sprout","health_points":100,"current_streak":1,"last_practiced_at":"2026-09-23T02:01:31.932251Z"}`
+
+3. **Revive flow (u2).** `GET /pet/status` first to ensure the row, then `UPDATE pet_states SET health_points=0, stage='wilted'` via SQL (`0 | wilted` confirmed). `POST /pet/revive` → **200**, `{"revival_passed":false,"pet_state":{"health_points":0,"stage":"wilted","current_streak":0}}` (starts the challenge, baseline 0s). Recorded 900s via `POST /quests/progress` (kept under 1800s so `OnTargetMet` does not fire and interfere) → `{"daily_seconds_spent":900,...,"is_target_met":false,"pet_health":0,"streak_count":0}`. Second `POST /pet/revive` → 200, `{"revival_passed":true,"pet_state":{"health_points":50,"stage":"sprout","current_streak":0}}` — exactly §6.3's 50/sprout/0.
+
+4. **409 on a user at health > 0.** `POST /pet/revive` for u1 (health 100 from step 2) → HTTP **409**, `{"error":"pet_not_wilted"}`.
+
+`make test-integration` (`go test ./... -count=1 -v -run Integration -p 1`) against the pet3 stack: every package's `TestIntegration*` passed —
+`TestIntegrationRateLimiterAllowsFiveThenBlocks`, `TestIntegrationUpsertCreatesThenPreservesTheLearnerState`, `TestIntegrationEnsureCreatesExactlyOnePetRow`, `TestIntegrationDailyAndProgressAgainstRealServices`, `TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent`, `TestIntegrationConcurrentMigrateDoesNotRace`, `TestIntegrationPetStatesRejectsASecondRowForTheSameUser`, `TestIntegrationRedisRoundTrip`. `grep -c SKIP` on the full log → `0`.
+
+**Observation (not a plan defect, not actioned):** `SIGTERM` alone did not stop the running API binary — `signal.NotifyContext` cancels the context (stopping the pet cron goroutine as designed) but nothing calls `http.Server.Shutdown` or otherwise unblocks `r.Run()`, so the process kept running until `SIGKILL`. This predates this plan's task list (the plan's `main.go` changes are limited to registering the quest hook, mounting the pet routes, and starting the cron) and is outside its scope; flagging for whichever plan owns `cmd/api/main.go`'s shutdown path.
+
+### Cleanup
+
+Killed the API process (`SIGKILL`, since `SIGTERM` did not exit it — see observation above). `docker compose -p pet3 down` (the first attempt after deleting `.env` used the wrong default project name and did nothing; re-run with the explicit `-p pet3` correctly stopped and removed both containers and the network). Removed the leftover `pet3_postgres_data` volume. Deleted scratch `backend/.env` and the two throwaway helpers (`cmd/minttoken`, `cmd/seedsession`). Verified: `pgrep -fl exe/api` → none; `docker ps` → only the owner's `scio3-redis-1`/`scio3-mongo-1`; `git status --short` in the worktree → clean.
+
+### Push and CI
+
+Pushed `harness/2026-09-22-high-pet-health-streak-and-stage-engine-with-revive`. `gh pr create --draft --base main --head ... --label harness ...` failed at label creation first (`gh label create` → `HTTP 404: Not Found`, no write access), then `gh pr create` itself without labels failed as expected: `pull request create failed: GraphQL: must be a collaborator (createPullRequest)`. Skipped per this task's instructions — recorded, not retried.
+
+CI on the branch (triggered by the push) is green: run [35808961490](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35808961490) — `backend-unit` (22s), `backend-integration` (41s), `harness-tooling` (5s) all ✓. `gh run watch 35808961490 --exit-status` confirmed `success`.
