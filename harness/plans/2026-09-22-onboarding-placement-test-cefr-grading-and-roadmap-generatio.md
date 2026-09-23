@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/onboarding-placement-test-cefr-grading-and-roadmap-generatio.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 6
 branch: harness/2026-09-23-high-onboarding-placement-test-cefr-grading-and-roadmap-generatio
 worktree: .worktrees/onboarding-placement-test-cefr-grading-and-roadmap-generatio

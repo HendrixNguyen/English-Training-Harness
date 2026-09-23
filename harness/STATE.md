@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 12:00. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 15:48. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,7 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-- `harness/ideas/_inbox/frontend-shell-plan-claims-the-6-1-auth-shape-is-live-on-mai.md` — frontend-shell plan claims the §6.1 auth shape is live on main; it is not, so the merged frontend cannot sign in — blocks `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md`
+_none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
@@ -30,7 +30,6 @@ _none_
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Every Google 403 becomes 409 reauth_required, so a quota error forces a pointless re-consent [medium]
 - `harness/ideas/_inbox/expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Expired-session sign-out leaves per-user API responses in the service worker cache [medium]
-- `harness/ideas/_inbox/frontend-shell-plan-claims-the-6-1-auth-shape-is-live-on-mai.md` — frontend-shell plan claims the §6.1 auth shape is live on main; it is not, so the merged frontend cannot sign in [high]
 - `harness/ideas/_inbox/gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md` — Gemini test assertion that the API key is not in the query string can never fail [low]
 - `harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider drops every response part after the first so a long roadmap arrives truncated [medium]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
@@ -118,13 +117,13 @@ _none_
 
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
-- `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs)
-- `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs)
-- `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass)
+- `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
 - `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-go-test-drops-every-table-in-whatever-database-url-points-at.md` — go test drops every table in whatever DATABASE_URL points at — Plan [high] (unreviewed) (merged)
 
 ## Failed

@@ -164,6 +164,27 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
         self.assertIs(read_fm(plan)["merged"], True)
 
+    def test_rejected_blocker_stops_blocking(self):
+        # Some findings are resolved by reality (a dependency merging), not by a fix.
+        _, feat = self.run_cli("new-idea", "--run", "harness/ideas/_inbox", "--title",
+                               "Frontend shell", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", feat, "status=selected", "priority=high")
+        _, plan = self.run_cli("new-plan", "--idea", feat)
+        self.run_cli("set", plan, "status=approved")
+        self.run_cli("set", plan, "status=executing")
+        self.run_cli("set", plan, "status=done")
+
+        _, bug = self.run_cli("new-idea", "--run", "harness/ideas/_inbox", "--title",
+                              "Plan claims X is live on main", "--type", "bug", "--source", "reviewer")
+        self.assertEqual(self.run_cli("set", bug, "priority=high")[0], 0)
+        self.assertEqual(self.run_cli("set", bug, "blocks=" + plan)[0], 0)
+        self.assertEqual(self.run_cli("blockers", "--plan", plan)[0], 1)
+        self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 1)
+
+        self.run_cli("set", bug, "status=rejected", "rejected_reason=resolved by the auth merge")
+        self.assertEqual(self.run_cli("blockers", "--plan", plan), (0, ""))
+        self.assertEqual(self.run_cli("set", plan, "merged=true")[0], 0)
+
     def test_two_blockers_can_share_one_fix_plan_via_the_plan_backlink(self):
         _, run = self.run_cli("new-run")
         _, idea = self.run_cli("new-idea", "--run", run, "--title", "Slice", "--type", "mvp-slice", "--source", "ideator", "--order", "1")

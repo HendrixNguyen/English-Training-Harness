@@ -1,10 +1,11 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: high
 blocks: harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md
+rejected_reason: "Resolved by reality: PR #1 merged the auth §6.1 shape to main on 2026-09-23, so the plan's claim is now true. No fix to write."
 ---
 # frontend-shell plan claims the §6.1 auth shape is live on main; it is not, so the merged frontend cannot sign in
 

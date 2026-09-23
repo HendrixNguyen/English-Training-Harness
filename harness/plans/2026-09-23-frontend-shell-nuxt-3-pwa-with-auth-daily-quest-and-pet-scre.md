@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 9
 design: harness/designs/frontend-shell.md
 branch: harness/2026-09-23-high-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre
