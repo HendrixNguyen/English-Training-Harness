@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Overtaken by the merged amend (a-rejected-post-quests-progress…): RecordProgress now returns a typed ErrInvalidDuration mapped to 400, and CheckExercise scopes the exercise to the caller's active roadmap and today's day_number (404 otherwise); both are covered in service_test.go."
 ---
 
 # Progress request validation is incomplete outside the Gin binding tags
@@ -44,3 +45,8 @@ thing that is much cheaper to tighten now than after a client depends on the loo
 - `backend/internal/quests/service.go:59-61`; `backend/internal/quests/handler.go:39,64-74`.
 - `backend/internal/quests/repo.go:76-79`.
 - `backend/internal/quests/service_test.go:213-225` — asserts only `err != nil`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** Both asks shipped: `quests/service.go:14,72,100` (`ErrInvalidDuration` → 400) and `service.go:89` (`CheckExercise(ctx, roadmap.ID, exerciseID, day)`). CODEMAP `quests` records it.

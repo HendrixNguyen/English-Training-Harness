@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into jwt-secret-is-accepted-at-any-length-including-one-character.md (survivor): one auth-hardening plan covers the secret length check, WithExpirationRequired, iss/aud binding and case-insensitive Bearer."
 ---
 # JWT verify does not require exp or bind iss/aud and Bearer is case-sensitive
 
@@ -49,3 +50,8 @@ Worth noting what is already right, so a fix does not disturb it: the algorithm 
 - `backend/internal/auth/middleware_test.go:59` — the malformed-header table has no lowercase-scheme case.
 - RFC 6750 §2.1 / RFC 7235 §2.1 — the auth scheme is case-insensitive.
 - Related: `harness/ideas/_inbox/jwt-secret-is-accepted-at-any-length-including-one-character.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** Three one-line hardenings in `token.go`/`middleware.go`; none exploitable alone. They ride with the JWT-secret plan so `auth` is touched once.

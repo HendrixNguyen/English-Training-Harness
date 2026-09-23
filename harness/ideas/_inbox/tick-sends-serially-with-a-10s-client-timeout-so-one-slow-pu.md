@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -40,3 +40,8 @@ the same class of finding already filed (`route-has-no-overall-deadline...`).
 - `backend/internal/notify/queue.go:16` — `DueBatchSize = 100`; `backend/internal/notify/schedule.go:12` — `PollInterval = 30 * time.Second`. 100 x 10 s >> 30 s.
 - `backend/internal/notify/worker.go:15-33` — `RunWorker` calls `svc.Tick(ctx, at)` with the process-lifetime context; no per-pass deadline.
 - Same class, already filed for a sibling package: `harness/ideas/_inbox/route-has-no-overall-deadline-so-one-call-can-take-90-second.md`, `harness/ideas/_inbox/synctimeout-gives-thirty-sequential-google-calls-a-two-secon.md`, `harness/ideas/_inbox/the-hourly-sweep-loads-every-pet-in-a-zone-into-memory-and-r.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Notify unmerged; plan after it lands. A stuck push endpoint delays every other user's 20:00 reminder — the feature's whole point. Per-pass deadline + small worker pool + 5 s client timeout; combine with the leader lock and subscription cap into one notify-hardening plan.

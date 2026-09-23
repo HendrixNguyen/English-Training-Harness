@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md, which adds the _ \"time/tzdata\" import to cmd/api/main.go and a boot-time check that Asia/Ho_Chi_Minh loads."
 ---
 # timezone handling depends on system tzdata with no time/tzdata import
 
@@ -47,3 +48,8 @@ so the operator learns at deploy time instead of from wrongly-timed pushes.
 - `grep -rn 'time/tzdata' backend --include='*.go'` → no import anywhere; the only hits are diagnostic strings (`internal/quests/day_test.go:116`, `internal/store/keys_test.go:35`, `internal/notify/schedule_test.go:78`).
 - No deployment image is committed: `find . -maxdepth 3 -iname 'Dockerfile*' -o -iname 'railway*' -o -iname 'nixpacks*' -o -iname 'Procfile'` returns nothing.
 - Same class, different symptom, already filed: `harness/ideas/_inbox/zones-that-skip-local-midnight-on-spring-forward-are-never-s.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** One import line in `main.go`; ships with the cmd/api hardening plan so `main.go` is merged once.

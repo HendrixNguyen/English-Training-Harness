@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: high
@@ -58,3 +58,8 @@ column, so the decrypt path should exist before that slice is planned.
   (the same config validation gap for the other secret).
 - Plan that shipped it: `harness/plans/2026-09-22-auth-google-oauth-code-exchange-and-jwt-sessions.md`
   (written against the 1st-thinking doc only, before the backend spec existed).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — high (top 10).** Spec §7 mandates AES-256-GCM via `ENCRYPTION_SECRET_KEY`; `auth/repo.go` stores the token verbatim and `google.PgRefreshTokenSource` reads it verbatim. It is standing write access to the user's Calendar and Tasks, and the fix gets strictly more expensive after the first real row (in-place re-encryption). Plan: `config` reads the key; `auth` encrypts on sign-in; `google.NewPgRefreshTokenSource` takes a decrypter (the seam the google plan left for exactly this). Touches `cmd/api/main.go` (one constructor argument) — schedule after the cmd/api hardening plan merges.

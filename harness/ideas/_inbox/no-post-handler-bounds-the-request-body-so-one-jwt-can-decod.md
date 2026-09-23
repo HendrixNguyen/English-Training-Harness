@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -66,3 +66,8 @@ one fix, not four.
   `backend/internal/onboarding/service.go:134` (`validate`) runs.
 - Concrete input: `POST /api/v1/onboarding/assessment` with a valid bearer token
   and an `answers` array of a few million entries.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Confirmed: no `MaxBytesReader` anywhere inbound; `AssessmentRequest.Answers` is an unbounded slice decoded before validation. One middleware on the `/api/v1` group fixes every handler. **Conflict note:** mounting it is one line in `cmd/api/main.go`; the server-timeout half of this finding is already carried by the cmd/api hardening plan, so plan this after that merges and keep the `main.go` diff to the single `Use(...)` line.

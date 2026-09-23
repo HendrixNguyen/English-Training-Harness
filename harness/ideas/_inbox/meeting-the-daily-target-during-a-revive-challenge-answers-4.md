@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "The frontend already maps 409 pet_not_wilted on the revive check to the 'your plant is healthy' screen (stores/pet.ts notWilted → pages/revive.vue), so the user sees the recovery, and the leftover pet:revive key expires within 24h and is replaced next day; no user-visible defect remains."
 ---
 # Meeting the daily target during a revive challenge answers 409 and leaks the Redis key for 24h
 
@@ -76,3 +77,8 @@ Finishing the day's target while a challenge is open is a success, not a conflic
 - Reviewer runtime probe, 2026-09-23, live Postgres + Redis (`petrev` compose project), transcript
   quoted above.
 - Backend spec §6.3 — `POST /api/v1/pet/revive`, "Resets health to 50% upon passing".
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** Reproduced logic is right, but the user impact the finding assumed ("a polling client gets a 409 forever") does not occur: `pet.revive()` turns `pet_not_wilted` into `notWilted = true` and `/revive` renders "Cây của bạn vẫn khỏe". The orphaned Redis key is harmless (24 h TTL, replaced by the next day's challenge). Not worth a branch.

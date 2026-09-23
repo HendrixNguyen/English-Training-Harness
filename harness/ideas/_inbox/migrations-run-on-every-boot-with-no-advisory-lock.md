@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Overtaken: PgMigrator now implements store.Locker (a Postgres advisory lock taken by Migrate; see CODEMAP store and TestIntegrationConcurrentMigrateDoesNotRace), shipped with the auth slice; the secondary ask (a deadline on the boot migration) is carried by migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md."
 ---
 # migrations run on every boot with no advisory lock
 
@@ -43,3 +44,8 @@ unreachable database fails the boot in bounded time rather than hanging.
 - `backend/internal/store/postgres.go:48-51` (`CREATE TABLE IF NOT EXISTS`), `:73-87` (`Apply`).
 - `backend/cmd/api/main.go:17` (`context.Background()`), `:36-39` (`Migrate` then `log.Fatalf`).
 - Spec §8 "Deploy compiled Go binary as lightweight Docker container on Railway."
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** The primary ask shipped (`PgMigrator.Lock`, CODEMAP `store`). The deadline ask moves to the lock-leak survivor, which must land first.

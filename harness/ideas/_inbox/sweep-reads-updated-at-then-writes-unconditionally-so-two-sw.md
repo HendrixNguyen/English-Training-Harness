@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # Sweep reads updated_at then writes unconditionally so two sweeps in one local hour double the miss penalty
 
@@ -64,3 +64,8 @@ no-op no matter how many processes are running:
 - `backend/internal/pet/service_test.go:255-269` — `TestSweepIsIdempotentWithinTheSameLocalDay`
   runs the two sweeps sequentially, so it passes and proves nothing about concurrency.
 - Backend spec §8 — `Health = Max(0, Health - 30)` is once per missed day, not once per sweeper.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Only opens with more than one replica or a manual sweep; the app is single-instance today. The pet "durable day judgement" plan should make the miss a conditional `UPDATE … WHERE updated_at < $midnight` while it is in `Sweep`, which closes this for free.

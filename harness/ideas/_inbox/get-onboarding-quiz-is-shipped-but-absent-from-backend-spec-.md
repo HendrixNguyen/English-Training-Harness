@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -44,3 +44,8 @@ addition"). It was not; only `harness/CODEMAP.md` records it.
   area.
 - Rule: AGENTS.md / CLAUDE.md — "REST under `/api/v1`, enumerated in §7. Keep
   that list in sync with the code."
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Doc-only: the endpoint is right, the two spec documents are behind. AGENTS.md makes the §7 list a contract; an executor can add the entry to both files in minutes. Batch with the next spec-touching plan (the 0003 migration plan also edits the backend spec's DDL).

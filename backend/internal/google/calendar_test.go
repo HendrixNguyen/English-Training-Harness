@@ -42,6 +42,16 @@ func fakeGoogleAPI(t *testing.T, answers map[string]struct {
 	return srv, &calls
 }
 
+func fakeAnswer(status int, body string) struct {
+	Status int
+	Body   string
+} {
+	return struct {
+		Status int
+		Body   string
+	}{status, body}
+}
+
 func sampleEvent() Event {
 	start := time.Date(2026, time.September, 22, 20, 0, 0, 0, Location("Asia/Ho_Chi_Minh"))
 	return Event{Summary: EventSummary, Description: EventDescription, Start: start, End: start.Add(EventDuration), TimeZone: "Asia/Ho_Chi_Minh"}
@@ -89,6 +99,49 @@ func TestCalendarPatchEventUsesTheStoredID(t *testing.T) {
 	}
 	if got := (*calls)[0]; got.Method != http.MethodPatch || got.Path != "/calendars/primary/events/evt_1" {
 		t.Errorf("call = %+v", got)
+	}
+	body := (*calls)[0].Body
+	start, _ := body["start"].(map[string]any)
+	if body["summary"] != EventSummary || body["status"] != "confirmed" || start["timeZone"] != "Asia/Ho_Chi_Minh" || start["dateTime"] == nil || body["end"] == nil {
+		t.Fatalf("patch body = %v — a PATCH that drops the payload must fail this test", body)
+	}
+	if rec, _ := body["recurrence"].([]any); len(rec) != 1 || rec[0] != Recurrence {
+		t.Fatalf("recurrence = %v", body["recurrence"])
+	}
+}
+
+func TestCalendarInsertSendsTheClientIDAndMaps409ToAlreadyExists(t *testing.T) {
+	ok := fakeAnswer(200, `{"id":"aelpu1"}`)
+	dup := fakeAnswer(409, `{"error":{"code":409,"message":"The requested identifier already exists.","errors":[{"reason":"duplicate"}]}}`)
+	for _, tc := range []struct {
+		name   string
+		answer struct {
+			Status int
+			Body   string
+		}
+		wantErr error
+	}{{"first insert", ok, nil}, {"repeat insert", dup, ErrAlreadyExists}} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, calls := fakeGoogleAPI(t, map[string]struct {
+				Status int
+				Body   string
+			}{"POST /calendars/primary/events": tc.answer})
+			c := NewHTTPCalendarClient()
+			c.BaseURL = srv.URL
+			ev := sampleEvent()
+			ev.ID = "aelpu1"
+			id, err := c.InsertEvent(context.Background(), "ya29.tok", ev)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tc.wantErr)
+			}
+			if tc.wantErr == nil && id != "aelpu1" {
+				t.Fatalf("id = %q", id)
+			}
+			body := (*calls)[0].Body
+			if body["id"] != "aelpu1" || body["status"] != "confirmed" {
+				t.Fatalf("insert body = %v", body)
+			}
+		})
 	}
 }
 

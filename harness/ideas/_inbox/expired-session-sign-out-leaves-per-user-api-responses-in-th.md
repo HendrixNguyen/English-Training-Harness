@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: high
 ---
 # Expired-session sign-out leaves per-user API responses in the service worker cache
 
@@ -24,3 +24,8 @@ Every path that drops a session also drops the per-user cache. `middleware/auth.
 - `frontend/service-worker/sw.ts:15-18` — `new NetworkFirst({ cacheName: 'api-state', networkTimeoutSeconds: 5 })` matching `/api/v1/(quests/daily|pet/status)$`, with no plugins array.
 - The cache name is not prefixed, so `caches.delete('api-state')` does match the worker's cache: `node_modules/workbox-core/_private/cacheNames.js` → `getRuntimeName: (userCacheName) => userCacheName || _createCacheName(...)`. The clear works where it is called; the problem is only the path that omits it.
 - The executor's own Runtime proof records the mechanism from the other side: "the SW's `NetworkFirst` cache for `/quests/daily` had cached an earlier 200 response, which persisted stale data across a backend state change until the SW/cache were cleared".
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — high (was medium; top 10).** Confirmed: `middleware/auth.global.ts:12-15` calls `auth.signOut()` without `clearApiCache()`, unlike the two other sign-out paths. Sessions are 24 h, so *every* user takes this path daily; on a shared device the next account, offline or on a slow network, is served the previous user's quests and plant from the `api-state` cache. Personal-data leak on the happy path, one-line fix plus making `signOut()` own the cache clear so no caller can forget again, plus an `ExpirationPlugin` bound. Cheap, high value — plan next after the current three.

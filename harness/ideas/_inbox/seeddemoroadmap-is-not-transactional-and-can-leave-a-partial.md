@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Overtaken: store.SeedDemoRoadmap was deleted by the onboarding slice (quests' integration test now seeds through onboarding.PgRepo.SaveAssessment, which is transactional)."
 ---
 
 # SeedDemoRoadmap is not transactional and can leave a partial active roadmap
@@ -47,3 +48,8 @@ is folded into the gated integration test.
 - `backend/internal/store/seed.go:25-47`.
 - `backend/internal/store/seed_test.go:5-18` — asserts constants against their own literals.
 - `backend/internal/quests/integration_test.go:52-54` — the only caller.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** `find backend -name 'seed*'` → nothing; CODEMAP `onboarding` records the deletion.

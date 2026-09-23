@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Trivial test-fixture imperfection: the neighbouring test (authStore.test.ts:18) pins the access_token claim honestly, so the behaviour is covered; fix the fixture opportunistically when stores/auth.ts is next touched."
 ---
 # authStore test "does not accept the pre-spec {token} shape" passes even when the store reads res.token
 
@@ -21,3 +22,8 @@ The test fails when the store reads the wrong key. Give the fixture a valid `exp
 - `frontend/stores/auth.ts:59` — the two-part guard.
 - Mutation test performed during review: `stores/auth.ts` changed so `signIn` reads `(res as unknown as {token: string}).token` in both the guard and the assignment. `npx vitest run tests/unit/authStore.test.ts` → **1 failed | 4 passed**. The failure was line 21 (`expect(auth.accessToken).toBe('eyJ.test')`) in "signIn stores the §6.1 access_token…"; the `{token}` test at line 31 **still passed** under the mutation. Change reverted; `git diff --quiet stores/auth.ts` clean.
 - The neighbouring test at line 18 does carry the claim honestly, so the behaviour is covered — only this test's name overstates what it checks.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject.** Test-only; the behaviour is covered by the adjacent test the reviewer names. Not worth a branch.

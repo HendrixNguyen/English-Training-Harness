@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # Migrate is only tested against the single embedded migration
 
@@ -47,3 +47,8 @@ minimum:
 - `backend/internal/store/migrations.go:33-63`.
 - `backend/internal/store/migrations_test.go:117-169` — all four `Migrate` tests pass `MigrationsFS`.
 - Coverage profile in the plan's worktree shows zero hits on `migrations.go:35-36,39-40,44-45,56-57`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Half overtaken: migration `0002` now exists, so ordering and the skip-applied branch run in the integration suite on every CI push. What remains is unit coverage of the error paths via `fstest.MapFS`. Batch with the 0003 migration plan, which touches `migrations_test.go` anyway.

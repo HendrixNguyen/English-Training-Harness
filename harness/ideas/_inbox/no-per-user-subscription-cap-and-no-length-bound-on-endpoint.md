@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -45,3 +45,8 @@ encryption time with an error that is *not* `ErrSubscriptionGone`, so `Tick` cou
 - `backend/internal/notify/service.go:143-164` — `Tick` iterates every subscription of the user; `service.go:158-160` classifies a non-gone error as `Failed` and leaves the row in place.
 - `backend/internal/notify/service_test.go:194-204` (`TestTickReportsSendFailuresButContinues`) pins exactly this behaviour: "a transient failure must not delete the subscription" — correct for a transient failure, but there is no bound for a permanent one.
 - Sibling finding: `harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — medium.** Notify is `done` but unmerged; plan after it lands. Unbounded rows per user, unvalidated key material that fails encryption forever, and N-fold outbound amplification are all real. Fix in `notify` only (validation + cap + prune-after-N-failures). Pairs naturally with `tick-sends-serially…` and `due-plus-re-slot…` as one notify-hardening plan if the owner wants fewer merges.

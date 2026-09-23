@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md, whose Task on .env.example/Makefile adds the application section (DATABASE_URL, REDIS_URL, PORT, GIN_MODE, JWT_SECRET, GOOGLE_*) and the note that the Go process does not read .env."
 ---
 # backend/.env.example omits the app's own DATABASE_URL REDIS_URL PORT
 
@@ -64,3 +65,8 @@ undocumented step:
   (`run` target, no comment) and `:12-14` (the comment that points at `.env.example`).
 - `harness/CODEMAP.md:7` — "copy `backend/.env.example` to `backend/.env`".
 - Reviewer reproduction: `env -u DATABASE_URL -u REDIS_URL make run` → `config: config: DATABASE_URL is required`, exit 1.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** Still true on `main` (`backend/.env.example` has ports, TEST_* URLs and AI keys only; `config.Load` requires five more). The cmd/api hardening plan adds `GIN_MODE` to config and must document it in `.env.example` anyway, so it carries this whole fix (app section + "Go does not read .env" note + `make run` comment + the doubled `config: config:` prefix).

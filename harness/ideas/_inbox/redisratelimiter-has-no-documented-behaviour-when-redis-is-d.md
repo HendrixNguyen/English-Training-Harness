@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Overtaken: the only caller (onboarding/service.go:64) fails closed on any limiter error — non-ErrRateLimited errors become 500 and no AI call is made — so the fail-open hazard is not live; documenting it and guarding a zero Limit literal are tidiness."
 ---
 # RedisRateLimiter has no documented behaviour when Redis is down and a zero Limit blocks everything
 
@@ -52,3 +53,8 @@ asserts the zero-`Limit` behaviour, so the contract is pinned without needing a 
 - `backend/internal/airouter/ratelimit.go:15-19` — the interface contract, silent on infrastructure errors; `:34-46` — `Allow`; `:24-27` — exported `Client`/`Limit` with no guard.
 - `backend/internal/airouter/ratelimit_test.go` — one constants test plus `TestIntegrationRateLimiterAllowsFiveThenBlocks`; no case for a dead Redis and none for a zero `Limit`.
 - Reviewer verification: the integration test passes against a live Redis 7 (`redis:7-alpine`, `TEST_REDIS_URL` on a scratch stack) — five allowed, sixth `ErrRateLimited`, TTL within (0, 60s]. The window semantics (fixed 60 s from the first hit, so up to 10 calls can straddle a boundary) are spec-conformant and are **not** part of this bug.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** Onboarding wrote the safe idiom. A `RateLimiter` doc comment can be added whenever `airouter` is next touched.

@@ -1,9 +1,9 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
-priority: medium
+priority: low
 ---
 # The hourly sweep loads every pet in a zone into memory and reparses tzdata per user
 
@@ -68,3 +68,8 @@ The sweep's cost is bounded by the number of users actually at local midnight, n
 - Reviewer benchmark, 2026-09-23, Go 1.25 (output quoted above).
 - Related: `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md`
   (the same missing-index theme for quests).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low (was medium).** Scale finding, correct at 100k users, irrelevant at MVP. The zone→`*time.Location` map is a free win for the pet "durable day judgement" plan while it is in `Sweep`; paging and the index can wait.

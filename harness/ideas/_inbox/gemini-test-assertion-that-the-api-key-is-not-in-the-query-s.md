@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into the plan for geminiprovider-drops-every-response-part-after-the-first-so-.md, which rewrites gemini_test.go and adds the RawQuery assertion there."
 ---
 # Gemini test assertion that the API key is not in the query string can never fail
 
@@ -59,3 +60,8 @@ DeepSeek/OpenAI key appears only in `Authorization` and never in the URL — wor
 - `backend/internal/airouter/gemini.go:48,59` — the URL has no query; the key goes in `x-goog-api-key`. The behaviour is correct; only its test is not.
 - `project-base/1st-thinking-architecture-doc.md` §6.2 — `url := fmt.Sprintf("%s?key=%s", baseUrl, g.apiKey)`, the form this test is meant to prevent coming back.
 - Reviewer verification: `grep -c 'key=' internal/airouter/gemini.go` → 0; a boot with fake keys produced no log line containing them (`grep -c 'SECRET-' api.log` → 0). The invariant holds today.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — folded.** The invariant holds (`grep -c 'key=' gemini.go` → 0); only the test is vacuous. The Gemini multi-part plan touches `gemini_test.go` and takes the `RawQuery` assertion with it.

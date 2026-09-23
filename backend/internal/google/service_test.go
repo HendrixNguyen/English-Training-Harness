@@ -3,6 +3,7 @@ package google
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -14,7 +15,7 @@ func TestSyncFirstTimeInsertsEventListAnd28Tasks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if res.Status != "synced" || res.CalendarEventID != "evt_new" || res.TasksCreatedCount != 28 {
+	if res.Status != "synced" || res.CalendarEventID != PracticeEventID("u1") || res.TasksCreatedCount != 28 {
 		t.Errorf("result = %+v", res)
 	}
 	if len(h.cal.inserted) != 1 || len(h.cal.patched) != 0 {
@@ -36,7 +37,7 @@ func TestSyncFirstTimeInsertsEventListAnd28Tasks(t *testing.T) {
 		}
 	}
 	final := h.repo.saved[len(h.repo.saved)-1]
-	if final != (SyncState{UserID: "u1", CalendarEventID: "evt_new", TasklistID: "list_new", RoadmapID: "roadmap-A", TasksCreatedCount: 28}) {
+	if final != (SyncState{UserID: "u1", CalendarEventID: PracticeEventID("u1"), TasklistID: "list_new", RoadmapID: "roadmap-A", TasksCreatedCount: 28}) {
 		t.Errorf("final state = %+v", final)
 	}
 }
@@ -49,7 +50,8 @@ func TestSyncPersistsStateAfterTheEventAndAfterTheListBeforeTasks(t *testing.T) 
 	if len(h.repo.saved) != 3 {
 		t.Fatalf("saved %d times, want 3 (after event, after list, final): %v", len(h.repo.saved), h.log.calls)
 	}
-	if s := h.repo.saved[0]; s.CalendarEventID != "evt_new" || s.TasklistID != "" {
+	evtID := PracticeEventID("u1")
+	if s := h.repo.saved[0]; s.CalendarEventID != evtID || s.TasklistID != "" {
 		t.Errorf("first save = %+v, want only the event id", s)
 	}
 	if s := h.repo.saved[1]; s.TasklistID != "list_new" || s.RoadmapID != "" || s.TasksCreatedCount != 0 {
@@ -64,7 +66,7 @@ func TestSyncPersistsStateAfterTheEventAndAfterTheListBeforeTasks(t *testing.T) 
 		}
 		return -1
 	}
-	if !(idx("repo.SaveSyncState(evt=evt_new,list=,") < idx("tasks.InsertTaskList") && idx("repo.SaveSyncState(evt=evt_new,list=list_new,roadmap=,") < idx("tasks.InsertTask(")) {
+	if !(idx(fmt.Sprintf("repo.SaveSyncState(evt=%s,list=,", evtID)) < idx("tasks.InsertTaskList") && idx(fmt.Sprintf("repo.SaveSyncState(evt=%s,list=list_new,roadmap=,", evtID)) < idx("tasks.InsertTask(")) {
 		t.Errorf("save points out of order: %v", h.log.calls)
 	}
 }
@@ -107,8 +109,15 @@ func TestResyncSameRoadmapPatchesEventAndCreatesNothing(t *testing.T) {
 	if res.CalendarEventID != "evt_old" || res.TasksCreatedCount != 28 {
 		t.Errorf("result = %+v", res)
 	}
-	if len(h.cal.inserted) != 0 || len(h.cal.patched) != 1 || h.cal.patched[0] != "evt_old" {
+	if len(h.cal.inserted) != 0 || len(h.cal.patched) != 1 || h.cal.patched[0].ID != "evt_old" {
 		t.Errorf("calendar inserts/patches = %v/%v", h.cal.inserted, h.cal.patched)
+	}
+	want, err := PracticeEvent(h.now, "20:00:00", "Asia/Ho_Chi_Minh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !h.cal.patched[0].Ev.Start.Equal(want.Start) {
+		t.Errorf("patch body start = %v, want %v", h.cal.patched[0].Ev.Start, want.Start)
 	}
 	for _, c := range h.log.calls {
 		if strings.HasPrefix(c, "tasks.") {
@@ -144,7 +153,7 @@ func TestResyncReinsertsTheEventWhenGoogleLostIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if res.CalendarEventID != "evt_new" || len(h.cal.inserted) != 1 {
+	if res.CalendarEventID != PracticeEventID("u1") || len(h.cal.inserted) != 1 {
 		t.Errorf("result = %+v, inserted = %d", res, len(h.cal.inserted))
 	}
 }
@@ -157,13 +166,89 @@ func TestSyncWithoutARoadmapPushesOnlyTheEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if res.Status != "synced" || res.CalendarEventID != "evt_new" || res.TasksCreatedCount != 0 {
+	if res.Status != "synced" || res.CalendarEventID != PracticeEventID("u1") || res.TasksCreatedCount != 0 {
 		t.Errorf("result = %+v", res)
 	}
 	for _, c := range h.log.calls {
 		if strings.HasPrefix(c, "tasks.") {
 			t.Errorf("no roadmap must not touch Tasks, but called %s", c)
 		}
+	}
+}
+
+// The idea's scenario: the client disconnects after InsertEvent, so the save
+// that would make the id findable fails. Before this fix the retry inserted a
+// second 28-day event; now the deterministic id makes the retry a 409 → patch.
+func TestAFailedSaveAfterTheEventInsertDoesNotCreateASecondEvent(t *testing.T) {
+	h := newHarness()
+	h.repo.failSaveAt = 1
+
+	if _, err := h.svc.Sync(context.Background(), "u1"); !errors.Is(err, errSaveBoom) {
+		t.Fatalf("first sync err = %v, want the save failure", err)
+	}
+	if len(h.cal.inserted) != 1 || h.repo.state.CalendarEventID != "" {
+		t.Fatalf("after the failed save: inserted=%d state=%+v", len(h.cal.inserted), h.repo.state)
+	}
+
+	res, err := h.svc.Sync(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	want := PracticeEventID("u1")
+	if len(h.cal.inserted) != 1 {
+		t.Fatalf("retry inserted a second event: %v", h.log.calls)
+	}
+	if len(h.cal.patched) != 1 || h.cal.patched[0].ID != want {
+		t.Fatalf("retry should patch %s once, got %+v", want, h.cal.patched)
+	}
+	if res.CalendarEventID != want || h.repo.state.CalendarEventID != want {
+		t.Fatalf("id not recorded: res=%+v state=%+v", res, h.repo.state)
+	}
+}
+
+// A user deleted the event by hand and Google has let the id go entirely
+// (PATCH → 404/410): fall back to one Google-assigned id rather than failing forever.
+func TestAReservedButGoneIDFallsBackToAGoogleAssignedInsert(t *testing.T) {
+	h := newHarness()
+	h.cal.known = map[string]bool{PracticeEventID("u1"): true}
+	h.cal.patchErr = ErrNotFound
+	h.cal.nextID = "evt_fresh"
+
+	res, err := h.svc.Sync(context.Background(), "u1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.CalendarEventID != "evt_fresh" || len(h.cal.inserted) != 1 || h.cal.inserted[0].ID != "" {
+		t.Fatalf("res=%+v inserted=%+v", res, h.cal.inserted)
+	}
+}
+
+// The Tasks half has no idempotency key: state this rather than pretend.
+func TestAFailedSaveAfterTheListInsertOrphansTheListAndIsDocumented(t *testing.T) {
+	h := newHarness()
+	h.repo.failSaveAt = 2 // the save right after InsertTaskList
+
+	if _, err := h.svc.Sync(context.Background(), "u1"); !errors.Is(err, errSaveBoom) {
+		t.Fatalf("err = %v", err)
+	}
+	h.tasks.nextList = "list_second"
+	if _, err := h.svc.Sync(context.Background(), "u1"); err != nil {
+		t.Fatal(err)
+	}
+	// Two lists were created at Google (fakeTasks.tasks only gains a key once a
+	// task is inserted into it, so the orphaned list — abandoned before any
+	// task insert — is invisible there; count InsertTaskList calls instead) and
+	// none deleted: the first ("list_new") is orphaned. This is the documented
+	// gap (service.go Sync doc, CODEMAP google) — if a future change closes it
+	// (e.g. tasklists.list by title), update this test to assert one list.
+	created := 0
+	for _, c := range h.log.calls {
+		if strings.HasPrefix(c, "tasks.InsertTaskList(") {
+			created++
+		}
+	}
+	if created != 2 || len(h.tasks.deleted) != 0 {
+		t.Fatalf("lists created=%d deleted=%v", created, h.tasks.deleted)
 	}
 }
 

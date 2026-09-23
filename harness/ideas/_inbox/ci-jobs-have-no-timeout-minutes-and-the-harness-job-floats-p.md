@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Overtaken: all four CI jobs now carry timeout-minutes: 10; the remaining ask (pinning python-version from 3.x) is tidiness with no live breakage."
 ---
 # CI jobs have no timeout-minutes and the harness job floats python-version 3.x
 
@@ -40,3 +41,8 @@ the local/CI version gap into something CI tests rather than something CI hides.
 - Local timings, worktree `.worktrees/ci-on-github-actions-for-backend-and-harness-tooling`:
   `unit exit=0` in ~3 s, `3/3 integration tests ran and passed` in ~1.3 s,
   `Ran 30 tests in 0.178s`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** `.github/workflows/ci.yml` lines 21/48/111/124 each set `timeout-minutes: 10`. `python-version: "3.x"` still floats (line 116) but the reviewer found nothing that would break; not worth a branch on its own.

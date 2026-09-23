@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -43,3 +43,8 @@ means updating both" note is then removed rather than maintained.
 - `backend/internal/store/migrations_test.go:124` — same literal.
 - `harness/CODEMAP.md` → `store` — the newly added sentence documenting the manual step.
 - Related but distinct, already in the inbox: `migrate-is-only-tested-against-the-single-embedded-migration.md` (that one is about coverage of multi-version runs, which `0002` has now supplied).
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Correct: `0003` would be applied by `Migrate` and never rolled back by `reset()`. The `0003` migration plan must fix this first (derive the down list and version count from `MigrationsFS`) or it will trip on it — batch there.

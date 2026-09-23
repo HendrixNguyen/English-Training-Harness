@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -47,3 +47,8 @@ read as contradicting each other.
 - `backend/internal/quests/repo.go:63-74`.
 - `backend/internal/store/migrations/0001_init.up.sql:53-68` — no `CREATE INDEX`.
 - `AGENTS.md` -> *Reading the spec* — `0001_init` must stay identical to the backend spec DDL.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Select — low.** Correct and cheap, invisible at MVP scale. Ships in the same `0003` migration as the one-active-roadmap partial unique index (`two-concurrent-assessment-submits…`) and the `NOT NULL user_id` spec correction (`spec-3-2-leaves-user-id-nullable…`); that plan also makes `store`'s `reset()` derive the down list from the FS (`store-reset-hard-codes…`) so this is the last migration that needs hand edits.

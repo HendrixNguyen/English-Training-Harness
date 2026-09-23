@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Duplicate of auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md (survivor): its Expected output already requires the UserRepo-failure, SessionStore-failure and Require-transport-error tests, which are exactly this file's three tests."
 ---
 # Service and Require failure paths are untested; the fakes' err fields are never set
 
@@ -43,3 +44,8 @@ Either use the fields or delete them. Using them is better — three small tests
 - `backend/internal/auth/session_test.go:42-45` — `Delete` ignores `f.err` where `Put`/`Get` honour it.
 - `backend/internal/auth/service.go:48-49` — the ordering guarantee this would cover.
 - `grep -n 'repo.err\|sess.err' backend/internal/auth/*_test.go` returns nothing.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — duplicate.** The survivor's plan cannot be written without wiring `fakeRepo.err`/`fakeSessions.err`; these are its regression tests.

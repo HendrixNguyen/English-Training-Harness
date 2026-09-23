@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: high
+rejected_reason: "Overtaken: the ai-router branch was merged on 2026-09-23 (plan status done, merged=true) and the plan file on main carries the canonical summary; the convention is already stated in the harness-execute skill step 9."
 ---
 # Branch carries its own execution summary so the ai-router plan file conflicts on merge
 
@@ -51,3 +52,8 @@ touches `harness/plans/`.
 - ROOT commit `6d55426` states the convention; ROOT commit `29c4355` wrote the canonical summary on `main`.
 - Reproduce: `cd .worktrees/ai-router-multi-llm-providers-task-strategies-and-rate-limit && git merge-tree --write-tree --name-only main HEAD` → `CONFLICT (content)` on that one path.
 - Diff of the two copies: `git diff main HEAD -- harness/plans/2026-09-22-ai-router-….md` → branch has `status: approved`, no `branch:`/`worktree:`, no `### CI`.
+
+## Evaluation
+_Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
+
+**Reject — overtaken.** The merge this warned about has happened; `harness/plans/2026-09-22-ai-router-…md` on `main` is `done`/`merged: true` with its `### CI` section intact. The "never commit the plan on the branch" rule is now explicit in `.agents/skills/harness-execute/SKILL.md` step 9.
