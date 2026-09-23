@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md
 ---
 # NUXT_PUBLIC_STUB_ONBOARDING defaults to true, so a deployment that forgets it ships the fake placement quiz
 
