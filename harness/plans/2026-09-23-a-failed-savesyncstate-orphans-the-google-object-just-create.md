@@ -1,8 +1,11 @@
 ---
 idea: harness/ideas/_inbox/a-failed-savesyncstate-orphans-the-google-object-just-create.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-23-high-a-failed-savesyncstate-orphans-the-google-object-just-create
+worktree: .worktrees/a-failed-savesyncstate-orphans-the-google-object-just-create
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/7"
 ---
 # google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan
 
@@ -529,3 +532,28 @@ From `backend/` in the worktree:
 - **Tasks orphan:** the honest fix would be `tasklists.list` + delete-by-title before creating, or a `pending_tasklist_id` write-ahead column. Both grow the API surface; neither is in this plan. `a-user-deleted-tasks-list-is-never-rebuilt…` (selected, low) is the natural home for the `tasklists.list` call if it is ever added.
 - **Merged plan text:** `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` carries an evaluator correction (2026-09-23) under its *Architecture* paragraph; plan files are ROOT bookkeeping, so the executor does not touch it on the branch.
 - **Conflicts:** none with `main.go`. `every-google-403-becomes-409…` and `the-google-sync-route-logs-nothing…` edit `client.go`/`handler.go` — merge this first; they are small rebases.
+
+## Execution summary
+
+All four tasks implemented as specified, in `.worktrees/a-failed-savesyncstate-orphans-the-google-object-just-create` on `harness/2026-09-23-high-a-failed-savesyncstate-orphans-the-google-object-just-create`, four commits (one per task) plus the CODEMAP correction.
+
+**Deviations from the plan:**
+1. The plan's regex `^[a-v0-9]{5,1024}$` in `TestPracticeEventIDIsDeterministicBase32Hex` panics under Go's RE2 engine (`invalid repeat count: {5,1024}` — RE2's max repeat count is 1000). Split into a charset check (`^[a-v0-9]+$`) plus an explicit `len(id)` 5–1024 bounds check. Same invariant, no engine limit.
+2. `TestAFailedSaveAfterTheListInsertOrphansTheListAndIsDocumented`'s plan-specified assertion `len(h.tasks.tasks) != 2` does not actually detect the orphan: `fakeTasks.tasks` only gains a map key once a task is *inserted* into that list, and the orphaned list is abandoned before any task insert, so it is invisible there — the assertion would spuriously pass with only 1 list ever created. Rewrote it to count `tasks.InsertTaskList(` calls from the shared call log, which correctly reflects lists actually created at Google (verified: 2 created, 0 deleted).
+3. `handler_test.go`'s pre-existing `TestSyncHandlerAnswersTheSpec64Body` asserted `calendar_event_id == "evt_new"`. Not enumerated in the plan's file-structure table, but it necessarily breaks once the first-time insert carries the deterministic id instead of the fake's `nextID` — updated to `PracticeEventID("u1")`, same as the 8 `service_test.go` occurrences the plan calls out explicitly.
+
+**Verification (all from `backend/` in the worktree, real output captured):**
+1. `go build ./... && go vet ./... && test -z "$(gofmt -l ./internal/google)"` → exit 0.
+2. `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -timeout 300s` → all 9 packages `ok` (airouter, auth, config, google, health, onboarding, pet, quests, store; cmd/api has no tests).
+3. `go test -race ./internal/google/... -count=1 -timeout 180s` → `ok` (CI does not run `-race`).
+4. Mutation check: changed `ev.ID = PracticeEventID(userID)` to `ev.ID = ""` in `service.go`, reran `-run 'FailedSaveAfterTheEventInsert'` → failed as required ("retry should patch aelpu1 once, got [{ID: Ev:{...}}]" — the retry silently created an unrecognized fresh event instead of patching). Reverted via the `.bak` gofmt made; `git diff --quiet internal/google/service.go` clean afterward.
+5. `grep -n "never orphans" internal/google/service.go ../harness/CODEMAP.md` → no matches (exit 1).
+6. Live boot: `.env` with `COMPOSE_PROJECT_NAME=orph`, Postgres `5450`, Redis `6398`; `COMPOSE_PROJECT_NAME=orph docker compose up -d --wait` → both healthy. Booted the API with `PORT=8104` and real `JWT_SECRET`/`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` — migrations `0001_init`, `0002_google_sync` applied automatically, `curl --max-time 5 /healthz` → 200. Used a small scratch helper (`cmd/tmpboot`, deleted before committing/pushing — never staged) to insert a user with `google_refresh_token = NULL`, issue a real JWT via `auth.NewTokenIssuer`, and write the matching `sess:{user_id}:token` Redis key, then `POST /api/v1/integrations/google/sync` with that bearer token → `409 {"error":"reauth_required"}`, exactly as the plan specifies for the one path exercisable without live Google credentials.
+7. `TEST_DATABASE_URL` exported → `go test ./internal/google/... -run Integration -count=1 -p 1 -timeout 120s` → `TestIntegrationSyncStateIsOneRowPerUser` PASS. Also ran the full `make test-integration -p 1` (all packages) with `TEST_DATABASE_URL`/`TEST_REDIS_URL` set → all `ok` (airouter, auth, config (no tests), google, health (no tests), onboarding, pet, quests, store).
+8. Full `go test ./internal/google/... -count=1 -timeout 120s -v` → 34/34 tests pass, including the 3 new regression tests and the extended PATCH/insert body assertions.
+
+**Cleanup confirmed:** API process (`go run`/`exe/api`) killed; `COMPOSE_PROJECT_NAME=orph docker compose down` + `docker volume rm orph_postgres_data`; scratch `.env` and `cmd/tmpboot/` removed (never staged/committed — `git status` in the worktree was clean before pushing). `pgrep -fl exe/api`, `pgrep -fl "go run ./cmd/api"` and `docker ps -a`/`docker volume ls` for `orph*` all empty after cleanup.
+
+**Push + PR:** pushed `harness/2026-09-23-high-a-failed-savesyncstate-orphans-the-google-object-just-create`; opened draft PR [#7](https://github.com/HendrixNguyen/English-Training-Harness/pull/7). CI run [35843798665](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35843798665) (pull_request trigger) green on all four jobs: `harness-tooling`, `backend-unit`, `frontend`, `backend-integration`.
+
+**CODEMAP / false invariant:** `harness/CODEMAP.md`'s `google` bullet corrected in the same branch (commit `a1ce911`) — the "a failure never orphans a Google object" sentence replaced with the deterministic-id coverage for Calendar and an explicit statement of the Tasks gap, pointing at `TestAFailedSaveAfterTheListInsertOrphansTheListAndIsDocumented`. The merged plan's own *Architecture* text on `main` already carries the evaluator's correction blockquote (per this plan's own note above) and was left untouched, as instructed.

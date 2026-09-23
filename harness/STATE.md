@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 16:28. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-23 16:37. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,7 +13,9 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/no-test-pins-the-stale-data-wins-branch-order-on-revive-so-a.md` — No test pins the stale-data-wins branch order on /revive, so a reorder silently regresses the cached-status case [low]
 - `harness/ideas/_inbox/nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` — Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400 [medium]
+- `harness/ideas/_inbox/the-revive-missed-days-line-renders-bo-hoc2-ngay-with-no-spa.md` — The /revive missed-days line renders "bỏ học2 ngày" with no space before the day count [low]
 
 ## Proposed
 
@@ -79,20 +81,20 @@ _none_
 
 ## Executing
 
-- `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high]
+_none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass) (merged)
+- `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high] (unreviewed)
 - `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-22-quests-daily-quest-suite-and-progress-recording.md` — Quests: daily quest suite and progress recording — Plan [high] (review: fail) (merged)
 - `harness/plans/2026-09-22-pet-health-streak-and-stage-engine-with-revive.md` — Pet: health, streak and stage engine with revive — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-onboarding-placement-test-cefr-grading-and-roadmap-generatio.md` — Onboarding placement test CEFR grading and roadmap generation — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 
