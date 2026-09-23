@@ -123,15 +123,26 @@ func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, erro
 	return ReviveResult{Passed: true, State: st}, nil
 }
 
-// Sweep is the body of the §8 hourly cron. It runs at :00 UTC; a user "hits
-// local midnight" when now in their timezone is in hour 0. For each such pet
-// whose previous local day recorded fewer than 1800s it applies ApplyMiss.
+// Sweep is the body of the §8 hourly cron. It runs at every :00 UTC and looks
+// at every pet: for each, the local day that most recently ended is
+// judged = PreviousDate(LocalDate(now, tz)), and there is work only while
+// judged_through is before it. That replaces "local hour is 0": a zone whose
+// clocks jump 23:59:59 → 01:00 is judged at 01:00, a zone whose hour 0
+// happens twice is judged once, and a tick the process slept through is
+// caught up at the next one. No midnight instant is ever constructed.
 //
-// Idempotency: a pet whose updated_at is already at or after that local
-// midnight has been touched this local day (by an earlier run of this same
-// sweep after a restart, or by a target met after midnight) and is skipped.
-// Errors on one pet are collected and the rest are still processed; the
-// count returned is the number of pets penalised.
+// A day is spared when the pet's own marker says its target was met
+// (last_target_met_date == judged) or — leniency fallback only — the Redis
+// counter for it reads >= 1800s; a spared day is recorded (MarkJudged) so it
+// is never re-read. Otherwise PenaliseMiss applies §8's inactivity logic in
+// one conditional UPDATE, so N concurrent sweepers penalise once and the
+// count returned is the number of writes that applied.
+//
+// First contact: a pet with no judged_through yet is judged only for days it
+// existed (LocalDate(updated_at) <= judged — updated_at is the creation stamp
+// until something writes the row); otherwise its marker is initialised.
+//
+// Errors on one pet are collected and the rest are still processed.
 func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
 	cands, err := s.repo.SweepCandidates(ctx)
 	if err != nil {
@@ -140,27 +151,48 @@ func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
 
 	penalised := 0
 	var errs []error
+	fail := func(userID string, err error) { errs = append(errs, fmt.Errorf("user %s: %w", userID, err)) }
+
 	for _, c := range cands {
 		loc := quests.Location(c.Timezone)
-		local := now.In(loc)
-		midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
-		if !c.State.UpdatedAt.Before(midnight) {
-			continue // already handled this local day
+		judged := PreviousDate(quests.LocalDate(now, loc))
+
+		switch {
+		case c.State.JudgedThrough != nil && *c.State.JudgedThrough >= judged:
+			continue // nothing has ended since the last judgement
+		case c.State.JudgedThrough == nil && quests.LocalDate(c.State.UpdatedAt, loc) > judged:
+			// Never judged and not yet alive on the judged day: nothing to
+			// judge, but record the day so the row stops depending on updated_at.
+			if _, err := s.repo.MarkJudged(ctx, c.UserID, judged); err != nil {
+				fail(c.UserID, err)
+			}
+			continue
 		}
-		yesterday := midnight.AddDate(0, 0, -1).Format("2006-01-02")
-		total, err := s.study.Total(ctx, c.UserID, yesterday)
+
+		met := c.State.LastTargetMetDate != nil && *c.State.LastTargetMetDate == judged
+		if !met {
+			total, err := s.study.Total(ctx, c.UserID, judged)
+			if err != nil {
+				fail(c.UserID, err)
+				continue
+			}
+			met = total >= quests.TargetSeconds
+		}
+		if met {
+			if _, err := s.repo.MarkJudged(ctx, c.UserID, judged); err != nil {
+				fail(c.UserID, err)
+			}
+			continue
+		}
+
+		applied, err := s.repo.PenaliseMiss(ctx, c.UserID, judged, now)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("user %s: %w", c.UserID, err))
+			fail(c.UserID, err)
 			continue
 		}
-		if total >= quests.TargetSeconds {
-			continue
+		if applied {
+			penalised++
 		}
-		if _, err := s.repo.PenaliseMiss(ctx, c.UserID, yesterday, now); err != nil {
-			errs = append(errs, fmt.Errorf("user %s: %w", c.UserID, err))
-			continue
-		}
-		penalised++
 	}
 	return penalised, errors.Join(errs...)
 }
