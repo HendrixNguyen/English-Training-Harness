@@ -30,11 +30,17 @@ func NewService(tokens RefreshTokenSource, oauth TokenRefresher, cal CalendarCli
 	return &Service{tokens: tokens, oauth: oauth, cal: cal, tasks: tasks, repo: repo, now: now}
 }
 
-// Sync pushes the recurring practice event and the per-day task list, and is
-// idempotent: the event is patched (re-inserted only if Google lost it) and
-// the task list is rebuilt only when the active roadmap changed. State is
-// persisted after the event and after the list is created, before the task
-// inserts, so a failure part-way never orphans a Google object.
+// Sync pushes the recurring practice event and the per-day task list.
+// Idempotency: the Calendar event is inserted with a deterministic client id
+// (PracticeEventID), so a repeat insert is a 409 that is patched, and a
+// stored id is patched (re-inserted only when Google lost it). The Tasks list
+// is rebuilt only when the active roadmap changed. State is persisted after
+// the event, after the list is created and after the task inserts.
+//
+// What that does NOT protect: a failure of SaveSyncState itself right after
+// tasklists.insert (Tasks has no client-supplied id) orphans an empty list
+// the retry cannot find — it deletes only the stored id. The Calendar half
+// is covered by the deterministic id.
 func (s *Service) Sync(ctx context.Context, userID string) (Result, error) {
 	refresh, err := s.tokens.RefreshToken(ctx, userID)
 	if errors.Is(err, ErrNoRefreshToken) {
@@ -76,7 +82,23 @@ func (s *Service) Sync(ctx context.Context, userID string) (Result, error) {
 		}
 	}
 	if state.CalendarEventID == "" {
+		// Client-supplied id: if a previous attempt inserted and then failed to
+		// save (pool hiccup, client disconnect cancelling the request context),
+		// this insert is a 409 and we patch our own event instead of adding a
+		// second one. status: confirmed in the payload also restores an event
+		// the user deleted (Google keeps it as cancelled with the id reserved).
+		ev.ID = PracticeEventID(userID)
 		id, err := s.cal.InsertEvent(ctx, access, ev)
+		if errors.Is(err, ErrAlreadyExists) {
+			id, err = ev.ID, s.cal.PatchEvent(ctx, access, ev.ID, ev)
+			if errors.Is(err, ErrNotFound) {
+				// The id is reserved but the event is gone for good (410): one
+				// insert with a Google-assigned id — today's non-idempotent path,
+				// reachable only after a user deleted the event by hand.
+				ev.ID = ""
+				id, err = s.cal.InsertEvent(ctx, access, ev)
+			}
+		}
 		if err != nil {
 			return Result{}, err
 		}

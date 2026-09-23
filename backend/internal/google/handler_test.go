@@ -45,7 +45,7 @@ func TestSyncHandlerAnswersTheSpec64Body(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "synced" || body["calendar_event_id"] != "evt_new" || body["tasks_created_count"] != float64(28) {
+	if body["status"] != "synced" || body["calendar_event_id"] != PracticeEventID("u1") || body["tasks_created_count"] != float64(28) {
 		t.Errorf("body = %v", body)
 	}
 	if len(body) != 3 {

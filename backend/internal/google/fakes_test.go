@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// patchedEvent records one PatchEvent call: the id it targeted and the body
+// (Event) sent, so tests can assert PATCH does not drop the payload.
+type patchedEvent struct {
+	ID string
+	Ev Event
+}
+
 // errSaveBoom is fakeRepo's default SaveSyncState failure — a pool hiccup or,
 // most plausibly, the client disconnecting mid-sync and cancelling the
 // request context that Exec runs under.
@@ -48,22 +55,34 @@ type fakeCalendar struct {
 	nextID   string
 	patchErr error // returned by PatchEvent (e.g. ErrNotFound)
 	errs     map[string]error
+	known    map[string]bool // ids Google has seen: a repeat insert is a 409, like the real API
 	inserted []Event
-	patched  []string
+	patched  []patchedEvent
 }
 
 func (f *fakeCalendar) fail(method string) error { return f.errs[method] }
 
 func (f *fakeCalendar) InsertEvent(_ context.Context, tok string, ev Event) (string, error) {
-	f.log.add("calendar.InsertEvent(%s)", tok)
+	f.log.add("calendar.InsertEvent(%s,%s)", tok, ev.ID)
 	if err := f.fail("InsertEvent"); err != nil {
 		return "", err
 	}
+	id := ev.ID
+	if id == "" {
+		id = f.nextID
+	}
+	if f.known == nil {
+		f.known = map[string]bool{}
+	}
+	if f.known[id] {
+		return "", fmt.Errorf("%w: calendar returned 409", ErrAlreadyExists)
+	}
+	f.known[id] = true
 	f.inserted = append(f.inserted, ev)
-	return f.nextID, nil
+	return id, nil
 }
 
-func (f *fakeCalendar) PatchEvent(_ context.Context, tok, id string, _ Event) error {
+func (f *fakeCalendar) PatchEvent(_ context.Context, tok, id string, ev Event) error {
 	f.log.add("calendar.PatchEvent(%s,%s)", tok, id)
 	if err := f.fail("PatchEvent"); err != nil {
 		return err
@@ -71,7 +90,7 @@ func (f *fakeCalendar) PatchEvent(_ context.Context, tok, id string, _ Event) er
 	if f.patchErr != nil {
 		return f.patchErr
 	}
-	f.patched = append(f.patched, id)
+	f.patched = append(f.patched, patchedEvent{ID: id, Ev: ev})
 	return nil
 }
 
