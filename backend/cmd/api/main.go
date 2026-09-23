@@ -6,6 +6,8 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +16,16 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
 func main() {
-	ctx := context.Background()
+	// Cancellable so background work started with it (the pet hourly cron)
+	// stops on SIGINT/SIGTERM instead of leaking past process shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -65,14 +71,25 @@ func main() {
 		tokens,
 	)
 
-	questRepo := quests.NewPgRepo(pg.Pool) // satisfies both QuestRepo and ProgressRepo
-	questSvc := quests.NewService(
-		quests.NewRedisCounter(rdb),
-		questRepo,
-		questRepo,
-		quests.NopPet{}, // the pet slice replaces this
+	studyCounter := quests.NewRedisCounter(rdb)
+	petSvc := pet.NewService(
+		pet.NewPgRepo(pg.Pool),
+		pet.NewRedisChallengeStore(rdb),
+		studyCounter, // pet reads the daily counter only through this interface
 		time.Now,
 	)
+
+	questRepo := quests.NewPgRepo(pg.Pool) // satisfies both QuestRepo and ProgressRepo
+	questSvc := quests.NewService(
+		studyCounter,
+		questRepo,
+		questRepo,
+		pet.NewQuestHook(petSvc),
+		time.Now,
+	)
+
+	// Spec §8 hourly cron, in-process (§2.1). Sweeps at every :00 UTC.
+	go pet.RunHourly(ctx, petSvc)
 
 	v1 := r.Group("/api/v1")
 	v1.POST("/auth/google", auth.Handler(authSvc))
@@ -80,6 +97,8 @@ func main() {
 	guarded := v1.Group("", auth.Require(tokens, sessions))
 	guarded.GET("/quests/daily", quests.DailyHandler(questSvc))
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
+	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
+	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
 
 	log.Printf("listening on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
