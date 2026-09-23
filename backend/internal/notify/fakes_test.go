@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -117,7 +118,12 @@ type fakeSender struct {
 	log  *callLog
 	gone map[string]bool // endpoint → answer ErrSubscriptionGone
 	fail map[string]bool // endpoint → answer a generic error
-	sent []string        // endpoints in order
+
+	// mu guards sent: RunWorker's tests read it from the test goroutine while
+	// Tick runs in a background one (see worker_test.go). Every other test
+	// calls Tick synchronously, but the mutex costs nothing there either.
+	mu   sync.Mutex
+	sent []string // endpoints in order
 }
 
 func newFakeSender(log *callLog) *fakeSender {
@@ -132,8 +138,19 @@ func (f *fakeSender) Send(_ context.Context, sub Subscription, _ Payload) error 
 	if f.fail[sub.Endpoint] {
 		return fmt.Errorf("push service returned 429")
 	}
+	f.mu.Lock()
 	f.sent = append(f.sent, sub.Endpoint)
+	f.mu.Unlock()
 	return nil
+}
+
+// Sent returns a snapshot of the endpoints sent so far. Tests that call Tick
+// synchronously may also read f.sent directly; Sent() is for the one test
+// (worker_test.go) that reads it while a worker goroutine is still writing.
+func (f *fakeSender) Sent() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.sent...)
 }
 
 type fakeCounter struct {
