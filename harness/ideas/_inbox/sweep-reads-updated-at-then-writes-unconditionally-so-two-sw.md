@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 ---
 # Sweep reads updated_at then writes unconditionally so two sweeps in one local hour double the miss penalty
 
@@ -69,3 +70,5 @@ no-op no matter how many processes are running:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low (was medium).** Only opens with more than one replica or a manual sweep; the app is single-instance today. The pet "durable day judgement" plan should make the miss a conditional `UPDATE … WHERE updated_at < $midnight` while it is in `Sweep`, which closes this for free.
+
+**Planned (2026-09-23):** `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — decision 3, Tasks 3 and 6 (`PenaliseMiss` is one conditional `UPDATE`; the count follows `RowsAffected`).

@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AUTH_STORAGE_KEY, useAuthStore, type SignInResponse } from '~/stores/auth'
+import { API_STATE_CACHE } from '~/utils/session'
+import { installSeededCaches } from './fakeCaches'
 
 const spec61: SignInResponse = {
   access_token: 'eyJ.test',
@@ -70,5 +72,25 @@ describe('useAuthStore', () => {
     expect(auth.accessToken).toBeNull()
     expect(auth.user).toBeNull()
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+  })
+
+  it('signOut deletes the service worker api-state cache and nothing else', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    const auth = useAuthStore()
+    auth.signIn(spec61, Date.now())
+
+    await auth.signOut()
+
+    expect(await caches.has(API_STATE_CACHE)).toBe(false)
+    expect(await caches.keys()).toEqual(['assets'])
+    expect(auth.isAuthenticated).toBe(false)
+  })
+
+  it('signOut still resolves where CacheStorage does not exist', async () => {
+    vi.stubGlobal('caches', undefined)
+    const auth = useAuthStore()
+    auth.signIn(spec61, Date.now())
+    await expect(auth.signOut()).resolves.toBeUndefined()
+    expect(auth.accessToken).toBeNull()
   })
 })

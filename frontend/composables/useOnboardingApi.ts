@@ -1,13 +1,33 @@
-import { useRuntimeConfig } from '#app'
 import { useApi } from '~/composables/useApi'
-import { STUB_QUIZ, stubAssessment, type AssessmentRequest, type AssessmentResponse, type QuizResponse } from '~/stubs/onboarding'
+
+/** GET /api/v1/onboarding/quiz item (backend bank.go PublicQuestion — no answer, no level). */
+export interface QuizQuestion {
+  id: string
+  prompt: string
+  options: Record<string, string>
+}
+export interface QuizResponse {
+  questions: QuizQuestion[]
+}
+/** Backend spec §6.1 POST /onboarding/assessment body. */
+export interface AssessmentRequest {
+  target_goal: string
+  notification_time: string
+  timezone: string
+  answers: { question_id: string, selected_option: string }[]
+}
+/** §6.1 response — 201 on a new roadmap, 200 when one was already active. */
+export interface AssessmentResponse {
+  status: 'success'
+  assessed_level: string
+  roadmap_id: string
+  pet_state: { plant_name: string, health_points: number, stage: string }
+}
 
 export function useOnboardingApi() {
-  const stub = useRuntimeConfig().public.stubOnboarding === 'true'
   return {
-    isStub: stub,
-    quiz: (): Promise<QuizResponse> => (stub ? Promise.resolve(STUB_QUIZ) : useApi().get<QuizResponse>('/api/v1/onboarding/quiz')),
+    quiz: (): Promise<QuizResponse> => useApi().get<QuizResponse>('/api/v1/onboarding/quiz'),
     assess: (req: AssessmentRequest): Promise<AssessmentResponse> =>
-      stub ? Promise.resolve(stubAssessment(req)) : useApi().post<AssessmentResponse>('/api/v1/onboarding/assessment', req),
+      useApi().post<AssessmentResponse>('/api/v1/onboarding/assessment', req),
   }
 }

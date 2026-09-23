@@ -10,7 +10,7 @@ export default defineNuxtRouteMiddleware((to) => {
     return
   }
   if (!auth.isAuthenticated) {
-    auth.signOut()
+    void auth.signOut()
     return navigateTo('/login', { replace: true })
   }
 })

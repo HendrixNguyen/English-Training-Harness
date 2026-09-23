@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { clearApiCache } from '~/utils/session'
 
 /** Backend spec §6.1 `user`. */
 export interface AuthUser {
@@ -64,11 +65,13 @@ export const useAuthStore = defineStore('auth', {
       const p: Persisted = { accessToken: this.accessToken, expiresAt: this.expiresAt, user: res.user }
       storageOrNull()?.setItem(AUTH_STORAGE_KEY, JSON.stringify(p))
     },
-    signOut() {
+    /** Drops the session, then the per-user service worker cache — every sign-out path goes through here. */
+    signOut(): Promise<void> {
       this.accessToken = null
       this.expiresAt = null
       this.user = null
       storageOrNull()?.removeItem(AUTH_STORAGE_KEY)
+      return clearApiCache()
     },
   },
 })

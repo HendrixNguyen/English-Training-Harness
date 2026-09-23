@@ -1,7 +1,6 @@
 import { navigateTo, useRuntimeConfig } from '#app'
 import { useAuthStore } from '~/stores/auth'
 import { createApiClient, type ApiClient } from '~/utils/apiClient'
-import { clearApiCache } from '~/utils/session'
 
 let client: ApiClient | null = null
 
@@ -14,8 +13,7 @@ export function useApi(): ApiClient {
     baseURL: config.public.apiBase,
     getToken: () => auth.accessToken,
     onUnauthorized: () => {
-      auth.signOut()
-      void clearApiCache()
+      void auth.signOut()
       void navigateTo('/login')
     },
   })

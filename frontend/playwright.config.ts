@@ -20,7 +20,6 @@ export default defineConfig({
       HOST: '127.0.0.1',
       NUXT_PUBLIC_API_BASE: 'http://127.0.0.1:3199',
       NUXT_PUBLIC_GOOGLE_CLIENT_ID: 'test-client-id',
-      NUXT_PUBLIC_STUB_ONBOARDING: 'true',
     },
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],

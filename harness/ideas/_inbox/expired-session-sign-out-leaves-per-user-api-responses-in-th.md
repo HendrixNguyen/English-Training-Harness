@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md
 ---
 # Expired-session sign-out leaves per-user API responses in the service worker cache
 
