@@ -130,3 +130,40 @@ func TestLoadReadsOptionalVAPIDKeys(t *testing.T) {
 		t.Errorf("cfg = %+v", cfg)
 	}
 }
+
+func TestLoadDefaultsGinModeToRelease(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("GOOGLE_CLIENT_ID", "cid")
+	t.Setenv("GOOGLE_CLIENT_SECRET", "csecret")
+	t.Setenv("JWT_SECRET", "s3cret")
+	t.Setenv("GIN_MODE", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// gin.Default() alone would run in debug mode; production must not.
+	if cfg.GinMode != "release" {
+		t.Fatalf("GinMode = %q, want release", cfg.GinMode)
+	}
+}
+
+func TestLoadRejectsAnUnknownGinMode(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("GOOGLE_CLIENT_ID", "cid")
+	t.Setenv("GOOGLE_CLIENT_SECRET", "csecret")
+	t.Setenv("JWT_SECRET", "s3cret")
+
+	for _, mode := range []string{"debug", "release", "test"} {
+		t.Setenv("GIN_MODE", mode)
+		if cfg, err := Load(); err != nil || cfg.GinMode != mode {
+			t.Fatalf("GIN_MODE=%s: cfg=%+v err=%v", mode, cfg, err)
+		}
+	}
+	t.Setenv("GIN_MODE", "verbose")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected an error for GIN_MODE=verbose (gin.SetMode would panic), got nil")
+	}
+}

@@ -3,6 +3,8 @@
 test:
 	go test ./...
 
+# The Go process does not read .env; export it first:
+#   set -a; . ./.env; set +a; make run
 run:
 	go run ./cmd/api
 
