@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -31,3 +31,12 @@ it will also miss a plan that really is unreviewed.
   `...-ci-on-github-actions-for-backend-and-harness-tooling.md` and
   `...-store-go-module-postgres-and-redis-clients-migration-0001-rereview.md`, each with `plan:` set to the parent.
 - `tools/harness/scan.py:27` `reviews_for` matches only `fm["plan"] == plan_rel`; `tools/harness/cli.py:192` uses it.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.**
+
+*Confirmed from the idea's evidence.* `tools/harness/scan.py` `reviews_for` matches only `fm["plan"] == plan_rel`, so an amend plan whose re-review was filed under its parent is re-queued forever by `next --stage review`, and STATE.md shows it without a review.
+
+*Fix, when planned.* One rule applied in `reviews_for` and STATE.md: a review on the parent plan dated at or after the amend plan's `done` transition covers the amend (or `new-review --covers` records it explicitly); a unit test in `tools/harness/tests` for an amend whose re-review sits on the parent. Low: noise for the unattended reviewer, no user impact — but worth doing before the next scheduled `/harness run` burns a review slot on merged code.

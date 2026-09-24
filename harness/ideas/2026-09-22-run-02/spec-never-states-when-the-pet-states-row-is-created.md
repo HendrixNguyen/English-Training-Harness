@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: 2026-09-22-run-02
 priority: low
+rejected_reason: "Moot: the pet slice settled it in code (pet.Service.Ensure runs INSERT ... ON CONFLICT (user_id) DO NOTHING at onboarding and on first GET /pet/status; CODEMAP records it); the remaining spec sentence is folded into reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md (selected, low)."
 ---
 # Spec never states when the pet_states row is created
 
@@ -21,3 +22,8 @@ With `pet\_states.user\_id` now `UNIQUE NOT NULL` (plan below), exactly one pet 
 - `1st-thinking-architecture-doc.md:302` — `8. Init Dashboard` is the only onboarding step that could create the pet row; no insert is named.
 - `1st-thinking-architecture-doc.md:678,680` — `GET /pet/status`, `POST /pet/revive` read/write the row without stating creation.
 - `grep -n -i 'INSERT\|ON CONFLICT\|upsert' 1st-thinking-architecture-doc.md` → no hits.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Reject — moot.** The gap this idea guards against ("an executor who lazily inserts will hit `unique_violation`… one who never inserts returns 404") was closed by the merged pet slice: `pet.Service.Ensure` runs `INSERT INTO pet_states (user_id) … ON CONFLICT (user_id) DO NOTHING` on every `GET /pet/status` and is called by onboarding through `cmd/api/main.go`'s `petForOnboarding`, and CODEMAP's pet bullet says so. The one remaining deliverable — a sentence in the spec's §5.1 and §7 — is folded into `reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` (selected today, low), which edits the same document.

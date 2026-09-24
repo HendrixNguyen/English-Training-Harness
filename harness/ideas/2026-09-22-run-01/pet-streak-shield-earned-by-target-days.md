@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-22-run-01
+priority: medium
 ---
 # Pet Streak Shield Earned by Target Days
 
@@ -26,3 +27,12 @@ Technical:
 - CODEMAP: `pet` package ("decay on missed target, revive challenge"), `store` migrations.
 - Duolingo streak/freeze data: https://duolingo.deconstructoroffun.com/mechanics/streaks and https://www.strivecloud.io/blog/gamification-examples-boost-user-retention-duolingo
 - Implementation breakdown of freeze caps and silent application: https://engagefabric.com/blog/building-duolingo-style-streak-system
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today (five slots taken by bugs).**
+
+*Is the Why real?* Yes: the pet engine is pure loss aversion and the streak-break moment is the churn cluster; a shield earned only by seven consecutive met days ties the safety net to the behaviour being built.
+
+*Achievable in one plan?* Yes, about a day: migration `0004` (`shields INT NOT NULL DEFAULT 0 CHECK (shields BETWEEN 0 AND 2)`, `last_shield_used_on DATE`), the award on the success path and the consume on the miss path, `GET /pet/status` fields, the pet view's shield icon and spent marker (needs a small design note — `harness/designs/pet-shield.md`). *Constraint for the planner:* both verdict writers are single conditional SQL statements (`saveTargetMetSQL` after today's plan, `penaliseMissSQL`); the award must be folded into the success UPDATE (`shields = LEAST(2, shields + CASE WHEN (streak+1) % 7 = 0 THEN 1 ELSE 0 END)`) and the consume into the miss UPDATE (`shields > 0` → decrement and keep health/streak, else −30), or the once-per-day guarantee is lost. *Dependencies:* none unbuilt.

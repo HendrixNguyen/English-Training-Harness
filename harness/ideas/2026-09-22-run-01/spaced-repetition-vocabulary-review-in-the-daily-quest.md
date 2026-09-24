@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-22-run-01
+priority: low
 ---
 # Spaced Repetition Vocabulary Review in the Daily Quest
 
@@ -26,3 +27,14 @@ Technical:
 - Spacing effect review in language learning: https://files.eric.ed.gov/fulltext/EJ1313692.pdf
 - Optimising spaced repetition schedules (Tabibian et al.): https://pmc.ncbi.nlm.nih.gov/articles/PMC6410796/
 - Reconsolidation account of long-timescale spacing: https://pmc.ncbi.nlm.nih.gov/articles/PMC5476736/
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low.**
+
+*Is the Why real?* Yes — the roadmap never returns to earlier vocabulary, and recall grades would be the first learning signal beyond minutes.
+
+*Achievable in one plan?* No, and it depends on an unbuilt foundation that *is* queued: `vocab_reviews` needs a stable `item_key` per vocabulary item, which only exists once task `content` has a schema — `2026-09-24-run-01/typed-task-content-with-answer-keys-…` (selected today, medium) defines `vocabulary → {words[{term, definition, example}]}`. After that it is still a table, SM-2 scheduling, two endpoint changes and a review UI — two plans.
+
+*Priority.* Low now; re-rank to medium once typed content has landed.

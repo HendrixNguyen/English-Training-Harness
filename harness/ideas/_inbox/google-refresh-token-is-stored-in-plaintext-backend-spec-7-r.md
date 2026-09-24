@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md
 ---
 # google_refresh_token is stored in plaintext; backend spec 7 requires AES-256-GCM via ENCRYPTION_SECRET_KEY
 
@@ -63,3 +64,7 @@ column, so the decrypt path should exist before that slice is planned.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — high (top 10).** Spec §7 mandates AES-256-GCM via `ENCRYPTION_SECRET_KEY`; `auth/repo.go` stores the token verbatim and `google.PgRefreshTokenSource` reads it verbatim. It is standing write access to the user's Calendar and Tasks, and the fix gets strictly more expensive after the first real row (in-place re-encryption). Plan: `config` reads the key; `auth` encrypts on sign-in; `google.NewPgRefreshTokenSource` takes a decrypter (the seam the google plan left for exactly this). Touches `cmd/api/main.go` (one constructor argument) — schedule after the cmd/api hardening plan merges.
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Planned today as the head of `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md`.** Root cause re-read on this branch: `backend/internal/auth/repo.go` `upsertUserSQL` stores `$4` verbatim and `backend/internal/google/token.go` `PgRefreshTokenSource` reads the column verbatim (the seam the google plan left for this). Decision: a new `backend/internal/secrets` package (AES-256-GCM, `v1:` + base64url(nonce‖ciphertext)); `auth.PgUserRepo` seals at write (the empty-token-keeps-stored-value rule unchanged), `google.PgRefreshTokenSource` opens at read and maps an unsealed or undecryptable stored value to `ErrNoRefreshToken` → `409 reauth_required`, so a pre-encryption row heals itself on the user's next sign-in (`prompt=consent` always returns a fresh refresh token) — no data migration. `ENCRYPTION_SECRET_KEY` is required (64 hex chars) per spec §9.

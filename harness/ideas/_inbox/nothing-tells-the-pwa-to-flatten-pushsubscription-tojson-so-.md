@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Folded into harness/ideas/2026-09-24-run-01/settings-screen-wires-web-push-reminders-and-google-calendar.md (selected, medium): the PWA-side flattening of PushSubscription.toJSON() and the CODEMAP note land with that screen; there is no settings code to fix today and the backend's 400 for the nested shape is loud and tested."
 ---
 # Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400
 
@@ -53,3 +54,7 @@ they write the call:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Leave proposed — a genuine later.** The frontend has no notifications settings screen yet (`pages/settings.vue` is a placeholder), so there is no code to fix on either side today; the backend's 400 is loud and tested. This belongs in the idea for the frontend settings/notifications slice: whoever writes it must flatten `PushSubscription.toJSON()` (or the handler should accept the nested alias). The ideator should carry this file's *Expected output* into that feature idea, then this can be rejected as folded.
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Reject — folded.** The 2026-09-24 ideation run filed `harness/ideas/2026-09-24-run-01/settings-screen-wires-web-push-reminders-and-google-calendar.md` (selected today, medium), whose *Expected output* carries this file's requirement verbatim — post **flat keys** flattened from `PushSubscription.toJSON().keys` — and names this bug as the trap it closes. There is still no settings code to fix (`frontend/pages/settings.vue` is the placeholder) and the backend's `400 invalid_request` for the nested shape is loud and pinned by `notify/handler_test.go`. The settings plan must add the CODEMAP note this idea asks for (frontend paragraph: "the PWA flattens `toJSON()`"). The spec §5 row is left to that plan's discretion — the CODEMAP is what executors read.

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: 2026-09-22-run-02
 priority: low
@@ -21,3 +21,12 @@ Same class of §3.1-vs-§3.2 drift that `add-unique-user-id-to-pet-states-ddl` f
 - `1st-thinking-architecture-doc.md:148` — `CREATE TYPE pet\_stage AS ENUM ('seed', 'sprout', 'sapling', 'flowering', 'fruitful', 'wilted');`
 - `1st-thinking-architecture-doc.md:202` — `stage pet\_stage DEFAULT 'sprout',`
 - `grep -n -i wilted 1st-thinking-architecture-doc.md` → only line 148; the state is never mentioned in the ERD or any flow.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.**
+
+*Is the Why real?* The drift is real and cheap to fix, and the code has since settled the answer the ERD lacks: `backend/internal/pet/engine.go` `StageFor` yields `wilted` iff health is 0 and never produces `seed`; the DDL default is `sprout`; CODEMAP's pet bullet records both. The 1st-thinking doc's §3.1 ERD still lists `('seed'..'fruitful')` and never mentions `wilted`.
+
+*Scope when planned (spec-only, one small edit set).* §3.1 ERD lists the six stages including `wilted`; a one-sentence note next to the §3.2 default says a new pet starts at `sprout` and `seed` is reserved; and — folded in from `spec-never-states-when-the-pet-states-row-is-created.md` (rejected today as moot) — one sentence in §5.1 and at §7 `GET /api/v1/pet/status` stating that the `pet_states` row is created idempotently (`INSERT … ON CONFLICT (user_id) DO NOTHING`) at onboarding completion and on first `GET /pet/status`, which is what `pet.Service.Ensure` does. Keep the document's backslash-escaping. Low: no runtime effect; it keeps the canonical spec honest for the next reader.

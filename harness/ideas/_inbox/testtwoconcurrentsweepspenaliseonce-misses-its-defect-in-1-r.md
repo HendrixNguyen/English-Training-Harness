@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md
 ---
 # TestTwoConcurrentSweepsPenaliseOnce misses its defect in 1 run in 10
 
@@ -45,3 +46,12 @@ stays as the SQL-level proof; this is about the unit-level guard being determini
 - Measured in review: removing the `applied` guard around `penalised++`
   (`backend/internal/pet/service.go:193-195`) was detected in **27/30** single runs; unmutated
   `-count=300` and `-count=100 -race` both `ok`.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Planned today in `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `backend/internal/pet/service_test.go:369-401` launches two bare goroutines with a `WaitGroup` for completion only; nothing forces both sweeps to hold their candidate lists before either writes, so a late sweep's fresh `JudgedThrough >= judged` pre-check skips every pet and the mutation goes undetected (reviewer: 27/30 detections).
+
+*Fix.* `fakeRepo.afterCandidates func()` — called once per sweep after `SweepCandidates` builds its list, outside the mutex — and the test installs a two-party `sync.WaitGroup` barrier there, so both sweeps carry the same stale list into the 20 `PenaliseMiss` calls. Assertions unchanged (sum 20, every pet at 70); the plan verifies 30/30 detections for both mutations and 300/300 clean runs. Low: the SQL-level proof (`TestIntegrationVerdictWritesAreConditional` section 2) already exists.

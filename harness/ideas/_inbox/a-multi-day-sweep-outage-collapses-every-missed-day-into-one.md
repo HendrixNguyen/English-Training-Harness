@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -47,3 +47,14 @@ resulting health and `judged_through` against the decided rule.
   `2026-09-18`, one `Sweep` at `2026-09-23T00:00Z` -> `penalised=1, health=70,
   judged_through=2026-09-22`. Five further ticks the same local day add nothing. Four days
   (19, 20, 21, 22) were missed; one -30 was applied, and the plant did not wilt.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today; the product decision the idea asks for is recorded here.**
+
+*Confirmed (read on this branch).* `backend/internal/pet/service.go` `Sweep`: `judged = PreviousDate(quests.LocalDate(now, loc))` once per pet, and both `PenaliseMiss` and `MarkJudged` set `judged_through = judged` outright, so every day between the old marker and `judged` is marked judged without being judged. The doc comment ("a tick the process slept through is caught up at the next one") and the CODEMAP pet bullet are true for a missed hour and false for a missed day.
+
+*Decision (evaluator; the owner may overrule before this is planned): catch up, bounded.* Backend spec §8's inactivity logic is per day, and the penalty is for the learner's inactivity, not the operator's outage — a plant at 0 after four unstudied days is exactly the wilted → revive path §5.2 designs for. `Sweep` walks from `max(judged_through + 1, first day the pet existed)` to `judged`, applying `PenaliseMiss` per day, and stops early at health 0 or after 7 days (the floor makes further iterations pointless; the cap bounds round trips for a long-dormant pet). The leniency read of `daily:accumulated` for each caught-up day still applies where the key exists (48 h TTL), so a learner who studied during the outage is spared those days. The service.go comment and the CODEMAP sentence change to say exactly this. Test: seed `judged_through = D-5`, one `Sweep` at `D` → four penalties, `wilted`, `judged_through = D-1`.
+
+*Why not today.* An outage of the in-process cron is rare (it needs the API itself to be down for a day), and the five slots go to a production blocker, a spec-mandated security control, and happy-path fixes. Medium: it under-applies the retention signal exactly when it should bite.

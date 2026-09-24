@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -40,3 +40,10 @@ id, as the real API does. With that, dropping the deterministic id makes
 - `backend/internal/google/service_test.go:182-204` — `TestAFailedSaveAfterTheEventInsertDoesNotCreateASecondEvent`; the `len(h.cal.inserted) != 1` guard cannot fire under the plan's mutation.
 - Plan Verification step 3 predicts a failure message the mutation does not produce.
 - Reproduced in the worktree: `sed` `ev.ID = PracticeEventID(userID)` -> `ev.ID = ""`, `go test ./internal/google/... -run 'FailedSaveAfterTheEventInsert' -count=1`. Restored; `git diff --quiet internal/google/service.go` clean.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today; plan with the other google test-double findings (`practiceeventid-is-a-lossy-filter-…`, `the-404-on-patch-fallback-…`) and the 409 mapping — one google branch.**
+
+*Confirmed from the idea's evidence (mutation re-run by the reviewer; not re-run here).* `backend/internal/google/fakes_test.go:65-82` returns one `nextID` for every Google-assigned insert and 409s on a repeat, which the real API never does. *Fix.* A per-insert counter (`nextID` + `-N`) or a `nextIDs` queue, so `known` 409s only on a repeated client-supplied id, and the plan's mutation check then fails on `len(h.cal.inserted) != 1` as predicted. Low: test-double fidelity; the guarded behaviour is correct.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md
 ---
 # fakeProgressRepo.Upsert's monotonic max is not covered by any unit test
 
@@ -39,3 +40,12 @@ The monotonic upsert is covered by the unit suite as well as the integration sui
   (`minutes_spent = EXCLUDED.minutes_spent` in `backend/internal/quests/repo.go:106`) does fail
   `TestIntegrationDailyAndProgressAgainstRealServices` - `daily_progress = (1, true) ... want
   (41, true)`.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Planned today in `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `backend/internal/quests/fakes_test.go` `Upsert`: `row.minutes = max(row.minutes, minutes)`; `TestTheHookFiresFromTheDurableFlagNotTheCounterEdge` re-adds the same 1800 s after the counter loss, so the value never decreases and the `max` is never exercised; only the `TEST_DATABASE_URL`-gated integration test pins the SQL.
+
+*Fix.* A service test that reaches 1800 s (row 30 min), loses the counter, records 60 s (total 60 → `Upsert(…, 1)`) and asserts the fake row is still 30 minutes — replacing `max(...)` with the new value turns it red. Low: the branch is protected by CI's integration job; this is the developer loop.

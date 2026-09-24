@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md
 ---
 # PgRepo.Save resets last_target_met_date to NULL on the revive path
 
@@ -46,3 +47,12 @@ No write path can move `last_target_met_date` backwards:
 - `backend/internal/pet/integration_test.go`, `TestIntegrationVerdictWritesAreConditional` section
   5 - passes `State{HealthPoints: 50, Stage: StageSprout, JudgedThrough: &earlier}` (nil marker)
   and asserts only `*st.JudgedThrough`.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Planned today in `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `backend/internal/pet/repo.go` `saveSQL`: `judged_through = GREATEST(judged_through, $8::date)` but `last_target_met_date = $7::date` unconditionally; `Service.Revive` is the only caller and builds the state from an `Ensure` pre-image, so an `OnTargetMet` landing in between is rolled back to the stale marker (usually NULL). `fakes_test.go` `Save` mirrors the unconditional write, and `TestIntegrationVerdictWritesAreConditional` section 5 passes a nil marker and asserts only `judged_through`.
+
+*Fix.* `last_target_met_date = GREATEST(last_target_met_date, $7::date)` (NULL-tolerant on either side), the fake keeps the stored marker when the incoming one is nil or earlier, and section 5 asserts the marker survived. Low: quests and the sweep are both unaffected today; the marker is the pet's stated source of truth and must not be erasable.

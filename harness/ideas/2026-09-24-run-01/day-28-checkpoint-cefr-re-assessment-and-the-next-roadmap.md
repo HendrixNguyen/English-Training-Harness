@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-24-run-01
+priority: medium
 ---
 # Day-28 checkpoint: CEFR re-assessment and the next roadmap
 
@@ -32,3 +33,12 @@ Technical:
 - Prior run `2026-09-22-run-01/_run.md` Notes: "CEFR re-assessment at the end of module 4 (strong, but depends on onboarding + airouter landing first; re-propose next run)".
 - Progress visibility and motivation: https://migaku.com/blog/language-fun/language-learning-progress-tracking , https://journals.sagepub.com/doi/10.1177/00472395241238693
 - Inbox noted: `two-concurrent-assessment-submits-double-spend-the-ai-and-or.md` (the same race applies to any roadmap-replacing route).
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today.**
+
+*Is the Why real?* Yes and verifiable in code: `backend/internal/quests/day.go` clamps `day_number` at 28, `onboarding` returns the existing active roadmap with `200` and no AI call, and `users.cefr_current` is written once at placement. Every learner dead-ends after four weeks with the same three tasks. The first real user reaches day 28 about four weeks after launch — this must be planned before then, not today.
+
+*Achievable in one plan?* Backend and frontend together are a long day; plan it as one backend plan (`POST /api/v1/roadmaps/next` reusing `TaskPlacementTest`/`TaskRoadmapGen`, the parsers, the rate-limit slot and the single-transaction save; `GET /quests/daily` gains an additive `roadmap_complete`; spec §6/§7 and CODEMAP) and one frontend plan (checkpoint card, level-check reuse of the quiz UI, roadmap history; design note first). *Dependencies:* the concurrent double-submit race (`two-concurrent-assessment-submits-…`, selected medium) applies to any roadmap-replacing route — fix it in onboarding first or fold the same guard into the new endpoint.

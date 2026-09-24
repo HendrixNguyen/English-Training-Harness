@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md
 ---
 # OnTargetMet's read-then-write erases a concurrent sweep's miss penalty
 
@@ -52,3 +53,12 @@ The success write stops depending on a pre-image it read over the network:
 - Pre-existing in class (`main`'s `OnTargetMet` also read-then-wrote via `Save`), so this is not a
   regression introduced by the branch - but the branch's own design decision 2 ("one mechanism, in
   the database") is only half applied.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Planned today in `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `backend/internal/pet/repo.go` `saveTargetMetSQL` writes `health_points = $2, stage = $3, current_streak = $4` from the caller's state, and `Service.OnTargetMet` builds that state from `Ensure` (a read) — so a `PenaliseMiss` (which does its arithmetic in SQL on the live row) landing between the read and the write is overwritten by the stale pre-image: 100 → 70 → **100**. The parent plan's design decision 2 ("one mechanism, in the database") was applied to the *once* predicate but not to the value.
+
+*Fix.* `Repo.SaveTargetMet(ctx, userID string, now time.Time, localDate string) (bool, error)` — no state argument — with `health_points = LEAST(100, COALESCE(health_points, 100) + $bonus)`, `current_streak = COALESCE(current_streak, 0) + 1`, `stage` from the `StageFor` CASE on the *new* streak, `last_practiced_at = updated_at = $now`, `last_target_met_date = $d`, under the unchanged `last_target_met_date IS NULL OR < $d` predicate. `Service.OnTargetMet` becomes `Ensure` (row creation only) then the write. `ApplyTargetMet` stays the Go reference the fake and `TestIntegrationVerdictWritesAreConditional` hold the SQL to; a new section interleaves `PenaliseMiss` then `SaveTargetMet` and asserts 90, not 100. The parent plan's "Residual race, documented" note gets a one-line resolution pointer. Medium: silently erases a whole −30, but needs the hourly sweep to land inside one request.

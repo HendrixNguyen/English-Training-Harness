@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md
 ---
 # healthz leaks Postgres and Redis driver error strings publicly
 
@@ -42,3 +43,7 @@ user or database name reaches the response body. The existing tests that assert 
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed at `health.go:31-38`: `body["postgres"] = err.Error()` on an unauthenticated route, disclosing the production DB user/name/host when it is down. Fix: fixed `"unavailable"` markers, log the error server-side, per-dependency deadlines. Folds in `healthz-shares-one-2s-deadline-across-two-sequential-pings.md` — same 20-line handler, same tests.
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Planned today in `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` (Also planned here).** Fixed `"unavailable"` markers, the driver error logged server-side, and a per-dependency `PingTimeout` budget (the folded `healthz-shares-one-2s-deadline` finding).
