@@ -36,7 +36,7 @@ type Roadmap struct {
 type Exercise struct {
 	ID          string
 	DayNumber   int
-	TaskType    string          // vocabulary | reading | practice
+	TaskType    string // vocabulary | reading | practice
 	ContentJSON json.RawMessage
 	IsCompleted bool
 }

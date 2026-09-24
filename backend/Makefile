@@ -11,6 +11,17 @@ run:
 tidy:
 	go mod tidy
 
+# What CI's backend-unit job runs, so a branch can be checked before it is pushed.
+.PHONY: fmt-check vet check
+fmt-check:
+	@unformatted=$$(gofmt -l .); if [ -n "$$unformatted" ]; then echo "gofmt -l:"; echo "$$unformatted"; exit 1; fi
+
+vet:
+	go vet ./...
+
+check: fmt-check vet
+	go test ./... -count=1 -race
+
 # Ports come from .env (copy .env.example). Set REDIS_PORT / POSTGRES_PORT there
 # if 6379 or 5432 is already taken on this machine; `down` keeps the postgres
 # volume, `docker compose down -v` discards it.
