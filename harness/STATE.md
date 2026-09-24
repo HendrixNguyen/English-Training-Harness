@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-23 17:19. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-24 04:39. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,12 +13,27 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — A cleared reminder-time field dead-ends onboarding on an opaque error after ten answered questions [medium]
+- `harness/ideas/_inbox/a-multi-day-sweep-outage-collapses-every-missed-day-into-one.md` — A multi-day sweep outage collapses every missed day into one penalty [medium]
+- `harness/ideas/_inbox/a-stale-api-state-cache-survives-into-the-next-account-when-.md` — A stale api-state cache survives into the next account when /login is the first route [medium]
+- `harness/ideas/_inbox/authstore-test-ts-leaves-caches-stubbed-undefined-for-every-.md` — authStore.test.ts leaves caches stubbed undefined for every test added after it [low]
 - `harness/ideas/_inbox/every-google-409-now-becomes-500-internal-error-instead-of-5.md` — Every Google 409 now becomes 500 internal_error instead of 502 google_unavailable [medium]
 - `harness/ideas/_inbox/fakecalendar-returns-the-same-nextid-for-every-google-assign.md` — fakeCalendar returns the same nextID for every Google-assigned insert so a second auto-id insert is a false 409 [low]
+- `harness/ideas/_inbox/fakeprogressrepo-upsert-s-monotonic-max-is-not-covered-by-an.md` — fakeProgressRepo.Upsert's monotonic max is not covered by any unit test [low]
+- `harness/ideas/_inbox/get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — GET quests/daily still reads is_target_met from the volatile counter [medium]
+- `harness/ideas/_inbox/gofmt-l-has-been-failing-on-two-internal-quests-files-since-.md` — gofmt -l has been failing on two internal/quests files since before this branch [low]
+- `harness/ideas/_inbox/marktargetmet-ignores-rowsaffected-so-a-missing-row-silently.md` — MarkTargetMet ignores RowsAffected so a missing row silently succeeds [low]
+- `harness/ideas/_inbox/next-stage-review-re-queues-merged-amend-plans-whose-review-.md` — next --stage review re-queues merged amend plans whose review was filed under the parent plan [low]
 - `harness/ideas/_inbox/no-test-pins-the-stale-data-wins-branch-order-on-revive-so-a.md` — No test pins the stale-data-wins branch order on /revive, so a reorder silently regresses the cached-status case [low]
 - `harness/ideas/_inbox/nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` — Nothing tells the PWA to flatten PushSubscription toJSON so slice 9 will send the nested keys shape and get 400 [medium]
+- `harness/ideas/_inbox/onboarding-s-ai-error-copy-is-untested-deleting-the-whole-br.md` — Onboarding's ai_* error copy is untested — deleting the whole branch leaves the suite green [medium]
+- `harness/ideas/_inbox/ontargetmet-s-read-then-write-erases-a-concurrent-sweep-s-mi.md` — OnTargetMet's read-then-write erases a concurrent sweep's miss penalty [medium]
+- `harness/ideas/_inbox/pgrepo-save-resets-last-target-met-date-to-null-on-the-reviv.md` — PgRepo.Save resets last_target_met_date to NULL on the revive path [low]
 - `harness/ideas/_inbox/practiceeventid-is-a-lossy-filter-that-can-return-a-4-charac.md` — PracticeEventID is a lossy filter that can return a 4-character id and collide, with no guard and no test [low]
+- `harness/ideas/_inbox/testtwoconcurrentsweepspenaliseonce-misses-its-defect-in-1-r.md` — TestTwoConcurrentSweepsPenaliseOnce misses its defect in 1 run in 10 [low]
 - `harness/ideas/_inbox/the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered [medium]
+- `harness/ideas/_inbox/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — The API sends no CORS headers, so the deployed PWA on its own Railway domain cannot call a single endpoint [high]
+- `harness/ideas/_inbox/the-api-state-cache-still-has-no-expiry-bound-so-a-stale-res.md` — The api-state cache still has no expiry bound so a stale response can be served indefinitely [low]
 - `harness/ideas/_inbox/the-revive-missed-days-line-renders-bo-hoc2-ngay-with-no-spa.md` — The /revive missed-days line renders "bỏ học2 ngày" with no space before the day count [low]
 
 ## Proposed
@@ -28,6 +43,10 @@ _none_
 - `harness/ideas/2026-09-22-run-01/spaced-repetition-vocabulary-review-in-the-daily-quest.md` — Spaced Repetition Vocabulary Review in the Daily Quest
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
 - `harness/ideas/2026-09-22-run-02/spec-never-states-when-the-pet-states-row-is-created.md` — Spec never states when the pet_states row is created [low]
+- `harness/ideas/2026-09-24-run-01/ai-graded-writing-practice-through-the-essay-grading-route.md` — AI-graded writing practice through the essay_grading route
+- `harness/ideas/2026-09-24-run-01/day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint: CEFR re-assessment and the next roadmap
+- `harness/ideas/2026-09-24-run-01/settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen wires Web Push reminders and Google Calendar sync to the shipped backend
+- `harness/ideas/2026-09-24-run-01/typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content with answer keys so every quest renders and gives instant feedback
 
 ## Selected
 
@@ -69,7 +88,6 @@ _none_
 ## Planned (awaiting approval)
 
 - `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan [high]
-- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium]
 
 ## Approved
 
@@ -81,16 +99,16 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
-- `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md` — /onboarding: delete the stub and wire the page to the real onboarding endpoints — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md` — Notify: Web Push subscriptions and delayed reminder queue — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-google-one-way-calendar-and-tasks-sync.md` — Google: one-way Calendar and Tasks sync — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-frontend-shell-nuxt-3-pwa-with-auth-daily-quest-and-pet-scre.md` — Frontend Shell: Nuxt 3 PWA with auth, daily quest and pet screens — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan [high] (unreviewed)
+- `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md` — Every sign-out drops the `api-state` cache — `useAuthStore.signOut()` owns the clear — Plan [high] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-auth-google-response-returns-token-and-omits-token-type-and-.md` — auth/google response: answer the backend spec §6.1 sign-in body — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-23-a-failed-savesyncstate-orphans-the-google-object-just-create.md` — google sync: idempotent Calendar insert via a client-supplied event id, and honest docs about what a failed save can orphan — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-22-store-go-module-postgres-and-redis-clients-migration-0001.md` — Store: Go module, Postgres and Redis clients, migration 0001 — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 

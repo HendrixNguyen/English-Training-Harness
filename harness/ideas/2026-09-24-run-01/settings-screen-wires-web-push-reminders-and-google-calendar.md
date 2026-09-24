@@ -1,0 +1,32 @@
+---
+type: feature
+status: proposed
+source: ideator
+run: 2026-09-24-run-01
+---
+# Settings screen wires Web Push reminders and Google Calendar sync to the shipped backend
+
+## Why
+Two of the spec's four retention levers are finished on the server and unreachable by any user. `POST /api/v1/settings/notifications` (notify slice) and `POST /api/v1/integrations/google/sync` (google slice) are merged, tested and covered by CI, but `frontend/pages/settings.vue` is still the frontend-shell placeholder: a "Sắp ra mắt" card with both buttons `disabled`. No browser ever calls `pushManager.subscribe`, so `push_subscriptions` stays empty, the notify worker has nobody to remind, and the 30-minute daily target (1st-thinking §1) relies entirely on the learner remembering. Onboarding does not trigger the Google push either, so the recurring 30-minute calendar block and daily checklist of §5.1 steps 6–7 never appear in anyone's Google account.
+
+This is the cheapest retention win left: no new endpoints, no schema change, only the UI the Frontend spec §5 already maps ("Settings & Integration Modal" → both endpoints). Daily reminders at a fixed time are the backbone of Duolingo's habit loop, which it credits with a large share of its drop in daily churn among its best users. Each day the placeholder stays shipped is a day of backend work producing zero user value.
+
+## Expected output
+User-visible:
+- `/settings` shows a **daily reminder** block: time picker (prefilled from the user's `notification_time`), an "Enable reminders" toggle that asks for notification permission, subscribes via the service worker's `pushManager.subscribe({ applicationServerKey: NUXT_PUBLIC_VAPID_PUBLIC_KEY })` and posts `{notification_time, timezone, push_subscription{endpoint, p256dh, auth}}` — **flat keys**, flattened from `PushSubscription.toJSON().keys` (this closes the inbox bug *nothing-tells-the-pwa-to-flatten-pushsubscription*). It shows the returned `next_reminder_at` in local time.
+- Clear states for: permission denied (explain how to re-enable in the browser), push unsupported (iOS Safari outside an installed PWA — suggest "Add to Home Screen"), VAPID key missing in config (block hidden, not broken).
+- A **Google sync** block: "Sync to Google Calendar & Tasks" button that calls the sync route and shows "Synced — N daily tasks" from `tasks_created_count`; `409 reauth_required` sends the user through Google consent again; `502 google_unavailable` shows a retry.
+- Onboarding's success step offers both actions once (turn on reminders, add to Google Calendar) so a new learner does not have to find the settings page.
+
+Technical:
+- A `useNotificationSettings` (or store) module and a `useGoogleSync` module going through `useApi`; no backend change.
+- Vitest covers the flattening, each error code → UI state, and the permission-denied path; a Playwright test stubs both routes.
+- CODEMAP's frontend paragraph drops "`/settings` (placeholder …)".
+
+## Evidence
+- Frontend spec §5 API→UI table, row "Settings & Integration Modal" (`POST /api/v1/settings/notifications`, `POST /api/v1/integrations/google/sync`); §4 `useAuthStore` "notification settings".
+- 1st-thinking §1 (30 min/day goal), §5.1 steps 6–7 (Google push at onboarding).
+- CODEMAP **notify**, **google** (both shipped), **shell** ("`/settings` (placeholder for notify/google)"); `frontend/pages/settings.vue` on `main` 2026-09-24 has both buttons `disabled`.
+- Inbox: `nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` (the payload-shape trap this feature must avoid).
+- Duolingo reminder/streak retention analyses: https://www.digia.tech/post/duolingo-habit-forming-reminders-retention-architecture/ , https://medium.com/@siddhartha-arora102/product-stories-how-duolingo-reignited-growth-by-mastering-retention-gamification-15b6d190b840
+- Prior run `2026-09-22-run-01` proposed *adaptive reminder timing* — that idea tunes reminders; this one makes any reminder possible at all.
