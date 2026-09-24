@@ -5,6 +5,7 @@ priority: high
 merged: false
 branch: harness/2026-09-24-high-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r
 worktree: .worktrees/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
 ---
 # Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan
 

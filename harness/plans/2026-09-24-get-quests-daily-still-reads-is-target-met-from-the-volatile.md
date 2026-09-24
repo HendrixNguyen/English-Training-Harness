@@ -5,6 +5,7 @@ priority: medium
 merged: false
 branch: harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile
 worktree: .worktrees/get-quests-daily-still-reads-is-target-met-from-the-volatile
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
 ---
 # quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan
 

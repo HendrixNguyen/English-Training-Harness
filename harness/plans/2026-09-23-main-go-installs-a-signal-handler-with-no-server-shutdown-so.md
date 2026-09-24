@@ -5,6 +5,7 @@ priority: high
 merged: false
 branch: harness/2026-09-24-high-main-go-installs-a-signal-handler-with-no-server-shutdown-so
 worktree: .worktrees/main-go-installs-a-signal-handler-with-no-server-shutdown-so
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
 ---
 # cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan
 

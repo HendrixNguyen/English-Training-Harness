@@ -13,7 +13,24 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` — A rejected CacheStorage delete now fails sign-in for a user who is already signed in [low]
+- `harness/ideas/_inbox/a-second-sigint-or-sigterm-during-the-8-s-shutdown-drain-is-.md` — A second SIGINT or SIGTERM during the 8 s shutdown drain is swallowed because stop is only deferred [low]
+- `harness/ideas/_inbox/a-slow-request-body-still-holds-its-goroutine-indefinitely-n.md` — A slow request body still holds its goroutine indefinitely: no server ReadTimeout, and MaxBytesReader's connection-close hook never fires through gin's writer [medium]
+- `harness/ideas/_inbox/a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md` — A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line [medium]
+- `harness/ideas/_inbox/backend-integration-never-runs-race-though-its-pet-and-store.md` — backend-integration never runs -race though its pet and store tests are concurrency tests [medium]
+- `harness/ideas/_inbox/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api exits 1 through log.Fatalf when the shutdown grace runs out, skipping the deferred pg and rdb Close [medium]
+- `harness/ideas/_inbox/config-gin-mode-validation-is-unreachable-in-the-binary-beca.md` — config GIN_MODE validation is unreachable in the binary because gin init panics first, and its comments claim otherwise [low]
+- `harness/ideas/_inbox/config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` — config.go still says JWT_SECRET is not in the 1st-thinking env list, and boot refusals print config: config: [low]
+- `harness/ideas/_inbox/durable-flag-and-live-row-success-tests-leave-updated-at-and.md` — Durable-flag and live-row success tests leave updated_at and the Daily error path unasserted [low]
+- `harness/ideas/_inbox/make-check-does-not-mirror-backend-unit-no-service-variable-.md` — make check does not mirror backend-unit: no service-variable guard and fmt-check passes on a parse error [low]
+- `harness/ideas/_inbox/no-test-pins-that-login-awaits-signin-s-cache-clear-before-n.md` — No test pins that login awaits signIn's cache clear before navigating to the hub [low]
+- `harness/ideas/_inbox/onboarding-s-invalid-request-copy-asks-the-learner-to-fix-fi.md` — Onboarding's invalid_request copy asks the learner to fix fields the quiz step no longer shows [low]
+- `harness/ideas/_inbox/parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — ParseOrigins accepts FRONTEND_ORIGIN entries no browser sends, so boot succeeds and the PWA is silently blocked [low]
+- `harness/ideas/_inbox/plan-branch-edits-harness-plans-and-misses-its-own-verificat.md` — Plan branch edits harness/plans and misses its own Verification expectations [low]
+- `harness/ideas/_inbox/refresh-token-sealing-tests-miss-the-sealer-error-path-and-a.md` — Refresh-token sealing tests miss the sealer-error path and a short-but-valid v1 payload, and one can panic instead of fail [low]
+- `harness/ideas/_inbox/revive-s-absolute-save-erases-a-concurrent-ontargetmet-s-20-.md` — Revive's absolute Save erases a concurrent OnTargetMet's +20 and streak [low]
+- `harness/ideas/_inbox/the-documented-set-a-env-export-also-exports-test-database-u.md` — The documented set -a env export also exports TEST_DATABASE_URL so a later make test drops the dev database [medium]
+- `harness/ideas/_inbox/the-sealed-refresh-token-is-not-bound-to-its-users-row-so-a-.md` — The sealed refresh token is not bound to its users row, so a ciphertext can be moved to another account [low]
 
 ## Proposed
 
