@@ -93,4 +93,15 @@ describe('useAuthStore', () => {
     await expect(auth.signOut()).resolves.toBeUndefined()
     expect(auth.accessToken).toBeNull()
   })
+
+  it('signIn drops the previous account\'s api-state cache and keeps assets', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    const auth = useAuthStore()
+
+    await auth.signIn(spec61, Date.now())
+
+    expect(await caches.has(API_STATE_CACHE)).toBe(false)
+    expect(await caches.keys()).toEqual(['assets'])
+    expect(auth.isAuthenticated).toBe(true)
+  })
 })
