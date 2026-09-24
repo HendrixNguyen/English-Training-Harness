@@ -13,7 +13,7 @@ budget: until 14:00 local
 
 Unattended BUGFIX execute run for the English-Training-Harness repo (GitHub, `gh`). This run only touches plans whose frontmatter is `type: bug`. Feature and mvp-slice plans belong to `daily-feature-execute` — never execute, approve or reprioritise them here. Make routine choices yourself and report at the end.
 
-1. **Sync and merge green harness PRs** per `.agents/routines/README.md` — that pulls in the 06:00 `harness: evaluate <date>` PR carrying today's approved plans. If a merge is refused or CI is red, note it and continue with what `main` has.
+1. **Sync, recover stranded work, merge green harness PRs** per `.agents/routines/README.md` — that pulls in the 06:00 `harness: evaluate <date>` PR carrying today's approved plans. If a merge is refused or CI is red, note it and continue with what `main` has.
 
 2. **Select bug plans**, blockers first:
    ```
