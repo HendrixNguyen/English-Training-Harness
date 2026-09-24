@@ -209,7 +209,8 @@ func toTask(e Exercise) Task {
 }
 
 // Daily resolves the active roadmap, computes today's day_number in the user's
-// timezone and returns that day's tasks plus today's running total.
+// timezone and returns that day's tasks, today's running total and whether the
+// day is met (counter or durable flag).
 func (s *Service) Daily(ctx context.Context, userID string) (DailySuite, error) {
 	profile, err := s.quests.Profile(ctx, userID)
 	if err != nil {
@@ -233,6 +234,10 @@ func (s *Service) Daily(ctx context.Context, userID string) (DailySuite, error) 
 	if err != nil {
 		return DailySuite{}, err
 	}
+	flagged, err := s.progress.TargetMet(ctx, userID, date)
+	if err != nil {
+		return DailySuite{}, err
+	}
 
 	tasks := make([]Task, 0, len(exercises)) // never nil: serialises as []
 	for _, e := range exercises {
@@ -244,7 +249,10 @@ func (s *Service) Daily(ctx context.Context, userID string) (DailySuite, error) 
 		DayNumber:            day,
 		TotalMinutesRequired: TargetSeconds / 60,
 		AccumulatedSeconds:   total,
-		IsTargetMet:          total >= TargetSeconds,
-		Tasks:                tasks,
+		// The durable row wins over a lost counter — the same rule
+		// RecordProgress answers with, so the two endpoints never disagree
+		// about one local day. AccumulatedSeconds stays live (the progress bar).
+		IsTargetMet: total >= TargetSeconds || flagged,
+		Tasks:       tasks,
 	}, nil
 }

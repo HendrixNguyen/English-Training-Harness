@@ -144,7 +144,7 @@ func TestProgressHandlerRejectsABadBody(t *testing.T) {
 		// Above MaxDurationSeconds (3600) — a task is 10 minutes:
 		`{"exercise_id":"ex-2-reading","duration_seconds":3601}`,
 		`{"exercise_id":"ex-2-reading","duration_seconds":1000000000}`,
-		`{"exercise_id":"ex-2-reading","duration_seconds":100000000000000}`, // the reviewer's 48h brick
+		`{"exercise_id":"ex-2-reading","duration_seconds":100000000000000}`,      // the reviewer's 48h brick
 		`{"exercise_id":"ex-2-reading","duration_seconds":99999999999999999999}`, // does not fit int64
 	} {
 		w := postJSON(r, "/api/v1/quests/progress", body)

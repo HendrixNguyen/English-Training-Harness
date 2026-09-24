@@ -1,14 +1,19 @@
-// Command api is the single Go process described in spec §2.1. This slice
-// serves only GET /healthz; later slices mount their own route groups here.
+// Command api is the single Go process of spec §2.1: it mounts every package's
+// routes under /api/v1 (the list lives in harness/CODEMAP.md, not here) and
+// runs the in-process cron workers. It serves through an http.Server that
+// drains on SIGINT/SIGTERM (server.go).
 package main
 
 import (
 	"context"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	_ "time/tzdata" // embed the zone database so timezone math never depends on the container image
 
 	"github.com/gin-gonic/gin"
 
@@ -17,10 +22,12 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/google"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/middleware"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/notify"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/secrets"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -45,7 +52,18 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		log.Fatal(err)
+	}
+
+	if _, err := time.LoadLocation("Asia/Ho_Chi_Minh"); err != nil {
+		log.Fatalf("tzdata: %v (time/tzdata is embedded; this should be impossible)", err)
+	}
+
+	// Backend spec §7: users.google_refresh_token is sealed with AES-256-GCM.
+	// One Box: auth seals with it at sign-in, google opens with it at sync.
+	box, err := secrets.New(cfg.EncryptionKey)
+	if err != nil {
+		log.Fatalf("secrets: %v", err)
 	}
 
 	pg, err := store.NewPostgres(ctx, cfg.DatabaseURL)
@@ -75,14 +93,31 @@ func main() {
 		log.Printf("airouter: providers %v", providers)
 	}
 
+	gin.SetMode(cfg.GinMode) // validated by config.Load; release unless GIN_MODE says otherwise
 	r := gin.Default()
+	// Nothing reads c.ClientIP() yet. Trust no proxy headers until something
+	// does and the platform's proxy range is known — gin.Default() trusts all.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("gin: %v", err)
+	}
+
+	// Spec §8: the PWA is a separate Railway service on its own origin, so
+	// every browser call is cross-origin. Global, so preflights for paths with
+	// no OPTIONS route reach it (see middleware.CORS).
+	origins, err := middleware.ParseOrigins(cfg.FrontendOrigin)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	r.Use(middleware.CORS(origins))
+	log.Printf("cors: allowing %v", origins)
+
 	r.GET("/healthz", health.Handler(pg, rdb))
 
 	tokens := auth.NewTokenIssuer(cfg.JWTSecret, time.Now)
 	sessions := auth.NewRedisSessionStore(rdb)
 	authSvc := auth.NewService(
 		auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
-		auth.NewPgUserRepo(pg.Pool),
+		auth.NewPgUserRepo(pg.Pool, box),
 		sessions,
 		tokens,
 	)
@@ -132,6 +167,7 @@ func main() {
 	}
 
 	v1 := r.Group("/api/v1")
+	v1.Use(middleware.BodyLimit(middleware.MaxBodyBytes)) // before any route: a group's middleware is copied at registration
 	v1.POST("/auth/google", auth.Handler(authSvc))
 
 	guarded := v1.Group("", auth.Require(tokens, sessions))
@@ -142,7 +178,7 @@ func main() {
 	guarded.POST("/settings/notifications", notify.SettingsHandler(notifySvc))
 
 	googleSvc := google.NewService(
-		google.NewPgRefreshTokenSource(pg.Pool), // plaintext today; the §7 encryption fix replaces only this
+		google.NewPgRefreshTokenSource(pg.Pool, box), // opens what auth sealed (backend spec §7)
 		google.NewOAuthClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
 		google.NewHTTPCalendarClient(),
 		google.NewHTTPTasksClient(),
@@ -161,8 +197,13 @@ func main() {
 	guarded.GET("/onboarding/quiz", onboarding.QuizHandler())
 	guarded.POST("/onboarding/assessment", onboarding.AssessmentHandler(onboardingSvc))
 
-	log.Printf("listening on :%s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
+	ln, err := net.Listen("tcp", ":"+cfg.Port)
+	if err != nil {
+		log.Fatalf("listen: %v", err)
+	}
+	log.Printf("listening on %s (GIN_MODE=%s)", ln.Addr(), cfg.GinMode)
+	if err := serve(ctx, newServer(r), ln); err != nil {
 		log.Fatalf("server: %v", err)
 	}
+	log.Printf("shutdown complete") // main returns: deferred pg.Close / rdb.Close run
 }

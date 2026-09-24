@@ -1,12 +1,16 @@
 package health
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,24 +44,81 @@ func TestHealthzOKWhenBothServicesRespond(t *testing.T) {
 	}
 }
 
-func TestHealthzUnavailableWhenPostgresIsDown(t *testing.T) {
-	w := do(t, newRouter(fakePinger{err: errors.New("no pg")}, fakePinger{}))
+// driverError is what pgx really says: the connection identity is inside it.
+const driverError = "failed to connect to `user=english database=english`: 10.0.0.7:5432 (10.0.0.7): dial error: connection refused"
+
+func TestHealthzUnavailableWhenPostgresIsDownNamesItWithoutTheDriverError(t *testing.T) {
+	w := do(t, newRouter(fakePinger{err: errors.New(driverError)}, fakePinger{}))
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), `"postgres":"no pg"`) {
-		t.Errorf("body = %s, want the postgres error reported", w.Body.String())
+	body := w.Body.String()
+	if !strings.Contains(body, `"postgres":"unavailable"`) || !strings.Contains(body, `"redis":"ok"`) || !strings.Contains(body, `"status":"unavailable"`) {
+		t.Errorf("body = %s, want postgres unavailable, redis ok, status unavailable", body)
+	}
+	for _, leak := range []string{"user=", "database=", "10.0.0.7", "5432", "dial error"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("body leaks %q on an unauthenticated route: %s", leak, body)
+		}
 	}
 }
 
-func TestHealthzUnavailableWhenRedisIsDown(t *testing.T) {
-	w := do(t, newRouter(fakePinger{}, fakePinger{err: errors.New("no redis")}))
+func TestHealthzUnavailableWhenRedisIsDownNamesItWithoutTheDriverError(t *testing.T) {
+	w := do(t, newRouter(fakePinger{}, fakePinger{err: errors.New("dial tcp 10.0.0.9:6379: connect: connection refused")}))
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), `"redis":"no redis"`) {
-		t.Errorf("body = %s, want the redis error reported", w.Body.String())
+	body := w.Body.String()
+	if !strings.Contains(body, `"redis":"unavailable"`) || strings.Contains(body, "10.0.0.9") || strings.Contains(body, "6379") {
+		t.Errorf("body = %s, want the marker and no host/port", body)
+	}
+}
+
+func TestHealthzNamesBothDependenciesWhenBothAreDown(t *testing.T) {
+	w := do(t, newRouter(fakePinger{err: errors.New("no pg")}, fakePinger{err: errors.New("no redis")}))
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), `"postgres":"unavailable"`) || !strings.Contains(w.Body.String(), `"redis":"unavailable"`) {
+		t.Errorf("status %d body %s; want 503 with both markers", w.Code, w.Body.String())
+	}
+}
+
+func TestHealthzLogsTheDriverErrorServerSide(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	do(t, newRouter(fakePinger{err: errors.New(driverError)}, fakePinger{}))
+
+	if !strings.Contains(buf.String(), "user=english database=english") {
+		t.Errorf("server log = %q, want the full driver error for the operator", buf.String())
+	}
+}
+
+// slowPinger never answers: it returns only when its own deadline fires.
+type slowPinger struct{}
+
+func (slowPinger) Ping(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }
+
+func TestHealthzGivesEachDependencyItsOwnBudget(t *testing.T) {
+	old := PingTimeout
+	PingTimeout = 30 * time.Millisecond
+	t.Cleanup(func() { PingTimeout = old })
+
+	start := time.Now()
+	w := do(t, newRouter(slowPinger{}, slowPinger{}))
+	elapsed := time.Since(start)
+
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), `"postgres":"unavailable"`) || !strings.Contains(w.Body.String(), `"redis":"unavailable"`) {
+		t.Errorf("status %d body %s; want 503 with both markers", w.Code, w.Body.String())
+	}
+	// Two sequential budgets: the second dependency is not starved by the
+	// first having spent a shared deadline (the folded healthz-shares-one-
+	// 2s-deadline finding), and the probe still finishes promptly.
+	if elapsed < 2*PingTimeout || elapsed > time.Second {
+		t.Errorf("elapsed = %v, want between %v and 1s", elapsed, 2*PingTimeout)
+	}
+	if strings.Contains(w.Body.String(), "deadline") {
+		t.Errorf("body leaks the context error: %s", w.Body.String())
 	}
 }

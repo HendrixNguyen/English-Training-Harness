@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -71,5 +73,16 @@ func TestVerifyRejectsTheNoneAlgorithm(t *testing.T) {
 	const none = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1c2VyLTEifQ."
 	if _, err := NewTokenIssuer("secret", time.Now).Verify(none); err == nil {
 		t.Fatal("expected an error for alg=none, got nil")
+	}
+}
+
+func TestVerifyRejectsATokenWithoutExp(t *testing.T) {
+	// Same secret, valid signature, no exp claim: must not verify.
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{Subject: "user-1"}).SignedString([]byte("secret"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewTokenIssuer("secret", time.Now).Verify(tok); err == nil {
+		t.Fatal("Verify accepted a token with no exp claim")
 	}
 }

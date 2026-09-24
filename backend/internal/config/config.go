@@ -4,11 +4,23 @@ package config
 import (
 	"fmt"
 	"os"
+
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/secrets"
 )
 
 // DefaultVAPIDSubject is used when VAPID_SUBJECT is unset. Replace with a real
 // contact before the first production push (see the notify plan's notes).
 const DefaultVAPIDSubject = "mailto:admin@example.com"
+
+// DefaultFrontendOrigin is the Nuxt dev server. Production sets FRONTEND_ORIGIN
+// to the PWA's own Railway origin (backend spec §9): the PWA and the API are
+// two services on two origins, so every browser call is cross-origin.
+const DefaultFrontendOrigin = "http://localhost:3000"
+
+// MinJWTSecretBytes is the HS256 floor: RFC 7518 §3.2 requires a key at least
+// as long as the hash output (256 bits). A shorter secret is brute-forceable
+// offline from one captured token.
+const MinJWTSecretBytes = 32
 
 // Config holds the environment this slice needs (GOOGLE_CLIENT_ID, JWT_SECRET,
 // VAPID_* have been added as their slices landed).
@@ -18,9 +30,12 @@ type Config struct {
 	Port               string
 	GoogleClientID     string
 	GoogleClientSecret string
-	// JWTSecret signs session tokens. NOTE: JWT_SECRET is NOT in the spec §8
-	// environment list — see the CODEMAP auth paragraph and the plan's open questions.
+	// JWTSecret signs session tokens (HS256) and must be ≥ MinJWTSecretBytes.
+	// NOTE: JWT_SECRET is NOT in the 1st-thinking §8 list — see CODEMAP auth.
 	JWTSecret string
+	// EncryptionKey is the decoded ENCRYPTION_SECRET_KEY (backend spec §7/§9):
+	// 32 raw bytes for AES-256-GCM over users.google_refresh_token. Required.
+	EncryptionKey []byte
 	// VAPIDPublicKey / VAPIDPrivateKey sign Web Push requests (spec §9). They
 	// are OPTIONAL at boot: without both, the notify worker does not start and
 	// reminder settings are stored but nothing is sent (see cmd/api/main.go).
@@ -29,6 +44,16 @@ type Config struct {
 	// VAPIDSubject is the VAPID JWT `sub` claim (a mailto: or https: URL push
 	// services may contact). NOT in spec §9; defaults to DefaultVAPIDSubject.
 	VAPIDSubject string
+	// GinMode is Gin's run mode: "release" (default), "debug" or "test". Read
+	// from GIN_MODE and validated here so the deployed binary never runs Gin's
+	// debug logging by accident — gin.Default() alone defaults to debug — and
+	// so gin.SetMode (which panics on an unknown value) is only ever given a
+	// valid one. Not in spec §8; documented in backend/.env.example.
+	GinMode string
+	// FrontendOrigin is FRONTEND_ORIGIN as given: a comma-separated allow-list
+	// of exact scheme://host[:port] origins. middleware.ParseOrigins validates
+	// it at wiring time; config only supplies the default.
+	FrontendOrigin string
 }
 
 // Load reads the environment and validates the required variables.
@@ -62,10 +87,37 @@ func Load() (Config, error) {
 		}
 	}
 
+	if len(cfg.JWTSecret) < MinJWTSecretBytes {
+		return Config{}, fmt.Errorf("config: JWT_SECRET must be at least %d bytes (generate one with: openssl rand -base64 32)", MinJWTSecretBytes)
+	}
+	rawKey := os.Getenv("ENCRYPTION_SECRET_KEY")
+	if rawKey == "" {
+		return Config{}, fmt.Errorf("config: ENCRYPTION_SECRET_KEY is required — 32 bytes as 64 hex characters (generate one with: openssl rand -hex 32)")
+	}
+	key, err := secrets.ParseHexKey(rawKey)
+	if err != nil {
+		return Config{}, fmt.Errorf("config: ENCRYPTION_SECRET_KEY must be 32 bytes as 64 hex characters (generate one with: openssl rand -hex 32)")
+	}
+	cfg.EncryptionKey = key
+
 	cfg.VAPIDPublicKey = os.Getenv("VAPID_PUBLIC_KEY")
 	cfg.VAPIDPrivateKey = os.Getenv("VAPID_PRIVATE_KEY")
 	if cfg.VAPIDSubject = os.Getenv("VAPID_SUBJECT"); cfg.VAPIDSubject == "" {
 		cfg.VAPIDSubject = DefaultVAPIDSubject
+	}
+
+	cfg.GinMode = os.Getenv("GIN_MODE")
+	if cfg.GinMode == "" {
+		cfg.GinMode = "release"
+	}
+	switch cfg.GinMode {
+	case "debug", "release", "test":
+	default:
+		return Config{}, fmt.Errorf("config: GIN_MODE must be debug, release or test, got %q", cfg.GinMode)
+	}
+
+	if cfg.FrontendOrigin = os.Getenv("FRONTEND_ORIGIN"); cfg.FrontendOrigin == "" {
+		cfg.FrontendOrigin = DefaultFrontendOrigin
 	}
 	return cfg, nil
 }

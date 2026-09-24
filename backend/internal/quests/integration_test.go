@@ -72,6 +72,10 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 
 	svc := NewService(counter, repo, repo, NopPet{}, func() time.Time { return now })
 
+	if err := repo.MarkTargetMet(ctx, userID, "1999-01-01"); !errors.Is(err, ErrNoProgressRow) {
+		t.Errorf("MarkTargetMet for a date with no row: err = %v, want ErrNoProgressRow", err)
+	}
+
 	suite, err := svc.Daily(ctx, userID)
 	if err != nil {
 		t.Fatalf("Daily: %v", err)
@@ -230,6 +234,14 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	}
 	if minutes != 41 || !met {
 		t.Errorf("daily_progress = (%d, %t) after the counter was lost, want (41, true) — never lowered", minutes, met)
+	}
+
+	after, err := svc.Daily(ctx, userID)
+	if err != nil {
+		t.Fatalf("Daily after the counter was lost: %v", err)
+	}
+	if after.AccumulatedSeconds != 60 || !after.IsTargetMet {
+		t.Errorf("Daily after the counter was lost = accumulated %d, is_target_met %t; want 60 (the one post-loss report) and true (durable row)", after.AccumulatedSeconds, after.IsTargetMet)
 	}
 }
 

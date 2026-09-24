@@ -42,7 +42,8 @@ func (t *TokenIssuer) Issue(userID string) (string, error) {
 	return signed, nil
 }
 
-// Verify checks the signature and expiry and returns the subject.
+// Verify checks the signature and expiry, requires an exp claim, and returns
+// the subject.
 func (t *TokenIssuer) Verify(token string) (string, error) {
 	parsed, err := jwt.ParseWithClaims(token, &jwt.RegisteredClaims{},
 		func(tok *jwt.Token) (any, error) {
@@ -53,6 +54,7 @@ func (t *TokenIssuer) Verify(token string) (string, error) {
 		},
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithTimeFunc(t.now),
+		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
 		return "", fmt.Errorf("auth: verifying token: %w", err)

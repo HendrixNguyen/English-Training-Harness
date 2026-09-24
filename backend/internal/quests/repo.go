@@ -19,6 +19,12 @@ var ErrNoActiveRoadmap = errors.New("quests: no active roadmap")
 // user's roadmap. The two are deliberately indistinguishable to the client.
 var ErrExerciseNotFound = errors.New("quests: exercise not found")
 
+// ErrNoProgressRow means MarkTargetMet found no daily_progress row for that
+// local date. RecordProgress cannot hit it (Upsert creates the row on the
+// same call); it exists so no caller can mistake "nothing there" for
+// "flagged" — every verdict writer in pet already reports what it did.
+var ErrNoProgressRow = errors.New("quests: no daily_progress row for that date")
+
 // Roadmap is the slice of spec §3.2 `roadmaps` this package reads.
 type Roadmap struct {
 	ID        string
@@ -30,7 +36,7 @@ type Roadmap struct {
 type Exercise struct {
 	ID          string
 	DayNumber   int
-	TaskType    string          // vocabulary | reading | practice
+	TaskType    string // vocabulary | reading | practice
 	ContentJSON json.RawMessage
 	IsCompleted bool
 }
@@ -65,8 +71,13 @@ type ProgressRepo interface {
 	// Upsert writes minutes_spent for (userID, localDate) — never lowering it —
 	// and reports whether is_target_met is already TRUE on that row.
 	Upsert(ctx context.Context, userID, localDate string, minutes int) (alreadyMet bool, err error)
-	// MarkTargetMet flips is_target_met to TRUE. Idempotent.
+	// MarkTargetMet flips is_target_met to TRUE. Idempotent; ErrNoProgressRow
+	// when the row does not exist.
 	MarkTargetMet(ctx context.Context, userID, localDate string) error
+	// TargetMet reports the row's is_target_met for (userID, localDate); no
+	// row → false. GET /quests/daily reads it so both endpoints answer the
+	// same is_target_met for the same local day, counter or no counter.
+	TargetMet(ctx context.Context, userID, localDate string) (bool, error)
 }
 
 const (
@@ -109,6 +120,11 @@ RETURNING COALESCE(is_target_met, FALSE)`
 	markTargetMetSQL = `
 UPDATE daily_progress
 SET is_target_met = TRUE
+WHERE user_id = $1 AND date = $2::date`
+
+	targetMetSQL = `
+SELECT COALESCE(is_target_met, FALSE)
+FROM daily_progress
 WHERE user_id = $1 AND date = $2::date`
 )
 
@@ -188,10 +204,26 @@ func (r *PgRepo) Upsert(ctx context.Context, userID, localDate string, minutes i
 }
 
 func (r *PgRepo) MarkTargetMet(ctx context.Context, userID, localDate string) error {
-	if _, err := r.Pool.Exec(ctx, markTargetMetSQL, userID, localDate); err != nil {
+	tag, err := r.Pool.Exec(ctx, markTargetMetSQL, userID, localDate)
+	if err != nil {
 		return fmt.Errorf("quests: marking target met: %w", err)
 	}
+	if tag.RowsAffected() == 0 {
+		return ErrNoProgressRow
+	}
 	return nil
+}
+
+func (r *PgRepo) TargetMet(ctx context.Context, userID, localDate string) (bool, error) {
+	var met bool
+	err := r.Pool.QueryRow(ctx, targetMetSQL, userID, localDate).Scan(&met)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("quests: reading daily_progress flag: %w", err)
+	}
+	return met, nil
 }
 
 var (

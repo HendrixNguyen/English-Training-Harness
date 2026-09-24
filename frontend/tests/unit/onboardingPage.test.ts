@@ -109,4 +109,50 @@ describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
     expect(w.text()).toContain('Câu 10 / 10')
     expect(w.text()).not.toContain('Trình độ của bạn')
   })
+
+  it('does not start the quiz while the reminder time is cleared, and says why', async () => {
+    const w = mountPage()
+    await flushPromises()
+    await click(w, 'IELTS 7.0')
+    await w.find('input[type="time"]').setValue('')
+
+    const start = w.findAll('button').find(b => b.text().includes('Bắt đầu bài kiểm tra'))
+    if (!start) throw new Error('no start button')
+    expect(start.attributes('disabled')).toBeDefined()
+    expect(w.find('[role="note"]').text()).toContain('giờ nhắc học')
+    await start.trigger('click')
+    await flushPromises()
+    expect(api.get).not.toHaveBeenCalledWith('/api/v1/onboarding/quiz')
+
+    await w.find('input[type="time"]').setValue('07:30')
+    expect(start.attributes('disabled')).toBeUndefined()
+    expect(w.find('[role="note"]').exists()).toBe(false)
+  })
+
+  it('names a 400 invalid_request so the learner knows what to fix, keeping their answers', async () => {
+    api.post.mockRejectedValue(new ApiError(400, 'invalid_request'))
+    const w = mountPage()
+    await flushPromises()
+    await completeQuiz(w)
+
+    const alert = w.find('[role="alert"]').text()
+    expect(alert).toContain('giờ nhắc học')
+    expect(alert).not.toContain('Không tạo được lộ trình')
+    expect(w.text()).toContain('Câu 10 / 10')
+  })
+
+  it.each([
+    [503, 'ai_unavailable'],
+    [502, 'ai_bad_output'],
+    [502, 'ai_upstream_failed'],
+  ])('renders the AI-specific copy for %i %s and keeps the learner on the quiz', async (status, code) => {
+    api.post.mockRejectedValue(new ApiError(status, code))
+    const w = mountPage()
+    await flushPromises()
+    await completeQuiz(w)
+
+    expect(w.find('[role="alert"]').text()).toContain('Máy chủ AI đang bận')
+    expect(w.text()).toContain('Câu 10 / 10')
+    expect(w.text()).not.toContain('Trình độ của bạn')
+  })
 })

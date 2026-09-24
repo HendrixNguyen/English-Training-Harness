@@ -592,3 +592,47 @@ func TestAnUpsertFailureAfterTheIncrbyLeavesTheCounterUsable(t *testing.T) {
 		t.Errorf("completed = %v, want only ex-2-practice (the failed call must not mark its exercise)", h.quests.completed)
 	}
 }
+
+func TestDailyReportsTheDurableFlagWhenTheCounterIsLost(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err != nil {
+		t.Fatal(err)
+	}
+	h.counter.totals = map[string]int64{} // eviction / restart / FLUSHDB
+
+	got, err := h.svc.Daily(ctx, "u1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AccumulatedSeconds != 0 || !got.IsTargetMet {
+		t.Errorf("Daily after the counter was lost = accumulated %d, is_target_met %t; want 0 and true — the durable row wins, exactly as POST /quests/progress already answers", got.AccumulatedSeconds, got.IsTargetMet)
+	}
+}
+
+func TestFakeMarkTargetMetRefusesAMissingRowLikeTheSQL(t *testing.T) {
+	f := newFakeProgressRepo(&callLog{})
+	if err := f.MarkTargetMet(context.Background(), "u1", "2026-09-22"); !errors.Is(err, ErrNoProgressRow) {
+		t.Fatalf("MarkTargetMet with no row: err = %v, want ErrNoProgressRow (PgRepo returns it on RowsAffected() == 0)", err)
+	}
+	if _, ok := f.rows["u1|2026-09-22"]; ok {
+		t.Error("the fake created a row; the SQL UPDATE cannot")
+	}
+}
+
+func TestALostCounterNeverLowersTheDurableMinutes(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err != nil { // row: 30 minutes
+		t.Fatal(err)
+	}
+	h.counter.totals = map[string]int64{}                                           // the counter restarts at 0…
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 60); err != nil { // …so this report upserts minutes = 1
+		t.Fatal(err)
+	}
+	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 30 || !row.targetMet {
+		t.Errorf("row = %+v after a short report on a lost counter, want minutes 30 (never lowered) and target met", row)
+	}
+}
