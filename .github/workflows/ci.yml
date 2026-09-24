@@ -51,7 +51,7 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test without services
-        run: go test ./... -count=1
+        run: go test ./... -count=1 -race
 
   backend-integration:
     runs-on: ubuntu-latest
