@@ -1,11 +1,13 @@
 package google
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
 	"testing"
 
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/secrets"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -28,13 +30,22 @@ func TestIntegrationSyncStateIsOneRowPerUser(t *testing.T) {
 		t.Fatalf("Migrate: %v", err)
 	}
 
+	box, err := secrets.New(bytes.Repeat([]byte{3}, secrets.KeyBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := box.Seal("1//refresh")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	const gid = "google-sync-integration"
 	var userID string
 	_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid)
 	if err := pg.Pool.QueryRow(ctx,
 		`INSERT INTO users (email, google_id, target_goal, timezone, notification_time, google_refresh_token)
 		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-		"google@example.com", gid, "", "Asia/Ho_Chi_Minh", "07:30:00", "1//refresh").Scan(&userID); err != nil {
+		"google@example.com", gid, "", "Asia/Ho_Chi_Minh", "07:30:00", sealed).Scan(&userID); err != nil {
 		t.Fatalf("inserting user: %v", err)
 	}
 	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid) })
@@ -50,10 +61,18 @@ func TestIntegrationSyncStateIsOneRowPerUser(t *testing.T) {
 		t.Errorf("profile = %+v", prof)
 	}
 
-	// The refresh-token seam reads the column as stored.
-	tok, err := NewPgRefreshTokenSource(pg.Pool).RefreshToken(ctx, userID)
+	// The refresh-token seam opens what auth sealed.
+	tok, err := NewPgRefreshTokenSource(pg.Pool, box).RefreshToken(ctx, userID)
 	if err != nil || tok != "1//refresh" {
-		t.Errorf("RefreshToken = %q, %v", tok, err)
+		t.Errorf("RefreshToken = %q, %v; want the opened plaintext", tok, err)
+	}
+	// A pre-encryption row (plaintext, no v1: prefix) is "no token on file":
+	// Service maps it to reauth_required and the next sign-in stores a sealed one.
+	if _, err := pg.Pool.Exec(ctx, `UPDATE users SET google_refresh_token = '1//legacy-plaintext' WHERE id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewPgRefreshTokenSource(pg.Pool, box).RefreshToken(ctx, userID); !errors.Is(err, ErrNoRefreshToken) {
+		t.Errorf("RefreshToken on a legacy plaintext row: err = %v, want ErrNoRefreshToken", err)
 	}
 
 	// No roadmap yet.

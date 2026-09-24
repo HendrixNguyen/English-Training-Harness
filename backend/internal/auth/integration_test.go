@@ -1,10 +1,13 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/secrets"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -30,7 +33,11 @@ func TestIntegrationUpsertCreatesThenPreservesTheLearnerState(t *testing.T) {
 		t.Fatalf("Migrate: %v", err)
 	}
 
-	repo := NewPgUserRepo(pg.Pool)
+	box, err := secrets.New(bytes.Repeat([]byte{7}, secrets.KeyBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewPgUserRepo(pg.Pool, box)
 	const gid = "google-integration-1"
 	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid) })
 	_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid)
@@ -75,7 +82,12 @@ func TestIntegrationUpsertCreatesThenPreservesTheLearnerState(t *testing.T) {
 	if goal != "IELTS 7.0" {
 		t.Errorf("target_goal = %q, want it preserved across re-login", goal)
 	}
-	if refresh != "rt-1" {
-		t.Errorf("google_refresh_token = %q, want the stored token kept when Google sends none", refresh)
+	// Backend spec §7: the column holds a v1: AES-256-GCM ciphertext, never the
+	// plaintext; and the re-login that sent no token kept the sealed one.
+	if refresh == "rt-1" || !strings.HasPrefix(refresh, "v1:") {
+		t.Errorf("google_refresh_token = %q, want a sealed v1: value, not the plaintext", refresh)
+	}
+	if plain, err := box.Open(refresh); err != nil || plain != "rt-1" {
+		t.Errorf("Open(stored) = %q, %v; want rt-1 — the stored token kept when Google sends none", plain, err)
 	}
 }
