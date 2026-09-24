@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-24 23:32. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 00:15. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -98,7 +98,7 @@ _none_
 - `harness/plans/2026-09-24-cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api amend: make the drain test observe the drain — it must fail when `srv.Shutdown` is gone — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs)
+- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs) (merged)
 
 ## Failed
 

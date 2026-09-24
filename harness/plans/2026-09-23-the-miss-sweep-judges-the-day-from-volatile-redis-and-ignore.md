@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-23-medium-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore
 worktree: .worktrees/the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore
 ---

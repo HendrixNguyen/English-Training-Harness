@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-22-run-02/notify-web-push-subscriptions-and-delayed-reminder-queue.md
 status: done
 priority: high
-merged: false
+merged: true
 order: 8
 branch: harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue
 worktree: .worktrees/notify-web-push-subscriptions-and-delayed-reminder-queue

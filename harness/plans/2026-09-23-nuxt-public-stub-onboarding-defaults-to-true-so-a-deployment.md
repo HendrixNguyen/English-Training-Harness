@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-23-high-nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment
 worktree: .worktrees/nuxt-public-stub-onboarding-defaults-to-true-so-a-deployment
 ---
