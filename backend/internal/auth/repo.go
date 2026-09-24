@@ -39,13 +39,38 @@ ON CONFLICT (google_id) DO UPDATE SET
     google_refresh_token = COALESCE(NULLIF(EXCLUDED.google_refresh_token, ''), users.google_refresh_token)
 RETURNING id, email, full_name, cefr_current`
 
-// PgUserRepo is the real UserRepo.
-type PgUserRepo struct{ Pool *pgxpool.Pool }
+// Sealer encrypts a refresh token before it is stored (backend spec §6.1,
+// §7: AES-256-GCM under ENCRYPTION_SECRET_KEY). *secrets.Box satisfies it.
+type Sealer interface {
+	Seal(plain string) (string, error)
+}
 
-// NewPgUserRepo builds a repo over an existing pool.
-func NewPgUserRepo(pool *pgxpool.Pool) *PgUserRepo { return &PgUserRepo{Pool: pool} }
+// PgUserRepo is the real UserRepo. It seals google_refresh_token on the way
+// in; google.PgRefreshTokenSource opens it on the way out.
+type PgUserRepo struct {
+	Pool   *pgxpool.Pool
+	sealer Sealer
+}
+
+// NewPgUserRepo builds a repo over an existing pool and the process's sealer.
+func NewPgUserRepo(pool *pgxpool.Pool, sealer Sealer) *PgUserRepo {
+	return &PgUserRepo{Pool: pool, sealer: sealer}
+}
 
 func (r *PgUserRepo) UpsertByGoogleID(ctx context.Context, googleID, email, fullName, refreshToken string) (User, error) {
+	// Google omits the refresh token on silent re-consent; "" must reach the
+	// SQL unsealed so COALESCE(NULLIF(…, ''), users.google_refresh_token)
+	// keeps the stored (sealed) value. Anything else is sealed here — the
+	// plaintext never reaches Postgres.
+	stored := ""
+	if refreshToken != "" {
+		sealed, err := r.sealer.Seal(refreshToken)
+		if err != nil {
+			return User{}, fmt.Errorf("auth: sealing refresh token: %w", err)
+		}
+		stored = sealed
+	}
+
 	// full_name and cefr_current are nullable in §3.2, so scan through pointers
 	// and flatten NULL to the zero value.
 	var (
@@ -54,7 +79,7 @@ func (r *PgUserRepo) UpsertByGoogleID(ctx context.Context, googleID, email, full
 		nullCEFR *string
 	)
 	err := r.Pool.QueryRow(ctx, upsertUserSQL,
-		email, fullName, googleID, refreshToken, defaultTargetGoal,
+		email, fullName, googleID, stored, defaultTargetGoal,
 	).Scan(&u.ID, &u.Email, &nullName, &nullCEFR)
 	if err != nil {
 		return User{}, fmt.Errorf("auth: upserting user: %w", err)

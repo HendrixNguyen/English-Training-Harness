@@ -103,3 +103,17 @@ func TestRequireRejectsASupersededToken(t *testing.T) {
 		t.Fatalf("status = %d, want 401 for a superseded token", w.Code)
 	}
 }
+
+func TestRequireAcceptsACaseInsensitiveBearerScheme(t *testing.T) {
+	iss := NewTokenIssuer("secret", time.Now)
+	tok, _ := iss.Issue("user-1")
+	sess := newFakeSessions()
+	_ = sess.Put(context.Background(), "user-1", tok, TokenTTL)
+	r := newGuardedRouter(iss, sess)
+
+	for _, header := range []string{"bearer " + tok, "BEARER " + tok, "Bearer " + tok} {
+		if w := get(t, r, header); w.Code != http.StatusOK {
+			t.Errorf("header %q → status %d, want 200 (RFC 7235: the scheme is case-insensitive)", header[:6], w.Code)
+		}
+	}
+}
