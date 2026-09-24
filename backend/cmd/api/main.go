@@ -1,14 +1,19 @@
-// Command api is the single Go process described in spec §2.1. This slice
-// serves only GET /healthz; later slices mount their own route groups here.
+// Command api is the single Go process of spec §2.1: it mounts every package's
+// routes under /api/v1 (the list lives in harness/CODEMAP.md, not here) and
+// runs the in-process cron workers. It serves through an http.Server that
+// drains on SIGINT/SIGTERM (server.go).
 package main
 
 import (
 	"context"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	_ "time/tzdata" // embed the zone database so timezone math never depends on the container image
 
 	"github.com/gin-gonic/gin"
 
@@ -45,7 +50,11 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		log.Fatal(err)
+	}
+
+	if _, err := time.LoadLocation("Asia/Ho_Chi_Minh"); err != nil {
+		log.Fatalf("tzdata: %v (time/tzdata is embedded; this should be impossible)", err)
 	}
 
 	pg, err := store.NewPostgres(ctx, cfg.DatabaseURL)
@@ -75,7 +84,13 @@ func main() {
 		log.Printf("airouter: providers %v", providers)
 	}
 
+	gin.SetMode(cfg.GinMode) // validated by config.Load; release unless GIN_MODE says otherwise
 	r := gin.Default()
+	// Nothing reads c.ClientIP() yet. Trust no proxy headers until something
+	// does and the platform's proxy range is known — gin.Default() trusts all.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("gin: %v", err)
+	}
 	r.GET("/healthz", health.Handler(pg, rdb))
 
 	tokens := auth.NewTokenIssuer(cfg.JWTSecret, time.Now)
@@ -161,8 +176,13 @@ func main() {
 	guarded.GET("/onboarding/quiz", onboarding.QuizHandler())
 	guarded.POST("/onboarding/assessment", onboarding.AssessmentHandler(onboardingSvc))
 
-	log.Printf("listening on :%s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
+	ln, err := net.Listen("tcp", ":"+cfg.Port)
+	if err != nil {
+		log.Fatalf("listen: %v", err)
+	}
+	log.Printf("listening on %s (GIN_MODE=%s)", ln.Addr(), cfg.GinMode)
+	if err := serve(ctx, newServer(r), ln); err != nil {
 		log.Fatalf("server: %v", err)
 	}
+	log.Printf("shutdown complete") // main returns: deferred pg.Close / rdb.Close run
 }
