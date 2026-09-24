@@ -78,6 +78,10 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 		return "", fmt.Errorf("gemini: decoding response: %w", err)
 	}
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
+		if br := parsed.PromptFeedback.BlockReason; br != "" {
+			// The prompt itself was refused: the one fact an operator needs.
+			return "", fmt.Errorf("gemini: empty response: blockReason %s", br)
+		}
 		return "", fmt.Errorf("gemini: empty response")
 	}
 	// STOP (or absent, on older responses) is the only complete answer. Anything

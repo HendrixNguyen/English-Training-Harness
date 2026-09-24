@@ -111,6 +111,7 @@ func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 		"empty candidates": {200, `{"candidates":[]}`, "empty"},
 		"empty parts":      {200, `{"candidates":[{"content":{"parts":[]}}]}`, "empty"},
 		"not json":         {200, `<html>`, "decoding"},
+		"prompt blocked":   {200, `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]},"candidates":[]}`, "blockReason SAFETY"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
