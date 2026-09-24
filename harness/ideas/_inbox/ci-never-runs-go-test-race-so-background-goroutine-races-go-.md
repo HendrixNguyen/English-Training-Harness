@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md
 ---
 # CI never runs go test -race so background goroutine races go undetected
 
@@ -43,3 +44,7 @@ introduced on a `harness/*` branch fails a check before merge instead of after.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: `grep -n race .github/workflows/ci.yml` → no match, and the production binary will run two long-lived goroutines once notify merges (pet cron + notify worker). Developer-workflow bug: the one class of defect those goroutines can have is invisible to CI. Plan together with `ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — same job in the same file; one branch, one merge. Scope `-race` to the packages with goroutines if the full suite is slow.
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Planned today in `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` (Also planned here).** `backend-unit`'s test step becomes `go test ./... -count=1 -race`; the plan measures the wall time and falls back to scoping `-race` to the goroutine packages (`./internal/notify/... ./internal/pet/...`) as a second step if the full run threatens the 10-minute job cap.

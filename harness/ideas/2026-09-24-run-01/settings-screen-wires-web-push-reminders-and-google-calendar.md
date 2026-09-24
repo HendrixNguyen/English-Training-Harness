@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-24-run-01
+priority: medium
 ---
 # Settings screen wires Web Push reminders and Google Calendar sync to the shipped backend
 
@@ -30,3 +31,14 @@ Technical:
 - Inbox: `nothing-tells-the-pwa-to-flatten-pushsubscription-tojson-so-.md` (the payload-shape trap this feature must avoid).
 - Duolingo reminder/streak retention analyses: https://www.digia.tech/post/duolingo-habit-forming-reminders-retention-architecture/ , https://medium.com/@siddhartha-arora102/product-stories-how-duolingo-reignited-growth-by-mastering-retention-gamification-15b6d190b840
 - Prior run `2026-09-22-run-01` proposed *adaptive reminder timing* — that idea tunes reminders; this one makes any reminder possible at all.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today; the next feature to plan.**
+
+*Is the Why real?* Yes: `POST /settings/notifications` and `POST /integrations/google/sync` are merged, tested and unreachable — `frontend/pages/settings.vue` is the shell's placeholder with both buttons disabled, `push_subscriptions` stays empty, and §5.1 steps 6–7 never happen for anyone.
+
+*Achievable in one plan?* Yes, about a day, and it needs no backend change. It requires `harness/designs/settings.md` first (frontend-design skill: reminder block states — permission denied, push unsupported, VAPID key absent; Google block states — synced N, `409 reauth_required`, `502 google_unavailable`) and must destructure `PushSubscription.toJSON().keys` into the flat `{endpoint, p256dh, auth}` body (the rejected `nothing-tells-the-pwa-to-flatten-…` bug is folded here) and add that note to CODEMAP's frontend paragraph. The onboarding success-step prompt is in scope only if it stays a link to `/settings`.
+
+*Dependencies.* Inert in production until the CORS plan (approved today) is merged and `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` are set on Railway. *Priority.* Medium — clear retention value, nothing blocked; as a medium feature its plan will stay `draft` for the owner's `/approve`.

@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/main-go-installs-a-signal-handler-with-no-server-shutdown-so.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-24-high-main-go-installs-a-signal-handler-with-no-server-shutdown-so
+worktree: .worktrees/main-go-installs-a-signal-handler-with-no-server-shutdown-so
 ---
 # cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan
 
@@ -518,3 +520,38 @@ From `backend/` in the worktree, dev stack up on non-default ports with a unique
 - **`SetTrustedProxies(nil)`** makes `c.ClientIP()` return the TCP peer (the platform proxy) rather than a spoofable `X-Forwarded-For`. When a per-IP limiter appears, replace `nil` with the platform's proxy CIDR — that is a config value, not a code change.
 - **Notify branch** — see the precondition at the top. Its `main.go` adds a `notify` import, a VAPID block and `go notify.RunWorker(ctx, …)` between the pet cron and the route groups; none of this plan's edits overlap those lines, but git will still need a human to confirm the merge if both land close together.
 - **Not here:** body-size middleware (`no-post-handler-bounds…`, one `Use` line later), migration deadline (`migrate-s-advisory-lock-leaks…` first), `JWT_SECRET` length validation (`jwt-secret-is-accepted…`, also `config.go` — schedule after this so `config` merges cleanly).
+
+## Execution summary
+
+**Status: done.** Branch `harness/2026-09-24-high-main-go-installs-a-signal-handler-with-no-server-shutdown-so`, worktree `.worktrees/main-go-installs-a-signal-handler-with-no-server-shutdown-so` (created off freshly fetched `origin/main`, which already had the notify branch merged — the merge-order precondition was already satisfied, no manual `main.go` merge needed). Four commits, one per task, exactly as planned: `4f26aca` (Task 1: `GIN_MODE`), `49e138b` (Task 2: `server.go`), `5cabf65` (Task 3: rewire `main.go`), `96d190d` (Task 4: `.env.example`/Makefile/CODEMAP).
+
+No deviations from the plan's tasks or file structure. One finding surfaced during the runtime proof, documented below rather than fixed, since it is outside this plan's intent.
+
+### Plan verification (all from `backend/`, dev stack on POSTGRES_PORT=55432/REDIS_PORT=56379, compose project `exec-shutdown`, all `TEST_*`/service vars otherwise unset)
+
+1. `go build ./... && go vet ./... && test -z "$(gofmt -l ./cmd ./internal/config)"` → `fmt-ok`.
+2. `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -timeout 300s` → all 11 packages `ok`.
+3. `go test ./cmd/api/... -count=1 -race -timeout 120s` → `ok`, no race report (also run right after writing `server.go`, and once more after wiring `main.go`).
+4. **Signal proof**, built binary `/tmp/<slug>-api`, `PORT=8097`:
+   - SIGTERM: `{"postgres":"ok","redis":"ok","status":"ok"}`; `exit=0`; `grep -c GIN-debug` = `0`; log has both `shutting down: draining in-flight requests for up to 8s` and `shutdown complete`.
+   - SIGINT: identical — `exit=0`, `0` GIN-debug lines, both shutdown lines present.
+5. In-flight drain: `POST /api/v1/auth/google` fired ~0.2 s before `kill -TERM`; curl received `400 {"error":"invalid_request"}` (request finished, not cut off); process exit `0`.
+6. `env -u DATABASE_URL -u REDIS_URL /tmp/<slug>-api` → `config: DATABASE_URL is required` once, exit 1. `GIN_MODE=verbose /tmp/<slug>-api` → refuses (see finding below).
+7. `GIN_MODE=debug` boot → `[GIN-debug]` route lines present (11 routes logged, plus the mode warning) — confirms the switch works both ways.
+8. Cleanup verified: `pgrep -fl main-go-installs` → none; `docker ps`/`docker ps -a` for `exec-shutdown` → none; scratch `.env` removed.
+9. Pushed; CI run [35958446539](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35958446539) — `frontend`, `harness-tooling`, `backend-unit`, `backend-integration` all green.
+
+### Runtime proof (skill step 8)
+
+- **Build:** `go build ./...` clean, no warnings.
+- **Whole suite, clean shell:** all 11 backend packages `ok` with `DATABASE_URL`/`REDIS_URL`/`TEST_DATABASE_URL`/`TEST_REDIS_URL` unset.
+- **Boots and answers:** built binary served `GET /healthz` → `{"postgres":"ok","redis":"ok","status":"ok"}` against the real dev-stack Postgres/Redis; also exercised `POST /api/v1/auth/google` (400 on an empty body — the real validation path).
+- **Documented commands, exactly as written:** `docker compose -p exec-shutdown up -d --wait --wait-timeout 120` (succeeded, healthy); `set -a; . ./.env; set +a; go run ./cmd/api` per the new Makefile comment → boot log `migrations applied: […]`, `listening on [::]:8097 (GIN_MODE=release)`, zero `[GIN-debug]` lines; `env -u DATABASE_URL -u REDIS_URL go run ./cmd/api` → single-line `config: DATABASE_URL is required`, exit 1; `GIN_MODE=debug go run ./cmd/api` → `[GIN-debug]` lines present, confirming the switch. `docker compose -p exec-shutdown down` removed the stack cleanly.
+- **Cleanup verified twice** (once after the `go run` loop, once after the built-binary signal proof): `pgrep -fl` and `docker ps -a` both came back empty for everything this run created.
+
+### Finding (documented, not fixed — outside this plan's intent)
+
+`GIN_MODE=verbose` does **not** surface the plan's Task-1 message ("`config: GIN_MODE must be debug, release or test, got "verbose"`") when run as the compiled `cmd/api` binary. Reason: `gin` has a package-level `init()` (`mode.go`) that reads `os.Getenv("GIN_MODE")` itself and calls `gin.SetMode`, which **panics** on an unknown value — and all package `init()`s run before `main()`, i.e. before `config.Load()` ever executes. So for the real binary, an invalid `GIN_MODE` crashes with a Go panic and `gin`'s own message ("`panic: gin mode unknown: verbose (available mode: debug release test)`", exit code 2), not our friendlier config error. This is pre-existing `gin` behavior, not something this plan's changes caused or could prevent from inside `config`/`main` — `config` deliberately stays free of the `gin` import (plan's own constraint), and by the time `main()` runs, `gin`'s `init()` has already fired.
+- The top-level Verification item 6 ("`GIN_MODE=verbose … → refuses`") is still satisfied literally: the process does refuse to serve (non-zero exit, no `listening on` line).
+- Task 4 Step 3's stricter wording ("must refuse with the `GIN_MODE must be` message") does **not** hold for the compiled binary — only for direct callers of `config.Load()` (covered by `TestLoadRejectsAnUnknownGinMode`, which passes because that test binary never imports `gin`).
+- Not fixed here: fixing it would mean either validating `GIN_MODE` before `gin` is imported anywhere in the import graph (impossible — `main` imports `gin` transitively at compile time regardless of call order) or duplicating gin's valid-mode check even earlier (e.g., a `TestMain`-style pre-check, or reading `GIN_MODE` via a wrapper that never imports `gin` in `main` — a design change beyond this plan's scope). Leaving as a documented gap for review/a future idea.

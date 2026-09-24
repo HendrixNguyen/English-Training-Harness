@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Duplicate of the selected ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md, planned today in harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md: same CI step, and its gofmt -w covers both quests files."
 ---
 # gofmt -l has been failing on two internal/quests files since before this branch
 
@@ -35,3 +36,8 @@ has now been paid for at least twice.
 - `gofmt -d internal/quests/repo.go` - one hunk, the `TaskType string // vocabulary | reading |
   practice` comment alignment.
 - `.github/workflows/ci.yml` - `backend-unit` runs build/vet/test, no format check.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Reject — duplicate.** The selected `ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` (medium) asks for the same CI step and the same `gofmt -w`, and is planned today in `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md`. `gofmt -l .` on this branch lists exactly the two files named here (`internal/quests/handler_test.go`, `internal/quests/repo.go`; `internal/google/fakes_test.go` has since been formatted), and that plan formats whatever `gofmt -l .` prints at execution time.

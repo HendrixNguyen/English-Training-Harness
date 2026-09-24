@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -38,3 +38,12 @@ pins a 409 from `events.patch` and a 409 from `tasks` to the chosen status.
 - `harness/CODEMAP.md` `google` bullet — "other Google failures or the 60 s `SyncTimeout` -> 502 `google_unavailable`".
 - No test asserts a 409 outside `TestCalendarInsertSendsTheClientIDAndMaps409ToAlreadyExists` (`backend/internal/google/calendar_test.go:113-145`).
 - Related: `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` (selected, medium).
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today; plan together with the selected `every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — the same class (a `doJSON` status mapping that is too broad for the one call site that motivated it), the same two files, one branch.**
+
+*Confirmed (read on this branch).* `backend/internal/google/client.go:82-85` maps `409` to `ErrAlreadyExists` for calendar, tasklists and tasks alike; `handler.go:32-43` switches on `ErrReauthRequired`, `*UpstreamError`/`DeadlineExceeded`, then a catch-all `500 internal_error` — no `ErrAlreadyExists` case; `service.go:73-80` returns a patch error unchanged. A transient conflict on `events.patch` is therefore reported as our fault (500) instead of Google's (502), contradicting the CODEMAP contract for the route.
+
+*Recommended fix.* Keep `doJSON` generic (the insert path needs the sentinel) and add `case errors.Is(err, ErrAlreadyExists): 502 google_unavailable` to `SyncHandler`, so an unconsumed 409 can never surface as 500; pin it with a client test for a 409 from `events.patch` and one from `tasks.insert`. Medium: a lost retry signal on a rare path, no data damage.

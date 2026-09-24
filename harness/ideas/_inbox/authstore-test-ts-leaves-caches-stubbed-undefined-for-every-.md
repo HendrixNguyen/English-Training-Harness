@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md
 ---
 # authStore.test.ts leaves caches stubbed undefined for every test added after it
 
@@ -25,3 +26,12 @@ A test added to the bottom of `authStore.test.ts` sees the same global state as 
 - `frontend/tests/unit/fakeCaches.ts:45-50` — `installSeededCaches()` calls `vi.stubGlobal('caches', fake)` and leaves the revert to the caller.
 - `frontend/utils/session.ts:5-8` — the `if (typeof caches === 'undefined') return` early return that makes a missing global silent rather than loud.
 - Reviewed plan: `harness/plans/2026-09-23-expired-session-sign-out-leaves-per-user-api-responses-in-th.md`, *Test approach*.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Planned today in `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Also planned here — two lines in a file that plan already edits).**
+
+*Confirmed (read on this branch).* `frontend/tests/unit/authStore.test.ts:90` — `vi.stubGlobal('caches', undefined)` with no `afterEach`; `frontend/vitest.config.ts` sets `restoreMocks: true` only, which does not revert `stubGlobal`.
+
+*Fix.* File-local `afterEach(() => vi.unstubAllGlobals())` in `authStore.test.ts`, plus a trailing case asserting `'caches' in globalThis` is `false` (the stub defines the property with value `undefined`; only an unstub removes it, so the case has teeth). **Not** `unstubGlobals: true` suite-wide, which the idea offers as the stronger option: `onboardingPage.test.ts` and `authMiddleware.test.ts` install `navigateTo` / `defineNuxtRouteMiddleware` with top-level `vi.stubGlobal` and would lose them between cases. Low: test hygiene; the leak's direction is the safe one today.

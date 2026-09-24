@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md
 ---
 # CI never runs gofmt so three files on main are unformatted and nothing fails
 
@@ -36,3 +37,7 @@ reviewer` because it is a conformance finding, like `google-refresh-token-is-sto
 _Evaluator, 2026-09-23 — post-MVP inbox triage._
 
 **Select — medium.** Developer-workflow bug with a live symptom (three unformatted files on `main`, green CI). One `ci.yml` step plus `gofmt -w` on three files. Plan together with `ci-never-runs-go-test-race-so-background-goroutine-races-go-.md` (same job).
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Planned today as the head of `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md`.** On this branch `gofmt -l .` lists two files (`internal/quests/handler_test.go`, `internal/quests/repo.go`; `internal/google/fakes_test.go` has been formatted since 2026-09-23) — the plan formats whatever the command prints at execution time and adds the gate before `go vet`. The duplicate inbox filing `gofmt-l-has-been-failing-on-two-internal-quests-files-since-.md` is rejected pointing here.

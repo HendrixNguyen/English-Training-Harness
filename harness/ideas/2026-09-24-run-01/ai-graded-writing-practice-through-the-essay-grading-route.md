@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-24-run-01
+priority: medium
 ---
 # AI-graded writing practice through the essay_grading route
 
@@ -33,3 +34,12 @@ Technical:
 - 1st-thinking §4 `ratelimit:ai:{user_id}` 5 req/min.
 - Corrective feedback effect sizes (explicit feedback strongest on short-term posttests): https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-9922.2010.00561.x , https://pmc.ncbi.nlm.nih.gov/articles/PMC9995700/
 - Inbox noted: `route-returns-upstream-provider-error-bodies-verbatim-to-its.md`, `route-has-no-overall-deadline-so-one-call-can-take-90-second.md` (a synchronous grading call makes both user-visible).
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today.**
+
+*Is the Why real?* Yes: `airouter` routes `essay_grading` → OpenAI with no caller, the third daily task is "practice/interactive" and is static today, and productive-skill feedback is what an IELTS learner pays for.
+
+*Achievable in one plan?* No — two: (1) backend `POST /api/v1/quests/writing/grade` behind `auth.Require()`, bounded text length, the `ratelimit:ai` slot, `TaskEssayGrading` with a strict-JSON prompt and a `ParseGrading` validator (retry once → `ai_bad_output`), and storage of the result (migration + backend spec DDL); (2) the writing UI on `/learn/:id` with its outcome states, after a design note. *Dependencies:* the `writing` practice variant belongs to the content schema that `typed-task-content-…` (selected, medium) introduces — land that first so the roadmap prompt can emit writing tasks. The synchronous grading call also makes the selected `route-has-no-overall-deadline-so-one-call-can-take-90-second.md` user-visible; plan it before or alongside.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md
 ---
 # No test pins the stale-data-wins branch order on /revive, so a reorder silently regresses the cached-status case
 
@@ -21,3 +22,12 @@ A fourth case in `frontend/tests/unit/revivePage.test.ts`: load succeeds with `W
 - `frontend/stores/pet.ts:45-55` — `load()` sets `error` and leaves a previous `status` in place; `:95` — `revive()` writes the same `error` field.
 - Surviving mutation, run in `.worktrees/revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p/frontend`: moved the `v-else-if="pet.error"` block above `v-else-if="pet.status"`, then `npx vitest run tests/unit/revivePage.test.ts` → `Test Files 1 passed (1) / Tests 3 passed (3)`. Restored afterwards; `git diff --quiet pages/revive.vue` clean.
 - For contrast, two mutations on the true-wilted render path were both killed (2 of 3 cases failed each time): `PlantSvg stage="wilted"` → `"sprout"`, and `v-else-if="pet.status"` → `v-else-if="pet.status && pet.error === null && false"`.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Planned today in `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Also planned here — rides with the `/revive` copy fix in the same file).**
+
+*Confirmed (read on this branch).* `frontend/pages/revive.vue:69` (`v-else-if="pet.status"`) sits above `:109` (`v-else-if="pet.error"`), and `tests/unit/revivePage.test.ts` never combines a non-null `status` with a non-null `error`; `stores/pet.ts` writes `error` from both `load()` and `revive()`.
+
+*Fix.* Two cases: a wilted load followed by a failed reload keeps the alarm and renders no `[role="status"]` error card; a rejected `POST /pet/revive` inside the wilted branch keeps the wilted UI and shows only the page's inline alert. Reordering the two branches must turn the first red. Low: the behaviour is correct today.

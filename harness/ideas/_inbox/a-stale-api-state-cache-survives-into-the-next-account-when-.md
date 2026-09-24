@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md
 ---
 # A stale api-state cache survives into the next account when /login is the first route
 
@@ -29,3 +30,14 @@ A regression test in the shape the reviewed plan established: seed the Map-backe
 - `frontend/pages/login.vue:35` — `auth.signIn(res)` then `navigateTo('/', { replace: true })`, with no cache clear in between.
 - `frontend/service-worker/sw.ts:15-18` — `NetworkFirst({ cacheName: 'api-state', networkTimeoutSeconds: 5 })` for `/quests/daily` + `/pet/status`, keyed on URL only, no plugins.
 - `frontend/nuxt.config.ts:50` — `start_url: '/'`, which is why the installed-PWA path is safe and this is medium, not high.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Planned today in `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `frontend/middleware/auth.global.ts:7-11` — the `/login` branch returns before the `!auth.isAuthenticated` sign-out branch, so an expired session present when `/login` is the first route is never dropped; `frontend/stores/auth.ts:59-67` — `signIn()` writes the new session and never calls `clearApiCache()` (only `signOut()` does, line 74); `hydrate()`'s corrupt-storage `catch` (55-57) removes the session with no cache clear. `pages/login.vue:35` calls `auth.signIn(res)` then `navigateTo('/')`, so the next account can be served the previous learner's `/quests/daily` and `/pet/status` from `api-state` whenever the network is slow or offline.
+
+*Fix.* `signIn()` owns a clear — state and storage are written synchronously as today, then `clearApiCache()` runs and `signIn` returns that promise; `login.vue` awaits it before navigating so `/` cannot read the stale entry first. The guard's `/login` branch also signs out a session that is present but expired, so `localStorage` and the cache are clean before the consent redirect. Tests in the shape the 2026-09-23 plan established (`installSeededCaches`): `signIn()` leaves `api-state` gone and `assets` intact; the guard on `to.path === '/login'` with an expired persisted session clears the cache and does not redirect.
+
+*Priority.* Medium: the installed PWA's `start_url: '/'` routes through the existing sign-out branch, so the leak needs a bookmark or typed `/login` on a shared device — a real deployment (family tablet, classroom laptop) but not the common path.

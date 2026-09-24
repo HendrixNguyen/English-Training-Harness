@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md
 ---
 # MarkTargetMet ignores RowsAffected so a missing row silently succeeds
 
@@ -37,3 +38,12 @@ The write reports what it did, like its three siblings:
   `ErrNoPet` on zero).
 - `backend/internal/quests/fakes_test.go:130-140` - the fake creates the row, so the unit suite
   cannot see the case either.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Planned today in `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `backend/internal/quests/repo.go` `MarkTargetMet` discards the `pgconn.CommandTag`; its three siblings in `pet/repo.go` return `RowsAffected() == 1` and `PgRepo.Save` returns `ErrNoPet` on zero. Unreachable today (`Upsert` creates the row on the same call), so this is hardening, not a live defect.
+
+*Fix.* `ErrNoProgressRow` when `RowsAffected() == 0`; the fake mirrors it (today it silently creates the row); an integration assertion for a date with no row. Low.

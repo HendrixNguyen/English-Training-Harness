@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-24-run-01
+priority: medium
 ---
 # Typed task content with answer keys so every quest renders and gives instant feedback
 
@@ -35,3 +36,14 @@ Technical:
 - `frontend/utils/content.ts` (`raw` fallback = `JSON.stringify`), `frontend/pages/learn/[id].vue` (answers collected, never evaluated).
 - 1st-thinking §6.1 (3 tasks × ~10 min: vocabulary/grammar, reading/listening, practice/interactive) — "interactive" is not delivered.
 - Li (2010), *The Effectiveness of Corrective Feedback in SLA: A Meta-Analysis*: https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-9922.2010.00561.x ; feedback timing review: https://pmc.ncbi.nlm.nih.gov/articles/PMC9995700/ ; CALL feedback meta-analysis: https://tesl-ej.org/wordpress/issues/volume24/ej94/ej94a4/
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today; plan right after the settings screen.**
+
+*Is the Why real?* Yes, and it is a happy-path defect dressed as a feature: `backend/internal/airouter/prompt.go` declares `content` free-form, `ParseRoadmap` validates everything but `content`, and `frontend/utils/content.ts` falls back to `JSON.stringify` — a learner can be shown braces instead of a lesson, and no task can say right or wrong. Every later adaptive feature (re-assessment, spaced repetition, writing) needs this contract.
+
+*Achievable in one plan?* No — two, and they must land in order: (1) backend — `RoadmapSchema` gains per-type `content` shapes (`vocabulary → {words[{term, definition, example}], questions[]}`, `reading → {passage, questions[{id, prompt, options{A..D}, answer, explanation}]}`, `practice → {questions[]}`), the §6.1 system prompt states them, `ParseRoadmap` rejects mismatches (answer ∉ options, counts out of bounds) through the existing retry-once → `ai_bad_output` path, and `POST /quests/progress` persists a score (migration + backend spec DDL); (2) frontend — typed renderers on `/learn/:id` with instant feedback and a score, `raw` kept only for pre-change roadmaps (design note first). *Decision for the planner:* send `answer` to the client — the key is low-stakes, it keeps the exercise offline-capable, and server-side grading would add a POST round trip for no security gain.
+
+*Priority.* Medium, not high: the app functions and the fallback renders *something*; but it is the highest-value feature after the settings screen and gates two other selected ideas.

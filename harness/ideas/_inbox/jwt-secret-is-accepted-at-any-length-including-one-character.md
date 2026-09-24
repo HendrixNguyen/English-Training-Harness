@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md
 ---
 # JWT_SECRET is accepted at any length including one character
 
@@ -49,3 +50,7 @@ follow-up spec bug about adding `JWT_SECRET` to §8 should carry the minimum len
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: `config.Load` is presence-only; `JWT_SECRET=x` boots. HS256 with a short secret is offline-brute-forceable from one captured token, and the variable is absent from the spec's env list so it will be typed by hand. Fix is a length check (≥ 32 bytes) with a generate-hint message and a boundary table test. Folds in `jwt-verify-does-not-require-exp-or-bind-iss-aud-and-bearer-i.md` (same package, same plan: `WithExpirationRequired`, `iss`/`aud`, case-insensitive `Bearer`). Touches `config` — schedule after the cmd/api plan (which adds `GIN_MODE` to the same file).
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Planned today in `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` (Also planned here).** `config.Load` rejects a `JWT_SECRET` under 32 bytes with a generate hint; boundary table test (31 rejected, 32 accepted). From the folded `jwt-verify-…` finding the plan takes `jwt.WithExpirationRequired()` and a case-insensitive `Bearer` scheme; `iss`/`aud` binding is deliberately left out — one issuer, one audience and one secret mean a token this API mints can only be consumed by this API, and forging one already requires the secret.

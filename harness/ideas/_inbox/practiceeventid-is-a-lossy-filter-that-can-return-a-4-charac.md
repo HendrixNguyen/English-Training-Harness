@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -48,3 +48,12 @@ dropped characters.
 - `backend/internal/store/migrations/0001_init.up.sql:12` — `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
 - `backend/internal/google/handler.go:23` — `userID := auth.UserID(c)` (JWT subject).
 - Reproduced in `.worktrees/a-failed-savesyncstate-orphans-the-google-object-just-create` with a temporary probe test (deleted; worktree left clean).
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today; google test-double bundle (with `fakecalendar-returns-the-same-nextid-…` and `the-404-on-patch-fallback-…`).**
+
+*Confirmed from the idea's probe (not re-run).* `backend/internal/google/schedule.go:95-112` filters to `[a-v0-9]` with no length guard; `PracticeEventID("")` and `PracticeEventID("wxyz")` both yield the 4-character `"aelp"`. Not reachable in production: `users.id` is a UUID and `auth.UserID(c)` is the JWT subject issued from it.
+
+*Fix, when planned.* Either document and check the canonical-UUID precondition (return an error / panic on anything else) or hash the id and base32hex-encode the digest for a fixed in-bounds length; tests for empty, all-dropped and a differs-only-in-dropped-characters pair. Low.

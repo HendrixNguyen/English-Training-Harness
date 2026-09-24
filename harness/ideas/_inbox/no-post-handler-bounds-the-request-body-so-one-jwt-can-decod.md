@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md
 ---
 # No POST handler bounds the request body so one JWT can decode an unbounded answers array into memory
 
@@ -71,3 +72,7 @@ one fix, not four.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: no `MaxBytesReader` anywhere inbound; `AssessmentRequest.Answers` is an unbounded slice decoded before validation. One middleware on the `/api/v1` group fixes every handler. **Conflict note:** mounting it is one line in `cmd/api/main.go`; the server-timeout half of this finding is already carried by the cmd/api hardening plan, so plan this after that merges and keep the `main.go` diff to the single `Use(...)` line.
+
+_Evaluator, 2026-09-24 — daily evaluate._
+
+**Planned today in `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` (Also planned here).** One `http.MaxBytesReader` middleware (`backend/internal/middleware`) on the `/api/v1` group at 64 KiB; every existing `ShouldBindJSON` failure already answers `400 invalid_request`, so no handler changes. The server-timeout half stays with the approved cmd/api shutdown plan.

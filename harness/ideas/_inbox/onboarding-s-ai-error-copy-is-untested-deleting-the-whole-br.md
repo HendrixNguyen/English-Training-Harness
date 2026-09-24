@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md
 ---
 # Onboarding's ai_* error copy is untested — deleting the whole branch leaves the suite green
 
@@ -21,3 +22,12 @@ A fourth case in `tests/unit/onboardingPage.test.ts` rejects the assessment with
 - `frontend/tests/unit/onboardingPage.test.ts:102-111` — the only error case, `429 rate_limited`.
 - `backend/internal/onboarding/handler.go:44-58` — `ai_unavailable` (503), `ai_bad_output` (502), `ai_upstream_failed` (502).
 - All three confirmed live against the real Go backend (API 8107): keyless boot + valid body → `{"error":"ai_unavailable"} HTTP 503`; provider returning non-JSON → `{"error":"ai_bad_output"} HTTP 502`; provider returning 500 → `{"error":"ai_upstream_failed"} HTTP 502`. In a browser, the 502 rendered "Máy chủ AI đang bận, chưa chấm được bài. Thử lại sau ít phút." — correct, and unguarded.
+
+## Evaluation
+_Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Planned today in `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Also planned here).**
+
+*Confirmed (read on this branch).* `frontend/tests/unit/onboardingPage.test.ts` has exactly one error case (`429 rate_limited`, lines 102-111); `pages/onboarding.vue:15` — the whole `e.code.startsWith('ai_')` branch — is unguarded, and the reviewer's mutation (deleting the line) left the suite green. This is the branch a keyless first Railway deploy puts every new user on (`main.go` logs "no provider API keys set; AI-backed routes will answer 503").
+
+*Fix.* Two cases in the same `describe`: `new ApiError(503, 'ai_unavailable')` and `new ApiError(502, 'ai_bad_output')` both render the AI-specific copy and keep the learner on question 10; deleting line 15 must turn them red. The `400 invalid_request` case lands with the head idea's new copy. Medium: a test gap, but on the funnel's most frequent error path.
