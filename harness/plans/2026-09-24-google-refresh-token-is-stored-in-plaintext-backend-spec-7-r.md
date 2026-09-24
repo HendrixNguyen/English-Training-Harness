@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-24-high-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r
+worktree: .worktrees/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r
 ---
 # Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan
 
@@ -878,3 +880,72 @@ Boot refusals: Task 5 Step 5's three messages, recorded in the execution summary
 - **`ENCRYPTION_SECRET_KEY` is required, `VAPID_*` are optional** — different postures on purpose: the app is fully functional without Web Push, but storing the refresh token unsealed is the defect this plan removes, so there is no unsealed mode.
 - **CI:** `backend-integration` needs no new env — both integration tests build a `Box` from a literal key. `backend-unit` is unaffected.
 - **Existing Railway rows** (if any test users exist): after deploy, their first `POST /integrations/google/sync` answers `409 reauth_required`; the PWA's settings screen (planned separately) routes that through consent. No operator action.
+
+## Execution summary
+
+Built exactly as planned, 5 commits (one per task), no deviations from the plan's design or file structure.
+
+**Deviation (environment, not scope):** this session's write-tool sandbox is confined to paths under this session's own worktree directory. The worktree was therefore created at `.claude/worktrees/zen-burnell-b29ff5/.worktrees/<slug>` instead of the top-level `<repo>/.worktrees/<slug>` the harness convention uses elsewhere. It is still on `origin/main` and the correct `harness/*` branch; the `worktree:` frontmatter (`.worktrees/2026-09-24-high-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r`, relative to ROOT) is accurate for ROOT's own bookkeeping. No plan content or task was changed.
+
+### Verification (plan's Verification section)
+
+```
+$ gofmt -l ./internal/secrets ./internal/config ./internal/auth ./internal/google ./cmd/api
+(no output)
+
+$ go build ./... && go vet ./... && go test ./... -count=1
+ok  .../internal/airouter, auth, config, google, health, notify, onboarding, pet, quests, secrets, store  (all ok, no live service needed)
+
+$ go test ./internal/secrets/ -count=1 -v
+PASS ×7: SealThenOpenRoundTrips, SealingTwiceGivesDifferentCiphertexts, OpenRejectsATamperedCiphertext,
+         OpenRejectsAnotherKey, OpenRefusesAPlaintextRow, NewRejectsTheWrongKeyLength, ParseHexKeyBoundaries
+
+$ go test ./internal/config/ -count=1 -v -run 'JWT|Encryption'
+PASS: TestLoadRejectsAShortJWTSecret (1,31 bytes → err; 32,64 bytes → nil), TestLoadRequiresAWellFormedEncryptionKey (5 subtests)
+
+$ go test ./internal/auth/ -count=1 -v -run 'WithoutExp|CaseInsensitiveBearer'
+PASS ×2: TestVerifyRejectsATokenWithoutExp, TestRequireAcceptsACaseInsensitiveBearerScheme
+
+$ go test ./internal/google/ -count=1 -v -run 'OpenStored'
+PASS ×2: TestOpenStoredReturnsThePlaintextOfASealedToken, TestOpenStoredMapsEmptyLegacyAndTamperedToErrNoRefreshToken
+
+$ grep -n 'refreshToken, defaultTargetGoal' internal/auth/repo.go   → (no output, as expected)
+$ grep -c 'WithExpirationRequired' internal/auth/token.go            → 1
+$ grep -n 'secrets.New(cfg.EncryptionKey)\|NewPgUserRepo(pg.Pool, box)\|NewPgRefreshTokenSource(pg.Pool, box)' cmd/api/main.go → 3 lines
+$ grep -rn 'plaintext today' cmd/api/main.go internal/google/token.go ../harness/CODEMAP.md → (no output)
+$ grep -c 'ENCRYPTION_SECRET_KEY' .env.example ../harness/CODEMAP.md → 2, 3
+$ grep -c 'AES-256-GCM via ENCRYPTION' backend-spec.md → 1
+$ grep -c 'JWT\_SECRET' backend-spec.md 1st-thinking-architecture-doc.md → 1, 1
+$ git log --oneline origin/main..HEAD | wc -l → 5
+$ python3 ../tools/harness/cli.py validate; echo exit=$? → exit=0
+
+# Docker Compose (COMPOSE_PROJECT_NAME=exec-secrets, POSTGRES_PORT=55434, REDIS_PORT=56381) + TEST_DATABASE_URL/TEST_REDIS_URL:
+$ go test ./internal/auth/ ./internal/google/ -count=1 -v -run Integration -p 1
+PASS TestIntegrationUpsertCreatesThenPreservesTheLearnerState (stored value has v1: prefix, is not "rt-1", Open() == "rt-1" after the empty re-login)
+PASS TestIntegrationSyncStateIsOneRowPerUser (RefreshToken opens the seeded sealed token; the legacy-plaintext row after it → ErrNoRefreshToken)
+$ make test-integration  → every package's Integration tests PASS (airouter, auth, google, notify, onboarding, pet, quests, store) — nothing else broke
+$ docker compose -p exec-secrets down → clean
+```
+
+### Boot refusals (Task 5 Step 5)
+
+```
+$ JWT_SECRET=x ENCRYPTION_SECRET_KEY=$(openssl rand -hex 32) DATABASE_URL=postgres://x REDIS_URL=redis://x GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x go run ./cmd/api
+config: JWT_SECRET must be at least 32 bytes (generate one with: openssl rand -base64 32)   exit status 1
+
+$ JWT_SECRET=$(openssl rand -base64 32) DATABASE_URL=postgres://x REDIS_URL=redis://x GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x go run ./cmd/api
+config: ENCRYPTION_SECRET_KEY is required — 32 bytes as 64 hex characters (generate one with: openssl rand -hex 32)   exit status 1
+
+$ JWT_SECRET=$(openssl rand -base64 32) ENCRYPTION_SECRET_KEY=abc DATABASE_URL=postgres://x REDIS_URL=redis://x GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x go run ./cmd/api
+config: ENCRYPTION_SECRET_KEY must be 32 bytes as 64 hex characters (generate one with: openssl rand -hex 32)   exit status 1
+```
+
+### Runtime proof (skill step 8)
+
+- **Build:** `go build ./...` clean, `go vet ./...` clean.
+- **Whole suite, clean shell** (no DATABASE_URL/REDIS_URL/JWT_SECRET/ENCRYPTION_SECRET_KEY/GOOGLE_CLIENT_* set): `go test ./... -count=1` → every package `ok`.
+- **Boots and answers a real path:** with a real 32-byte `JWT_SECRET`, a real 64-hex `ENCRYPTION_SECRET_KEY`, and the isolated Postgres/Redis (ports 55434/56381) up, `go run ./cmd/api` on port 18083 logged migrations applied, mounted every route, and `curl http://localhost:18083/healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`. Exercising the actual sign-in/sync seal-then-open path end-to-end needs a real Google OAuth exchange (the codebase deliberately never calls Google in tests — see CODEMAP), so the seal/open code paths added by this plan are proven against the same live Postgres via the two Integration tests above (`auth` seals at upsert, `google` opens at read, legacy plaintext → `ErrNoRefreshToken`), run through the real `cmd/api` wiring's constructors.
+- **Boot refusals:** verified above — short `JWT_SECRET`, missing `ENCRYPTION_SECRET_KEY`, malformed `ENCRYPTION_SECRET_KEY` all refuse before any service dial, with the documented generate hints.
+- **Documented commands:** `make test`, `make up`/`make down` (via `docker compose up -d --wait`/`down -p exec-secrets`), `make test-integration` all ran as documented, with a unique `COMPOSE_PROJECT_NAME`/ports so no other worktree's containers were touched.
+- **Cleanup:** `go run` process and its compiled child were killed (verified via `lsof -i :18083` and `pgrep`, both empty afterward); `docker compose -p exec-secrets down` removed both containers and the network; scratch `backend/.env` deleted. `git status` in the worktree is clean.
+- **CI:** pushed `harness/2026-09-24-high-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r`; run [35958815050](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35958815050) — **success** (`backend-unit`, `backend-integration`, `harness-tooling`, `frontend` all green).
