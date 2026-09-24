@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -17,13 +18,21 @@ func listen(t *testing.T) net.Listener {
 	return ln
 }
 
-// The signal arrives while a request is in flight: serve must let it finish,
-// close the listener, and return nil — the shape a Railway SIGTERM produces.
+// The signal arrives while a request is in flight: serve must stop accepting,
+// keep running until that request finishes, then return nil — the shape a
+// Railway SIGTERM produces. The ordering is the point: serve returning lets
+// main run pg.Close()/rdb.Close() and exit, so it must not return while a
+// handler is still working. The handler blocks on release so the test can
+// observe the drain window instead of racing a sleep.
 func TestServeStopsOnContextCancelAndDrainsInFlightRequests(t *testing.T) {
 	started := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(unblock) // a failing assertion must not leave the handler wedged
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(started)
-		time.Sleep(300 * time.Millisecond) // well under ShutdownGrace
+		<-release
 		w.WriteHeader(http.StatusOK)
 	})
 	ln := listen(t)
@@ -45,19 +54,29 @@ func TestServeStopsOnContextCancelAndDrainsInFlightRequests(t *testing.T) {
 	<-started
 	cancel()
 
+	// Drain window: the handler is still blocked, so serve must still be running…
+	select {
+	case err := <-done:
+		t.Fatalf("serve returned (%v) while a request was still in flight", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	// …but new connections must already be refused (Shutdown closes listeners first).
+	if c, err := net.DialTimeout("tcp", ln.Addr().String(), time.Second); err == nil {
+		_ = c.Close()
+		t.Fatal("listener still accepting new connections during the drain")
+	}
+
+	unblock()
 	select {
 	case err := <-done:
 		if err != nil {
 			t.Fatalf("serve returned %v, want nil on a clean shutdown", err)
 		}
 	case <-time.After(ShutdownGrace + time.Second):
-		t.Fatal("serve did not return after the context was cancelled")
+		t.Fatal("serve did not return after the in-flight request finished")
 	}
 	if got := <-code; got != http.StatusOK {
 		t.Fatalf("in-flight request got %d, want 200 (drained, not cut off)", got)
-	}
-	if _, err := net.DialTimeout("tcp", ln.Addr().String(), time.Second); err == nil {
-		t.Fatal("listener still accepting connections after shutdown")
 	}
 }
 
