@@ -371,6 +371,12 @@ func TestTwoConcurrentSweepsPenaliseOnce(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		h.repo.states[fmt.Sprintf("u%02d", i)] = State{HealthPoints: 100, UpdatedAt: midnite.Add(-72 * time.Hour), JudgedThrough: judgedThrough("2026-09-21")}
 	}
+	// Neither sweep may write until both have read: with identical stale
+	// candidate lists, only the conditional write can keep the count at 20.
+	var ready sync.WaitGroup
+	ready.Add(2)
+	h.repo.afterCandidates = func() { ready.Done(); ready.Wait() }
+
 	var wg sync.WaitGroup
 	counts := make(chan int, 2)
 	for i := 0; i < 2; i++ {

@@ -19,6 +19,11 @@ type fakeRepo struct {
 	saveErr     error
 	saveErrFor  map[string]error // per-user failure of any writer; nil == fine
 	timezoneErr error
+
+	// afterCandidates, when set, runs once per SweepCandidates call after the
+	// list is built and the mutex released — a test barrier so two sweeps can
+	// be made to hold the same stale list before either writes.
+	afterCandidates func()
 }
 
 func newFakeRepo(now func() time.Time) *fakeRepo {
@@ -151,13 +156,16 @@ func (f *fakeRepo) Timezone(_ context.Context, userID string) (string, error) {
 
 func (f *fakeRepo) SweepCandidates(context.Context) ([]Candidate, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	var out []Candidate
 	for userID, s := range f.states {
 		tz, _ := f.Timezone(context.Background(), userID)
 		out = append(out, Candidate{UserID: userID, Timezone: tz, State: s})
 	}
+	f.mu.Unlock()
 	sort.Slice(out, func(i, j int) bool { return out[i].UserID < out[j].UserID })
+	if f.afterCandidates != nil {
+		f.afterCandidates()
+	}
 	return out, nil
 }
 
