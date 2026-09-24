@@ -29,6 +29,12 @@ type Config struct {
 	// VAPIDSubject is the VAPID JWT `sub` claim (a mailto: or https: URL push
 	// services may contact). NOT in spec §9; defaults to DefaultVAPIDSubject.
 	VAPIDSubject string
+	// GinMode is Gin's run mode: "release" (default), "debug" or "test". Read
+	// from GIN_MODE and validated here so the deployed binary never runs Gin's
+	// debug logging by accident — gin.Default() alone defaults to debug — and
+	// so gin.SetMode (which panics on an unknown value) is only ever given a
+	// valid one. Not in spec §8; documented in backend/.env.example.
+	GinMode string
 }
 
 // Load reads the environment and validates the required variables.
@@ -66,6 +72,16 @@ func Load() (Config, error) {
 	cfg.VAPIDPrivateKey = os.Getenv("VAPID_PRIVATE_KEY")
 	if cfg.VAPIDSubject = os.Getenv("VAPID_SUBJECT"); cfg.VAPIDSubject == "" {
 		cfg.VAPIDSubject = DefaultVAPIDSubject
+	}
+
+	cfg.GinMode = os.Getenv("GIN_MODE")
+	if cfg.GinMode == "" {
+		cfg.GinMode = "release"
+	}
+	switch cfg.GinMode {
+	case "debug", "release", "test":
+	default:
+		return Config{}, fmt.Errorf("config: GIN_MODE must be debug, release or test, got %q", cfg.GinMode)
 	}
 	return cfg, nil
 }
