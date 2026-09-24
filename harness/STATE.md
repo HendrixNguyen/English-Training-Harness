@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-24 04:39. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-24 10:51. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -87,11 +87,11 @@ _none_
 
 ## Planned (awaiting approval)
 
-- `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan [high]
+_none_
 
 ## Approved
 
-_none_
+- `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` — cmd/api: serve through an http.Server that drains on SIGINT/SIGTERM, and harden the wiring file once — Plan [high]
 
 ## Executing
 

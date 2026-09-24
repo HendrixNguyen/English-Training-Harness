@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/main-go-installs-a-signal-handler-with-no-server-shutdown-so.md
-status: draft
+status: approved
 priority: high
 merged: false
 ---
