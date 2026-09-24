@@ -21,6 +21,7 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/secrets"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
@@ -46,6 +47,13 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config: %v", err)
+	}
+
+	// Backend spec §7: users.google_refresh_token is sealed with AES-256-GCM.
+	// One Box: auth seals with it at sign-in, google opens with it at sync.
+	box, err := secrets.New(cfg.EncryptionKey)
+	if err != nil {
+		log.Fatalf("secrets: %v", err)
 	}
 
 	pg, err := store.NewPostgres(ctx, cfg.DatabaseURL)
@@ -82,7 +90,7 @@ func main() {
 	sessions := auth.NewRedisSessionStore(rdb)
 	authSvc := auth.NewService(
 		auth.NewGoogleClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
-		auth.NewPgUserRepo(pg.Pool),
+		auth.NewPgUserRepo(pg.Pool, box),
 		sessions,
 		tokens,
 	)
@@ -142,7 +150,7 @@ func main() {
 	guarded.POST("/settings/notifications", notify.SettingsHandler(notifySvc))
 
 	googleSvc := google.NewService(
-		google.NewPgRefreshTokenSource(pg.Pool), // plaintext today; the §7 encryption fix replaces only this
+		google.NewPgRefreshTokenSource(pg.Pool, box), // opens what auth sealed (backend spec §7)
 		google.NewOAuthClient(cfg.GoogleClientID, cfg.GoogleClientSecret),
 		google.NewHTTPCalendarClient(),
 		google.NewHTTPTasksClient(),

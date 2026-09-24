@@ -363,7 +363,7 @@ func NewRouter() (*Router, error) {
 
 # **7\. Security & Token Lifecycle Architecture**
 
-*  users.google\_refresh\_token encrypted with  via ENCRYPTION\_SECRET\_KEY (32-byte hex).  
+*  users.google\_refresh\_token encrypted with AES-256-GCM via ENCRYPTION\_SECRET\_KEY (32-byte hex).  
 *  JWT access token validated against Redis key (sess:{user\_id}:token) with a 24-hour TTL.
 
 |             |     |  Queues)    |     |  Tasks)      |     | Router     |
@@ -384,7 +384,7 @@ func NewRouter() (*Router, error) {
 # **9\. Deployment & Infrastructure Checklist (Railway)**
 
 1.  Provision PostgreSQL & Redis plugins on Railway and execute DDL migration scripts.  
-2.  Inject DATABASE\_URL, REDIS\_URL, GOOGLE\_CLIENT\_ID, GOOGLE\_CLIENT\_SECRET, GEMINI\_API\_KEY, OPENAI\_API\_KEY, DEEPSEEK\_API\_KEY, ENCRYPTION\_SECRET\_KEY, and VAPID\_PUBLIC\_KEY/VAPID\_PRIVATE\_KEY.  
+2.  Inject DATABASE\_URL, REDIS\_URL, GOOGLE\_CLIENT\_ID, GOOGLE\_CLIENT\_SECRET, GEMINI\_API\_KEY, OPENAI\_API\_KEY, DEEPSEEK\_API\_KEY, ENCRYPTION\_SECRET\_KEY, JWT\_SECRET (at least 32 bytes), and VAPID\_PUBLIC\_KEY/VAPID\_PRIVATE\_KEY.  
 3.  Deploy compiled Go binary in a lightweight Docker container on Railway.
 
 # 

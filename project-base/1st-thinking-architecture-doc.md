@@ -699,6 +699,10 @@ return parsedResp.Choices\[0\].Message.Content, nil
 
     \*   \`VAPID\_PUBLIC\_KEY\` & \`VAPID\_PRIVATE\_KEY\`: Web Push parameters
 
+    \*   \`JWT\_SECRET\`: HS256 session-token secret, at least 32 bytes
+
+    \*   \`ENCRYPTION\_SECRET\_KEY\`: 32-byte hex key for the refresh-token cipher
+
 3\.  \*\*Build & Deploy:\*\*
 
     \*   Deploy Nuxt 3 PWA with \`@vite-pwa/nuxt\` configured for service worker caching.
