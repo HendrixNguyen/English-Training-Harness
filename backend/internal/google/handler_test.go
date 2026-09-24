@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -94,5 +95,16 @@ func TestSyncHandlerMapsADeadlineTo502(t *testing.T) {
 	w := post(t, router(h.svc, "u1"))
 	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
 		t.Fatalf("status %d body %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSyncHandlerMapsAnUnconsumed409To502(t *testing.T) {
+	h := newHarness()
+	// A 409 from tasklists.insert is not the Calendar insert's "ours already";
+	// nothing consumes it, so it must read as "Google is being difficult, retry".
+	h.tasks.errs = map[string]error{"InsertTaskList": fmt.Errorf("%w: tasks returned 409", ErrAlreadyExists)}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
+		t.Fatalf("status %d body %s, want 502 google_unavailable (CODEMAP: other Google failures → 502)", w.Code, w.Body.String())
 	}
 }

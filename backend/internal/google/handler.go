@@ -32,10 +32,14 @@ func SyncHandler(svc *Service) gin.HandlerFunc {
 		var up *UpstreamError
 		switch {
 		case errors.Is(err, ErrReauthRequired):
-			// The refresh token is gone or revoked: the client sends the user
-			// back through /login (auth.AuthCodeURL re-requests consent).
+			// The refresh token is gone or revoked, or Google rejected the
+			// scopes: the client sends the user back through /login
+			// (auth.AuthCodeURL re-requests consent).
 			c.JSON(http.StatusConflict, gin.H{"error": "reauth_required"})
-		case errors.As(err, &up), errors.Is(err, context.DeadlineExceeded):
+		case errors.As(err, &up), errors.Is(err, context.DeadlineExceeded), errors.Is(err, ErrAlreadyExists):
+			// Quota/throttle, 5xx, our 60 s deadline, or a 409 the insert path
+			// did not consume (a concurrent patch, any Tasks conflict): Google
+			// was the problem and a retry is the answer — 502, never 500.
 			c.JSON(http.StatusBadGateway, gin.H{"error": "google_unavailable"})
 		case err != nil:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
