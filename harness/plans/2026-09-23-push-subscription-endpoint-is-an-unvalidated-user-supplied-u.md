@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-23-notify-web-push-subscriptions-and-delayed-reminder-queue.md
 branch: harness/2026-09-23-high-notify-web-push-subscriptions-and-delayed-reminder-queue
 worktree: .worktrees/notify-web-push-subscriptions-and-delayed-reminder-queue

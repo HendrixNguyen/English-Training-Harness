@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/expired-session-sign-out-leaves-per-user-api-responses-in-th.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-23-high-expired-session-sign-out-leaves-per-user-api-responses-in-th
 worktree: .worktrees/expired-session-sign-out-leaves-per-user-api-responses-in-th
 ---
