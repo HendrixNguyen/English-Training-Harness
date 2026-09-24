@@ -620,3 +620,19 @@ func TestFakeMarkTargetMetRefusesAMissingRowLikeTheSQL(t *testing.T) {
 		t.Error("the fake created a row; the SQL UPDATE cannot")
 	}
 }
+
+func TestALostCounterNeverLowersTheDurableMinutes(t *testing.T) {
+	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
+	h := newHarness(t, now)
+	ctx := context.Background()
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err != nil { // row: 30 minutes
+		t.Fatal(err)
+	}
+	h.counter.totals = map[string]int64{} // the counter restarts at 0…
+	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 60); err != nil { // …so this report upserts minutes = 1
+		t.Fatal(err)
+	}
+	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 30 || !row.targetMet {
+		t.Errorf("row = %+v after a short report on a lost counter, want minutes 30 (never lowered) and target met", row)
+	}
+}
