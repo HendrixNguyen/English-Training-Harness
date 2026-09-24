@@ -51,15 +51,15 @@ func (s *Service) Ensure(ctx context.Context, userID string) (State, error) {
 // §6.2), and may fire it again after a failure on the same call or after a
 // lost Redis counter. The pet owns the once: Repo.SaveTargetMet's predicate
 // on last_target_met_date refuses a second write for the same (or an
-// earlier) local date, and that refusal is a silent no-op — quests logs hook
-// errors, and "already counted" is not one. There is deliberately no Go-side
-// pre-check: one mechanism, in the database, is what the tests pin.
+// earlier) local date, and that refusal is a silent no-op. Ensure only
+// creates the row; the arithmetic runs in SQL on the live row, so nothing
+// read here can go stale before the write — a sweep's -30 landing between
+// the two calls is kept, not overwritten.
 func (s *Service) OnTargetMet(ctx context.Context, userID, localDate string) error {
-	st, err := s.Ensure(ctx, userID)
-	if err != nil {
+	if err := s.repo.Ensure(ctx, userID); err != nil {
 		return err
 	}
-	_, err = s.repo.SaveTargetMet(ctx, userID, ApplyTargetMet(st, s.now(), localDate))
+	_, err := s.repo.SaveTargetMet(ctx, userID, s.now(), localDate)
 	return err
 }
 

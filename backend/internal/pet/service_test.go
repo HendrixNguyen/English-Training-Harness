@@ -371,6 +371,12 @@ func TestTwoConcurrentSweepsPenaliseOnce(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		h.repo.states[fmt.Sprintf("u%02d", i)] = State{HealthPoints: 100, UpdatedAt: midnite.Add(-72 * time.Hour), JudgedThrough: judgedThrough("2026-09-21")}
 	}
+	// Neither sweep may write until both have read: with identical stale
+	// candidate lists, only the conditional write can keep the count at 20.
+	var ready sync.WaitGroup
+	ready.Add(2)
+	h.repo.afterCandidates = func() { ready.Done(); ready.Wait() }
+
 	var wg sync.WaitGroup
 	counts := make(chan int, 2)
 	for i := 0; i < 2; i++ {
@@ -589,5 +595,26 @@ func TestSweepContinuesPastAUserWhoseWriteFails(t *testing.T) {
 	}
 	if n != 1 || h.repo.states["u1"].HealthPoints != 100 || h.repo.states["u2"].HealthPoints != 70 {
 		t.Errorf("n=%d u1=%d u2=%d; want 1, u1 untouched, u2 penalised", n, h.repo.states["u1"].HealthPoints, h.repo.states["u2"].HealthPoints)
+	}
+}
+
+func TestFakeSaveKeepsAMarkerItWasNotGiven(t *testing.T) {
+	h := newHarness(sept22)
+	marker := "2026-09-22"
+	h.repo.states["u1"] = State{HealthPoints: 0, Stage: StageWilted, LastTargetMetDate: &marker}
+
+	// Revive's Save carries the pre-image's marker — nil when the pre-image
+	// predates a concurrent OnTargetMet. GREATEST(last_target_met_date, NULL)
+	// keeps the stored one.
+	if err := h.repo.Save(ctx, "u1", State{HealthPoints: 50, Stage: StageSprout}); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.repo.states["u1"].LastTargetMetDate; got == nil || *got != marker {
+		t.Errorf("Save with a nil marker left last_target_met_date = %v, want %s kept", got, marker)
+	}
+	earlier := "2026-01-01"
+	_ = h.repo.Save(ctx, "u1", State{HealthPoints: 50, Stage: StageSprout, LastTargetMetDate: &earlier})
+	if got := h.repo.states["u1"].LastTargetMetDate; got == nil || *got != marker {
+		t.Errorf("Save with an earlier marker moved last_target_met_date to %v, want %s kept", got, marker)
 	}
 }

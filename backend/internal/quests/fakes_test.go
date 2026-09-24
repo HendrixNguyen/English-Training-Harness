@@ -132,11 +132,21 @@ func (f *fakeProgressRepo) MarkTargetMet(_ context.Context, userID, localDate st
 		return f.markErr
 	}
 	key := userID + "|" + localDate
-	row := f.rows[key]
+	row, ok := f.rows[key]
+	if !ok {
+		return ErrNoProgressRow
+	}
 	row.targetMet = true
 	f.rows[key] = row
 	f.log.add("MARK TARGET MET %s", key)
 	return nil
+}
+
+func (f *fakeProgressRepo) TargetMet(_ context.Context, userID, localDate string) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.rows[userID+"|"+localDate].targetMet, nil
 }
 
 type fakePet struct {

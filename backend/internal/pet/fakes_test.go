@@ -19,6 +19,11 @@ type fakeRepo struct {
 	saveErr     error
 	saveErrFor  map[string]error // per-user failure of any writer; nil == fine
 	timezoneErr error
+
+	// afterCandidates, when set, runs once per SweepCandidates call after the
+	// list is built and the mutex released — a test barrier so two sweeps can
+	// be made to hold the same stale list before either writes.
+	afterCandidates func()
 }
 
 func newFakeRepo(now func() time.Time) *fakeRepo {
@@ -79,6 +84,11 @@ func (f *fakeRepo) Save(_ context.Context, userID string, s State) error {
 	} else {
 		s.JudgedThrough = cur.JudgedThrough
 	}
+	if s.LastTargetMetDate != nil {
+		s.LastTargetMetDate = laterDate(cur.LastTargetMetDate, *s.LastTargetMetDate) // GREATEST(last_target_met_date, $7)
+	} else {
+		s.LastTargetMetDate = cur.LastTargetMetDate
+	}
 	f.states[userID] = s
 	return nil
 }
@@ -86,20 +96,20 @@ func (f *fakeRepo) Save(_ context.Context, userID string, s State) error {
 // dateBefore is the SQL predicate `col IS NULL OR col < $d`.
 func dateBefore(col *string, d string) bool { return col == nil || *col < d }
 
-func (f *fakeRepo) SaveTargetMet(_ context.Context, userID string, s State) (bool, error) {
+// SaveTargetMet mirrors saveTargetMetSQL: read and write under one lock is
+// the fake's "one statement"; ApplyTargetMet is the shared reference.
+func (f *fakeRepo) SaveTargetMet(_ context.Context, userID string, now time.Time, localDate string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.writeErr(userID); err != nil {
 		return false, err
 	}
 	cur, ok := f.states[userID]
-	if !ok || s.LastTargetMetDate == nil || !dateBefore(cur.LastTargetMetDate, *s.LastTargetMetDate) {
+	if !ok || !dateBefore(cur.LastTargetMetDate, localDate) {
 		return false, nil
 	}
 	f.saved++
-	s.PlantName = cur.PlantName
-	s.JudgedThrough = cur.JudgedThrough
-	f.states[userID] = s
+	f.states[userID] = ApplyTargetMet(cur, now, localDate)
 	return true, nil
 }
 
@@ -146,13 +156,16 @@ func (f *fakeRepo) Timezone(_ context.Context, userID string) (string, error) {
 
 func (f *fakeRepo) SweepCandidates(context.Context) ([]Candidate, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	var out []Candidate
 	for userID, s := range f.states {
 		tz, _ := f.Timezone(context.Background(), userID)
 		out = append(out, Candidate{UserID: userID, Timezone: tz, State: s})
 	}
+	f.mu.Unlock()
 	sort.Slice(out, func(i, j int) bool { return out[i].UserID < out[j].UserID })
+	if f.afterCandidates != nil {
+		f.afterCandidates()
+	}
 	return out, nil
 }
 
