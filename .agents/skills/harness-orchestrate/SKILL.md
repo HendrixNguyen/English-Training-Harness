@@ -5,7 +5,7 @@ description: Drive the harness end to end — status, one bounded autonomous run
 
 # harness-orchestrate
 
-Subcommands: `status`, `run [--auto-approve] [--stages ideate,evaluate,execute,review]`, `daily-pr`, `merge <plan>`, `prune`.
+Subcommands: `status`, `run [--stages ideate,evaluate,execute,review]`, `daily-pr`, `merge <plan>`, `prune`.
 
 ## status
 `python3 tools/harness/cli.py state`; then `python3 tools/harness/cli.py stale-worktrees` and append a "Stale worktrees" list. Print.
@@ -17,7 +17,7 @@ Idempotent; safe to call on a schedule. `LOG=harness/runs/$(date +%Y%m%dT%H%M%S)
 2. **ideate** if enabled and there are no `proposed` ideas in any run folder (inbox bugs do not count — they are the evaluator's, not the ideator's): spawn the ideator role (features mode, count 5). Log the run path.
 3. **blockers** — run `python3 tools/harness/cli.py blockers`. Any listed bug is holding up an unmerged branch: spawn the evaluator on those first, ahead of the ordinary queue, and log them.
 4. **evaluate** if enabled and `next --stage evaluate --all` is non-empty: spawn the evaluator role on all of them — features and inbox bugs together; the evaluator ranks. Log verdicts.
-4. **auto-approve** if `--auto-approve`: for each `draft` plan whose idea is `type: mvp-slice` **or** (`type: bug` and `priority: high`): `cli.py set <plan> status=approved`. Log each. Never auto-approve features.
+4. **auto-approve** (always on; owner, 2026-09-24): the evaluator approves eligible plans as it writes them; this step catches any eligible `draft` left over — every `type: bug` plan (any priority, blockers included), every `type: mvp-slice` plan, and every `type: feature` plan whose idea is `priority: high`: `cli.py set <plan> status=approved`. Log each. Medium/low feature plans stay `draft` for `/approve`. (`--auto-approve` is accepted and ignored for old schedules.)
 5. **execute** if enabled and `next --stage execute` is non-empty: spawn the executor role on exactly that one plan. Log status, branch, PR.
 6. **review** if enabled: for each path in `next --stage review --all`: spawn the reviewer role. Log verdicts and bugs filed.
 7. `cli.py state`; append "Awaiting human: N draft plans, M passed reviews to merge" to `$LOG`; commit `harness/` with `harness: orchestrator run $(basename $LOG .log)`.

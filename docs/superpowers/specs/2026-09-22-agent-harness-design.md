@@ -149,7 +149,7 @@ The reviewer therefore does not spend its budget asking "does it run" — it re-
 | — → `proposed` | ideator, human (`/idea`), reviewer (into `_inbox/`) |
 | `proposed` → `selected` / `rejected` (+ priority) | evaluator |
 | `selected` → `planned`; plan created `draft` | evaluator |
-| plan `draft` → `approved` | human (`/approve`); orchestrator `--auto-approve` for `priority: high` bugs and `mvp-slice` only |
+| plan `draft` → `approved` | evaluator, automatically, for every bug, every `mvp-slice` and `priority: high` features (owner, 2026-09-24); human (`/approve`) for medium/low features |
 | `approved` → `executing` → `done` / `failed` | executor |
 | review written; bugs → `_inbox/`; blockers get `blocks:` | reviewer |
 | blocker → fix plan with `amends:`, executed on the same branch | evaluator, then executor |
@@ -164,7 +164,7 @@ The reviewer therefore does not spend its budget asking "does it run" — it re-
 | `/ideate [--mvp] [--count N]` | New run folder; default 5 ideas |
 | `/idea "<text>"` | Human idea → evaluator |
 | `/evaluate [<idea> \| --run <run>]` | One idea or all `proposed` in run |
-| `/approve <plan>` | `draft → approved`. The safety boundary. |
+| `/approve <plan>` | `draft → approved` for plans outside the auto-approve rule (medium/low features). |
 | `/execute [<plan>]` | Default: highest-priority `approved` |
 | `/review [<plan>]` | Default: oldest `done` without review |
 | `/harness status` | Regenerate + print `STATE.md`, list stale worktrees |
@@ -172,13 +172,13 @@ The reviewer therefore does not spend its budget asking "does it run" — it re-
 | `/harness prune` | Remove worktrees of merged plans |
 | `cli.py blockers [--plan P]` | List unresolved blockers; exit 1 if any (used by merge and by the orchestrator) |
 
-**Orchestrator:** `/harness run [--auto-approve] [--stages a,b,c]`
+**Orchestrator:** `/harness run [--stages a,b,c]`
 
 ```
 1. validate harness/ → list malformed files, skip them
 2. if _inbox non-empty OR no proposed ideas → ideate
 3. if proposed ideas → evaluate all
-4. if --auto-approve → approve eligible drafts (high bugs, mvp-slices)
+4. approve any eligible draft the evaluator left (all bugs, mvp-slices, high features)
 5. if approved plans → execute ONE (highest priority, lowest order)
 6. if done plans lack review → review them
 7. regenerate STATE.md; write harness/runs/<timestamp>.log
@@ -203,7 +203,7 @@ Deferred: vector/semantic search. Revisit when CODEMAP + `rg` stop being enough;
 
 The harness initialises the repo. `main` is the integration branch and the main checkout is never modified by any role.
 
-**Executor:** for each plan, `git worktree add .worktrees/<slug> -b harness/<date>-<priority>-<slug> main`. All code changes, builds, and tests happen inside that worktree. Commits land on `harness/<slug>`. The plan's frontmatter records `branch:` and `worktree: .worktrees/<slug>`. The executor never merges and never deletes the worktree.
+**Executor:** for each plan, `git fetch origin main && git worktree add .worktrees/<slug> -b harness/<date>-<priority>-<slug> origin/main` (always the fetched `origin/main`, never a stale local `main`). All code changes, builds, and tests happen inside that worktree. Commits land on `harness/<slug>`. The plan's frontmatter records `branch:` and `worktree: .worktrees/<slug>`. The executor never merges and never deletes the worktree.
 
 **Reviewer:** works inside the same worktree — runs the build and tests there, diffs `harness/<slug>` against `main`, and checks the result against plan and idea. The review file links branch, worktree, and the `git diff main...harness/<slug> --stat` summary.
 
@@ -218,7 +218,7 @@ The plan's frontmatter records `pr:` (URL). If no GitHub remote is configured or
 
 **Reviewer** posts its verdict as a PR comment (summary + link to the review file) and, on `pass`, marks the PR ready (`gh pr ready`). On `fail` the PR stays Draft.
 
-**Human merge:** after a `pass` or `pass-with-bugs` review, the human merges — either in GitHub or via `/harness merge <plan>`, which merges `--no-ff` into `main`, pushes `main`, removes the worktree, deletes the branch, and sets `merged: true`. A `fail` review leaves worktree and PR in place. Merging is human-only in every mode, including `--auto-approve`.
+**Human merge:** after a `pass` or `pass-with-bugs` review, the human merges — either in GitHub or via `/harness merge <plan>`, which merges `--no-ff` into `main`, pushes `main`, removes the worktree, deletes the branch, and sets `merged: true`. A `fail` review leaves worktree and PR in place. Merging is human-only in every mode, including auto-approved plans.
 
 **Push permission:** the harness may push `harness/*` branches and open/update Draft PRs without asking. It never pushes `main` except inside `/harness merge`, which a human invoked.
 
@@ -231,7 +231,7 @@ The plan's frontmatter records `pr:` (URL). If no GitHub remote is configured or
 1. `/ideate` against the spec alone → well-formed idea files, `## Why` tied to spec goals, `STATE.md` shows them Proposed.
 2. `/idea "add UNIQUE(user_id) to pet_states in the DDL doc"` → evaluate → `/approve` → `/execute` → `/review` → `/harness merge`: every transition fires, a worktree is created and removed, a Draft PR titled `[2026-09-22][P<n>] …` is opened then marked ready by the reviewer, the change lands on `main` only via the merge command, review verdict `pass`.
 3. `/harness run` with nothing to do → exits cleanly, writes a log, changes nothing.
-4. `/ideate --mvp` → 8 ordered `mvp-slice` ideas; `/harness run --auto-approve` executes exactly the `order: 1` slice.
+4. `/ideate --mvp` → 8 ordered `mvp-slice` ideas; `/harness run` executes exactly the `order: 1` slice.
 
 ## 10. Build order
 
