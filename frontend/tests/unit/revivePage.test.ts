@@ -74,4 +74,24 @@ describe('/revive (wireframe 7.5) when GET /pet/status fails', () => {
     expect(w.find('[role="alert"]').text()).toContain('héo rũ')
     expect(w.find('[role="status"]').exists()).toBe(false)
   })
+
+  it('renders the missed-days sentence with its space, and cleanly with no last practice', async () => {
+    vi.setSystemTime(new Date('2026-09-23T13:00:00Z')) // 3 whole days after last_practiced_at; Date only, timers untouched
+    try {
+      routeGet(() => Promise.resolve(WILTED))
+      const w = mountPage()
+      await flushPromises()
+      expect(w.text()).toContain('Bạn đã bỏ học 3 ngày liên tiếp. Hãy hoàn thành')
+      expect(w.text()).not.toContain('bỏ học3')
+    } finally {
+      vi.useRealTimers()
+    }
+
+    setActivePinia(createPinia())
+    routeGet(() => Promise.resolve({ ...WILTED, last_practiced_at: null }))
+    const w2 = mountPage()
+    await flushPromises()
+    expect(w2.text()).toContain('Bạn đã bỏ học. Hãy hoàn thành')
+    expect(w2.text()).not.toContain('bỏ học  ')
+  })
 })

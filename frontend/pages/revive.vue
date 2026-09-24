@@ -17,6 +17,10 @@ onMounted(async () => {
 })
 
 const missedDays = computed(() => daysSince(pet.status?.last_practiced_at ?? null))
+// One string, computed here: a leading space inside <template v-if> is a
+// text node Vue's whitespace condensing strips, which rendered "bỏ học2 ngày".
+const missedLine = computed(() =>
+  missedDays.value === null ? 'Bạn đã bỏ học.' : `Bạn đã bỏ học ${missedDays.value} ngày liên tiếp.`)
 const today = computed(() => quest.daily?.date ?? new Date().toISOString().slice(0, 10))
 const challengeActive = computed(() => pet.challenge !== null && pet.challenge.date === today.value)
 const progress = computed(() => pet.challengeProgress(quest.accumulatedSeconds))
@@ -80,7 +84,7 @@ async function revive() {
 
       <AppCard v-if="!challengeActive" class="mt-4">
         <p class="font-display text-lg">
-          "Bạn đã bỏ học<template v-if="missedDays !== null"> {{ missedDays }} ngày liên tiếp</template>. Hãy hoàn thành Bài kiểm tra Cứu Cây 15 phút để hồi sinh!"
+          "{{ missedLine }} Hãy hoàn thành Bài kiểm tra Cứu Cây 15 phút để hồi sinh!"
         </p>
         <AppButton class="mt-4" variant="danger" block :loading="busy" @click="revive">
           🚨 Cứu cây ngay (Quiz 15 phút)
