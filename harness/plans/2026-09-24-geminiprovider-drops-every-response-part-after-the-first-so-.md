@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-24-medium-geminiprovider-drops-every-response-part-after-the-first-so-
+worktree: .worktrees/geminiprovider-drops-every-response-part-after-the-first-so-
 ---
 # GeminiProvider joins every response part, names a non-STOP finish reason, surfaces a safety block, and asks for enough output tokens — Plan
 
@@ -260,3 +262,67 @@ Expected: no gofmt output; every `TestGemini*` PASS; whole backend PASS. Push; `
 
 - `thinkingConfig` is deliberately not set: `gemini-2.5-flash` applies `maxOutputTokens` to the visible answer. If production logs show `finishReason MAX_TOKENS` on roadmaps despite this budget, the fix is `GEMINI_MODEL`/config, or a `thinkingBudget` field added then — not now.
 - This ticket makes feature F2 (typed content, larger answers) safer but F2 does not depend on it.
+
+## Execution summary
+
+**Status: done.** All 5 tasks implemented exactly as specified, each with a failing-test-first commit, in `.worktrees/geminiprovider-drops-every-response-part-after-the-first-so-` on branch `harness/2026-09-24-medium-geminiprovider-drops-every-response-part-after-the-first-so-`, based on freshly fetched `origin/main`.
+
+**Deviations:** none. The plan's exact test names, struct shapes, comments, and implementation matched `main` @ current `origin/main` (root cause was re-confirmed identical to the plan's description before starting).
+
+Commits:
+- `7dc57fe` airouter: GeminiProvider concatenates every part of the candidate
+- `af8da7e` airouter: Gemini non-STOP finishReason is a named error, not a truncated success
+- `0ee66aa` airouter: Gemini surfaces promptFeedback.blockReason on an empty answer
+- `49091ef` airouter: Gemini requests maxOutputTokens sized for an 84-task roadmap
+- `87ea60f` codemap: Gemini response handling
+
+**Plan's Verification section output:**
+
+```
+$ gofmt -l . ; go vet ./... && go test -timeout 120s ./internal/airouter -count=1 -run 'Gemini' -v 2>&1 | grep -E '^(--- FAIL|ok|FAIL|=== RUN)' | head -40
+internal/quests/handler_test.go   # pre-existing gofmt finding, untouched by this plan (last modified by commit 267ab95, no diff from this branch); out of scope for airouter-only plan
+internal/quests/repo.go           # same — pre-existing, unrelated
+=== RUN   TestGeminiSendsTheSpec62RequestAndReturnsTheText
+=== RUN   TestGeminiJoinsEveryPartOfTheFirstCandidate
+=== RUN   TestGeminiNamesANonStopFinishReason
+=== RUN   TestGeminiNamesANonStopFinishReason/MAX_TOKENS_with_partial_text
+=== RUN   TestGeminiNamesANonStopFinishReason/SAFETY
+=== RUN   TestGeminiNamesANonStopFinishReason/RECITATION
+=== RUN   TestGeminiNamesANonStopFinishReason/no_finishReason_(older_responses)
+=== RUN   TestGeminiNamesANonStopFinishReason/STOP
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON/not_json
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON/prompt_blocked
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON/500
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON/429
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON/empty_candidates
+=== RUN   TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON/empty_parts
+=== RUN   TestGeminiDefaultsToTheRealEndpoint
+=== RUN   TestUnknownTaskDefaultsToGemini
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter	0.703s
+
+$ go test -timeout 300s ./...
+ok  	.../internal/airouter	0.989s
+ok  	.../internal/auth	4.841s
+ok  	.../internal/config	2.214s
+ok  	.../internal/google	3.419s
+ok  	.../internal/health	6.163s
+ok  	.../internal/notify	6.779s
+ok  	.../internal/onboarding	7.592s
+ok  	.../internal/pet	8.461s
+ok  	.../internal/quests	9.811s
+ok  	.../internal/store	8.962s
+```
+
+`go vet ./...` on the whole backend: clean, no output.
+
+**Runtime proof (Definition of done, step 8):**
+
+1. **Build** — `go build -o /tmp/b3gemini-api ./cmd/api` → clean, no errors/warnings.
+2. **Full suite** — see above, ran from a clean shell (only the env vars this run itself set); every package `ok`.
+3. **Boots and answers a real path** — Docker containers `b3gemini-postgres-1` / `b3gemini-redis-1` started via `docker compose -p b3gemini up -d --wait --wait-timeout 120` on host ports 15435/16382 (scratch `backend/.env` with `POSTGRES_PORT=15435`/`REDIS_PORT=16382`, deleted afterwards). API booted with `DATABASE_URL=postgres://english:english@localhost:15435/english?sslmode=disable REDIS_URL=redis://localhost:16382/0 PORT=18083 GOOGLE_CLIENT_ID=test-client GOOGLE_CLIENT_SECRET=test-secret JWT_SECRET=test-jwt-secret`; log showed migrations applied and `listening on :18083`. `curl --max-time 10 http://localhost:18083/healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`.
+   - The real Gemini API was never called (`GEMINI_API_KEY` unset — log confirms "airouter: no provider API keys set"). Per this plan's own change, the concatenation/finishReason/blockReason/maxOutputTokens behavior is proven entirely by the `httptest`-backed unit tests above (`TestGeminiJoinsEveryPartOfTheFirstCandidate`, `TestGeminiNamesANonStopFinishReason`, the `prompt blocked` row, and the `maxOutputTokens` assertion in `TestGeminiSendsTheSpec62RequestAndReturnsTheText`); the boot/health check proves the binary still starts and serves with these changes present.
+4. **Documented commands** — `gofmt -l internal/airouter`, `go vet ./internal/airouter`, package test runs, `go test ./...`, `make up`/`make down` (via `docker compose -p b3gemini`) all run exactly as documented; all behaved as expected.
+5. **Cleanup verified** — process killed (`pgrep -fl b3gemini-api` empty), `docker compose -p b3gemini down` removed both containers and the network (`docker ps -a --filter name=b3gemini` empty), scratch `backend/.env` and the built binary/log deleted. `git status` in the worktree: clean.
+
+**CI:** branch pushed; run green — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36026652849 (`backend-integration`, `backend-unit`, `frontend`, `harness-tooling` all passed).

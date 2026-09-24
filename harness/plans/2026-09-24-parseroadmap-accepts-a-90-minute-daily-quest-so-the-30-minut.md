@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-24-medium-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut
+worktree: .worktrees/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut
 ---
 # ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan
 
@@ -282,3 +284,39 @@ Expected: no gofmt output, `ok …/internal/airouter`, `ok …/internal/onboardi
 
 - The bands (`5..15`, `20..40`) are the evaluator's reading of "approximately"; the owner can tighten them by editing two constants — no other code depends on the numbers.
 - A model that consistently overshoots will now hit `ai_bad_output` after one retry instead of storing an unachievable day; if that happens in production the answer is a stronger prompt line, not a wider band.
+
+## Execution summary
+
+Built exactly as specified — no deviations from the plan. All four tasks landed as separate commits in `.worktrees/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut` on `harness/2026-09-24-medium-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut`, based on freshly fetched `origin/main`:
+
+- `c03d982` airouter: ParseRoadmap enforces the §6.1 day budget (tasks 5..15, day 20..40)
+- `b577faa` airouter: ParseRoadmap rejects a module whose week disagrees with its position
+- `1f3a7b3` airouter: gofmt roadmap_test.go (formatting fixup after Task 2's edit; `gofmt -l` was clean before commit but the mid-loop constant edits shifted map-literal alignment — caught and fixed before the next task, not left for review)
+- `6f89f4c` airouter: ParseRoadmap requires roadmap, module and day titles
+- `42f8fd6` codemap: ParseRoadmap day budget, week and title rules
+
+One deviation: F2 (typed task content) was not yet on `origin/main` when this branch was cut, so the conflict note's "fetch + merge, keep both sides" step did not apply — nothing to merge.
+
+**Plan verification (from `backend/`):**
+```
+gofmt -l . ; go vet ./... && go test -timeout 120s ./internal/airouter ./internal/onboarding -count=1 -v 2>&1 | grep -E '^(--- FAIL|ok|FAIL)'
+  -> internal/quests/handler_test.go, internal/quests/repo.go   (pre-existing gofmt findings on origin/main, untouched by this plan — internal/airouter and internal/onboarding are clean)
+  -> ok  .../internal/airouter
+  -> ok  .../internal/onboarding
+
+go test -timeout 300s ./...
+  -> ok for every package (airouter, auth, config, google, health, notify, onboarding, pet, quests, store); cmd/api has no test files
+```
+
+**Runtime proof (step 8, ports/project per instructions: API 18082, Postgres 15434, Redis 16381, `COMPOSE_PROJECT_NAME=b2roadmap`):**
+- `go build ./...` — clean, no errors/warnings.
+- Whole suite from a clean shell (`env -u DATABASE_URL -u REDIS_URL -u GOOGLE_CLIENT_ID -u GOOGLE_CLIENT_SECRET -u GEMINI_API_KEY -u OPENAI_API_KEY -u DEEPSEEK_API_KEY -u VAPID_PUBLIC_KEY -u VAPID_PRIVATE_KEY -u GEMINI_BASE_URL -u OPENAI_BASE_URL -u DEEPSEEK_BASE_URL go test -timeout 300s ./...`) — all packages `ok`.
+- `docker compose up -d --wait --wait-timeout 120` (scratch `.env`: `POSTGRES_PORT=15434`, `REDIS_PORT=16381`, `COMPOSE_PROJECT_NAME=b2roadmap`) — both `postgres` and `redis` reported `Healthy`.
+- Built the API to a scratch path and ran it with `PORT=18082`, `DATABASE_URL=postgres://english:english@localhost:15434/english?sslmode=disable`, `REDIS_URL=redis://localhost:16381/0`, dummy `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`JWT_SECRET` — it applied migrations (`0001_init 0002_google_sync 0003_pet_verdict_dates`) and started listening on `:18082`.
+- `curl --max-time 10 http://localhost:18082/healthz` -> `{"postgres":"ok","redis":"ok","status":"ok"}` (200) — real end-to-end path through both backing services.
+- `curl --max-time 10 http://localhost:18082/api/v1/onboarding/quiz` -> `{"error":"unauthorized"}` (401) — auth middleware correctly gates the route.
+- Stopped the API process, then `make test` (`go test ./...`) — all packages `ok`.
+- Brought the scoped stack back up and ran the Makefile's documented `test-integration` command (`go test ./... -count=1 -v -run Integration -p 1 -timeout 120s`) with `TEST_DATABASE_URL=postgres://english:english@localhost:15434/english?sslmode=disable` and `TEST_REDIS_URL=redis://localhost:16381/0` — every `Integration` test passed, including `TestIntegrationSaveAssessmentPersists84ExercisesAndDeactivatesPrevious` (the onboarding path that exercises `ParseRoadmap` end to end) and the `airouter`/`store` integration tests.
+- Cleanup verified: `docker compose down` removed both containers and the network; scratch `backend/.env` deleted; `pgrep -fl exe/api` / `pgrep -fl b2roadmap-api` both empty; `docker ps --filter name=b2roadmap` empty; `git status --short` in the worktree clean before recording this summary.
+
+CI: pushed `harness/2026-09-24-medium-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut`; run green — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36026829877 (frontend, backend-integration, backend-unit, harness-tooling all passed).

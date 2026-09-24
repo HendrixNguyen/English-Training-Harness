@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro
+worktree: .worktrees/every-google-403-becomes-409-reauth-required-so-a-quota-erro
 ---
 # Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan
 
@@ -451,3 +453,86 @@ Expected: no gofmt output; the five new/extended tests PASS; `ok …/internal/go
 
 - Google's 403 envelope sometimes carries `error.status: "PERMISSION_DENIED"` / `"RESOURCE_EXHAUSTED"` (newer APIs) instead of `errors[].reason`. Calendar v3 and Tasks v1 use the `errors[]` form; if a log line later shows a 403 with an empty reason and a `RESOURCE_EXHAUSTED` status, extend `googleErrorReason` to read `error.status` — do not pre-build it (YAGNI).
 - No rate limiting of the sync route itself is added here (the plan's `Notes → Rate/abuse` gap stays open as a separate idea).
+
+## Execution summary
+
+Built and pushed as planned; all 5 tasks landed exactly as written, no deviations from the plan's intent.
+
+**Commits** (branch `harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro`, based on freshly fetched `origin/main`):
+1. `c06961d` — a throttling 403 (`rateLimitExceeded` & co) is `*UpstreamError`, not reauth
+2. `f8ed2a9` — document the status → error mapping on the sentinels
+3. `2cfb4f3` — an unconsumed 409 answers 502 `google_unavailable`, not 500
+4. `4e50505` — `SyncHandler` logs Google's reason server-side; client body stays opaque
+5. `a378230` — CODEMAP: google sync error mapping and logging
+
+**Deviations:** none from the plan's tasks/steps. One incidental fix: the plan's Task 4 Step 3 text said to add imports `log` **and** `strings` to `handler.go`, but the `truncate` helper as specified uses only `len`/slicing — `strings` would have been an unused import and failed the build. Added only `log`; `strings` stays in `handler_test.go` where it's actually used (`strings.Contains`, `strings.Repeat`, `strings.Count`).
+
+**Verification output** (from `backend/` in the worktree):
+
+```
+$ gofmt -l . ; go vet ./... && go test -timeout 120s ./internal/google -count=1 -v 2>&1 | grep -E '^(=== RUN|--- (PASS|FAIL)|PASS|FAIL|ok)' | grep -E 'Throttle|Quota|Unconsumed409|Logs|MapsStatuses|ok|FAIL'
+internal/quests/handler_test.go   # pre-existing, unrelated to this plan (internal/google is clean; see below)
+internal/quests/repo.go           # pre-existing, unrelated to this plan
+=== RUN   TestCalendarMapsStatusesToSentinelErrors
+--- PASS: TestCalendarMapsStatusesToSentinelErrors (0.00s)
+=== RUN   TestSyncHandlerMapsAnUnconsumed409To502
+--- PASS: TestSyncHandlerMapsAnUnconsumed409To502 (0.00s)
+=== RUN   TestSyncHandlerLogsTheFailureServerSideOnly
+--- PASS: TestSyncHandlerLogsTheFailureServerSideOnly (0.00s)
+=== RUN   TestSyncHandlerLogsA500WithTheCauseAndTruncatesLongBodies
+--- PASS: TestSyncHandlerLogsA500WithTheCauseAndTruncatesLongBodies (0.00s)
+=== RUN   TestSyncHandlerLogsSuccessWithoutTokens
+--- PASS: TestSyncHandlerLogsSuccessWithoutTokens (0.00s)
+=== RUN   TestTasksMapsAQuota403ToUpstreamNotReauth
+--- PASS: TestTasksMapsAQuota403ToUpstreamNotReauth (0.00s)
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/google	0.503s
+
+$ gofmt -l internal/google   # scoped per the plan's Global Constraints — clean
+(no output)
+
+$ go test -timeout 300s ./...
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter	0.599s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth	1.014s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/config	1.589s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/google	2.747s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/health	2.237s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/notify	3.443s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding	4.121s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet	6.383s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests	4.891s
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/store	5.511s
+```
+
+The `gofmt -l .` hits on `internal/quests/handler_test.go` / `internal/quests/repo.go` are pre-existing on `origin/main` (last touched by commit `267ab95`, unrelated to this branch, no local changes) — outside this plan's scope per its Global Constraints (`gofmt -l internal/google` must print nothing, and it does).
+
+### Runtime proof
+
+Ports/project used per the day's concurrency assignment: API `18081`, Postgres host port `15433`, Redis host port `16380`, `COMPOSE_PROJECT_NAME=b1google` (scratch `backend/.env`, deleted afterward).
+
+```
+$ go build -o /tmp/b1google-api ./cmd/api      # clean, no errors
+
+$ docker compose -p b1google up -d --wait --wait-timeout 120
+ Container b1google-postgres-1  Healthy
+ Container b1google-redis-1  Healthy
+
+$ PORT=18081 DATABASE_URL=postgres://english:english@localhost:15433/english?sslmode=disable \
+  REDIS_URL=redis://localhost:16380/0 JWT_SECRET=*** GOOGLE_CLIENT_ID=*** GOOGLE_CLIENT_SECRET=*** \
+  /tmp/b1google-api
+2026/09/24 23:21:01 migrations applied: [0001_init 0002_google_sync 0003_pet_verdict_dates]
+[GIN-debug] POST   /api/v1/integrations/google/sync --> .../internal/google.SyncHandler.func1 (4 handlers)
+2026/09/24 23:21:01 listening on :18081
+
+$ curl --max-time 10 -s -o /dev/null -w "healthz: %{http_code}\n" http://localhost:18081/healthz
+healthz: 200
+
+$ curl --max-time 10 -s -w "\nsync (no auth): %{http_code}\n" -X POST http://localhost:18081/api/v1/integrations/google/sync
+{"error":"unauthorized"}
+sync (no auth): 401
+```
+
+The binary boots against real Postgres + Redis, applies migrations, and serves a real request through the modified route (auth guard on `SyncHandler` answers correctly). The new 403/409/logging branches themselves are exercised by the `httptest`-backed unit tests above (`go test ./...` never calls Google, per the plan's Global Constraints) — a full authenticated sync would need a live Google account, which is out of scope for a local runtime proof.
+
+**Cleanup verified:** process killed (`pgrep -fl b1google-api` → none), `docker compose -p b1google down` + `docker volume rm b1google_postgres_data`, `docker ps --filter name=b1google` → empty, scratch `backend/.env` and `/tmp/b1google-api*` removed. Worktree `git status` clean before push.
+
+**CI:** pushed `harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro` to origin. Green: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36026951264 — `backend-unit`, `backend-integration`, `frontend`, `harness-tooling` all passed.
