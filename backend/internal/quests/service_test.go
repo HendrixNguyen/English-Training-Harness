@@ -610,3 +610,13 @@ func TestDailyReportsTheDurableFlagWhenTheCounterIsLost(t *testing.T) {
 		t.Errorf("Daily after the counter was lost = accumulated %d, is_target_met %t; want 0 and true — the durable row wins, exactly as POST /quests/progress already answers", got.AccumulatedSeconds, got.IsTargetMet)
 	}
 }
+
+func TestFakeMarkTargetMetRefusesAMissingRowLikeTheSQL(t *testing.T) {
+	f := newFakeProgressRepo(&callLog{})
+	if err := f.MarkTargetMet(context.Background(), "u1", "2026-09-22"); !errors.Is(err, ErrNoProgressRow) {
+		t.Fatalf("MarkTargetMet with no row: err = %v, want ErrNoProgressRow (PgRepo returns it on RowsAffected() == 0)", err)
+	}
+	if _, ok := f.rows["u1|2026-09-22"]; ok {
+		t.Error("the fake created a row; the SQL UPDATE cannot")
+	}
+}

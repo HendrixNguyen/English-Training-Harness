@@ -72,6 +72,10 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 
 	svc := NewService(counter, repo, repo, NopPet{}, func() time.Time { return now })
 
+	if err := repo.MarkTargetMet(ctx, userID, "1999-01-01"); !errors.Is(err, ErrNoProgressRow) {
+		t.Errorf("MarkTargetMet for a date with no row: err = %v, want ErrNoProgressRow", err)
+	}
+
 	suite, err := svc.Daily(ctx, userID)
 	if err != nil {
 		t.Fatalf("Daily: %v", err)

@@ -19,6 +19,12 @@ var ErrNoActiveRoadmap = errors.New("quests: no active roadmap")
 // user's roadmap. The two are deliberately indistinguishable to the client.
 var ErrExerciseNotFound = errors.New("quests: exercise not found")
 
+// ErrNoProgressRow means MarkTargetMet found no daily_progress row for that
+// local date. RecordProgress cannot hit it (Upsert creates the row on the
+// same call); it exists so no caller can mistake "nothing there" for
+// "flagged" — every verdict writer in pet already reports what it did.
+var ErrNoProgressRow = errors.New("quests: no daily_progress row for that date")
+
 // Roadmap is the slice of spec §3.2 `roadmaps` this package reads.
 type Roadmap struct {
 	ID        string
@@ -65,7 +71,8 @@ type ProgressRepo interface {
 	// Upsert writes minutes_spent for (userID, localDate) — never lowering it —
 	// and reports whether is_target_met is already TRUE on that row.
 	Upsert(ctx context.Context, userID, localDate string, minutes int) (alreadyMet bool, err error)
-	// MarkTargetMet flips is_target_met to TRUE. Idempotent.
+	// MarkTargetMet flips is_target_met to TRUE. Idempotent; ErrNoProgressRow
+	// when the row does not exist.
 	MarkTargetMet(ctx context.Context, userID, localDate string) error
 	// TargetMet reports the row's is_target_met for (userID, localDate); no
 	// row → false. GET /quests/daily reads it so both endpoints answer the
@@ -197,8 +204,12 @@ func (r *PgRepo) Upsert(ctx context.Context, userID, localDate string, minutes i
 }
 
 func (r *PgRepo) MarkTargetMet(ctx context.Context, userID, localDate string) error {
-	if _, err := r.Pool.Exec(ctx, markTargetMetSQL, userID, localDate); err != nil {
+	tag, err := r.Pool.Exec(ctx, markTargetMetSQL, userID, localDate)
+	if err != nil {
 		return fmt.Errorf("quests: marking target met: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNoProgressRow
 	}
 	return nil
 }

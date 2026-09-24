@@ -132,7 +132,10 @@ func (f *fakeProgressRepo) MarkTargetMet(_ context.Context, userID, localDate st
 		return f.markErr
 	}
 	key := userID + "|" + localDate
-	row := f.rows[key]
+	row, ok := f.rows[key]
+	if !ok {
+		return ErrNoProgressRow
+	}
 	row.targetMet = true
 	f.rows[key] = row
 	f.log.add("MARK TARGET MET %s", key)
