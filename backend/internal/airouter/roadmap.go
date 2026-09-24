@@ -109,6 +109,13 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 	}
 	for mi := range r.Modules {
 		m := &r.Modules[mi]
+		if m.Week != mi+1 {
+			// Exercises() derives day_number from position; a module that says
+			// otherwise would store JSON the frontend renders as one week while
+			// exercises serve another. Reject — the retry gives the model a
+			// checkable instruction; sorting would hide the disagreement.
+			return Roadmap{}, invalid("module %d declares week %d, want %d", mi+1, m.Week, mi+1)
+		}
 		if len(m.Days) != DaysPerModule {
 			return Roadmap{}, invalid("module %d has %d days, want %d", mi+1, len(m.Days), DaysPerModule)
 		}

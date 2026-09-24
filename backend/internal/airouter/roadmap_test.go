@@ -117,6 +117,9 @@ func TestParseRoadmapRejects(t *testing.T) {
 			}
 		}),
 		"one 20-minute task in an otherwise normal day": validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[4].Tasks[1].DurationMinutes = 20 }),
+		"weeks reversed":                                validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week, r.Modules[3].Week = 4, 1 }),
+		"duplicate week":                                validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Week = 1 }),
+		"week counts from 0":                             validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week = 0 }),
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -142,6 +145,11 @@ func TestExercisesFlattensTo84RowsCarryingTitleAndDuration(t *testing.T) {
 	}
 	if ex[0].DayNumber != 1 || ex[83].DayNumber != 28 || ex[21].DayNumber != 8 {
 		t.Errorf("day numbers: first %d, [21] %d, last %d; want 1, 8, 28", ex[0].DayNumber, ex[21].DayNumber, ex[83].DayNumber)
+	}
+	// day 8 is the first day of module 2 — and module 2 must be the one that
+	// declared week 2, otherwise stored roadmap_json and exercises disagree.
+	if r.Modules[1].Week != 2 || ex[21].DayNumber != (r.Modules[1].Week-1)*DaysPerModule+1 {
+		t.Errorf("exercise[21] day %d should come from the module declaring week 2 (got week %d)", ex[21].DayNumber, r.Modules[1].Week)
 	}
 	seen := map[string]int{}
 	for _, e := range ex {
