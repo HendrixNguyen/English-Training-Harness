@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-24 23:24. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-24 23:32. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -89,16 +89,16 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (unreviewed)
+- `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (unreviewed)
-- `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider joins every response part, names a non-STOP finish reason, surfaces a safety block, and asks for enough output tokens — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-24-cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api amend: make the drain test observe the drain — it must fail when `srv.Shutdown` is gone — Plan [high] (review: pass) (merged)
+- `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs)
-- `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 

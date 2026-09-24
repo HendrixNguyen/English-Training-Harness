@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md
 branch: harness/2026-09-24-high-main-go-installs-a-signal-handler-with-no-server-shutdown-so
 worktree: .worktrees/main-go-installs-a-signal-handler-with-no-server-shutdown-so

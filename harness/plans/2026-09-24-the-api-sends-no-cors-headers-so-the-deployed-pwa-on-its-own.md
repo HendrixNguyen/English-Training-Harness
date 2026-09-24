@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-24-high-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own
 worktree: .worktrees/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"

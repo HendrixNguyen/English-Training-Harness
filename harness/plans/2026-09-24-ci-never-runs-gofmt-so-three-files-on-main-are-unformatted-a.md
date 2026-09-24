@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-24-medium-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a
 worktree: .worktrees/ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"

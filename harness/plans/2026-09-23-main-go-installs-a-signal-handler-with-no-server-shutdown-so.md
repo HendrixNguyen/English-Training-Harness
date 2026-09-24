@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/main-go-installs-a-signal-handler-with-no-server-shutdown-so.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-24-high-main-go-installs-a-signal-handler-with-no-server-shutdown-so
 worktree: .worktrees/main-go-installs-a-signal-handler-with-no-server-shutdown-so
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
