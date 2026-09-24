@@ -24,6 +24,6 @@ Unattended evaluation run for the English-Training-Harness repo (GitHub, `gh`). 
 
 4. **Approval** is automatic for every `type: bug` plan, every `type: mvp-slice` plan and every `priority: high` feature plan (owner, 2026-09-24) — the evaluator sets `status=approved` as it writes them. Medium/low feature plans stay `draft`; only the owner's `/approve` moves them. Do not wait for a human before continuing.
 
-5. **Bookkeeping PR** titled `harness: evaluate <date>` per the README. The 10:00 bugfix run and the 14:00 feature run merge it and read the plans from `main`.
+5. **Bookkeeping PR — this is the hand-off, not an afterthought.** Work on branch `harness/plan-<date>` (create it from `origin/main` if the session did not start on one). Then per the README: `validate`, `state`, commit `harness/`, `git push -u origin harness/plan-<date>`, `gh pr create --base main --title "harness: evaluate <date>"`, and prove it with `gh pr view --json url -q .url`. The 10:00 bugfix run and the 14:00 feature run read the plans from that PR once it is on `main`; a plan that exists only in this worktree does not exist for them. Do not end the run, and do not report "nothing is pushed", before the PR URL prints.
 
 6. **Report.** Per selected item: type, priority, plan path, approved or draft, which execute run will take it. Rejected/deferred items with reasons. Drafts waiting on `/approve`.

@@ -13,7 +13,7 @@ budget: 3h
 
 Unattended review run for the English-Training-Harness repo (GitHub, `gh`). It verifies what the two execute runs claimed, files what they broke, and turns the day into the owner's single code PR. It never fixes code and never approves plans. Make routine choices yourself and report at the end. Budget: 3 hours.
 
-1. **Sync and merge green harness PRs** per `.agents/routines/README.md` — that pulls in the `harness: daily bugfix <date>` and `harness: daily feature <date>` PRs so every `done` plan is visible.
+1. **Sync, recover stranded work, merge green harness PRs** per `.agents/routines/README.md` — that pulls in the `harness: daily bugfix <date>` and `harness: daily feature <date>` PRs so every `done` plan is visible.
 
 2. **Review.** For each path in `python3 tools/harness/cli.py next --stage review --all`, oldest first, spawn the reviewer role (load skill harness-review). The reviewer re-runs the plan's Verification and the executor's runtime proof in the plan's worktree, reads that branch's CI run (`gh run list --branch <branch>`), walks the diff against the plan and the plan against the idea, and reviews quality per the role's scope list. Anything that does not reproduce, or a red or missing CI check, is a **blocker** (`type: bug`, `priority: high`, `blocks: <plan>`). Other findings become inbox bugs for tomorrow's 06:00 decide run. Write the review file with verdict `pass`, `pass-with-bugs` or `fail`.
 

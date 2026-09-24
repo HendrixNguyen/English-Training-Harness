@@ -13,7 +13,7 @@ budget: 2.5h
 
 Unattended ideation run for the English-Training-Harness repo (GitHub, `gh`). Make routine choices yourself and report at the end. Budget: 2.5 hours; when it is spent, commit what exists.
 
-1. **Sync and merge green harness PRs** as `.agents/routines/README.md` describes.
+1. **Sync, recover stranded work, merge green harness PRs** as `.agents/routines/README.md` describes.
 
 2. **Load the product.** Read `README.md`, the three specs in `project-base/` (§1 goals of the 1st-thinking doc, the frontend spec's wireframes §7, the backend spec's §6 contracts), `harness/CODEMAP.md`, and the last three days of `harness/plans/` and `harness/reviews/` — what shipped, what failed, what the reviewer keeps filing. The product is an adaptive English-learning PWA whose retention loop is the daily 30-minute quest and the pet/plant; ideas are judged on whether a real learner notices them.
 
