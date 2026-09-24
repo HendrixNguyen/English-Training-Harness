@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/get-quests-daily-still-reads-is-target-met-from-the-volatile.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile
+worktree: .worktrees/get-quests-daily-still-reads-is-target-met-from-the-volatile
 ---
 # quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan
 
@@ -702,3 +704,51 @@ Mutation checks (each must turn the named test red, then restore):
 - **`Daily` makes one more Postgres read per call.** `daily_progress` is keyed `(user_id, date)` (the §3.2 unique constraint), so it is an index lookup. Acceptable; the alternative (widening `ExercisesForDay`) crosses no boundary but muddles a read that belongs to `ProgressRepo`.
 - **`TestFakeMarkTargetMetRefusesAMissingRowLikeTheSQL` and `TestFakeSaveKeepsAMarkerItWasNotGiven` test fakes.** Deliberate: both fakes mirror SQL predicates the unit suite otherwise cannot observe; a fake that drifts from its SQL is how the reviewer's finding went unseen. The SQL itself is pinned by the integration test.
 - **Out of scope:** the multi-day sweep catch-up (`a-multi-day-sweep-outage-collapses-…`, selected medium, decision recorded in its Evaluation) — a separate plan.
+
+## Execution summary
+
+Status: **done**. Branch `harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile`, worktree `.worktrees/get-quests-daily-still-reads-is-target-met-from-the-volatile` (created off freshly fetched `origin/main`). All 7 tasks implemented exactly as specified, TDD throughout (failing test → implementation → pass → commit).
+
+**Commits** (8, one extra beyond the plan's 7 — see deviation below):
+1. `46c3ae6` quests: GET /quests/daily reports is_target_met from the durable row too
+2. `474d32f` quests: MarkTargetMet reports a missing daily_progress row
+3. `f9fce85` quests: pin the monotonic minutes_spent in the unit suite with a value that drops
+4. `c94d288` pet: SaveTargetMet does the success arithmetic in SQL on the live row
+5. `4431d16` pet: Save keeps last_target_met_date monotonic like judged_through
+6. `6cd65e1` pet: the concurrent-sweep test forces both sweeps to read before either writes
+7. `eb693c0` harness: CODEMAP tells the truth about the durable flag and the single-statement success write
+8. `db1f5e8` quests: gofmt the monotonic-minutes test (deviation, see below)
+
+**Deviations:**
+- Added an 8th commit. `gofmt -l` flagged `internal/quests/service_test.go` after Task 3's `TestALostCounterNeverLowersTheDurableMinutes` was inserted verbatim from the plan — the plan's own snippet left an EOL-comment alignment gofmt wants across two adjacent commented lines. Ran `gofmt -w` on that one file and committed the whitespace-only fix separately rather than folding it into Task 3's commit (repo convention favors new commits over amends). `internal/quests/repo.go` and `internal/quests/handler_test.go` remain gofmt-dirty exactly as before this plan (`repo.go`'s hit is a pre-existing `Exercise.TaskType` comment-alignment issue unrelated to any line this plan touched, confirmed identical on `origin/main`; `handler_test.go` is the plan's documented pre-existing exception, left alone).
+- Two of the plan's own grep-based verification lines are cosmetically off from their literal "expect" text, though the underlying behavior is exactly as designed:
+  - `grep -n 'IsTargetMet:' internal/quests/service.go` → 2 lines, but only 1 contains `||` textually. `Daily`'s line does (`total >= TargetSeconds || flagged`); `RecordProgress`'s line reads a precomputed `targetMet` variable (`targetMet := total >= TargetSeconds || alreadyMet`, unchanged pre-existing code, outside Task 1's scope) rather than inlining the `||`. Design decision 1's actual requirement — "the same rule, computed the same way" — holds; only the textual grep assumption doesn't match RecordProgress's existing style.
+  - `grep -rn 'pet_states' internal/quests/` → not empty; all hits are pre-existing doc comments (`internal/quests/pet.go`) and one test error string (`service_test.go:310`, `"pet_states unreachable"`) explaining *why* quests never reads that table — confirmed present verbatim on `origin/main` before this plan. No SQL/query against `pet_states` exists in `internal/quests/`; the actual boundary holds.
+
+**Verification (from `backend/`):**
+- `gofmt -l ./internal/quests ./internal/pet` → only `internal/quests/handler_test.go` (documented pre-existing) and `internal/quests/repo.go` (pre-existing, unrelated line, confirmed on `origin/main`).
+- `go build ./... && go vet ./... && go test ./... -count=1` → all 10 packages `ok`.
+- `go test ./internal/quests/ -count=1 -v -run 'DailyReportsTheDurableFlag|ALostCounterNeverLowers|FakeMarkTargetMetRefuses'` → PASS ×3.
+- `go test ./internal/pet/ -count=1 -v -run 'OnTargetMet|FakeSaveKeepsAMarker|TwoConcurrentSweeps'` → PASS ×7 (4 pre-existing `OnTargetMet` tests unchanged in meaning, `TwoConcurrentSweepsPenaliseOnce`, `FakeSaveKeepsAMarkerItWasNotGiven`).
+- `go test ./internal/pet/ -run TestTwoConcurrentSweepsPenaliseOnce -count=300 -timeout 120s` → ok (300/300); also `-count=100 -race` → ok.
+- Mutation checks, all as specified: unconditional `penalised++` → 30/30 FAIL (`reported 40 penalties`), restored; fake `PenaliseMiss` guard minus the `JudgedThrough` half → 30/30 FAIL (`health = 40, want 70`), restored; fake `Upsert`'s `row.minutes = minutes` (drop the `max`) → FAIL (`minutes 1`), restored.
+- Grep checks: `health_points = $2` → 1 hit (`saveSQL` only); `GREATEST(last_target_met_date` → 1 hit; `ApplyTargetMet(` in `pet/service.go` → no output (service no longer builds a pre-image); `daily_progress` in `internal/pet/` → no hits. (`IsTargetMet:` and `pet_states` in `internal/quests/` results explained under Deviations above.)
+- `git log --oneline origin/main..HEAD | wc -l` → 8 (7 planned + 1 gofmt fix, see Deviations).
+- `python3 ../tools/harness/cli.py validate; echo exit=$?` → exit=0.
+
+**Integration tests** (isolated compose project `exec-quests`, Postgres on 55435, Redis on 56382):
+- `go test ./internal/quests/ ./internal/pet/ -count=1 -v -run Integration -p 1` → PASS `TestIntegrationDailyAndProgressAgainstRealServices` (Daily after the Redis `DEL` → 60/true; `MarkTargetMet` on `1999-01-01` → `ErrNoProgressRow`), PASS `TestIntegrationVerdictWritesAreConditional` (section 4b: 70+20=90, four SQL↔`ApplyTargetMet` mirrors; section 5 keeps the `2026-11-04` marker and `2026-10-04` `judged_through`), PASS `TestIntegrationEnsureCreatesExactlyOnePetRow`.
+- `make test-integration` (the documented command, run for real with `TEST_DATABASE_URL`/`TEST_REDIS_URL` exported) → PASS across all 10 packages, no `--- SKIP`.
+
+**Runtime proof:** Built and booted `cmd/api` on port 18084 against the isolated compose stack (`DATABASE_URL`/`REDIS_URL` pointed at 55435/56382, dummy `JWT_SECRET`/`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`). Seeded one real user + active roadmap via `onboarding.PgRepo.SaveAssessment` (same helper shape as the integration test), minted a real session JWT + Redis `sess:{user_id}:token` key, and drove the actual HTTP surface end to end:
+- `GET /quests/daily` (fresh) → `is_target_met: false`, 3 tasks.
+- `POST /quests/progress` (1800s) → `is_target_met: true`, `pet_health: 100`, `streak_count: 1`.
+- `redis-cli DEL daily:accumulated:...` (simulated eviction/restart/FLUSHDB) then `GET /quests/daily` again → **`accumulated_seconds: 0`, `is_target_met: true`** — the exact head defect, reproduced and confirmed fixed live over real HTTP against a real Postgres row.
+- `GET /pet/status` → `health_points: 100, current_streak: 1, stage: sprout` — matches `ApplyTargetMet`'s live-row arithmetic.
+The seed helper (`backend/cmd/e2eseed/`) and its build artifacts were scratch-only, never committed, and removed afterward; `git status` in the worktree is clean.
+
+**Cleanup verified:** API process killed (`pgrep e2e-api` → no matches), `docker compose -p exec-quests down` (containers + network removed, confirmed via `docker ps -a --filter name=exec-quests` → empty), scratch `backend/.env` removed.
+
+**CI:** green on the pushed branch — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35960183886 (`backend-unit`, `backend-integration`, `harness-tooling`, `frontend` all ✓).
+
+Branch pushed (`git push -u origin harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile`); no PR opened.
