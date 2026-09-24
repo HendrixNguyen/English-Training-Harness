@@ -149,12 +149,12 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 	// 1. SaveTargetMet is once per local date: the second write for the same
 	//    date is refused by the predicate, a later date is accepted.
 	st, _ := repo.Get(ctx, userID)
-	applied, err := repo.SaveTargetMet(ctx, userID, ApplyTargetMet(st, now, "2026-09-22"))
+	applied, err := repo.SaveTargetMet(ctx, userID, now, "2026-09-22")
 	if err != nil || !applied {
 		t.Fatalf("first SaveTargetMet = (%t, %v), want (true, nil)", applied, err)
 	}
 	st, _ = repo.Get(ctx, userID)
-	applied, err = repo.SaveTargetMet(ctx, userID, ApplyTargetMet(st, now, "2026-09-22"))
+	applied, err = repo.SaveTargetMet(ctx, userID, now, "2026-09-22")
 	if err != nil || applied {
 		t.Fatalf("repeat SaveTargetMet = (%t, %v), want (false, nil)", applied, err)
 	}
@@ -162,7 +162,7 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 	if st.CurrentStreak != 1 || st.LastTargetMetDate == nil || *st.LastTargetMetDate != "2026-09-22" {
 		t.Errorf("after two same-day writes = %+v, want streak 1 and last_target_met_date 2026-09-22", st)
 	}
-	if applied, _ = repo.SaveTargetMet(ctx, userID, ApplyTargetMet(st, now, "2026-09-23")); !applied {
+	if applied, _ = repo.SaveTargetMet(ctx, userID, now, "2026-09-23"); !applied {
 		t.Error("SaveTargetMet for the next day was refused")
 	}
 
@@ -221,12 +221,50 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 		}
 	}
 
+	// 4b. The success write adds to the LIVE row: a miss that landed after any
+	//     earlier read is kept. -30 then +20 is 90, never 100 (the review's
+	//     live reproduction of the erased penalty). And the SQL mirrors
+	//     ApplyTargetMet the way penaliseMissSQL mirrors ApplyMiss.
+	pre := State{HealthPoints: 100, CurrentStreak: 5, Stage: StageSapling}
+	if err := repo.Save(ctx, userID, pre); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if ok, _ := repo.PenaliseMiss(ctx, userID, "2026-10-04", now); !ok {
+		t.Fatal("PenaliseMiss for 2026-10-04 did not apply")
+	}
+	if ok, err := repo.SaveTargetMet(ctx, userID, now, "2026-10-05"); err != nil || !ok {
+		t.Fatalf("SaveTargetMet after a miss = (%t, %v), want (true, nil)", ok, err)
+	}
+	st, _ = repo.Get(ctx, userID)
+	if st.HealthPoints != 90 || st.CurrentStreak != 1 || st.Stage != StageSprout || st.LastTargetMetDate == nil || *st.LastTargetMetDate != "2026-10-05" {
+		t.Errorf("miss then met = %+v, want health 90 (70 + 20), streak 1, sprout, marker 2026-10-05 — the -30 must survive", st)
+	}
+	for i, pre := range []State{
+		{HealthPoints: 95, CurrentStreak: 2, Stage: StageSprout},      // cap at 100, sapling at 3
+		{HealthPoints: 40, CurrentStreak: 6, Stage: StageSapling},     // flowering at 7
+		{HealthPoints: 0, CurrentStreak: 0, Stage: StageWilted},       // a met day revives arithmetic-wise: 20, sprout
+		{HealthPoints: 100, CurrentStreak: 13, Stage: StageFlowering}, // fruitful at 14
+	} {
+		d := fmt.Sprintf("2026-11-%02d", i+1)
+		if err := repo.Save(ctx, userID, pre); err != nil {
+			t.Fatalf("Save pre-image %d: %v", i, err)
+		}
+		if ok, err := repo.SaveTargetMet(ctx, userID, now, d); err != nil || !ok {
+			t.Fatalf("SaveTargetMet %d = (%t, %v)", i, ok, err)
+		}
+		got, _ := repo.Get(ctx, userID)
+		want := ApplyTargetMet(pre, now, d)
+		if got.HealthPoints != want.HealthPoints || got.CurrentStreak != want.CurrentStreak || got.Stage != want.Stage || got.LastPracticedAt == nil {
+			t.Errorf("SQL success on %+v = %d/%d/%s, ApplyTargetMet says %d/%d/%s", pre, got.HealthPoints, got.CurrentStreak, got.Stage, want.HealthPoints, want.CurrentStreak, want.Stage)
+		}
+	}
+
 	// 5. Save (the revive path) keeps judged_through monotonic.
 	earlier := "2026-01-01"
 	if err := repo.Save(ctx, userID, State{HealthPoints: 50, Stage: StageSprout, JudgedThrough: &earlier}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	if st, _ = repo.Get(ctx, userID); *st.JudgedThrough != "2026-10-03" {
+	if st, _ = repo.Get(ctx, userID); *st.JudgedThrough != "2026-10-04" {
 		t.Errorf("Save moved judged_through back to %s", *st.JudgedThrough)
 	}
 

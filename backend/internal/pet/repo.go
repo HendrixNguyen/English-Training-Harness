@@ -29,7 +29,9 @@ type Candidate struct {
 // The three verdict writers are conditional UPDATEs: the predicate on the
 // verdict date is what makes OnTargetMet and Sweep safe to run twice, from
 // two processes, for the same local day. applied == false is "already done",
-// never an error.
+// never an error — and compute on the live row: no writer takes a Go-side
+// pre-image except Save (revive), whose two date columns are
+// GREATEST-protected.
 type Repo interface {
 	// Ensure creates the 1:1 row idempotently: INSERT ... ON CONFLICT DO NOTHING.
 	Ensure(ctx context.Context, userID string) error
@@ -37,9 +39,14 @@ type Repo interface {
 	// Save writes every mutable column unconditionally (judged_through only
 	// ever forwards). Revive uses it; the two verdict writers below do not.
 	Save(ctx context.Context, userID string, s State) error
-	// SaveTargetMet writes s only while the row's last_target_met_date is
-	// NULL or before s.LastTargetMetDate.
-	SaveTargetMet(ctx context.Context, userID string, s State) (applied bool, err error)
+	// SaveTargetMet applies §8's success arithmetic in SQL on the live row —
+	// +TargetMetHealthBonus capped at MaxHealth, streak+1, stage from the new
+	// streak, last_practiced_at = updated_at = now, last_target_met_date =
+	// localDate — only while last_target_met_date is NULL or before
+	// localDate. Pre-image and write are one statement, like PenaliseMiss: a
+	// concurrent miss can no longer be overwritten by a stale Go-side read.
+	// ApplyTargetMet is the Go reference this SQL is held to.
+	SaveTargetMet(ctx context.Context, userID string, now time.Time, localDate string) (applied bool, err error)
 	// PenaliseMiss applies §8's inactivity arithmetic in SQL and advances
 	// judged_through to judged, only while judged_through is NULL or earlier.
 	PenaliseMiss(ctx context.Context, userID, judged string, now time.Time) (applied bool, err error)
@@ -72,11 +79,24 @@ SET health_points = $2, stage = $3::pet_stage, current_streak = $4, last_practic
     last_target_met_date = $7::date, judged_through = GREATEST(judged_through, $8::date)
 WHERE user_id = $1`
 
+	// Pre-image and write in one statement: every right-hand side reads the
+	// row's current values. health' is always > 0 (health ≥ 0 plus the
+	// bonus), so the stage CASE needs only StageFor's streak thresholds;
+	// integration section 4b pins it to ApplyTargetMet.
 	saveTargetMetSQL = `
 UPDATE pet_states
-SET health_points = $2, stage = $3::pet_stage, current_streak = $4, last_practiced_at = $5, updated_at = $6,
-    last_target_met_date = $7::date
-WHERE user_id = $1 AND (last_target_met_date IS NULL OR last_target_met_date < $7::date)`
+SET health_points = LEAST($4, COALESCE(health_points, $4) + $3),
+    current_streak = COALESCE(current_streak, 0) + 1,
+    stage = (CASE
+               WHEN COALESCE(current_streak, 0) + 1 >= 14 THEN 'fruitful'
+               WHEN COALESCE(current_streak, 0) + 1 >= 7  THEN 'flowering'
+               WHEN COALESCE(current_streak, 0) + 1 >= 3  THEN 'sapling'
+               ELSE 'sprout'
+             END)::pet_stage,
+    last_practiced_at = $5,
+    updated_at = $5,
+    last_target_met_date = $2::date
+WHERE user_id = $1 AND (last_target_met_date IS NULL OR last_target_met_date < $2::date)`
 
 	// Pre-image and write in one statement: health_points on the right-hand
 	// side is the row's current value. The CASE is StageFor(health, 0) for
@@ -153,11 +173,8 @@ func (r *PgRepo) Save(ctx context.Context, userID string, s State) error {
 	return nil
 }
 
-func (r *PgRepo) SaveTargetMet(ctx context.Context, userID string, s State) (bool, error) {
-	if s.LastTargetMetDate == nil {
-		return false, errors.New("pet: SaveTargetMet needs LastTargetMetDate — build the state with ApplyTargetMet")
-	}
-	tag, err := r.Pool.Exec(ctx, saveTargetMetSQL, userID, s.HealthPoints, s.Stage, s.CurrentStreak, s.LastPracticedAt, s.UpdatedAt, *s.LastTargetMetDate)
+func (r *PgRepo) SaveTargetMet(ctx context.Context, userID string, now time.Time, localDate string) (bool, error) {
+	tag, err := r.Pool.Exec(ctx, saveTargetMetSQL, userID, localDate, TargetMetHealthBonus, MaxHealth, now)
 	if err != nil {
 		return false, fmt.Errorf("pet: saving target met: %w", err)
 	}

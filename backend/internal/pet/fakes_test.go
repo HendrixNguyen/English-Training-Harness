@@ -86,20 +86,20 @@ func (f *fakeRepo) Save(_ context.Context, userID string, s State) error {
 // dateBefore is the SQL predicate `col IS NULL OR col < $d`.
 func dateBefore(col *string, d string) bool { return col == nil || *col < d }
 
-func (f *fakeRepo) SaveTargetMet(_ context.Context, userID string, s State) (bool, error) {
+// SaveTargetMet mirrors saveTargetMetSQL: read and write under one lock is
+// the fake's "one statement"; ApplyTargetMet is the shared reference.
+func (f *fakeRepo) SaveTargetMet(_ context.Context, userID string, now time.Time, localDate string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.writeErr(userID); err != nil {
 		return false, err
 	}
 	cur, ok := f.states[userID]
-	if !ok || s.LastTargetMetDate == nil || !dateBefore(cur.LastTargetMetDate, *s.LastTargetMetDate) {
+	if !ok || !dateBefore(cur.LastTargetMetDate, localDate) {
 		return false, nil
 	}
 	f.saved++
-	s.PlantName = cur.PlantName
-	s.JudgedThrough = cur.JudgedThrough
-	f.states[userID] = s
+	f.states[userID] = ApplyTargetMet(cur, now, localDate)
 	return true, nil
 }
 
