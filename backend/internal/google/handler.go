@@ -3,6 +3,7 @@ package google
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -29,6 +30,9 @@ func SyncHandler(svc *Service) gin.HandlerFunc {
 		defer cancel()
 
 		res, err := svc.Sync(ctx, userID)
+		if err != nil {
+			logSyncFailure(userID, err)
+		}
 		var up *UpstreamError
 		switch {
 		case errors.Is(err, ErrReauthRequired):
@@ -44,7 +48,29 @@ func SyncHandler(svc *Service) gin.HandlerFunc {
 		case err != nil:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
 		default:
+			log.Printf("google: sync user=%s ok event=%s tasks=%d", userID, res.CalendarEventID, res.TasksCreatedCount)
 			c.JSON(http.StatusOK, res)
 		}
 	}
+}
+
+// logSyncFailure records why a sync failed, server-side only. For an
+// UpstreamError that is Google's own reason (service, status, body) — the
+// single most useful line when a user reports "sync does nothing". Tokens
+// are never part of any error value in this package (token.go, oauth.go);
+// TestSyncHandlerLogsTheFailureServerSideOnly keeps it that way.
+func logSyncFailure(userID string, err error) {
+	var up *UpstreamError
+	if errors.As(err, &up) {
+		log.Printf("google: sync user=%s failed: %s returned %d: %s", userID, up.Service, up.Status, truncate(up.Body, 512))
+		return
+	}
+	log.Printf("google: sync user=%s failed: %v", userID, err)
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
