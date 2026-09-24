@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-24-medium-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a
+worktree: .worktrees/ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a
 ---
 # CI: a `gofmt` gate and the race detector in `backend-unit` — Plan
 
@@ -233,3 +235,35 @@ Negative proof (local, Task 2 Step 1): the gate script exits 1 and names `intern
 - **`-race` and integration tests:** unchanged — `backend-integration` stays a plain run. Racing against a shared database with `-p 1` would only slow it, and its tests are sequential by design.
 - **Formatting the two files** touches `internal/quests/repo.go`, which today's quests/pet plan also edits (different regions: a struct comment alignment vs. new SQL and a method). If both land the same day, the merge is trivial; whichever executor goes second runs `gofmt -l .` after merging `origin/main`.
 - **Out of scope:** `golangci-lint` (CODEMAP already records what adopting it would need), `staticcheck`, a frontend `-race` analogue (none exists).
+
+## Execution summary
+
+**Status: done.** Branch `harness/2026-09-24-medium-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a`, worktree `.worktrees/ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a`, based on freshly fetched `origin/main` (`fe2c29a`).
+
+**Tasks, exactly as planned, no deviations:**
+1. `gofmt -l .` from `backend/` printed exactly the two files the plan named (`internal/quests/handler_test.go`, `internal/quests/repo.go`); `gofmt -d` confirmed whitespace-only (comment alignment); `gofmt -w` + `gofmt -l .` (empty) + `go build ./... && go vet ./... && go test ./internal/quests/ -count=1` (ok) → commit `76c5717`.
+2. Wrote the gate script to a scratch file, proved it green (`gofmt: clean`, exit=0) after Task 1 and red (`::error::...`, then `internal/zz_probe.go`, exit=1) with a probe file, removed the probe, then added the `gofmt` step to `.github/workflows/ci.yml` between `Build` and `Vet`. `actionlint .github/workflows/ci.yml` — clean. Commit `cafab95`.
+3. Measured `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL bash -c 'time go test ./... -count=1 -race'` from `backend/`: all 9 tested packages `ok`, `real 0m8.199s` — well under the 4-minute threshold, so **Step 2a** (single command, race on) applied, not the fallback. Changed the `Test without services` step to `go test ./... -count=1 -race`. Added `fmt-check`, `vet`, `check` targets to `backend/Makefile` after `tidy:`, exactly as specified. `make check` → fmt-check silent, vet silent, all 9 packages `ok` under `-race`, exit 0. `actionlint` clean. Commit `ebd170a`.
+4. Updated the CODEMAP `backend-unit` bullet to name the `gofmt` gate and the race run (with the `pet.RunHourly`/`notify.RunWorker` justification) and appended "`make check` runs the same three checks locally."; changed "No linter yet: `golangci-lint`…" to "No linter beyond `gofmt` yet: `golangci-lint`…". Commit `76bb6ca`.
+
+**Plan verification (all as expected):**
+```
+cd backend && gofmt -l . ; echo "exit=$?"        → (no output) exit=0
+make check                                        → fmt-check silent, go vet silent, ok × 9 packages under -race, exit 0
+grep -n 'gofmt' .github/workflows/ci.yml          → the gofmt step, positioned after Build and before Vet
+grep -n '\-race' .github/workflows/ci.yml         → 1 line: `run: go test ./... -count=1 -race` (Step 2a)
+grep -n 'gofmt\|race' harness/CODEMAP.md          → backend-unit sentence names both; make check sentence present
+actionlint .github/workflows/ci.yml               → clean (exit 0)
+git log --oneline origin/main..HEAD | wc -l       → 4 commits, each with the Co-Authored-By trailer (verified via git log --format)
+python3 tools/harness/cli.py validate             → exit=0
+```
+Negative proof (Task 2 Step 1, local only): gate script exited 1 and named `internal/zz_probe.go` when an unformatted probe file was present; not repeated as a throwaway push to GitHub (optional per the plan).
+
+**Runtime proof (Definition of done, step 8):**
+- **Build:** `go build -o /tmp/aelp-api-check-exec-ci ./cmd/api` — succeeded, no errors/warnings.
+- **Full suite, clean shell:** `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL` + `make check` (fmt-check, vet, `go test ./... -count=1 -race`) — all 9 tested packages `ok`, exit 0. Run twice (measurement + final verification), identical result both times.
+- **Boots and answers, end to end:** started an isolated stack (`COMPOSE_PROJECT_NAME=exec-ci`, `POSTGRES_PORT=55437`, `REDIS_PORT=56384`) with `docker compose up -d --wait --wait-timeout 120`, ran the built binary on `PORT=18086` with dummy `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`JWT_SECRET`. Log showed migrations applied (`0001_init 0002_google_sync 0003_pet_verdict_dates`) and `listening on :18086`. `curl http://localhost:18086/healthz` → `{"postgres":"ok","redis":"ok","status":"ok"}`, HTTP 200.
+- **Documented commands:** `gofmt -l .`, `make check`, `actionlint` all run as documented above, matching their documented behavior.
+- **Cleanup:** the app process ignored SIGTERM (pre-existing bug on this `origin/main` base — no server-shutdown wiring on signal, being fixed in a separate in-flight plan/branch not yet merged; out of scope here) and needed `SIGKILL`; confirmed gone via `pgrep`. `docker compose down` (exec-ci project) removed both containers; the scratch `exec-ci_postgres_data` volume was removed explicitly since it was created only for this check. Deleted the scratch `backend/.env`, the built binary, and the log file. Final `pgrep -fl "exe/api|aelp-api"` → none; `docker ps -a --filter name=exec-ci` → none; `docker volume ls | grep exec-ci` → none; `git status --short` in the worktree → clean.
+
+**CI on the pushed branch:** run [35959338732](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35959338732) — all 4 jobs green (`frontend`, `harness-tooling`, `backend-integration`, `backend-unit`). Confirmed in `backend-unit`'s job log: the `gofmt` step printed `gofmt: clean`, and `Test without services` ran `go test ./... -count=1 -race` with all 9 packages `ok`.
