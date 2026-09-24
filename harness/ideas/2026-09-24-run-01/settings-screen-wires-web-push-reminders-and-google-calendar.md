@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-24-run-01
 priority: medium
+plan: harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md
 ---
 # Settings screen wires Web Push reminders and Google Calendar sync to the shipped backend
 
@@ -42,3 +43,13 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Achievable in one plan?* Yes, about a day, and it needs no backend change. It requires `harness/designs/settings.md` first (frontend-design skill: reminder block states — permission denied, push unsupported, VAPID key absent; Google block states — synced N, `409 reauth_required`, `502 google_unavailable`) and must destructure `PushSubscription.toJSON().keys` into the flat `{endpoint, p256dh, auth}` body (the rejected `nothing-tells-the-pwa-to-flatten-…` bug is folded here) and add that note to CODEMAP's frontend paragraph. The onboarding success-step prompt is in scope only if it stays a link to `/settings`.
 
 *Dependencies.* Inert in production until the CORS plan (approved today) is merged and `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` are set on Railway. *Priority.* Medium — clear retention value, nothing blocked; as a medium feature its plan will stay `draft` for the owner's `/approve`.
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — Feature team ticket F1. Estimate 6 h. Approved by owner override (see below).**
+*Still true on `main`.* `frontend/pages/settings.vue` is the disabled placeholder; `POST /settings/notifications` and `POST /integrations/google/sync` are merged and tested on `main` (`backend/internal/notify`, `backend/internal/google`); `service-worker/sw.ts` already handles `push`/`notificationclick`; `runtimeConfig.public.vapidPublicKey` already exists. Nothing on the server needs to change.
+*Design.* `harness/designs/settings.md` (frontend-design skill) — two blocks, every state enumerated, copy in Vietnamese per the shell design.
+*Decisions.* (1) No `GET` for settings exists, so the reminder time is pre-filled from the client's own last submission (`localStorage['aelp.settings']`, written by onboarding and by this screen), default `20:00`; a read endpoint is a later backend idea, not this ticket. (2) "Turn off" = `PushSubscription.unsubscribe()` client-side; the server prunes the dead endpoint on its next 404/410 — no unsubscribe endpoint is added. (3) `409 reauth_required` re-uses `googleAuthUrl` (already `prompt=consent`). (4) Onboarding's result step gets one ghost link to `/settings`; no second copy of the blocks.
+*Approval.* Medium feature → would stay `draft` under the auto-approve rule; the owner's 2026-09-24 planning instruction approves today's five plans explicitly. Recorded here and in the commit message.
+*One-day check.* Frontend only: one page, one store, one composable, one util, tests; CI `frontend` job. Inert in production until `VAPID_*` are set on Railway (documented, not blocking).

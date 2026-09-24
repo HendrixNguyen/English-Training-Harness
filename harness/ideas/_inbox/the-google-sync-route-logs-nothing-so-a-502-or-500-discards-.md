@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md
 ---
 # The google sync route logs nothing, so a 502 or 500 discards Google's error reason entirely
 
@@ -47,3 +48,9 @@ feature operable at all; that is a judgement call for the owner.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: `handler.go:31-44` switches on `err` and drops it; `UpstreamError.Body` — the only diagnostic — never reaches a log. Operability of the one third-party integration. Two `log.Printf` lines plus a test that the tokens are absent; pair with the 403-mapping plan (same handler/client files).
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — folded into Bug team ticket B1** (`every-google-403-becomes-409-reauth-required-so-a-quota-erro.md`), Task 4 of its plan.
+*Confirmed on `main`.* `handler.go:31-44` switches on `err` and never logs it; `UpstreamError{Service, Status, Body}` — the only diagnostic Google gives — is dropped. The plan adds one `log.Printf` on the 409/502/500 branches carrying user id, service, status and body (never a token: none is ever placed in an error value — `token.go`, `oauth.go`) and one info line on success, and a test that a redacted body pattern (`ya29.`) is asserted absent from the log output. The client keeps receiving only the opaque code.

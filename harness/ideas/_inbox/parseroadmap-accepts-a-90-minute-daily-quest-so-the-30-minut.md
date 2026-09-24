@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md
 ---
 # ParseRoadmap accepts a 90-minute daily quest so the 30-minute day is unenforced
 
@@ -66,3 +67,14 @@ PROBE empty roadmap/module/day titles accepted: true
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium (top 10).** Confirmed: per-task `1..30` only, no day sum, no non-task title checks. A model that drifts to longer tasks yields a day the learner cannot finish under a header that says 30 minutes, and the pet decays for it — the product's core promise broken with no error. Plan together with `module-week-is-never-validated…` as one `ParseRoadmap` validation plan (named constants with the §6.1 quote, day-sum band, week == position, title checks, CODEMAP wording).
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — Bug team ticket B2 (head idea). Estimate 3 h.**
+*Root cause (re-read on `main`).* `backend/internal/airouter/roadmap.go:116-126` validates each task's `duration_minutes` against `1..maxTaskMinutes(30)` only; there is no per-day sum, so `3×30` passes and `GET /quests/daily` then advertises a 30-minute day the learner cannot finish. Only task titles are checked (`roadmap.go:113`); roadmap/module/day titles are not. `Module.Week` is decoded (`roadmap.go:34`) and never compared with position (`Exercises()` uses `mi*DaysPerModule+di+1`).
+*Why today.* The 30-minute day is the product's promise and the pet's health depends on it; a model that drifts to longer tasks breaks it silently for 28 days. The whole fix is in one function plus its test table.
+*Folded into this ticket* (same function, same laxness — a schema field the validator neither enforces nor uses): `module-week-is-never-validated-and-day-number-comes-from-arr.md`. Decision recorded: **reject** out-of-order or duplicate weeks (do not sort) — silently accepting is the one option that yields wrong content with no error, and rejecting gives the model a checkable instruction through the existing retry-once path.
+*Bands chosen* (named constants, §6.1 quoted above them): task `5..15` minutes, day sum `20..40`. The missing-duration default of 10 stays and is applied **before** the sum.
+*Conflict note.* Feature ticket F2 (typed task content) also edits `ParseRoadmap`; F2 is written to put its logic in a new `content.go` with a one-line hook so the two branches overlap only on `CODEMAP.md` and the test-table tail.
+*One-day check.* One file + one test file + CODEMAP; no migration, no frontend.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md
 ---
 # Module.week is never validated and day_number comes from array position
 
@@ -56,3 +57,9 @@ declaring `week: 2`. `harness/CODEMAP.md`'s `ParseRoadmap` sentence lists the ne
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: `roadmap.go` decodes `week` and never checks it; `Exercises()` uses array position. A model emitting modules out of order produces a roadmap whose stored JSON and `exercises.day_number` disagree, silently, for 28 days. Plan together with `parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — one `ParseRoadmap` validation plan, one `roadmap_test.go` table.
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — folded into Bug team ticket B2** (`parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md`), Task 2 of its plan.
+*Confirmed on `main`.* `roadmap.go` decodes `week` and never checks it; `Exercises()` derives `day_number` from position. Decision: module `i` must declare `week == i+1`, rejected via `invalid("module %d declares week %d, want %d")`; `TestParseRoadmapRejects` gains "weeks out of order" and "duplicate week"; the flatten test asserts the task at `day_number` 8 came from the module declaring `week: 2`.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md
 ---
 # Every Google 403 becomes 409 reauth_required, so a quota error forces a pointless re-consent
 
@@ -48,3 +49,12 @@ drives a 403 `rateLimitExceeded` body and asserts `*UpstreamError`, alongside th
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed at `client.go:74-75`: every 401/403 → `ErrReauthRequired` → 409 and a pointless full re-consent; Google's quota errors are 403s. A user who syncs twice quickly (28 Tasks inserts each) can hit this. Fix: decode `error.errors[].reason` and map the rate/quota reasons (and 429) to `*UpstreamError` → 502; keep `insufficientPermissions`/401 → reauth. Small `google` plan; can share a branch with the orphan fix if the owner prefers fewer `google` merges, but it is independent.
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — Bug team ticket B1 (head idea). Estimate 4 h.**
+*Root cause (re-read on `main` @ 9517f25).* `backend/internal/google/client.go:74-75` — `doJSON` maps every 401 **and** 403 to `ErrReauthRequired` without decoding the body, while `oauth.go:65-73` decodes the body and claims reauth only on `invalid_grant`/401. Google's Calendar v3 / Tasks v1 quota answers (`rateLimitExceeded`, `userRateLimitExceeded`, `dailyLimitExceeded`, `quotaExceeded`) are 403s and so become `409 reauth_required`, sending the user through consent for nothing.
+*Why today.* Happy-path for every user who syncs: one sync is up to 30 Tasks calls, nothing rate-limits the route, so a second tap can hit a per-minute quota and dead-end in a consent loop. Fix is confined to `client.go` (decode `error.errors[].reason`), `handler.go` (`ErrAlreadyExists` → 502, one log line) and their tests.
+*Folded into this ticket* (same two files, same class — a `doJSON`/`SyncHandler` mapping too broad for the one call site that motivated it): `every-google-409-now-becomes-500-internal-error-instead-of-5.md` and `the-google-sync-route-logs-nothing-so-a-502-or-500-discards-.md`. One branch, one plan, one review.
+*One-day check.* One package, two production files, no migration, no frontend, no new dependency.

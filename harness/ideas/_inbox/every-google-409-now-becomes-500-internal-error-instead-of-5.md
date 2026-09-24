@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md
 ---
 # Every Google 409 now becomes 500 internal_error instead of 502 google_unavailable
 
@@ -47,3 +48,9 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Confirmed (read on this branch).* `backend/internal/google/client.go:82-85` maps `409` to `ErrAlreadyExists` for calendar, tasklists and tasks alike; `handler.go:32-43` switches on `ErrReauthRequired`, `*UpstreamError`/`DeadlineExceeded`, then a catch-all `500 internal_error` — no `ErrAlreadyExists` case; `service.go:73-80` returns a patch error unchanged. A transient conflict on `events.patch` is therefore reported as our fault (500) instead of Google's (502), contradicting the CODEMAP contract for the route.
 
 *Recommended fix.* Keep `doJSON` generic (the insert path needs the sentinel) and add `case errors.Is(err, ErrAlreadyExists): 502 google_unavailable` to `SyncHandler`, so an unconsumed 409 can never surface as 500; pin it with a client test for a 409 from `events.patch` and one from `tasks.insert`. Medium: a lost retry signal on a rare path, no data damage.
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — folded into Bug team ticket B1** (`every-google-403-becomes-409-reauth-required-so-a-quota-erro.md`), Task 3 of its plan.
+*Confirmed on `main`.* `client.go:82-83` maps 409 → `ErrAlreadyExists` for all three services; `handler.go:32-43` has no case for it, so an unconsumed 409 (a patch conflict, any Tasks 409) answers `500 internal_error` instead of the CODEMAP's `502 google_unavailable`. Fix as recommended on 2026-09-24: keep `doJSON` generic, add `case errors.Is(err, ErrAlreadyExists)` → 502 in `SyncHandler`, pin with a handler test.
