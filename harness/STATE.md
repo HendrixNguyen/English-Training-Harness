@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-24 12:32. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-24 22:35. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,11 +9,29 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api drain test passes with srv.Shutdown deleted so the shutdown regression is unguarded — blocks `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` — A rejected CacheStorage delete now fails sign-in for a user who is already signed in [low]
+- `harness/ideas/_inbox/a-second-sigint-or-sigterm-during-the-8-s-shutdown-drain-is-.md` — A second SIGINT or SIGTERM during the 8 s shutdown drain is swallowed because stop is only deferred [low]
+- `harness/ideas/_inbox/a-slow-request-body-still-holds-its-goroutine-indefinitely-n.md` — A slow request body still holds its goroutine indefinitely: no server ReadTimeout, and MaxBytesReader's connection-close hook never fires through gin's writer [medium]
+- `harness/ideas/_inbox/a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md` — A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line [medium]
+- `harness/ideas/_inbox/backend-integration-never-runs-race-though-its-pet-and-store.md` — backend-integration never runs -race though its pet and store tests are concurrency tests [medium]
+- `harness/ideas/_inbox/cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api drain test passes with srv.Shutdown deleted so the shutdown regression is unguarded [high]
+- `harness/ideas/_inbox/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api exits 1 through log.Fatalf when the shutdown grace runs out, skipping the deferred pg and rdb Close [medium]
+- `harness/ideas/_inbox/config-gin-mode-validation-is-unreachable-in-the-binary-beca.md` — config GIN_MODE validation is unreachable in the binary because gin init panics first, and its comments claim otherwise [low]
+- `harness/ideas/_inbox/config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` — config.go still says JWT_SECRET is not in the 1st-thinking env list, and boot refusals print config: config: [low]
+- `harness/ideas/_inbox/durable-flag-and-live-row-success-tests-leave-updated-at-and.md` — Durable-flag and live-row success tests leave updated_at and the Daily error path unasserted [low]
+- `harness/ideas/_inbox/make-check-does-not-mirror-backend-unit-no-service-variable-.md` — make check does not mirror backend-unit: no service-variable guard and fmt-check passes on a parse error [low]
+- `harness/ideas/_inbox/no-test-pins-that-login-awaits-signin-s-cache-clear-before-n.md` — No test pins that login awaits signIn's cache clear before navigating to the hub [low]
+- `harness/ideas/_inbox/onboarding-s-invalid-request-copy-asks-the-learner-to-fix-fi.md` — Onboarding's invalid_request copy asks the learner to fix fields the quiz step no longer shows [low]
+- `harness/ideas/_inbox/parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — ParseOrigins accepts FRONTEND_ORIGIN entries no browser sends, so boot succeeds and the PWA is silently blocked [low]
+- `harness/ideas/_inbox/plan-branch-edits-harness-plans-and-misses-its-own-verificat.md` — Plan branch edits harness/plans and misses its own Verification expectations [low]
+- `harness/ideas/_inbox/refresh-token-sealing-tests-miss-the-sealer-error-path-and-a.md` — Refresh-token sealing tests miss the sealer-error path and a short-but-valid v1 payload, and one can panic instead of fail [low]
+- `harness/ideas/_inbox/revive-s-absolute-save-erases-a-concurrent-ontargetmet-s-20-.md` — Revive's absolute Save erases a concurrent OnTargetMet's +20 and streak [low]
+- `harness/ideas/_inbox/the-documented-set-a-env-export-also-exports-test-database-u.md` — The documented set -a env export also exports TEST_DATABASE_URL so a later make test drops the dev database [medium]
+- `harness/ideas/_inbox/the-sealed-refresh-token-is-not-bound-to-its-users-row-so-a-.md` — The sealed refresh token is not bound to its users row, so a ciphertext can be moved to another account [low]
 
 ## Proposed
 
@@ -79,11 +97,11 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (unreviewed)
-- `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (unreviewed)
-- `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (review: pass-with-bugs)
+- `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan [medium] (review: pass-with-bugs)
+- `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (review: pass-with-bugs)
+- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs)
 - `harness/plans/2026-09-23-revive-shows-a-false-your-plant-is-dead-alarm-whenever-get-p.md` — /revive: render an error state when GET /pet/status fails, never a false wilted plant — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-23-push-subscription-endpoint-is-an-unvalidated-user-supplied-u.md` — Notify amend: validate `push_subscription.endpoint` at subscribe and refuse private destinations at the dial (SSRF) — Plan [high] (review: pass)
