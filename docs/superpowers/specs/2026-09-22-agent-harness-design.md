@@ -203,7 +203,7 @@ Deferred: vector/semantic search. Revisit when CODEMAP + `rg` stop being enough;
 
 The harness initialises the repo. `main` is the integration branch and the main checkout is never modified by any role.
 
-**Executor:** for each plan, `git worktree add .worktrees/<slug> -b harness/<date>-<priority>-<slug> main`. All code changes, builds, and tests happen inside that worktree. Commits land on `harness/<slug>`. The plan's frontmatter records `branch:` and `worktree: .worktrees/<slug>`. The executor never merges and never deletes the worktree.
+**Executor:** for each plan, `git fetch origin main && git worktree add .worktrees/<slug> -b harness/<date>-<priority>-<slug> origin/main` (always the fetched `origin/main`, never a stale local `main`). All code changes, builds, and tests happen inside that worktree. Commits land on `harness/<slug>`. The plan's frontmatter records `branch:` and `worktree: .worktrees/<slug>`. The executor never merges and never deletes the worktree.
 
 **Reviewer:** works inside the same worktree — runs the build and tests there, diffs `harness/<slug>` against `main`, and checks the result against plan and idea. The review file links branch, worktree, and the `git diff main...harness/<slug> --stat` summary.
 
