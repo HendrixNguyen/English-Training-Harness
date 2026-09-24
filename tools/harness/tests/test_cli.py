@@ -26,6 +26,17 @@ class CliTests(unittest.TestCase):
     def test_slug(self):
         self.assertEqual(self.run_cli("slug", "Spaced Repetition: Vocab!")[1], "spaced-repetition-vocab")
 
+    def test_context_hook_emits_session_start_json_and_writes_nothing(self):
+        import json
+        pathlib.Path("harness/CODEMAP.md").write_text("## Backend\n\n- **store** — x\n")
+        code, out = self.run_cli("context", "--hook")
+        self.assertEqual(code, 0)
+        hso = json.loads(out)["hookSpecificOutput"]
+        self.assertEqual(hso["hookEventName"], "SessionStart")
+        self.assertIn("  - store", hso["additionalContext"])
+        self.assertFalse(pathlib.Path("harness/STATE.md").exists())
+        self.assertTrue(self.run_cli("context")[1].startswith("# Session context"))
+
     def test_new_run_increments(self):
         _, r1 = self.run_cli("new-run")
         _, r2 = self.run_cli("new-run")

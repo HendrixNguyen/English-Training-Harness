@@ -1,7 +1,7 @@
 # tools/harness/tests/test_scan_state.py
 import os, tempfile, unittest, pathlib
 from tools.harness.scan import scan
-from tools.harness.state import render_state
+from tools.harness.state import render_state, render_context
 
 def w(root, rel, text):
     p = pathlib.Path(root, rel); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(text); return p
@@ -41,6 +41,21 @@ class ScanTests(unittest.TestCase):
         s = render_state(scan(self.root))
         self.assertIn("beta.md", s)
         self.assertIn("(unreviewed)", s)
+    def test_render_context_keeps_actionable_sections_and_collapses_history(self):
+        codemap = "# CODEMAP\n\n## Backend\n\n- **store** — Postgres + Redis.\n- plain bullet\n"
+        s = render_context(scan(self.root), codemap, "Branch: main")
+        self.assertIn("## Git\nBranch: main", s)
+        self.assertIn("## Backend\n  - store\n", s); self.assertNotIn("plain bullet", s)
+        self.assertIn("bugone.md", s.split("## Inbox")[1].split("##")[0])
+        self.assertIn("2026-09-22-alpha.md", s.split("## Approved")[1].split("##")[0])
+        self.assertIn("## Proposed: 1 item(s)", s); self.assertNotIn("r1/alpha.md", s)
+        self.assertIn("## Done (last 10): 1 item(s)", s); self.assertNotIn("beta.md", s)
+        self.assertNotIn("_Generated", s)
+
+    def test_render_context_without_git_or_codemap(self):
+        s = render_context(scan(self.root))
+        self.assertNotIn("## Git", s); self.assertNotIn("Code map", s)
+        self.assertIn("## Harness state", s)
 
 if __name__ == "__main__":
     unittest.main()
