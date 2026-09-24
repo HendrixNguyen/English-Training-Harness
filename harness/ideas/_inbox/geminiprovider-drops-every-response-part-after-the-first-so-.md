@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-24-geminiprovider-drops-every-response-part-after-the-first-so-.md
 ---
 # GeminiProvider drops every response part after the first so a long roadmap arrives truncated
 
@@ -54,3 +55,12 @@ truncation is prevented rather than only detected.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium (top 10).** Confirmed at `gemini.go:79`: `Parts[0].Text` only; `finishReason` and `promptFeedback.blockReason` never read. When it bites it bites the user's very first interaction (onboarding → `ai_bad_output` after a paid retry). Frequency is uncertain — the reviewer reproduced it against a fake, not against Gemini — so medium rather than high; the fix (join parts, surface `finishReason`, set `maxOutputTokens`) is small and makes the failure diagnosable. Folds in `gemini-test-assertion-that-the-api-key-is-not-in-the-query-s.md`.
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — Bug team ticket B3. Estimate 3 h.**
+*Root cause (re-read on `main`).* `backend/internal/airouter/gemini.go:64-79` decodes `candidates[0].content.parts` as a slice and returns `Parts[0].Text`; `finishReason` and `promptFeedback.blockReason` are not in the struct at all; `generationConfig` sets no `maxOutputTokens`. Every fake in `gemini_test.go` has exactly one part.
+*Why today.* The largest answer the product ever requests (84 tasks with content — and larger once feature ticket F2 types `content`) goes through this provider on the user's first interaction; a split or truncated answer surfaces as `ai_bad_output` after a paid retry. Small, self-contained fix: join parts with `strings.Builder`, decode `finishReason` (non-`STOP` → error naming it), decode `promptFeedback.blockReason`, set `maxOutputTokens`. No router or caller change.
+*Decision on `thinkingConfig`.* Not set (YAGNI): `gemini-2.5-flash` honours `maxOutputTokens` for the visible answer; if the configured model spends its budget thinking, that is a config change, not code.
+*One-day check.* One file, one test file, CODEMAP sentence; no migration, no frontend.
