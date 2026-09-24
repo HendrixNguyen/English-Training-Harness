@@ -12,10 +12,40 @@ import (
 )
 
 // ErrReauthRequired means Google no longer honours this user's refresh token
-// (invalid_grant) or rejects the scopes (401/403). The handler answers 409
-// reauth_required so the client sends the user through /login again
-// (auth.AuthCodeURL asks for calendar.events + tasks with prompt=consent).
+// (invalid_grant), or rejects the request as unauthorized (401) or as a
+// permissions/scope problem (403 without a throttling reason). The handler
+// answers 409 reauth_required so the client sends the user through /login
+// again (auth.AuthCodeURL asks for calendar.events + tasks with prompt=consent).
+//
+// A 403 whose error reason is one of throttleReasons is *not* reauth: Calendar
+// v3 and Tasks v1 answer quota exhaustion with 403, and re-consenting cannot
+// fix a quota. Those, and 429, are UpstreamError (→ 502, "try again later").
 var ErrReauthRequired = errors.New("google: re-authentication required")
+
+// throttleReasons are the error.errors[].reason values Google uses for quota
+// and rate limiting on Calendar v3 and Tasks v1 (they arrive as 403).
+var throttleReasons = map[string]bool{
+	"rateLimitExceeded":     true,
+	"userRateLimitExceeded": true,
+	"dailyLimitExceeded":    true,
+	"quotaExceeded":         true,
+}
+
+// googleErrorReason returns error.errors[0].reason from Google's standard
+// error envelope, or "" when the body is not that shape.
+func googleErrorReason(raw []byte) string {
+	var env struct {
+		Error struct {
+			Errors []struct {
+				Reason string `json:"reason"`
+			} `json:"errors"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil || len(env.Error.Errors) == 0 {
+		return ""
+	}
+	return env.Error.Errors[0].Reason
+}
 
 // ErrNotFound means the Calendar event or Tasks list we stored an id for no
 // longer exists at Google (404/410). Service re-creates it.
@@ -75,13 +105,16 @@ func doJSON(ctx context.Context, client *http.Client, service, method, url, acce
 		return fmt.Errorf("google: reading %s response: %w", service, err)
 	}
 	switch {
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		return fmt.Errorf("%w: %s returned %d", ErrReauthRequired, service, resp.StatusCode)
+	case resp.StatusCode == http.StatusUnauthorized:
+		return fmt.Errorf("%w: %s returned 401", ErrReauthRequired, service)
+	case resp.StatusCode == http.StatusForbidden && !throttleReasons[googleErrorReason(raw)]:
+		return fmt.Errorf("%w: %s returned 403 %s", ErrReauthRequired, service, googleErrorReason(raw))
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return fmt.Errorf("%w: %s returned %d", ErrNotFound, service, resp.StatusCode)
 	case resp.StatusCode == http.StatusConflict:
 		return fmt.Errorf("%w: %s returned 409", ErrAlreadyExists, service)
 	case resp.StatusCode < 200 || resp.StatusCode > 299:
+		// Includes throttling 403s and 429: the handler answers 502.
 		return &UpstreamError{Service: service, Status: resp.StatusCode, Body: string(raw)}
 	}
 	if out == nil || len(raw) == 0 {
