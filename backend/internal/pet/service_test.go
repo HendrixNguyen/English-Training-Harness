@@ -591,3 +591,24 @@ func TestSweepContinuesPastAUserWhoseWriteFails(t *testing.T) {
 		t.Errorf("n=%d u1=%d u2=%d; want 1, u1 untouched, u2 penalised", n, h.repo.states["u1"].HealthPoints, h.repo.states["u2"].HealthPoints)
 	}
 }
+
+func TestFakeSaveKeepsAMarkerItWasNotGiven(t *testing.T) {
+	h := newHarness(sept22)
+	marker := "2026-09-22"
+	h.repo.states["u1"] = State{HealthPoints: 0, Stage: StageWilted, LastTargetMetDate: &marker}
+
+	// Revive's Save carries the pre-image's marker — nil when the pre-image
+	// predates a concurrent OnTargetMet. GREATEST(last_target_met_date, NULL)
+	// keeps the stored one.
+	if err := h.repo.Save(ctx, "u1", State{HealthPoints: 50, Stage: StageSprout}); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.repo.states["u1"].LastTargetMetDate; got == nil || *got != marker {
+		t.Errorf("Save with a nil marker left last_target_met_date = %v, want %s kept", got, marker)
+	}
+	earlier := "2026-01-01"
+	_ = h.repo.Save(ctx, "u1", State{HealthPoints: 50, Stage: StageSprout, LastTargetMetDate: &earlier})
+	if got := h.repo.states["u1"].LastTargetMetDate; got == nil || *got != marker {
+		t.Errorf("Save with an earlier marker moved last_target_met_date to %v, want %s kept", got, marker)
+	}
+}

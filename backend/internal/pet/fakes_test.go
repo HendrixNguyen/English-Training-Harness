@@ -79,6 +79,11 @@ func (f *fakeRepo) Save(_ context.Context, userID string, s State) error {
 	} else {
 		s.JudgedThrough = cur.JudgedThrough
 	}
+	if s.LastTargetMetDate != nil {
+		s.LastTargetMetDate = laterDate(cur.LastTargetMetDate, *s.LastTargetMetDate) // GREATEST(last_target_met_date, $7)
+	} else {
+		s.LastTargetMetDate = cur.LastTargetMetDate
+	}
 	f.states[userID] = s
 	return nil
 }

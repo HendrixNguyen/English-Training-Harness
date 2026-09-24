@@ -267,6 +267,9 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 	if st, _ = repo.Get(ctx, userID); *st.JudgedThrough != "2026-10-04" {
 		t.Errorf("Save moved judged_through back to %s", *st.JudgedThrough)
 	}
+	if st.LastTargetMetDate == nil || *st.LastTargetMetDate != "2026-11-04" {
+		t.Errorf("Save with a nil marker moved last_target_met_date to %v, want 2026-11-04 kept (GREATEST ignores NULL)", st.LastTargetMetDate)
+	}
 
 	cands, err := repo.SweepCandidates(ctx)
 	if err != nil {

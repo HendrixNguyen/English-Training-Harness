@@ -36,8 +36,9 @@ type Repo interface {
 	// Ensure creates the 1:1 row idempotently: INSERT ... ON CONFLICT DO NOTHING.
 	Ensure(ctx context.Context, userID string) error
 	Get(ctx context.Context, userID string) (State, error)
-	// Save writes every mutable column unconditionally (judged_through only
-	// ever forwards). Revive uses it; the two verdict writers below do not.
+	// Save writes every mutable column unconditionally except the two verdict
+	// dates, which only ever move forward. Revive uses it; the verdict
+	// writers do not.
 	Save(ctx context.Context, userID string, s State) error
 	// SaveTargetMet applies §8's success arithmetic in SQL on the live row —
 	// +TargetMetHealthBonus capped at MaxHealth, streak+1, stage from the new
@@ -72,11 +73,13 @@ const (
 
 	getSQL = `SELECT ` + stateColumns + ` FROM pet_states p WHERE p.user_id = $1`
 
-	// GREATEST ignores NULL, so a NULL judged_through takes $8 and a later one is kept.
+	// GREATEST ignores NULL on either side, so both verdict dates only ever
+	// move forward: a revive built from a pre-image that predates a concurrent
+	// OnTargetMet cannot erase that day's marker.
 	saveSQL = `
 UPDATE pet_states
 SET health_points = $2, stage = $3::pet_stage, current_streak = $4, last_practiced_at = $5, updated_at = $6,
-    last_target_met_date = $7::date, judged_through = GREATEST(judged_through, $8::date)
+    last_target_met_date = GREATEST(last_target_met_date, $7::date), judged_through = GREATEST(judged_through, $8::date)
 WHERE user_id = $1`
 
 	// Pre-image and write in one statement: every right-hand side reads the
