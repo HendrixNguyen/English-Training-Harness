@@ -384,7 +384,7 @@ func NewRouter() (*Router, error) {
 # **9\. Deployment & Infrastructure Checklist (Railway)**
 
 1.  Provision PostgreSQL & Redis plugins on Railway and execute DDL migration scripts.  
-2.  Inject DATABASE\_URL, REDIS\_URL, GOOGLE\_CLIENT\_ID, GOOGLE\_CLIENT\_SECRET, GEMINI\_API\_KEY, OPENAI\_API\_KEY, DEEPSEEK\_API\_KEY, ENCRYPTION\_SECRET\_KEY, and VAPID\_PUBLIC\_KEY/VAPID\_PRIVATE\_KEY.  
+2.  Inject DATABASE\_URL, REDIS\_URL, GOOGLE\_CLIENT\_ID, GOOGLE\_CLIENT\_SECRET, GEMINI\_API\_KEY, OPENAI\_API\_KEY, DEEPSEEK\_API\_KEY, ENCRYPTION\_SECRET\_KEY, VAPID\_PUBLIC\_KEY/VAPID\_PRIVATE\_KEY, and FRONTEND\_ORIGIN (the PWA's origin, comma-separated if several).  
 3.  Deploy compiled Go binary in a lightweight Docker container on Railway.
 
 # 

@@ -17,6 +17,7 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/config"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/google"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/health"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/middleware"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/notify"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/onboarding"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/pet"
@@ -76,6 +77,17 @@ func main() {
 	}
 
 	r := gin.Default()
+
+	// Spec §8: the PWA is a separate Railway service on its own origin, so
+	// every browser call is cross-origin. Global, so preflights for paths with
+	// no OPTIONS route reach it (see middleware.CORS).
+	origins, err := middleware.ParseOrigins(cfg.FrontendOrigin)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	r.Use(middleware.CORS(origins))
+	log.Printf("cors: allowing %v", origins)
+
 	r.GET("/healthz", health.Handler(pg, rdb))
 
 	tokens := auth.NewTokenIssuer(cfg.JWTSecret, time.Now)
@@ -132,6 +144,7 @@ func main() {
 	}
 
 	v1 := r.Group("/api/v1")
+	v1.Use(middleware.BodyLimit(middleware.MaxBodyBytes)) // before any route: a group's middleware is copied at registration
 	v1.POST("/auth/google", auth.Handler(authSvc))
 
 	guarded := v1.Group("", auth.Require(tokens, sessions))
