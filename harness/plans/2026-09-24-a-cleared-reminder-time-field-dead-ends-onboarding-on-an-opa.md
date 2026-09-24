@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-24-medium-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa
+worktree: .worktrees/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa
 ---
 # frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan
 
@@ -504,3 +506,54 @@ Optional browser proof (local only; needs `npx playwright install chromium` once
 - **`signIn` returning a promise** is a signature change from `void`; every caller was checked (`pages/login.vue` only; tests call it without awaiting and still read state synchronously, which the ordering preserves).
 - **Playwright is untouched.** Service workers are blocked in e2e, so the cache behaviour is proven at the store level with the Map-backed `FakeCacheStorage`, exactly as the 2026-09-23 sign-out plan did.
 - **Out of scope:** the `api-state` expiry bound (`the-api-state-cache-still-has-no-expiry-bound-…`, selected low) needs a browser-level proof and its own plan.
+
+## Execution summary
+
+Executed in `.worktrees/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa` on branch `harness/2026-09-24-medium-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa`, based on freshly fetched `origin/main`. All 6 tasks (onboarding gate + `invalid_request` + pinned `ai_*` copy; sign-in cache clear + `/login` expired-session drop; authStore global unstubbing; revive missed-days spacing; revive branch-order pin; CODEMAP) implemented exactly as written — no deviations from the plan's design decisions, file list, or copy text.
+
+For each task: wrote the failing tests first, ran them to see the expected failure (matched the plan's stated expectations, e.g. "`Không tạo được lộ trình. Thử lại.` to contain `giờ nhắc học`"), implemented, reran to green, ran the specified mutation to confirm the guard has teeth, restored, reran green, then `npm run lint && npm run typecheck`, then committed with the plan's exact message.
+
+One minor deviation: in Task 6's CODEMAP edit, rather than literally inserting the new onboarding sentence before the pre-existing "`rate_limited` / `ai_*` get their own copy" clause (which would have left it redundant with the new, more complete sentence covering the same three error codes), I replaced that old clause with the new one so the paragraph reads once, not twice, over the same fact. All information the plan wanted recorded (gate, `invalid_request`, pinning) is present.
+
+### Plan Verification (all commands run from `frontend/` in the worktree)
+
+```
+npm run lint && npm run typecheck
+# clean, no errors
+
+npm run test:unit
+# Test Files  16 passed (16)
+# Tests  78 passed (78)
+# onboardingPage.test.ts: 8 passed
+# authStore.test.ts: 9 passed
+# authMiddleware.test.ts: 4 passed
+# revivePage.test.ts: 6 passed
+
+npx vitest run tests/unit/onboardingPage.test.ts tests/unit/authStore.test.ts tests/unit/authMiddleware.test.ts tests/unit/revivePage.test.ts
+# 4 files, 27 tests passed
+
+npm run build
+# ✨ Build complete! (client + server + service worker all built)
+
+grep -n 'canStart\|invalid_request' pages/onboarding.vue        # gate + copy present, 4 hits
+grep -n 'return clearApiCache()' stores/auth.ts                  # 2 hits (signIn, signOut)
+grep -n 'await auth.signIn' pages/login.vue                      # 1 hit
+grep -n 'unstubAllGlobals' tests/unit/authStore.test.ts          # 1 hit
+grep -n 'bỏ học<template' pages/revive.vue                       # no output (fixed)
+git log --oneline origin/main..HEAD | wc -l                      # 6
+python3 tools/harness/cli.py validate; echo "exit=$?"            # exit=0 (run from worktree root, not frontend/)
+```
+
+All mutation checks in the plan's table were run and confirmed (each named test turned red, then was restored to green): the `!goal` gate regression, the `ai_*` branch deletion, the `invalid_request` branch deletion, `signIn` returning `Promise.resolve()` instead of clearing the cache, removing the guard's new `signOut()` line, removing `authStore.test.ts`'s `afterEach`, restoring the old `bỏ học<template>` markup, and swapping the `pet.error`/`pet.status` template branches (this last mutation actually failed *two* tests, not just the one the plan named — a stronger confirmation than specified).
+
+### Runtime proof
+
+- `npm run build` succeeded (client, Nitro server, and the `injectManifest` service worker all built; 50-entry precache manifest generated).
+- Booted the built app: `PORT=13001 NUXT_PUBLIC_API_BASE=http://localhost:18085 NUXT_PUBLIC_GOOGLE_CLIENT_ID=test-client NUXT_PUBLIC_VAPID_PUBLIC_KEY=test-vapid node .output/server/index.mjs` (no backend needed for this proof — the app is `ssr:false`, so real content is client-rendered and store-driven).
+- `curl` confirmed `/`, `/onboarding`, `/login`, `/revive` all return `200` and serve the real `<title>Học 30 phút</title>` SPA shell.
+- Drove it with the in-app browser (Claude_Browser): `/login` rendered "Đăng nhập bằng Google"; with a fake session seeded into `localStorage['aelp.auth']`, `/onboarding` rendered the real goal step (goal cards, time input, start button). Clicked "IELTS 7.0", cleared the `<input type="time">` via `form_input`, and confirmed live in the DOM (`document.querySelectorAll('button')`) that the start button's `.disabled` property became `true` with the hint "Chọn một giờ nhắc học để tiếp tục." showing — the exact defect from the idea, now gated, proven against the actual built artifact rather than only the test harness. `/revive` correctly rendered the error state ("Không tải được trạng thái cây…") since no backend was running — the expected, non-crashing behavior.
+- Cleaned up: killed the node server (verified via `pgrep`, nothing left), closed the browser tab. No Docker containers were started for this proof (not needed since the runtime check only exercised the frontend's own error/loading states, not a real backend response) — `docker ps` confirmed nothing running.
+
+### CI
+
+Pushed `harness/2026-09-24-medium-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa`. CI run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/35959491527 — all 4 jobs green (`frontend`, `backend-unit`, `harness-tooling`, `backend-integration`).
