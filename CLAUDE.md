@@ -17,6 +17,7 @@ python3 -m unittest discover -s tools/harness/tests -v   # harness tooling tests
 python3 -m unittest tools.harness.tests.test_cli -v     # one module
 python3 tools/harness/cli.py validate                    # exit 1 on malformed harness artifacts
 python3 tools/harness/cli.py state                       # regenerate harness/STATE.md
+python3 tools/harness/cli.py context                     # session briefing; the SessionStart hook runs it with --hook
 ```
 
 Slash commands (`/ideate`, `/idea`, `/evaluate`, `/approve`, `/execute`, `/review`, `/harness`) are defined in `.claude/commands/` and are registered at session start.

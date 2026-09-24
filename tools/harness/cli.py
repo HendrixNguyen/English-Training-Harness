@@ -1,13 +1,13 @@
 # tools/harness/cli.py
 """Single entry point for every harness state mutation. Agents call this; they never hand-edit frontmatter."""
-import argparse, datetime, os, pathlib, re, sys, time, unicodedata
+import argparse, datetime, json, os, pathlib, re, subprocess, sys, time, unicodedata
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from tools.harness.frontmatter import split_document, parse, join_document
 from tools.harness.schema import kind_of, validate, TRANSITIONS
 from tools.harness.scan import scan, load
-from tools.harness.state import render_state, plan_sort_key, PRIO_RANK
+from tools.harness.state import render_state, render_context, plan_sort_key, PRIO_RANK
 
 TEMPLATES = pathlib.Path(".agents/templates")
 LOCK = pathlib.Path("harness/.lock")          # pre-2026-09-23 single lock, migrated on first use
@@ -59,6 +59,25 @@ def cmd_validate(a):
 
 def cmd_state(a):
     print(refresh_state()); return 0
+
+
+def _git(*args):
+    try:
+        return subprocess.run(["git", *args], capture_output=True, text=True, timeout=10).stdout.rstrip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def cmd_context(a):
+    """Read-only session briefing. --hook wraps it in the SessionStart JSON that Claude Code, Gemini CLI and Codex all accept."""
+    status = "\n".join(_git("status", "--short").splitlines()[:15])
+    git = f"Branch: {_git('branch', '--show-current')}\n" + (f"{status}\n" if status else "") + \
+          f"\nRecent commits:\n{_git('log', '--oneline', '-8')}"
+    codemap = pathlib.Path("harness/CODEMAP.md")
+    text = render_context(scan("."), codemap.read_text() if codemap.exists() else "", git)
+    if a.hook:
+        text = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}})
+    print(text); return 0
 
 
 def cmd_slug(a):
@@ -264,6 +283,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("validate").set_defaults(fn=cmd_validate)
     sub.add_parser("state").set_defaults(fn=cmd_state)
+    p = sub.add_parser("context"); p.add_argument("--hook", action="store_true"); p.set_defaults(fn=cmd_context)
     p = sub.add_parser("slug"); p.add_argument("title"); p.set_defaults(fn=cmd_slug)
     p = sub.add_parser("new-run"); p.add_argument("--mvp", action="store_true"); p.set_defaults(fn=cmd_new_run)
     p = sub.add_parser("new-idea")

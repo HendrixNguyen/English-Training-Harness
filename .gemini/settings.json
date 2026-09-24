@@ -1,0 +1,22 @@
+{
+  "context": {
+    "fileName": [
+      "AGENTS.md"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "harness-context",
+            "type": "command",
+            "command": "cd \"${GEMINI_PROJECT_DIR:-$(git rev-parse --show-toplevel)}\" && python3 tools/harness/cli.py context --hook",
+            "timeout": 20000
+          }
+        ]
+      }
+    ]
+  }
+}

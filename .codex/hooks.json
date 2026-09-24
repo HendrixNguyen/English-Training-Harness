@@ -1,0 +1,17 @@
+{
+  "description": "Load harness state and the CODEMAP index at session start (python3 tools/harness/cli.py context).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CODEX_PROJECT_DIR:-$(git rev-parse --show-toplevel)}\" && python3 tools/harness/cli.py context --hook",
+            "timeout": 20,
+            "statusMessage": "Loading project context"
+          }
+        ]
+      }
+    ]
+  }
+}

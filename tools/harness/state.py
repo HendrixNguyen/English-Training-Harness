@@ -45,3 +45,34 @@ def render_state(res):
     section("Done (last 10)", done_lines)
     section("Failed", [_line(a) for a in res.plans if a.fm["status"] == "failed"])
     return "\n".join(out) + "\n"
+
+
+CONTEXT_COLLAPSED = ("Proposed", "Selected", "Done")
+
+
+def render_context(res, codemap="", git=""):
+    """Session-start briefing for any agent: git, CODEMAP index, actionable STATE sections.
+    Kept small (hook context budgets are ~10K chars), so history sections collapse to counts."""
+    out = ["# Session context (python3 tools/harness/cli.py context)\n"]
+    if git:
+        out += ["## Git", git.rstrip(), ""]
+    index = [l for l in codemap.splitlines() if l.startswith("## ")
+             or (l.startswith("- **") and "**" in l[4:])]
+    if index:
+        out.append("## Code map index — read the matching paragraph of harness/CODEMAP.md before exploring code")
+        out += [l if l.startswith("## ") else "  - " + l[4:].split("**", 1)[0] for l in index]
+        out.append("")
+    out.append("## Harness state (full dashboard: python3 tools/harness/cli.py state)")
+    title, collapsed, n = None, True, 0     # True until the first section: drops the STATE.md title lines
+    for line in render_state(res).splitlines():
+        if line.startswith("## "):
+            title = line[3:]
+            collapsed = title.startswith(CONTEXT_COLLAPSED)
+            n = 0
+            out.append(line)
+        elif collapsed:
+            if title and line.startswith("- "):
+                n += 1; out[-1] = f"## {title}: {n} item(s)"
+        elif line:
+            out.append(line)
+    return "\n".join(out) + "\n"

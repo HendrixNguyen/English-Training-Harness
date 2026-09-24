@@ -10,6 +10,8 @@ An adaptive English-learning PWA (spec: `project-base/1st-thinking-architecture-
 
 Four roles in `.agents/roles/` — ideator, evaluator, executor, reviewer — pass markdown artifacts through `harness/`. The ideator proposes features, the reviewer files bugs, and the **evaluator alone chooses and ranks across both**; the executor builds what was approved. **Standing priority (owner, 2026-09-23): the nine MVP slices are merged, so the MVP-first rule has expired. The evaluator now ranks the `_inbox` on user impact — data loss, security, and anything a real user hits on the happy path outrank internal tidiness. Blockers still jump the queue.** **Auto-approve (owner, 2026-09-24): the evaluator approves every bug plan, every `mvp-slice` plan and every `priority: high` feature plan as it writes them, so the executor picks them up without a human `/approve`; medium/low feature plans still wait for `/approve`. The owner's gate is the daily PR merge.** Status lives in each file's frontmatter; `harness/STATE.md` is a generated dashboard. All state changes go through `python3 tools/harness/cli.py` — never hand-edit frontmatter. Read `harness/CODEMAP.md` before exploring code.
 
+**Session start:** every agent begins with `python3 tools/harness/cli.py context` — git, the CODEMAP index and the actionable harness state (read-only; it never rewrites `STATE.md`). Claude Code (`.claude/settings.json`), Gemini CLI (`.gemini/settings.json`) and Codex (`.codex/hooks.json`) inject it automatically through a `SessionStart` hook calling `context --hook`; any other agent runs it by hand before its first task.
+
 ## Reading the spec
 
 Three documents in `project-base/`, all canonical:
@@ -45,6 +47,7 @@ All three were pasted from a rich-text editor: headings and symbols are backslas
 ```
 python3 tools/harness/cli.py validate                 # exit 1 on malformed artifacts
 python3 tools/harness/cli.py state                    # regenerate + print STATE.md
+python3 tools/harness/cli.py context [--hook]          # read-only session briefing (--hook: SessionStart JSON)
 python3 tools/harness/cli.py new-run [--mvp]          # -> harness/ideas/<date>-run-NN/
 python3 tools/harness/cli.py new-idea --run DIR --title T --type feature|bug|mvp-slice --source ideator|human|reviewer [--order N]
 python3 tools/harness/cli.py new-plan --idea FILE     # -> harness/plans/<date>-<slug>.md (status draft)
