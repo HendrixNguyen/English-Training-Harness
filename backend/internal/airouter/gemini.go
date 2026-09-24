@@ -19,6 +19,13 @@ const ProviderTimeout = 30 * time.Second
 const (
 	DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com"
 	DefaultGeminiModel   = "gemini-2.5-flash"
+
+	// GeminiMaxOutputTokens sizes the answer for the largest thing we ask for:
+	// a 28-day roadmap, 84 tasks each carrying content (word lists, passages,
+	// questions). Without it the model's default budget truncates long
+	// roadmaps, which ParseRoadmap then rejects as malformed JSON. 2.5-class
+	// models accept up to 65536; 32768 leaves headroom for typed content.
+	GeminiMaxOutputTokens = 32768
 )
 
 // GeminiProvider calls models/{model}:generateContent in JSON mode.
@@ -54,6 +61,7 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 		"generationConfig": map[string]any{
 			"response_mime_type": "application/json",
 			"temperature":        0.2,
+			"maxOutputTokens":    GeminiMaxOutputTokens,
 		},
 	}
 	body, err := postJSON(ctx, g.client, url, reqBody, map[string]string{"x-goog-api-key": g.apiKey})

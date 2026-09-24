@@ -51,6 +51,9 @@ func TestGeminiSendsTheSpec62RequestAndReturnsTheText(t *testing.T) {
 	if gen["response_mime_type"] != "application/json" || gen["temperature"] != 0.2 {
 		t.Errorf("generationConfig = %v, want application/json and 0.2", gen)
 	}
+	if gen["maxOutputTokens"] != float64(GeminiMaxOutputTokens) || GeminiMaxOutputTokens < 16384 {
+		t.Errorf("maxOutputTokens = %v, want %d (≥ 16384: 84 tasks with content)", gen["maxOutputTokens"], GeminiMaxOutputTokens)
+	}
 }
 
 func TestGeminiJoinsEveryPartOfTheFirstCandidate(t *testing.T) {
