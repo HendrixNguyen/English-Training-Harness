@@ -38,6 +38,16 @@ jobs:
           done
       - name: Build
         run: go build ./...
+      - name: gofmt
+        run: |
+          set -o pipefail
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt -l reports unformatted Go files — run: gofmt -w <file>"
+            echo "$unformatted"
+            exit 1
+          fi
+          echo "gofmt: clean"
       - name: Vet
         run: go vet ./...
       - name: Test without services
