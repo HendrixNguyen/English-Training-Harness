@@ -76,10 +76,12 @@ func invalid(format string, args ...any) error {
 
 // ParseRoadmap decodes a model response strictly: no markdown fences or
 // preamble (§6.1 constraint 1), no trailing tokens, exactly 4 modules × 7 days
-// × 3 tasks with the three task types each present once, non-empty task
-// titles, durations within (0, 30] (a missing duration becomes 10), and a
-// valid cefr_level. Unknown extra fields are tolerated. Nothing is stripped or
-// repaired — a non-conforming answer is the caller's cue to retry.
+// × 3 tasks with the three task types each present once, module i declaring
+// week i, non-empty roadmap/module/day/task titles, task durations within
+// 5..15 and each day summing to 20..40 minutes (a missing duration becomes 10
+// before the sum), and a valid cefr_level. Unknown extra fields are
+// tolerated. Nothing is stripped or repaired — a non-conforming answer is the
+// caller's cue to retry.
 func ParseRoadmap(raw string) (Roadmap, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -101,6 +103,9 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 		return Roadmap{}, invalid("trailing content after the JSON object")
 	}
 
+	if strings.TrimSpace(r.Title) == "" {
+		return Roadmap{}, invalid("roadmap has no title")
+	}
 	if !cefrLevels[r.CEFRLevel] {
 		return Roadmap{}, invalid("cefr_level %q is not a CEFR level", r.CEFRLevel)
 	}
@@ -116,11 +121,17 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 			// checkable instruction; sorting would hide the disagreement.
 			return Roadmap{}, invalid("module %d declares week %d, want %d", mi+1, m.Week, mi+1)
 		}
+		if strings.TrimSpace(m.Title) == "" {
+			return Roadmap{}, invalid("module %d has no title", mi+1)
+		}
 		if len(m.Days) != DaysPerModule {
 			return Roadmap{}, invalid("module %d has %d days, want %d", mi+1, len(m.Days), DaysPerModule)
 		}
 		for di := range m.Days {
 			d := &m.Days[di]
+			if strings.TrimSpace(d.Title) == "" {
+				return Roadmap{}, invalid("module %d day %d has no title", mi+1, di+1)
+			}
 			if len(d.Tasks) != TasksPerDay {
 				return Roadmap{}, invalid("module %d day %d has %d tasks, want %d", mi+1, di+1, len(d.Tasks), TasksPerDay)
 			}

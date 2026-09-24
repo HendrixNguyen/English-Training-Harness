@@ -117,9 +117,13 @@ func TestParseRoadmapRejects(t *testing.T) {
 			}
 		}),
 		"one 20-minute task in an otherwise normal day": validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[4].Tasks[1].DurationMinutes = 20 }),
-		"weeks reversed":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week, r.Modules[3].Week = 4, 1 }),
-		"duplicate week":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Week = 1 }),
-		"week counts from 0": validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week = 0 }),
+		"weeks reversed":      validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week, r.Modules[3].Week = 4, 1 }),
+		"duplicate week":      validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Week = 1 }),
+		"week counts from 0":  validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week = 0 }),
+		"empty roadmap title": validRoadmapJSON(t, func(r *Roadmap) { r.Title = "" }),
+		"blank roadmap title": validRoadmapJSON(t, func(r *Roadmap) { r.Title = "   " }),
+		"empty module title":  validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Title = "" }),
+		"empty day title":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[5].Title = "" }),
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
