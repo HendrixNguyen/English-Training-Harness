@@ -231,6 +231,14 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	if minutes != 41 || !met {
 		t.Errorf("daily_progress = (%d, %t) after the counter was lost, want (41, true) — never lowered", minutes, met)
 	}
+
+	after, err := svc.Daily(ctx, userID)
+	if err != nil {
+		t.Fatalf("Daily after the counter was lost: %v", err)
+	}
+	if after.AccumulatedSeconds != 60 || !after.IsTargetMet {
+		t.Errorf("Daily after the counter was lost = accumulated %d, is_target_met %t; want 60 (the one post-loss report) and true (durable row)", after.AccumulatedSeconds, after.IsTargetMet)
+	}
 }
 
 // integrationRoadmap is a valid 4x7x3 roadmap whose tasks carry the title and

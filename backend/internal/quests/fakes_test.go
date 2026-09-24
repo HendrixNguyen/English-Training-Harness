@@ -139,6 +139,13 @@ func (f *fakeProgressRepo) MarkTargetMet(_ context.Context, userID, localDate st
 	return nil
 }
 
+func (f *fakeProgressRepo) TargetMet(_ context.Context, userID, localDate string) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.rows[userID+"|"+localDate].targetMet, nil
+}
+
 type fakePet struct {
 	log      *callLog
 	fired    int

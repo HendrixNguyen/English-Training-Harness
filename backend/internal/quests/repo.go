@@ -67,6 +67,10 @@ type ProgressRepo interface {
 	Upsert(ctx context.Context, userID, localDate string, minutes int) (alreadyMet bool, err error)
 	// MarkTargetMet flips is_target_met to TRUE. Idempotent.
 	MarkTargetMet(ctx context.Context, userID, localDate string) error
+	// TargetMet reports the row's is_target_met for (userID, localDate); no
+	// row → false. GET /quests/daily reads it so both endpoints answer the
+	// same is_target_met for the same local day, counter or no counter.
+	TargetMet(ctx context.Context, userID, localDate string) (bool, error)
 }
 
 const (
@@ -109,6 +113,11 @@ RETURNING COALESCE(is_target_met, FALSE)`
 	markTargetMetSQL = `
 UPDATE daily_progress
 SET is_target_met = TRUE
+WHERE user_id = $1 AND date = $2::date`
+
+	targetMetSQL = `
+SELECT COALESCE(is_target_met, FALSE)
+FROM daily_progress
 WHERE user_id = $1 AND date = $2::date`
 )
 
@@ -192,6 +201,18 @@ func (r *PgRepo) MarkTargetMet(ctx context.Context, userID, localDate string) er
 		return fmt.Errorf("quests: marking target met: %w", err)
 	}
 	return nil
+}
+
+func (r *PgRepo) TargetMet(ctx context.Context, userID, localDate string) (bool, error) {
+	var met bool
+	err := r.Pool.QueryRow(ctx, targetMetSQL, userID, localDate).Scan(&met)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("quests: reading daily_progress flag: %w", err)
+	}
+	return met, nil
 }
 
 var (
