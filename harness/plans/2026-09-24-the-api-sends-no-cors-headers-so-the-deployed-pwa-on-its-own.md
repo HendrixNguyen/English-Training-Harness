@@ -5,6 +5,7 @@ priority: high
 merged: false
 branch: harness/2026-09-24-high-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own
 worktree: .worktrees/the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
 ---
 # API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan
 

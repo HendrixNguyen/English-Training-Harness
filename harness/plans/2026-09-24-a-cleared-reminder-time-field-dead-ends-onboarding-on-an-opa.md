@@ -5,6 +5,7 @@ priority: medium
 merged: false
 branch: harness/2026-09-24-medium-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa
 worktree: .worktrees/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
 ---
 # frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan
 
