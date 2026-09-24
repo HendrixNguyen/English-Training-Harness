@@ -6,6 +6,7 @@ import AppButton from '~/components/ui/AppButton.vue'
 import AppCard from '~/components/ui/AppCard.vue'
 import SegmentedProgress from '~/components/ui/SegmentedProgress.vue'
 import StateBlock from '~/components/ui/StateBlock.vue'
+import { usePetStore } from '~/stores/pet'
 
 const api = { get: vi.fn(), post: vi.fn() }
 vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
@@ -93,5 +94,39 @@ describe('/revive (wireframe 7.5) when GET /pet/status fails', () => {
     await flushPromises()
     expect(w2.text()).toContain('Bạn đã bỏ học. Hãy hoàn thành')
     expect(w2.text()).not.toContain('bỏ học  ')
+  })
+
+  it('keeps the last-known wilted state when a later reload fails — stale data wins over the error card', async () => {
+    let fails = false
+    routeGet(() => (fails ? Promise.reject(new Error('offline')) : Promise.resolve(WILTED)))
+    const w = mountPage()
+    await flushPromises()
+    expect(w.find('[data-stage="wilted"]').exists()).toBe(true)
+
+    fails = true
+    await usePetStore().load()
+    await flushPromises()
+
+    expect(w.find('[data-stage="wilted"]').exists()).toBe(true)
+    expect(w.find('[role="status"]').exists()).toBe(false)
+    expect(w.text()).toContain('Cứu cây ngay')
+  })
+
+  it('a failed POST /pet/revive keeps the wilted screen and shows only the inline message', async () => {
+    routeGet(() => Promise.resolve(WILTED))
+    api.post.mockRejectedValue(new Error('offline'))
+    const w = mountPage()
+    await flushPromises()
+
+    const start = w.findAll('button').find(b => b.text().includes('Cứu cây ngay'))
+    if (!start) throw new Error('no revive button')
+    await start.trigger('click')
+    await flushPromises()
+
+    expect(w.find('[data-stage="wilted"]').exists()).toBe(true)
+    expect(w.find('[role="status"]').exists()).toBe(false)
+    const alerts = w.findAll('[role="alert"]').map(a => a.text())
+    expect(alerts.some(t => t.includes('héo rũ'))).toBe(true)
+    expect(alerts.some(t => t.includes('Không bắt đầu được thử thách'))).toBe(true)
   })
 })
