@@ -32,7 +32,7 @@ async function finishSignIn(code: string, state: string) {
   busy.value = true
   try {
     const res = await useApi().post<SignInResponse>('/api/v1/auth/google', { code, redirect_uri: redirectUri.value })
-    auth.signIn(res)
+    await auth.signIn(res)
     if (!auth.isAuthenticated) {
       // The backend answered 200 but not in the §6.1 shape (see the plan's merge blocker).
       error.value = 'Máy chủ trả về phiên đăng nhập không hợp lệ. Thử lại sau.'

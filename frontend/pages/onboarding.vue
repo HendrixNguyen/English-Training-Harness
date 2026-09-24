@@ -13,6 +13,7 @@ const GOALS = [
 function assessErrorMessage(e: unknown): string {
   if (e instanceof ApiError && e.code === 'rate_limited') return 'Bạn vừa gửi quá nhiều lần. Đợi một phút rồi thử lại.'
   if (e instanceof ApiError && e.code.startsWith('ai_')) return 'Máy chủ AI đang bận, chưa chấm được bài. Thử lại sau ít phút.'
+  if (e instanceof ApiError && e.code === 'invalid_request') return 'Máy chủ không nhận thông tin đã gửi. Kiểm tra lại mục tiêu và giờ nhắc học rồi thử lại.'
   return 'Không tạo được lộ trình. Thử lại.'
 }
 
@@ -22,6 +23,10 @@ const quest = useQuestStore()
 const step = ref<'goal' | 'quiz' | 'result'>('goal')
 const goal = ref<string | null>(null)
 const time = ref('20:00')
+/** <input type="time"> yields HH:MM, or '' once cleared; §6.1 wants HH:MM:SS, built in next(). */
+const TIME_RE = /^\d{2}:\d{2}$/
+const timeValid = computed(() => TIME_RE.test(time.value))
+const canStart = computed(() => goal.value !== null && timeValid.value)
 const questions = ref<QuizQuestion[]>([])
 const index = ref(0)
 const answers = ref<Record<string, string>>({})
@@ -38,7 +43,7 @@ const current = computed(() => questions.value[index.value])
 const isLast = computed(() => index.value >= questions.value.length - 1)
 
 async function startQuiz() {
-  if (!goal.value) return
+  if (!canStart.value) return
   loading.value = true
   error.value = null
   try {
@@ -92,9 +97,10 @@ async function finish() {
       </div>
       <label class="mt-6 block">
         <span class="text-sm text-mute">Chọn giờ nhắc học hằng ngày</span>
-        <input v-model="time" type="time" class="mt-1 block w-full rounded-btn border border-ink/15 bg-transparent px-3 py-2 dark:border-paper/15">
+        <input v-model="time" type="time" required :aria-invalid="!timeValid || undefined" class="mt-1 block w-full rounded-btn border border-ink/15 bg-transparent px-3 py-2 dark:border-paper/15">
+        <span v-if="!timeValid" class="mt-1 block text-sm text-alert" role="note">Chọn một giờ nhắc học để tiếp tục.</span>
       </label>
-      <AppButton class="mt-6" block :disabled="!goal" :loading="loading" @click="startQuiz">
+      <AppButton class="mt-6" block :disabled="!canStart" :loading="loading" @click="startQuiz">
         Bắt đầu bài kiểm tra đầu vào
       </AppButton>
     </AppCard>

@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AUTH_STORAGE_KEY, useAuthStore, type SignInResponse } from '~/stores/auth'
 import { API_STATE_CACHE } from '~/utils/session'
 import { installSeededCaches } from './fakeCaches'
@@ -16,6 +16,7 @@ describe('useAuthStore', () => {
     setActivePinia(createPinia())
     localStorage.clear()
   })
+  afterEach(() => vi.unstubAllGlobals())
 
   it('signIn stores the §6.1 access_token and computes expiresAt from expires_in', () => {
     const auth = useAuthStore()
@@ -92,5 +93,23 @@ describe('useAuthStore', () => {
     auth.signIn(spec61, Date.now())
     await expect(auth.signOut()).resolves.toBeUndefined()
     expect(auth.accessToken).toBeNull()
+  })
+
+  it('signIn drops the previous account\'s api-state cache and keeps assets', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    const auth = useAuthStore()
+
+    await auth.signIn(spec61, Date.now())
+
+    expect(await caches.has(API_STATE_CACHE)).toBe(false)
+    expect(await caches.keys()).toEqual(['assets'])
+    expect(auth.isAuthenticated).toBe(true)
+  })
+
+  it('leaves no caches stub behind for the next case (the file-level afterEach unstubs)', () => {
+    // vi.stubGlobal('caches', undefined) defines the property; only an unstub
+    // removes it. Without the afterEach, every case appended after the
+    // "CacheStorage does not exist" case would silently run with no caches.
+    expect('caches' in globalThis).toBe(false)
   })
 })

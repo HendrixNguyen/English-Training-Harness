@@ -56,14 +56,21 @@ export const useAuthStore = defineStore('auth', {
         storageOrNull()?.removeItem(AUTH_STORAGE_KEY)
       }
     },
-    signIn(res: SignInResponse, now: number = Date.now()) {
-      if (typeof res.access_token !== 'string' || typeof res.expires_in !== 'number') return
+    /**
+     * Stores the new session, then drops any previous account's cached API
+     * responses — the mirror of signOut(). State and storage are written
+     * synchronously; the returned promise is the cache clear, and /login
+     * awaits it before navigating so the hub never reads a stale entry.
+     */
+    signIn(res: SignInResponse, now: number = Date.now()): Promise<void> {
+      if (typeof res.access_token !== 'string' || typeof res.expires_in !== 'number') return Promise.resolve()
       this.accessToken = res.access_token
       this.expiresAt = now + res.expires_in * 1000
       this.user = res.user
       this.hydrated = true
       const p: Persisted = { accessToken: this.accessToken, expiresAt: this.expiresAt, user: res.user }
       storageOrNull()?.setItem(AUTH_STORAGE_KEY, JSON.stringify(p))
+      return clearApiCache()
     },
     /** Drops the session, then the per-user service worker cache — every sign-out path goes through here. */
     signOut(): Promise<void> {

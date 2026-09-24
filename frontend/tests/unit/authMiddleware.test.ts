@@ -47,4 +47,28 @@ describe('middleware/auth.global — expired session (the daily sign-out path)',
     expect(await caches.has(API_STATE_CACHE)).toBe(true)
     expect(navigateTo).not.toHaveBeenCalled()
   })
+
+  it('drops an expired session and its cache when /login is the first route, without redirecting', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    persistSession(Date.now() - 1) // a bookmark straight to /login on a shared device
+    const login = { path: '/login', query: {} } as RouteLocationNormalized
+
+    guard(login, login)
+
+    await vi.waitFor(async () => expect(await caches.has(API_STATE_CACHE)).toBe(false))
+    expect(await caches.has('assets')).toBe(true)
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+    expect(navigateTo).not.toHaveBeenCalled()
+  })
+
+  it('leaves /login alone when there is no session at all', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    const login = { path: '/login', query: {} } as RouteLocationNormalized
+
+    guard(login, login)
+    await Promise.resolve()
+
+    expect(await caches.has(API_STATE_CACHE)).toBe(true) // nothing to drop; signIn() will
+    expect(navigateTo).not.toHaveBeenCalled()
+  })
 })
