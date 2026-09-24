@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -23,3 +23,8 @@ The new tests kill every unit mutation in the plan's table (the reviewer ran six
 ## Evidence
 - Plan: `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` (review: `harness/reviews/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md`), and the reviewer's test-gap pass over `git diff origin/main...harness/2026-09-24-high-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r`.
 - `grep -n 'Sealer' backend/internal/auth/*_test.go` finds no fake.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Test-gap findings, all confirmed by reading `auth/repo.go`, `secrets/secrets.go` and `google/token_test.go`; none changes behaviour. To be planned with the AAD change (`the-sealed-refresh-token-is-not-bound-to-its-users-row-so-a-.md`) as one `secrets`/`auth` test-and-hardening branch, since both edit `secrets.go` and its tests.

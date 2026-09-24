@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: medium
@@ -25,3 +25,8 @@ Rollout path: `.env.example:44` documents what rotating or losing the key does, 
 - `backend/internal/google/token.go:58`: `fmt.Errorf("%w: stored value unusable (%v)", ErrNoRefreshToken, err)` collapses ErrOpen and ErrNotSealed.
 - `backend/internal/google/service.go:46-47` maps it to `ErrReauthRequired`. `backend/internal/google/handler.go:34-37` answers 409 and logs nothing.
 - Reproduced on the reviewer's `rev-secrets` stack (API :18093): a legacy row gives `{"error":"reauth_required"} HTTP 409`, and `grep -c 'ciphertext\|reauth\|no refresh token' api.log` gives `0`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium. Not planned today.** Confirmed on `main`: `backend/internal/google/token.go` wraps `secrets.ErrOpen` and `secrets.ErrNotSealed` into one `ErrNoRefreshToken`, `service.go` maps it to `ErrReauthRequired`, and nothing on that path logs, so a wrong `ENCRYPTION_SECRET_KEY` presents as every user needing to re-consent. Real operator hazard at the first Railway deploy. *Why not today:* the `google` package has a finished, unmerged branch (`harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro`, edits `handler.go`/`client.go` and adds route logging) that the 20:00 review merges tonight; a second branch on the same files today would conflict at the daily merge. First in line tomorrow, on top of that branch's logging convention. Decision recorded for the plan: log one line at `ErrOpen` with the user id and the sentinel name (never the value), stay silent for empty rows, note `ErrNotSealed` at info; a boot-time key fingerprint is a later, optional step.

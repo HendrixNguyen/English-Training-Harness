@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -45,3 +45,8 @@ that fires both calls after a single task. It costs one day's +20 and one streak
 - `backend/internal/pet/repo.go:79-83`: `saveSQL` writes `health_points = $2, stage = $3, current_streak = $4` unconditionally. Only the two dates are `GREATEST`-protected.
 - `backend/internal/pet/repo.go:29-35`: the `Repo` comment names this exception without calling it unsafe.
 - Sibling idea `harness/ideas/_inbox/pgrepo-save-resets-last-target-met-date-to-null-on-the-reviv.md` fixed only the marker for the same window.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Confirmed on `main`: `pet/repo.go` `saveSQL` writes `health_points`, `stage` and `current_streak` as absolute values from `Revive`'s pre-image while the two dates are `GREATEST`-protected. Real but rare: it needs a revive call and a target-crossing progress call in flight together; the cost is one +20 and one streak day. Decision recorded for the plan: make the revive write conditional on `health_points = 0` like the three verdict writers, re-read and answer the live state when it does not apply, mirror the predicate in the fake, and add the interleaving integration case. Behind the four user-facing items above; the same package's `Repo` comment and CODEMAP sentence are corrected in that plan.
