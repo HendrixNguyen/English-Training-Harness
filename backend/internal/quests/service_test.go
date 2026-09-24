@@ -628,7 +628,7 @@ func TestALostCounterNeverLowersTheDurableMinutes(t *testing.T) {
 	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-reading", 1800); err != nil { // row: 30 minutes
 		t.Fatal(err)
 	}
-	h.counter.totals = map[string]int64{} // the counter restarts at 0…
+	h.counter.totals = map[string]int64{}                                           // the counter restarts at 0…
 	if _, err := h.svc.RecordProgress(ctx, "u1", "ex-2-practice", 60); err != nil { // …so this report upserts minutes = 1
 		t.Fatal(err)
 	}
