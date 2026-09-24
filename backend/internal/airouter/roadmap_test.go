@@ -63,6 +63,32 @@ func TestParseRoadmapDefaultsAMissingDurationToTen(t *testing.T) {
 	}
 }
 
+func TestParseRoadmapAcceptsTheDayBudgetEdges(t *testing.T) {
+	cases := map[string]func(r *Roadmap){
+		"exactly 30":                     nil,
+		"missing duration counts as ten": func(r *Roadmap) { r.Modules[0].Days[0].Tasks[2].DurationMinutes = 0 },
+		"task band still applies at 15/15/5": func(r *Roadmap) {
+			d := &r.Modules[3].Days[6]
+			d.Tasks[0].DurationMinutes, d.Tasks[1].DurationMinutes, d.Tasks[2].DurationMinutes = 15, 15, 5
+		},
+		"lower day edge 5+5+10 = 20": func(r *Roadmap) {
+			d := &r.Modules[1].Days[1]
+			d.Tasks[0].DurationMinutes, d.Tasks[1].DurationMinutes, d.Tasks[2].DurationMinutes = 5, 5, 10
+		},
+		"upper day edge 15+15+10 = 40": func(r *Roadmap) {
+			d := &r.Modules[2].Days[3]
+			d.Tasks[0].DurationMinutes, d.Tasks[1].DurationMinutes, d.Tasks[2].DurationMinutes = 15, 15, 10
+		},
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseRoadmap(validRoadmapJSON(t, mutate)); err != nil {
+				t.Fatalf("ParseRoadmap rejected a day inside the §6.1 budget: %v", err)
+			}
+		})
+	}
+}
+
 func TestParseRoadmapRejects(t *testing.T) {
 	cases := map[string]string{
 		"markdown fence":      "```json\n" + validRoadmapJSON(t, nil) + "\n```",
@@ -80,6 +106,17 @@ func TestParseRoadmapRejects(t *testing.T) {
 		"empty task title":    validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].Title = "" }),
 		"absurd duration":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].DurationMinutes = 120 }),
 		"bad cefr":            validRoadmapJSON(t, func(r *Roadmap) { r.CEFRLevel = "B7" }),
+		"three thirty-minute tasks (90-minute day)": validRoadmapJSON(t, func(r *Roadmap) {
+			for i := range r.Modules[0].Days[0].Tasks {
+				r.Modules[0].Days[0].Tasks[i].DurationMinutes = 30
+			}
+		}),
+		"three three-minute tasks (9-minute day)": validRoadmapJSON(t, func(r *Roadmap) {
+			for i := range r.Modules[1].Days[2].Tasks {
+				r.Modules[1].Days[2].Tasks[i].DurationMinutes = 3
+			}
+		}),
+		"one 20-minute task in an otherwise normal day": validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[4].Tasks[1].DurationMinutes = 20 }),
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {

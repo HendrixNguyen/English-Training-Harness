@@ -13,7 +13,18 @@ const (
 	DaysPerModule      = 7
 	TasksPerDay        = 3
 	DefaultTaskMinutes = 10
-	maxTaskMinutes     = 30
+)
+
+// §6.1 constraint 4: "Each Daily Quest MUST be calculated to take
+// approximately 30 minutes to complete, split into 3 distinct tasks (10 mins
+// each)". "Approximately" is read as ±10 minutes on the day and ±5 on a task;
+// quests hard-codes total_minutes_required: 30 and the pet needs 1800 s, so
+// a day outside this band is a promise the learner cannot keep.
+const (
+	minTaskMinutes = 5
+	maxTaskMinutes = 15
+	minDayMinutes  = 20
+	maxDayMinutes  = 40
 )
 
 // TaskTypes are the §3.2 task_category values in the §6.1 order
@@ -107,6 +118,7 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 				return Roadmap{}, invalid("module %d day %d has %d tasks, want %d", mi+1, di+1, len(d.Tasks), TasksPerDay)
 			}
 			seen := map[string]bool{}
+			dayMinutes := 0
 			for ti := range d.Tasks {
 				task := &d.Tasks[ti]
 				if !isTaskType(task.Type) {
@@ -122,9 +134,13 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 				if task.DurationMinutes == 0 {
 					task.DurationMinutes = DefaultTaskMinutes
 				}
-				if task.DurationMinutes < 1 || task.DurationMinutes > maxTaskMinutes {
-					return Roadmap{}, invalid("module %d day %d task %d duration %d is outside 1..%d", mi+1, di+1, ti+1, task.DurationMinutes, maxTaskMinutes)
+				if task.DurationMinutes < minTaskMinutes || task.DurationMinutes > maxTaskMinutes {
+					return Roadmap{}, invalid("module %d day %d task %d duration %d is outside %d..%d", mi+1, di+1, ti+1, task.DurationMinutes, minTaskMinutes, maxTaskMinutes)
 				}
+				dayMinutes += task.DurationMinutes
+			}
+			if dayMinutes < minDayMinutes || dayMinutes > maxDayMinutes {
+				return Roadmap{}, invalid("module %d day %d adds up to %d minutes, want %d..%d (§6.1: approximately 30)", mi+1, di+1, dayMinutes, minDayMinutes, maxDayMinutes)
 			}
 		}
 	}
