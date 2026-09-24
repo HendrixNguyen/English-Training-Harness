@@ -80,6 +80,12 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
 		return "", fmt.Errorf("gemini: empty response")
 	}
+	// STOP (or absent, on older responses) is the only complete answer. Anything
+	// else — MAX_TOKENS, SAFETY, RECITATION, … — would otherwise surface downstream
+	// as "ParseRoadmap: unexpected end of JSON input" and burn a paid retry.
+	if fr := parsed.Candidates[0].FinishReason; fr != "" && fr != "STOP" {
+		return "", fmt.Errorf("gemini: finishReason %s (answer incomplete or refused)", fr)
+	}
 	var sb strings.Builder
 	for _, part := range parsed.Candidates[0].Content.Parts {
 		sb.WriteString(part.Text)

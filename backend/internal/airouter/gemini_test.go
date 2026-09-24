@@ -70,6 +70,36 @@ func TestGeminiJoinsEveryPartOfTheFirstCandidate(t *testing.T) {
 	}
 }
 
+func TestGeminiNamesANonStopFinishReason(t *testing.T) {
+	cases := map[string]struct {
+		body    string
+		wantErr string // "" = success
+	}{
+		"no finishReason (older responses)": {`{"candidates":[{"content":{"parts":[{"text":"{}"}]}}]}`, ""},
+		"STOP":                              {`{"candidates":[{"content":{"parts":[{"text":"{}"}]},"finishReason":"STOP"}]}`, ""},
+		"MAX_TOKENS with partial text":      {`{"candidates":[{"content":{"parts":[{"text":"{\"title\":\"Road"}]},"finishReason":"MAX_TOKENS"}]}`, "MAX_TOKENS"},
+		"SAFETY":                            {`{"candidates":[{"content":{"parts":[{"text":""}]},"finishReason":"SAFETY"}]}`, "SAFETY"},
+		"RECITATION":                        {`{"candidates":[{"content":{"parts":[{"text":"x"}]},"finishReason":"RECITATION"}]}`, "RECITATION"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.body)) }))
+			defer srv.Close()
+			p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+			out, err := p.GenerateContent(context.Background(), "s", "u")
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("err = %v, want success", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) || !strings.Contains(err.Error(), "finishReason") {
+				t.Fatalf("err = %v (out %q), want an error naming finishReason %s", err, out, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 	cases := map[string]struct {
 		status int
