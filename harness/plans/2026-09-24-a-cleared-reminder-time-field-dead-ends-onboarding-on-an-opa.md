@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-24-medium-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa
 worktree: .worktrees/a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"

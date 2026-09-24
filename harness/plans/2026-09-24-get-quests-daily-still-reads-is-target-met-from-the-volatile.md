@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/get-quests-daily-still-reads-is-target-met-from-the-volatile.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile
 worktree: .worktrees/get-quests-daily-still-reads-is-target-met-from-the-volatile
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"

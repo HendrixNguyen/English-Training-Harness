@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-24-high-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r
 worktree: .worktrees/google-refresh-token-is-stored-in-plaintext-backend-spec-7-r
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/17"
