@@ -1,6 +1,6 @@
 ---
 name: harness-evaluate
-description: Evaluate one idea or every proposed idea in a run — reject with reason or select with priority and write a draft plan (and design doc for UI). Use for /evaluate, /idea, and the evaluate stage of /harness run.
+description: Evaluate one idea or every proposed idea in a run — reject with reason or select with priority and write a plan (and design doc for UI), auto-approving bugs, mvp-slices and high features. Use for /evaluate, /idea, and the evaluate stage of /harness run.
 ---
 
 # harness-evaluate
@@ -22,7 +22,8 @@ Adopt `.agents/roles/evaluator.md`. Input: one idea path, or `--run <dir>` for a
 7. If the idea involves UI: write `harness/designs/<slug>.md` following the frontend-design skill. Keep it to layout, states, component list, and token choices — no code.
 8. If `type: bug`: apply systematic-debugging to locate root cause in the worktree-free main checkout (read-only). Record it in `## Evaluation`.
 9. `PLAN=$(python3 tools/harness/cli.py new-plan --idea <idea>)`. Fill the plan body using the writing-plans skill. If a design exists: `python3 tools/harness/cli.py set $PLAN design=harness/designs/<slug>.md`.
-10. `python3 tools/harness/cli.py validate && python3 tools/harness/cli.py state`; commit `harness/` with message `harness: evaluate <slug>`.
+10. **Auto-approve** (owner, 2026-09-24 — always on): if the idea is `type: bug` (any priority), `type: mvp-slice`, or `type: feature` with `priority: high`, run `python3 tools/harness/cli.py set $PLAN status=approved` so the executor can pick it up. Leave medium/low feature plans `draft` for the owner's `/approve`. Only approve a plan whose body is complete — tasks, paths, tests and `## Verification` filled in; an unfinished plan stays `draft`.
+11. `python3 tools/harness/cli.py validate && python3 tools/harness/cli.py state`; commit `harness/` with message `harness: evaluate <slug>`.
 
 ## Report
-List each idea → verdict (+ priority / plan path or rejected reason). Remind the user that drafts need `/approve <plan>`.
+List each idea → verdict (+ priority / plan path and `approved` or `draft`, or rejected reason). Remind the user that the remaining drafts (medium/low features) need `/approve <plan>`.

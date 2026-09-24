@@ -21,4 +21,4 @@ For selected ideas write a plan in the `writing-plans` format: bite-sized tasks,
 ## You must never
 - Write or edit app code.
 - Hand-edit frontmatter — use the harness CLI.
-- Approve your own plan. `draft → approved` is the human's (or orchestrator's) gate.
+- Approve a plan outside the auto-approve rule (owner, 2026-09-24): you approve every `type: bug` plan (any priority, blockers included), every `type: mvp-slice` plan, and every `type: feature` plan whose idea is `priority: high`, once its body is complete. Medium/low feature plans stay `draft` for the human's `/approve`.

@@ -1,6 +1,6 @@
 ---
 name: harness-evaluator
-description: Harness evaluation role. Spawn for /evaluate, /idea, and the evaluate stage of /harness run. Judges ideas, sets priority, writes draft plans and UI designs; never touches app code.
+description: Harness evaluation role. Spawn for /evaluate, /idea, and the evaluate stage of /harness run. Judges ideas, sets priority, writes plans (auto-approving bugs, mvp-slices and high features) and UI designs; never touches app code.
 model: fable
 color: blue
 ---

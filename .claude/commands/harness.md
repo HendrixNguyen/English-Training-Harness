@@ -1,6 +1,6 @@
 ---
-description: Harness orchestrator — status | run [--auto-approve] [--stages …] | daily-pr | merge <plan> | prune
-argument-hint: status | run [--auto-approve] | daily-pr | merge <plan-file> | prune
+description: Harness orchestrator — status | run [--stages …] | daily-pr | merge <plan> | prune
+argument-hint: status | run [--stages …] | daily-pr | merge <plan-file> | prune
 ---
 
 Load `.agents/skills/harness-orchestrate/SKILL.md` and perform the subcommand in `$ARGUMENTS`.
