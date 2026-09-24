@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-24-run-01
 priority: medium
+plan: harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md
 ---
 # Typed task content with answer keys so every quest renders and gives instant feedback
 
@@ -47,3 +48,11 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Achievable in one plan?* No — two, and they must land in order: (1) backend — `RoadmapSchema` gains per-type `content` shapes (`vocabulary → {words[{term, definition, example}], questions[]}`, `reading → {passage, questions[{id, prompt, options{A..D}, answer, explanation}]}`, `practice → {questions[]}`), the §6.1 system prompt states them, `ParseRoadmap` rejects mismatches (answer ∉ options, counts out of bounds) through the existing retry-once → `ai_bad_output` path, and `POST /quests/progress` persists a score (migration + backend spec DDL); (2) frontend — typed renderers on `/learn/:id` with instant feedback and a score, `raw` kept only for pre-change roadmaps (design note first). *Decision for the planner:* send `answer` to the client — the key is low-stakes, it keeps the exercise offline-capable, and server-side grading would add a POST round trip for no security gain.
 
 *Priority.* Medium, not high: the app functions and the fallback renders *something*; but it is the highest-value feature after the settings screen and gates two other selected ideas.
+
+## Evaluation — 2026-09-24 daily planning (evaluator)
+_Owner instruction 2026-09-24: pick ≤ 5 one-day tickets from the `selected` backlog, split Bug team / Feature team, write and approve the plans, one planning PR._
+
+**Planned today — Feature team ticket F2 = the backend half only. Estimate 5 h. Approved by owner override (see F1).**
+*Still true on `main`.* `prompt.go` declares `"content" is free-form JSON`; `ParseRoadmap` never looks at `content`; `frontend/utils/content.ts` already renders `{words[{term, definition}]}` and `{questions[{id, prompt, options}]}` and falls back to raw JSON otherwise — so a backend schema that is a **superset of those two shapes** makes today's frontend render every new roadmap without a frontend change, and the answer-key/feedback UI becomes a clean follow-up plan.
+*Decisions.* (1) `answer` and `explanation` travel to the client in `content_json` (simple, offline-capable, low stakes) — no server-side grading. (2) **No score persistence in this ticket** (YAGNI: nothing reads it yet; `POST /quests/progress` already accepts `user_answers` unpersisted); the frontend/feedback plan decides where a score lives. (3) Validation lives in a new `content.go` (`validateContent(task)`) with one call from `ParseRoadmap`, so it does not collide with Bug ticket B2's edits to the same function. (4) Legacy roadmaps already in `roadmaps.roadmap_json` are untouched; the frontend keeps its `raw` fallback for them.
+*One-day check.* `airouter` only (new file + tests, prompt schema text, two fixtures), CODEMAP; no migration, no route, no frontend.
