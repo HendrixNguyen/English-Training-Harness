@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestGeminiSendsTheSpec62RequestAndReturnsTheFirstPart(t *testing.T) {
+func TestGeminiSendsTheSpec62RequestAndReturnsTheText(t *testing.T) {
 	var gotPath, gotKey, gotCT string
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +50,23 @@ func TestGeminiSendsTheSpec62RequestAndReturnsTheFirstPart(t *testing.T) {
 	gen := gotBody["generationConfig"].(map[string]any)
 	if gen["response_mime_type"] != "application/json" || gen["temperature"] != 0.2 {
 		t.Errorf("generationConfig = %v, want application/json and 0.2", gen)
+	}
+}
+
+func TestGeminiJoinsEveryPartOfTheFirstCandidate(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// The Generative Language API may split one candidate's answer across
+		// parts; a roadmap split mid-object is not JSON unless re-joined.
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"a\":1,"},{"text":"\"b\":2}"}]},"finishReason":"STOP"}]}`))
+	}))
+	defer srv.Close()
+	p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+	out, err := p.GenerateContent(context.Background(), "s", "u")
+	if err != nil {
+		t.Fatalf("GenerateContent: %v", err)
+	}
+	if out != `{"a":1,"b":2}` {
+		t.Fatalf("out = %q, want the two parts concatenated in order", out)
 	}
 }
 

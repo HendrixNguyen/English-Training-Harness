@@ -68,7 +68,11 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 					Text string `json:"text"`
 				} `json:"parts"`
 			} `json:"content"`
+			FinishReason string `json:"finishReason"`
 		} `json:"candidates"`
+		PromptFeedback struct {
+			BlockReason string `json:"blockReason"`
+		} `json:"promptFeedback"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", fmt.Errorf("gemini: decoding response: %w", err)
@@ -76,7 +80,11 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
 		return "", fmt.Errorf("gemini: empty response")
 	}
-	return parsed.Candidates[0].Content.Parts[0].Text, nil
+	var sb strings.Builder
+	for _, part := range parsed.Candidates[0].Content.Parts {
+		sb.WriteString(part.Text)
+	}
+	return sb.String(), nil
 }
 
 // postJSON is shared by both providers: marshal, POST, require 2xx, return the
