@@ -51,8 +51,9 @@ func googleErrorReason(raw []byte) string {
 // longer exists at Google (404/410). Service re-creates it.
 var ErrNotFound = errors.New("google: resource not found")
 
-// ErrAlreadyExists means Google already holds a resource with the id we sent
-// (Calendar events.insert with a client id → 409). Sync treats it as ours.
+// ErrAlreadyExists means Google already holds a resource with the id we sent.
+// Only Calendar events.insert with a client id relies on it (Service patches
+// its own event). Any other 409 is not consumed and the handler answers 502.
 var ErrAlreadyExists = errors.New("google: resource already exists")
 
 // UpstreamError is any other non-2xx from Google. The handler maps it to 502.
@@ -71,8 +72,10 @@ func (e *UpstreamError) Error() string {
 func defaultHTTPClient() *http.Client { return &http.Client{Timeout: 15 * time.Second} }
 
 // doJSON sends in (JSON-encoded, or nothing when nil) with a bearer token,
-// maps the status code as documented on the errors above, and decodes a 2xx
-// body into out when out is non-nil.
+// maps the status code as documented on the errors above (401 and non-throttle
+// 403 → ErrReauthRequired; 404/410 → ErrNotFound; 409 → ErrAlreadyExists;
+// everything else non-2xx, including throttling 403 and 429 → *UpstreamError),
+// and decodes a 2xx body into out when out is non-nil.
 func doJSON(ctx context.Context, client *http.Client, service, method, url, accessToken string, in, out any) error {
 	var body io.Reader
 	if in != nil {
