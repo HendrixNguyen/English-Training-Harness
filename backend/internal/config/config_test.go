@@ -167,3 +167,29 @@ func TestLoadRejectsAnUnknownGinMode(t *testing.T) {
 		t.Fatal("expected an error for GIN_MODE=verbose (gin.SetMode would panic), got nil")
 	}
 }
+
+func TestLoadDefaultsFrontendOriginToTheNuxtDevServer(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("GOOGLE_CLIENT_ID", "cid")
+	t.Setenv("GOOGLE_CLIENT_SECRET", "csecret")
+	t.Setenv("JWT_SECRET", "0123456789abcdef0123456789abcdef")
+	t.Setenv("FRONTEND_ORIGIN", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() = %v, want nil", err)
+	}
+	if cfg.FrontendOrigin != DefaultFrontendOrigin || DefaultFrontendOrigin != "http://localhost:3000" {
+		t.Errorf("FrontendOrigin = %q, want the Nuxt dev server default %q", cfg.FrontendOrigin, "http://localhost:3000")
+	}
+
+	t.Setenv("FRONTEND_ORIGIN", "https://app.example.com, https://staging.example.com")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FrontendOrigin != "https://app.example.com, https://staging.example.com" {
+		t.Errorf("FrontendOrigin = %q, want the raw value (middleware.ParseOrigins validates it)", cfg.FrontendOrigin)
+	}
+}

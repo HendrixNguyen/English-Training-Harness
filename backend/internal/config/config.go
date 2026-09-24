@@ -10,6 +10,11 @@ import (
 // contact before the first production push (see the notify plan's notes).
 const DefaultVAPIDSubject = "mailto:admin@example.com"
 
+// DefaultFrontendOrigin is the Nuxt dev server. Production sets FRONTEND_ORIGIN
+// to the PWA's own Railway origin (backend spec §9): the PWA and the API are
+// two services on two origins, so every browser call is cross-origin.
+const DefaultFrontendOrigin = "http://localhost:3000"
+
 // Config holds the environment this slice needs (GOOGLE_CLIENT_ID, JWT_SECRET,
 // VAPID_* have been added as their slices landed).
 type Config struct {
@@ -35,6 +40,10 @@ type Config struct {
 	// so gin.SetMode (which panics on an unknown value) is only ever given a
 	// valid one. Not in spec §8; documented in backend/.env.example.
 	GinMode string
+	// FrontendOrigin is FRONTEND_ORIGIN as given: a comma-separated allow-list
+	// of exact scheme://host[:port] origins. middleware.ParseOrigins validates
+	// it at wiring time; config only supplies the default.
+	FrontendOrigin string
 }
 
 // Load reads the environment and validates the required variables.
@@ -82,6 +91,10 @@ func Load() (Config, error) {
 	case "debug", "release", "test":
 	default:
 		return Config{}, fmt.Errorf("config: GIN_MODE must be debug, release or test, got %q", cfg.GinMode)
+	}
+
+	if cfg.FrontendOrigin = os.Getenv("FRONTEND_ORIGIN"); cfg.FrontendOrigin == "" {
+		cfg.FrontendOrigin = DefaultFrontendOrigin
 	}
 	return cfg, nil
 }
