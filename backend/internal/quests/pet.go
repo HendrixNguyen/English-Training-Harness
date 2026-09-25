@@ -20,6 +20,10 @@ type PetState struct {
 // returned: a failing pet update must never roll back a recorded study session.
 //
 // State is read after the hook so the response carries the post-bump values.
+// A user with no pet_states row is not an error — implementations create or
+// default it (pet.QuestHook goes through Service.Ensure). An error means the
+// read itself failed; RecordProgress then omits pet_health/streak_count
+// rather than fabricate a dead plant.
 type Pet interface {
 	OnTargetMet(ctx context.Context, userID, localDate string) error
 	State(ctx context.Context, userID string) (PetState, error)

@@ -19,8 +19,10 @@ type ProgressResult struct {
 	DailySecondsSpent int64 `json:"daily_seconds_spent"`
 	DailyMinutesSpent int   `json:"daily_minutes_spent"`
 	IsTargetMet       bool  `json:"is_target_met"`
-	PetHealth         int   `json:"pet_health"`
-	StreakCount       int   `json:"streak_count"`
+	// §6.2's two pet fields. Pointers so a failed read is *omitted* (decision
+	// below), never reported as 0 — health 0 is a dead plant in spec §8.
+	PetHealth   *int `json:"pet_health,omitempty"`
+	StreakCount *int `json:"streak_count,omitempty"`
 
 	// NewlyMet is true only on a call that fired Pet.OnTargetMet — the total is
 	// at or past TargetSeconds and daily_progress did not yet say the pet was
@@ -141,21 +143,21 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 	}
 
 	// Also best-effort: the write is done, and a 500 here would make the client
-	// retry and double-count. GET /pet/status (pet slice) is the authoritative read.
-	pet, err := s.pet.State(ctx, userID)
-	if err != nil {
-		log.Printf("quests: reading pet state for user %s: %v", userID, err)
-		pet = PetState{}
-	}
-
-	return ProgressResult{
+	// retry and double-count. A failed read leaves both fields nil — omitted on
+	// the wire — so the client keeps the last state it knew; GET /pet/status
+	// (pet slice) is the authoritative read.
+	res := ProgressResult{
 		DailySecondsSpent: total,
 		DailyMinutesSpent: int(total / 60),
 		IsTargetMet:       targetMet,
-		PetHealth:         pet.Health,
-		StreakCount:       pet.Streak,
 		NewlyMet:          newlyMet,
-	}, nil
+	}
+	if pet, err := s.pet.State(ctx, userID); err != nil {
+		log.Printf("quests: reading pet state for user %s (pet fields omitted): %v", userID, err)
+	} else {
+		res.PetHealth, res.StreakCount = &pet.Health, &pet.Streak
+	}
+	return res, nil
 }
 
 // DefaultTaskMinutes is the §6.2 task length ("3x 10-min tasks"), used when an
