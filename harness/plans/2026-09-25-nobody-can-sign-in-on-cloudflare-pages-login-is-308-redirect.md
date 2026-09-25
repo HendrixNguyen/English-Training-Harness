@@ -5,6 +5,7 @@ priority: high
 merged: false
 branch: harness/2026-09-25-high-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
 worktree: .worktrees/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"
 ---
 # Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan
 

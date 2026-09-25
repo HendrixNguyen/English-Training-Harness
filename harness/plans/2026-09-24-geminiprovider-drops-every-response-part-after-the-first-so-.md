@@ -5,6 +5,7 @@ priority: medium
 merged: false
 branch: harness/2026-09-24-medium-geminiprovider-drops-every-response-part-after-the-first-so-
 worktree: .worktrees/geminiprovider-drops-every-response-part-after-the-first-so-
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"
 ---
 # GeminiProvider joins every response part, names a non-STOP finish reason, surfaces a safety block, and asks for enough output tokens — Plan
 

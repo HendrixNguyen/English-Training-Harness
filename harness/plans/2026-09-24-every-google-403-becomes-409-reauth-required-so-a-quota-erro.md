@@ -5,6 +5,7 @@ priority: medium
 merged: false
 branch: harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro
 worktree: .worktrees/every-google-403-becomes-409-reauth-required-so-a-quota-erro
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"
 ---
 # Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan
 

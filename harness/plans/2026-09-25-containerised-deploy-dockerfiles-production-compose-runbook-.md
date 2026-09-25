@@ -5,6 +5,7 @@ priority: high
 merged: false
 branch: harness/2026-09-25-high-containerised-deploy-dockerfiles-production-compose-runbook-
 worktree: /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.worktrees/containerised-deploy-dockerfiles-production-compose-runbook-
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"
 ---
 # Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan
 
