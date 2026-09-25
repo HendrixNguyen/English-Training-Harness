@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 15:27. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 16:18. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -15,6 +15,7 @@ _none_
 
 - `harness/ideas/_inbox/gemini-default-model-gemini-2-5-flash-is-retired-for-new-acc.md` — Gemini default model gemini-2.5-flash is retired for new accounts, so a fresh deploy fails every placement test with 502 [high]
 - `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
+- `harness/ideas/_inbox/providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — ProviderTimeout of 30 s makes roadmap generation impossible on every non-Gemini provider, so onboarding 502s after the placement test [high]
 
 ## Proposed
 
