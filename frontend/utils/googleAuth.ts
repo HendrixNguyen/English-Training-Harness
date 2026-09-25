@@ -1,6 +1,9 @@
 /** Mirrors backend/internal/auth/scopes.go — keep the two lists identical. */
 export const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 
+/** sessionStorage key for the OAuth `state` anti-forgery token, shared by /login and /settings. */
+export const OAUTH_STATE_KEY = 'aelp.oauth_state'
+
 export const GOOGLE_SCOPES = [
   'openid',
   'email',

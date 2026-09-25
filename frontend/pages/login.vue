@@ -3,9 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useApi } from '~/composables/useApi'
 import { useAuthStore, type SignInResponse } from '~/stores/auth'
 import { ApiError } from '~/utils/apiClient'
-import { googleAuthUrl, randomState } from '~/utils/googleAuth'
-
-const STATE_KEY = 'aelp.oauth_state'
+import { googleAuthUrl, OAUTH_STATE_KEY, randomState } from '~/utils/googleAuth'
 
 const config = useRuntimeConfig()
 const route = useRoute()
@@ -18,13 +16,13 @@ const redirectUri = computed(() => `${window.location.origin}/login`)
 function startSignIn() {
   error.value = null
   const state = randomState()
-  sessionStorage.setItem(STATE_KEY, state)
+  sessionStorage.setItem(OAUTH_STATE_KEY, state)
   window.location.assign(googleAuthUrl(config.public.googleClientId, redirectUri.value, state))
 }
 
 async function finishSignIn(code: string, state: string) {
-  const expected = sessionStorage.getItem(STATE_KEY)
-  sessionStorage.removeItem(STATE_KEY)
+  const expected = sessionStorage.getItem(OAUTH_STATE_KEY)
+  sessionStorage.removeItem(OAUTH_STATE_KEY)
   if (!expected || expected !== state) {
     error.value = 'Phiên đăng nhập không hợp lệ. Thử lại.'
     return
