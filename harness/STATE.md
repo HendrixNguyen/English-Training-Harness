@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 16:55. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 17:41. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,6 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md` — Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS [high]
 - `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
 
 ## Proposed
