@@ -34,11 +34,29 @@ describe('usePetStore', () => {
   })
 
   it('applyProgress updates health and streak from a §6.2 progress response', async () => {
-    api.get.mockResolvedValue(status)
+    api.get.mockResolvedValue({ ...status })
     const pet = usePetStore()
     await pet.load()
     pet.applyProgress({ pet_health: 100, streak_count: 6 })
     expect(pet.status).toMatchObject({ health_points: 100, current_streak: 6 })
+  })
+
+  it('applyProgress leaves health and streak alone when the response omits them', async () => {
+    // A fresh copy: applyProgress mutates the loaded object in place, and the
+    // module-level `status` fixture must stay untouched for other tests.
+    api.get.mockResolvedValue({ ...status })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({})
+    expect(pet.status).toMatchObject({ health_points: 80, current_streak: 5 })
+  })
+
+  it('applyProgress still applies a real 0', async () => {
+    api.get.mockResolvedValue({ ...status })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({ pet_health: 0, streak_count: 0 })
+    expect(pet.status).toMatchObject({ health_points: 0, current_streak: 0 })
   })
 
   it('revive: first call starts a challenge anchored to the current daily seconds', async () => {
