@@ -80,6 +80,7 @@ func TestRouteFallsBackWhenThePreferredProviderErrors(t *testing.T) {
 }
 
 func TestRouteJoinsEveryErrorWhenAllProvidersFail(t *testing.T) {
+	logs := captureLog(t)
 	gemini := &scripted{err: errors.New("gemini down")}
 	openai := &scripted{err: errors.New("openai down")}
 	r := NewRouterWithProviders(map[ProviderType]LLMProvider{ProviderGemini: gemini, ProviderOpenAI: openai})
@@ -95,6 +96,10 @@ func TestRouteJoinsEveryErrorWhenAllProvidersFail(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v, missing %q", err, want)
 		}
+	}
+	got := logs.String()
+	if !strings.Contains(got, "gemini failed for task roadmap_generation after") || !strings.Contains(got, "openai failed for task roadmap_generation after") {
+		t.Errorf("log missing per-provider failure lines:\n%s", got)
 	}
 }
 

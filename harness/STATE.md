@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 14:34. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 21:52. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,15 +9,36 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — ParseRoadmap day-sum rejection has no test; the 90- and 9-minute day rows fail on the task band — blocks `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — 59 of 84 roadmap tasks render as raw JSON and the other 25 as blank flashcards or option-less questions, so a learner cannot do a single task [high]
+- `harness/ideas/_inbox/a-non-uuid-exercise-id-on-post-quests-progress-answers-500-i.md` — A non-UUID exercise_id on POST quests progress answers 500 instead of 400 or 404 [low]
+- `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
+- `harness/ideas/_inbox/caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Caddyfile serves index.html with a one-year immutable cache for missing /_nuxt assets [medium]
+- `harness/ideas/_inbox/deploy-compose-yml-drops-the-ai-provider-base-url-and-model-.md` — deploy/compose.yml drops the AI provider base-URL and model variables the live deployment depends on [medium]
+- `harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md` — Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS [high]
+- `harness/ideas/_inbox/executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — Executor worktree nested under .claude/worktrees while plan frontmatter names .worktrees/<slug> [low]
+- `harness/ideas/_inbox/frontend-dist-symlink-left-by-nuxi-generate-is-not-gitignore.md` — frontend/dist symlink left by nuxi generate is not gitignored [low]
+- `harness/ideas/_inbox/gemini-thinking-tokens-share-maxoutputtokens-so-the-32768-bu.md` — Gemini thinking tokens share maxOutputTokens so the 32768 budget does not prevent roadmap truncation [medium]
+- `harness/ideas/_inbox/geminiprovider-returns-an-empty-string-as-success-when-a-sto.md` — GeminiProvider returns an empty string as success when a STOP candidate has only empty-text parts [low]
+- `harness/ideas/_inbox/google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent [low]
+- `harness/ideas/_inbox/no-test-pins-a-409-from-calendar-events-patch-to-502-google-.md` — No test pins a 409 from Calendar events.patch to 502 google_unavailable [low]
+- `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
+- `harness/ideas/_inbox/parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — ParseRoadmap day-sum rejection has no test; the 90- and 9-minute day rows fail on the task band [high]
+- `harness/ideas/_inbox/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback [medium]
+- `harness/ideas/_inbox/smoke-api-sh-stops-at-the-first-unreachable-check-instead-of.md` — smoke-api.sh stops at the first unreachable check instead of reporting every check [low]
+- `harness/ideas/_inbox/task-4-follow-up-smoke-web-has-no-login-return-trip-check-an.md` — Task 4 follow-up: smoke-web has no /login return-trip check and the deploy runbook still says Pages needs no _headers [medium]
+- `harness/ideas/_inbox/testparseroadmaprejects-checks-only-that-an-error-occurred-s.md` — TestParseRoadmapRejects checks only that an error occurred, so a row can pass for the wrong reason [low]
+- `harness/ideas/_inbox/web-image-runs-caddy-as-root-and-reinstalls-npm-deps-on-ever.md` — Web image runs Caddy as root and reinstalls npm deps on every source change [low]
+- `harness/ideas/_inbox/week-2-provenance-assertion-in-testexercisesflattens-repeats.md` — Week-2 provenance assertion in TestExercisesFlattens repeats the day-number check [low]
 
 ## Proposed
 
-- `harness/ideas/2026-09-25-run-01/containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build [high]
+- `harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task [high]
+- `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
+- `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion [high]
 
 ## Selected
 
@@ -74,11 +95,7 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan [medium]
-- `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan [medium]
-- `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan [medium]
-- `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium]
-- `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium]
+_none_
 
 ## Executing
 
@@ -86,16 +103,16 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high] (unreviewed)
+- `harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-24-geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider joins every response part, names a non-STOP finish reason, surfaces a safety block, and asks for enough output tokens — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api amend: make the drain test observe the drain — it must fail when `srv.Shutdown` is gone — Plan [high] (review: pass) (merged)
 
 ## Failed
 

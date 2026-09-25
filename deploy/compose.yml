@@ -1,0 +1,82 @@
+# Production stack (deploy/README.md). Dokploy deploys this file as a Compose
+# app; on the Railway/Supabase/Upstash/Cloudflare split it is documentation of
+# the same env contract. Values come from deploy/.env (copy deploy/.env.example).
+# Postgres and Redis are never published to the host.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-english}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-english}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # AOF: queue:webpush:delay (spec §4) is a persistent ZSET and must survive
+    # a restart; everything else in Redis has a TTL and may be lost.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../backend
+    image: aelp-api:local
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-english}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:-english}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      PORT: "8080"
+      GIN_MODE: release
+      GOMEMLIMIT: ${GOMEMLIMIT:-128MiB}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/.env (openssl rand -base64 32)}
+      ENCRYPTION_SECRET_KEY: ${ENCRYPTION_SECRET_KEY:?set ENCRYPTION_SECRET_KEY in deploy/.env (openssl rand -hex 32)}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID in deploy/.env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?set GOOGLE_CLIENT_SECRET in deploy/.env}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN in deploy/.env}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:?set NUXT_PUBLIC_API_BASE in deploy/.env}
+        NUXT_PUBLIC_GOOGLE_CLIENT_ID: ${NUXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        NUXT_PUBLIC_VAPID_PUBLIC_KEY: ${NUXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    image: aelp-web:local
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+# Named so `docker compose down` keeps the data; `down -v` discards it.
+volumes:
+  postgres_data:
+  redis_data:

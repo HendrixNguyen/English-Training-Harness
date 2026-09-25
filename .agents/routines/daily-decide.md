@@ -18,7 +18,7 @@ Unattended evaluation run for the English-Training-Harness repo (GitHub, `gh`). 
 2. **Queue.** `python3 tools/harness/cli.py blockers` first — any blocker is evaluated before anything else. Then `python3 tools/harness/cli.py next --stage evaluate --all`: reviewer bugs from `harness/ideas/_inbox/` and ideator features together, ranked by the evaluator on user impact (AGENTS.md standing priority: data loss, security and happy-path breakage outrank tidiness).
 
 3. **Decide.** Spawn the evaluator role (load skill harness-evaluate) on the queue. Select **at most 5 bug items and at most 5 feature items** for today (owner, 2026-09-25: the 10:00 and 14:00 runs are separate capacity, so the two queues are ranked independently and neither displaces the other; feature slots go to the oldest `selected`-but-unplanned features first, and an empty feature slot is never given to a bug), each one an executor can finish inside a single execute run; reject or defer the rest with a reason. For each selected item write the plan:
-   - UI work gets a design doc from the frontend spec (`project-base/… Frontend Technical Specification.md` §6 design system, §7 wireframes) using the frontend-design skill.
+   - Anything touching `frontend/` gets its design doc first: the evaluator spawns the designer role (load skill harness-design), which works inside `harness/UI-KIT.md` and the frontend spec's §7 wireframes.
    - Backend work follows YAGNI, the package layout in `harness/CODEMAP.md`, the backend spec's §6 DTO contracts, and reuses existing helpers rather than duplicating them.
    - Where the specs disagree, the layer's own spec wins; say so in the plan.
 

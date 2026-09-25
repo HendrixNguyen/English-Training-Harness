@@ -24,7 +24,7 @@ Slash commands (`/ideate`, `/idea`, `/evaluate`, `/approve`, `/execute`, `/revie
 
 ## Planned architecture
 
-Two deployables on Railway, no shared code:
+Two deployables, no shared code, each built into its own image (`backend/Dockerfile`, `frontend/Dockerfile`; runbook `deploy/README.md`). Hosting today is the free split — API on Railway, Postgres on Supabase, Redis on Upstash, PWA on Cloudflare Pages; later the owner's Dokploy server runs the whole stack from `deploy/compose.yml`. Either way the API needs a host that never sleeps: the cron worker runs in-process.
 
 - **Frontend**: Nuxt 3 PWA (Vue 3, Pinia, Tailwind, `@vite-pwa/nuxt`, service worker for offline + Web Push).
 - **Backend**: single Go binary (Gin or Fiber) that also runs the cron worker in-process — the scheduler is not a separate service.
@@ -49,6 +49,8 @@ The pet/plant engine is the retention mechanism: health 0–100, streak, and a s
 
 `airouter` (§6.2) maps a `TaskType` to a `ProviderType` through a `strategies` map, then to an `LLMProvider` implementation. Current routing: roadmap generation and placement test → Gemini, exercise generation → DeepSeek, essay grading → OpenAI. Only two concrete drivers exist — `GeminiProvider` and `OpenAICompatibleProvider` (used for both OpenAI and DeepSeek, differing only in base URL and model).
 
+Per-task deadlines live in `airouter/timeouts.go` and travel in the context: `TaskTimeout` is 180 s for roadmap generation (the §6.1 answer is ~4.5 k output tokens and takes 53–78 s on the OpenAI/DeepSeek fallbacks) and 30 s for every other task; `onboarding.routeJSON` sets it per `Route` call, `Route` applies it when a caller passes no deadline, and the drivers' `http.Client` has no timeout of its own. A deadline hit surfaces as 504 `ai_timeout`. Each driver retries once after 2 s on 429/502/503/504 and logs elapsed time, token usage and, on failure, the upstream status plus the first 200 chars of the body (never the key). The Gemini default model is `gemini-3.8-flash` — `gemini-2.5-flash` is retired for new accounts.
+
 Providers are registered only if their API key env var is set, and the router falls back to any available provider when the preferred one is missing. Adding a task type means adding a `strategies` entry; adding a provider behind an OpenAI-compatible API needs no new driver.
 
 All roadmap/exercise generation must return strict JSON — Gemini via `response_mime_type: application/json`, OpenAI-compatible via `response_format: json_object`, both at `temperature: 0.2`. The system prompt in §6.1 hard-codes the shape callers depend on: 4 modules × 7 days = 28 daily quests, each quest 3 tasks of ~10 minutes (vocabulary/grammar, reading/listening, practice/interactive). Changing that shape breaks `GET /api/v1/quests/daily`.
@@ -61,4 +63,4 @@ REST under `/api/v1`, enumerated in §7. Keep that list in sync with the code.
 
 ## Required environment variables
 
-`DATABASE_URL`, `REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. The router also reads `GEMINI_BASE_URL`, `OPENAI_BASE_URL`, `DEEPSEEK_BASE_URL`.
+`DATABASE_URL`, `REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. The router also reads `GEMINI_BASE_URL`, `OPENAI_BASE_URL`, `DEEPSEEK_BASE_URL` and `GEMINI_MODEL`, `OPENAI_MODEL`, `DEEPSEEK_MODEL`.
