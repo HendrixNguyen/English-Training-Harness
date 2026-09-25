@@ -76,7 +76,7 @@ func TestOpenAICompatibleRejectsNon2xxEmptyChoicesAndBadJSON(t *testing.T) {
 
 func TestOpenAICompatibleDefaults(t *testing.T) {
 	p := NewOpenAICompatibleProvider("", "k", "", nil)
-	if p.baseURL != DefaultOpenAIBaseURL || p.model != DefaultOpenAIModel || p.client.Timeout != ProviderTimeout {
+	if p.baseURL != DefaultOpenAIBaseURL || p.model != DefaultOpenAIModel || p.client.Timeout != 0 {
 		t.Errorf("defaults = %q %q %v", p.baseURL, p.model, p.client.Timeout)
 	}
 	if DefaultOpenAIBaseURL != "https://api.openai.com/v1" || DefaultDeepSeekBaseURL != "https://api.deepseek.com/v1" {

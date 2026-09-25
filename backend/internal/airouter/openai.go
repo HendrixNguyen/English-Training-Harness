@@ -36,7 +36,7 @@ func NewOpenAICompatibleProvider(baseURL, apiKey, model string, client *http.Cli
 		model = DefaultOpenAIModel
 	}
 	if client == nil {
-		client = &http.Client{Timeout: ProviderTimeout}
+		client = &http.Client{} // no Timeout: the per-task deadline is in the context (timeouts.go)
 	}
 	return &OpenAICompatibleProvider{baseURL: strings.TrimRight(baseURL, "/"), apiKey: apiKey, model: model, client: client}
 }

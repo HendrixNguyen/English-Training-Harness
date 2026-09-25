@@ -89,7 +89,7 @@ func TestGeminiDefaultsToTheRealEndpoint(t *testing.T) {
 	if DefaultGeminiBaseURL != "https://generativelanguage.googleapis.com" {
 		t.Errorf("DefaultGeminiBaseURL = %q", DefaultGeminiBaseURL)
 	}
-	if p.client.Timeout != ProviderTimeout {
-		t.Errorf("timeout = %v, want %v (§6.2: 30s)", p.client.Timeout, ProviderTimeout)
+	if p.client.Timeout != 0 {
+		t.Errorf("client.Timeout = %v, want 0: the per-task deadline travels in the context (timeouts.go)", p.client.Timeout)
 	}
 }

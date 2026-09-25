@@ -8,11 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
-
-// ProviderTimeout is the §6.2 HTTP client timeout.
-const ProviderTimeout = 30 * time.Second
 
 // Gemini defaults. §6.2's "gemini.api.internal" was a placeholder; this is the
 // real Generative Language API. The model is configurable because names churn.
@@ -39,7 +35,7 @@ func NewGeminiProvider(apiKey, baseURL, model string, client *http.Client) *Gemi
 		model = DefaultGeminiModel
 	}
 	if client == nil {
-		client = &http.Client{Timeout: ProviderTimeout}
+		client = &http.Client{} // no Timeout: the per-task deadline is in the context (timeouts.go)
 	}
 	return &GeminiProvider{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), model: model, client: client}
 }
