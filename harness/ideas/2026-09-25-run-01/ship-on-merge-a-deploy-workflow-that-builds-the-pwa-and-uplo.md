@@ -1,9 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: human
 run: 2026-09-25-run-01
 priority: high
+plan: harness/plans/2026-09-25-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md
 ---
 # Ship on merge: a deploy workflow that builds the PWA and uploads it to Cloudflare Pages on every push to main, then smoke-checks both public URLs
 
@@ -22,3 +23,24 @@ The live PWA on Cloudflare Pages (`english-learning`, `https://english-learning-
 - `deploy/smoke-web.sh`, `deploy/smoke-api.sh` exist on the deploy branch (in daily PR #30); `.github/workflows/ci.yml` has `backend-unit`, `backend-integration`, `frontend`, `harness-tooling`, `docker-images`.
 - Cloudflare: Pages direct upload via wrangler needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` — https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/
 - Related: backlog entry "Continuous delivery to Dokploy" (GHCR + webhook) is the later, self-hosted version of this workflow; this idea is the free-tier version and should be written so the Dokploy job can be added beside it.
+
+## Evaluation
+
+**Verdict: select, `priority: high` (auto-approve).** The *Why* is real and verified today: `wrangler pages project list` shows the Pages project with no Git provider, and both live deploys were CLI uploads from one machine. Railway rebuilds `main` on every push, so after each daily PR the API moves and the PWA does not — the owner's daily merge is the deploy for only one of the two deployables, which breaks the harness's one gate. With the retro restyle landing screen by screen this is the difference between the daily PR reaching users or not; that is a happy-path user impact, not tidiness.
+
+**Achievable in one plan (~2 h):** one new workflow file, a one-knob edit to `deploy/smoke-web.sh`, three doc edits. No app code. Facts checked against `origin/main` (`68529ad`, fetched during this evaluation):
+- PR #30 (`harness/daily-2026-09-25`) is **merged** (2026-09-25 14:18Z): `deploy/smoke-web.sh`, `deploy/smoke-api.sh`, `deploy/README.md`, both Dockerfiles and the `docker-images` CI job are on `origin/main`. The executor's base has the scripts, so the workflow calls them directly — no inline-`curl` fallback is planned.
+- `.github/workflows/ci.yml` is named `CI`, triggers on `push` to `main`/`harness/**` and `pull_request`, jobs `backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling`. `frontend` builds with `npm run build` (`nuxi build`); the Pages artefact needs `npx nuxi generate` (`ssr: false`, `nitro.prerender.autoSubfolderIndex: false` — output `.output/public`).
+- `frontend/public/_redirects` and `_headers` are on `main` (login-308 fix merged), but the inbox bug `pages-ignores-the-redirects-spa-rewrite-while-404-html-exist` is still `proposed`: a deep link on Pages answers 404 with the shell because `404.html` wins over the splat rewrite. `deploy/smoke-web.sh` therefore fails its "spa fallback" line against the live URL today.
+- `actionlint` is installed on this machine (`/opt/homebrew/bin/actionlint`) and was the verification tool of the containerised-deploy plan; the repo's CI does not run it.
+- The GitHub repo (`HendrixNguyen/English-Training-Harness`, default branch `main`) has **no** repository variables or secrets yet (`gh variable list`, `gh secret list` both empty).
+
+**Design answers to the idea's open questions:**
+1. *Trigger.* `workflow_run` on workflow `CI`, `types: [completed]`, guarded in the job's `if:` by `conclusion == 'success' && head_branch == 'main' && event == 'push'` — so PR runs and `harness/**` runs never deploy — plus `workflow_dispatch` with a boolean `dry_run` (build only, no upload, no smoke). The job checks out `workflow_run.head_sha`, the exact commit CI proved. `concurrency: { group: deploy, cancel-in-progress: false }`. A `workflow_run` event only fires for workflow files on the default branch, so this workflow cannot run on its own `harness/*` branch at all — CI proof on the branch is `actionlint` + the existing `frontend` job; the first real run is an owner step after merge.
+2. *Deep-link 404.* Downgraded to a warning, not fixed here: `deploy/smoke-web.sh` gains an opt-in `SMOKE_WEB_SPA_WARN=1` that turns only the "spa fallback" line into `WARN` (exit unaffected); the workflow sets it, the `docker-images` job does not, so the Caddy image stays strictly checked. When the inbox bug's fix lands, the knob is removed from the workflow.
+3. *Configuration.* Public values from repository **variables** `NUXT_PUBLIC_API_BASE`, `NUXT_PUBLIC_GOOGLE_CLIENT_ID`, `NUXT_PUBLIC_VAPID_PUBLIC_KEY`, `PAGES_URL`, `API_URL`; secrets `CLOUDFLARE_API_TOKEN` (custom token, Account → Cloudflare Pages → Edit), `CLOUDFLARE_ACCOUNT_ID`. A first step fails a real run with one message naming every missing item; a dry run only warns. Agents never hold the token — the plan ends at the owner checklist.
+4. *Railway.* Nothing to configure; the job polls `$API_URL/healthz` for up to 2 min before `deploy/smoke-api.sh`, because Railway's rebuild started at the push while CI ran.
+
+**Dependencies:** none unbuilt. The Dokploy CD backlog entry is a later sibling job in the same file; nothing here blocks it.
+
+**Priority rationale:** `high` — the owner's only gate (the daily merge) does not ship the PWA today, so every merged frontend change is invisible to users until someone uploads by hand.
