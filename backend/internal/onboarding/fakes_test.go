@@ -47,7 +47,9 @@ type fakeQuiz struct {
 	cleared int
 }
 
-func newFakeQuiz() *fakeQuiz { return &fakeQuiz{staged: map[string][]Answer{}, level: map[string]string{}} }
+func newFakeQuiz() *fakeQuiz {
+	return &fakeQuiz{staged: map[string][]Answer{}, level: map[string]string{}}
+}
 
 func (f *fakeQuiz) StageAnswers(_ context.Context, userID string, answers []Answer, ttl time.Duration) error {
 	f.staged[userID] = answers

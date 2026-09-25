@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 )
 
 // FallbackOrder is the deterministic order Route tries providers other than
@@ -86,10 +87,12 @@ func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPro
 		if p != preferred {
 			log.Printf("airouter: fallback from %s to %s for task %s", preferred, p, task)
 		}
+		started := time.Now()
 		out, err := provider.GenerateContent(ctx, systemPrompt, userPrompt)
 		if err == nil {
 			return out, nil
 		}
+		log.Printf("airouter: %s failed for task %s after %.1fs: %v", p, task, time.Since(started).Seconds(), err)
 		errs = append(errs, fmt.Errorf("%s: %w", p, err))
 	}
 	if ctx.Err() != nil {
