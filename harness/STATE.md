@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 20:23. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 21:17. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,12 +13,15 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — 59 of 84 roadmap tasks render as raw JSON and the other 25 as blank flashcards or option-less questions, so a learner cannot do a single task [high]
 - `harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md` — Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS [high]
 - `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
 
 ## Proposed
 
-_none_
+- `harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task [high]
+- `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
+- `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion [high]
 
 ## Selected
 
