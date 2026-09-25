@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 21:17. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 22:02. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -22,6 +22,7 @@ _none_
 - `harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task [high]
 - `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
 - `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion [high]
+- `harness/ideas/2026-09-25-run-01/ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md` — Ship on merge: a deploy workflow that builds the PWA and uploads it to Cloudflare Pages on every push to main, then smoke-checks both public URLs [high]
 
 ## Selected
 
