@@ -11,13 +11,13 @@ budget: until 20:00 local
 
 # Daily feature execute — 14:00 local
 
-Unattended FEATURE execute run for the English-Training-Harness repo (GitHub, `gh`). This run only touches plans whose frontmatter is `type: feature` or `type: mvp-slice`. Bug plans belong to `daily-bugfix-execute` (10:00) — never execute them here, except a blocker (`blocks:` / `amends:`) that targets one of this run's own feature branches. Make routine choices yourself and report at the end.
+Unattended FEATURE execute run for the English-Training-Harness repo (GitHub, `gh`). This run only touches feature and mvp-slice plans — a plan's type is the `type:` of the idea its `idea:` line points at (plans carry no `type:` of their own). Bug plans belong to `daily-bugfix-execute` (10:00) — never execute them here, except a blocker (`blocks:` / `amends:`) that targets one of this run's own feature branches. Make routine choices yourself and report at the end.
 
 1. **Sync, recover stranded work, merge green harness PRs** per `.agents/routines/README.md` — that pulls in the 06:00 evaluate PR and the 10:00 `harness: daily bugfix <date>` PR so the two runs' `STATE.md` regenerations land in sequence.
 
 2. **Select feature plans:**
    ```
-   for p in $(python3 tools/harness/cli.py next --stage execute --all); do grep -Eq '^type: (feature|mvp-slice)' "$p" && echo "$p"; done
+   for p in $(python3 tools/harness/cli.py next --stage execute --all); do i=$(sed -n 's/^idea: *//p' "$p" | head -1); grep -Eq '^type: (feature|mvp-slice)' "$i" && echo "$p"; done
    ```
    Leave every `type: bug` plan untouched, even if approved. `status: approved` is set by the evaluator for `priority: high` features and by the owner's `/approve` for medium/low — never set it yourself.
 

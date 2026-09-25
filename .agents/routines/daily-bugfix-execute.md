@@ -11,13 +11,13 @@ budget: until 14:00 local
 
 # Daily bugfix execute — 10:00 local
 
-Unattended BUGFIX execute run for the English-Training-Harness repo (GitHub, `gh`). This run only touches plans whose frontmatter is `type: bug`. Feature and mvp-slice plans belong to `daily-feature-execute` — never execute, approve or reprioritise them here. Make routine choices yourself and report at the end.
+Unattended BUGFIX execute run for the English-Training-Harness repo (GitHub, `gh`). This run only touches bug plans — a plan's type is the `type:` of the idea its `idea:` line points at (plans carry no `type:` of their own). Feature and mvp-slice plans belong to `daily-feature-execute` — never execute, approve or reprioritise them here. Make routine choices yourself and report at the end.
 
 1. **Sync, recover stranded work, merge green harness PRs** per `.agents/routines/README.md` — that pulls in the 06:00 `harness: evaluate <date>` PR carrying today's approved plans. If a merge is refused or CI is red, note it and continue with what `main` has.
 
 2. **Select bug plans**, blockers first:
    ```
-   for p in $(python3 tools/harness/cli.py next --stage execute --all); do grep -q '^type: bug' "$p" && echo "$p"; done
+   for p in $(python3 tools/harness/cli.py next --stage execute --all); do i=$(sed -n 's/^idea: *//p' "$p" | head -1); grep -q '^type: bug' "$i" && echo "$p"; done
    ```
    Plans with `blocks:` or `amends:` are blockers and jump the queue. Leave every `type: feature` / `type: mvp-slice` plan untouched, even if approved.
 
