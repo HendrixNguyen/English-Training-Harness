@@ -1,0 +1,21 @@
+---
+type: feature
+status: proposed
+source: human
+run: 2026-09-25-run-01
+priority: medium
+---
+# Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync
+
+## Why
+Until 2026-09-25 the production env existed only on the Railway service and in one gitignored file on the owner's Mac. A new device or a second person had to rebuild it from four dashboards. The owner chose Infisical (open source, free plan: 5 identities, unlimited projects, 3 environments, 10 secret syncs; self-hostable later on the Dokploy box). Done by hand today: Secret Manager project `english-learning` (id `8573a7c5-4e89-4d44-8ead-8f4bc8528cc9`), environment `prod` holds the 24 non-empty keys of `deploy/.env`; `deploy/`'s parent has an untracked `.infisical.json` pointing at it. Agents never see values: `infisical export --env prod --format dotenv > deploy/.env` regenerates the file on any machine after `infisical login`.
+
+## Expected output
+- `.infisical.json` committed at the repo root (`{"workspaceId":"8573a7c5-…","defaultEnvironment":"prod"}` — a project id, not a secret) so `infisical export` works from any checkout; `deploy/.env` stays gitignored.
+- `deploy/README.md` gains an "Env source of truth" section: `infisical login`, `infisical export --env prod --format dotenv > deploy/.env`, `infisical secrets set --env prod --file deploy/.env` (note: the CLI refuses a file with an empty value — filter `grep -E '^[A-Z_]+=.+'` first), inviting a collaborator, and the rule that Railway variables are pushed by Infisical's **Railway secret sync** (owner creates a Railway account token, adds it as an Infisical Railway connection, sync → project `english-learning` / env `production` / service `api`, auto-redeploy on) rather than by hand. `deploy/README.md` lives on the deploy branch — conditional edit as earlier plans did, or land this after the daily PR.
+- The owner checklist artifact/`deploy/README.md` step list starts with "infisical export" instead of "fill the file".
+- Optional: `deploy/smoke-*.sh` read `RAILWAY_DOMAIN`/`PAGES_DOMAIN` via `infisical run -- sh deploy/smoke-api.sh …` example.
+
+## Evidence
+- Infisical free plan and Railway secret sync: https://infisical.com/pricing , https://infisical.com/docs/integrations/secret-syncs/railway
+- CLI facts verified 2026-09-25: `infisical secrets set --file` exists; a blank value aborts the whole upload ("Secret key 'DEEPSEEK_API_KEY' has an empty value"); `infisical init` lists every product's projects by name only, so a Secret Manager project must exist first (org sample projects are of types agent-vault, kms, secret-scanning, cert-manager, pam plus one secret-manager).

@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 17:41. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 17:57. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -18,7 +18,7 @@ _none_
 
 ## Proposed
 
-_none_
+- `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
 
 ## Selected
 
