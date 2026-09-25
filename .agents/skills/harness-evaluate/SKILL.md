@@ -7,6 +7,14 @@ description: Evaluate one idea or every proposed idea in a run — reject with r
 
 Adopt `.agents/roles/evaluator.md`. Input: one idea path, or `--run <dir>` for all `proposed` ideas in it, or nothing (then use `python3 tools/harness/cli.py next --stage evaluate --all` — this includes the reviewer's `_inbox/` bugs; you rank features and bugs together, per the role's *Choosing the work*).
 
+## Two queues, two caps (owner, 2026-09-25)
+
+Bugs (`_inbox/`) and features (run folders) are ranked as **two separate lists**, each capped at **5 plans per day** — the 10:00 bugfix run and the 14:00 feature run are separate capacity, so a bug never costs a feature its slot and an empty feature slot is never given to a bug. Within the feature list, an idea that is already `selected` but has no plan outranks any new `proposed` idea: `next --stage evaluate --all` lists only `proposed` items, so find the aged ones with `grep -l '^status: selected' harness/ideas/*/*.md | xargs grep -l '^type: feature'` (also under *Selected* in `harness/STATE.md`) and plan them first, oldest run folder first. A feature selected on day N therefore gets its plan by day N+1.
+
+## Two queues, two caps (owner, 2026-09-25)
+
+Bugs (`_inbox/`) and features (run folders) are ranked as **two separate lists**, each capped at **5 plans per day** — the 10:00 bugfix run and the 14:00 feature run are separate capacity, so a bug never costs a feature its slot and an empty feature slot is never given to a bug. Within the feature list, an idea that is already `selected` but has no plan outranks any new `proposed` idea: `next --stage evaluate --all` lists only `proposed` items, so find the aged ones with `grep -l '^status: selected' harness/ideas/*/*.md | xargs grep -l '^type: feature'` (also under *Selected* in `harness/STATE.md`) and plan them first, oldest run folder first. A feature selected on day N therefore gets its plan by day N+1.
+
 ## Blockers first
 
 `python3 tools/harness/cli.py blockers` lists bugs with a `blocks:` field whose fix is not yet done — review findings holding up an unmerged branch. They jump the queue: evaluate them before anything else, and never reject one without saying why the branch is safe to merge without it. A blocker's plan **amends the branch under review rather than starting a new one**: after `new-plan`, set `amends=<the blocked plan>` on it, and write its tasks as edits to files that already exist on that branch. Its `## Verification` must re-run the evidence from the review that found it, so the fix is proven, not asserted.
