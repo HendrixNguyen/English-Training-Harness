@@ -21,7 +21,7 @@ Depends on the sibling idea; not before it. Priority is the evaluator's call —
 - **Smoke check** from the sibling idea runs as the last step of the workflow against the public URL and fails the run (not the deploy — Dokploy has already switched) so the failure is visible in Actions and in the 20:00 review routine's report.
 - Docs: runbook "Dokploy" section gains the CD subsection; AGENTS.md's CI paragraph lists `deploy.yml` and states it never runs on `harness/**`.
 
-Out of scope: preview environments per branch, blue/green, database migration gating (migrations still run at API boot), Railway (it keeps building from `main` on its own).
+Out of scope: preview environments per branch, blue/green, database migration gating (migrations still run at API boot), Railway (it builds from `production` on its own).
 
 ## Evidence
 - Repo: `.github/workflows/ci.yml` runs on `main` and `harness/**` pushes; no `deploy.yml`; no registry pushes anywhere.
