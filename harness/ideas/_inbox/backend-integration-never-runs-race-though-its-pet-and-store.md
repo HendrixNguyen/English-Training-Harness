@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md
 ---
 # backend-integration never runs -race though its pet and store tests are concurrency tests
 
@@ -42,3 +43,8 @@ seconds (`-p 1` already serialises packages; `-race` does not change that).
   `TEST_DATABASE_URL=… TEST_REDIS_URL=… go test ./... -count=1 -v -run Integration -p 1 -race -timeout 300s`
   → exit 0, 12/12 `--- PASS: TestIntegration*`, no `DATA RACE`, every package ≤ 1.8 s.
 - CI run 35959338732, `backend-integration` log: `go test ./... -count=1 -v -run Integration -p 1` (no `-race`), `12/12 integration tests ran and passed`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium, planned today, folded into `the-documented-set-a-env-export-also-exports-test-database-u.md`.** Confirmed on `main`: `.github/workflows/ci.yml` `backend-integration` runs `go test ./... -count=1 -v -run Integration -p 1` with no `-race`, and the three concurrency integration tests the idea names exist (`grep -n 'go func' backend --include='*_test.go'`). The gofmt plan's "sequential by design" premise was wrong; the reviewer measured the race run at seconds. One flag in the workflow and one in `make test-integration`, plus the CODEMAP sentence — it rides with the Makefile plan because that plan already edits `test-integration`'s block.

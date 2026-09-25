@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -18,3 +18,8 @@ Clearing the `api-state` cache is best-effort everywhere: `clearApiCache()` swal
 ## Evidence
 - Plan under review: `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Task 2, Design decision 3).
 - `frontend/stores/auth.ts:65-74`, `frontend/pages/login.vue:33-45`, `frontend/utils/session.ts:5-8`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Confirmed on `main`: `frontend/utils/session.ts` guards only `typeof caches === 'undefined'`, and `pages/login.vue` awaits `signIn()` inside the `try` that renders the sign-in failure. Unreproduced in a named browser (the reviewer says so), so it stays low, but the fix is cheap and the shape is right: cache clearing is best-effort. Decision recorded for the plan: `clearApiCache()` catches a rejected `caches.delete` and logs it; the unit test stubs a rejecting `delete`. Plan it together with the missing `/login` component test (`no-test-pins-that-login-awaits-signin-s-cache-clear-before-n.md`) — same page, same test file.

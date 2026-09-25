@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
-priority: low
+priority: medium
+plan: harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md
 ---
 # ParseOrigins accepts FRONTEND_ORIGIN entries no browser sends, so boot succeeds and the PWA is silently blocked
 
@@ -30,3 +31,8 @@ On tests: the exact-map match is correct today. The review drove `null`, `https:
 - `go run` scratch check of `url.Parse` (go1.27.1): `"https://app.example.com:443"` → `host="app.example.com:443"`; `"https://*.up.railway.app"` → `host="*.up.railway.app"`; `"https://app.example.com."` → `host="app.example.com."`. None of these has a path or an error, so all pass the validation.
 - Live, on the branch binary with `FRONTEND_ORIGIN=https://app.example.com`, a preflight with `Origin: https://app.example.com:443` returns `403`, which shows the lookup is exact on the port. The eight lookalike origins listed under *Why* all return `403`.
 - `backend/internal/middleware/cors_test.go`: `TestPreflightFromAnotherOriginIs403` and `TestAnActualRequestFromAnotherOriginPassesWithoutCORSHeaders` are the only disallowed-origin tests, and both use `https://evil.example`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium, planned today.** Raised from the reviewer's low: the failure mode is a silent, total outage of the deployed PWA at the exact moment an operator first configures Railway (`https://*.up.railway.app` for a preview, or a copy-pasted `:443`), and boot reports `cors: allowing [...]` as if healthy. Confirmed on `main`: `backend/internal/middleware/cors.go` `ParseOrigins` keeps `u.Host` verbatim, so a default port, a `*` and a trailing dot all pass its validation, and `CORS` matches by exact map lookup, so none of them ever equals a browser's `Origin`. Root cause: the validation was written for "is this a bare origin" and never for "can a browser send this". Decision: **reject** rather than normalise — a default port is dropped from the stored key would silently rewrite what the operator typed; a loud boot failure with the offending entry quoted is what this package promises. The lookalike table (`null`, suffix, prefix, scheme downgrade, explicit port, trailing slash) is added to pin the exact-match behaviour against a future prefix/suffix "preview support" change. The redundant scheme condition is simplified in the same pass. Plan: `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md`. Touches only `internal/middleware/cors.go` + its test; no overlap with the other four plans.

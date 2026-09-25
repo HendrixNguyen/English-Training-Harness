@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md
 ---
 # make check does not mirror backend-unit: no service-variable guard and fmt-check passes on a parse error
 
@@ -38,3 +39,8 @@ its comment says.
   compare `.github/workflows/ci.yml:31-38` (the guard) and `backend/Makefile:38-44` (`-p 1` rationale).
 - Reviewer probe, 2026-09-24: `printf 'package probe\n\nfunc F( {}\n' > internal/zz_syntax.go` →
   CI gate script under `bash -eo pipefail`: exit 2; `make fmt-check`: prints `expected ')', found '{'`, **exit 0**. Probe removed.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low, planned today, folded into `the-documented-set-a-env-export-also-exports-test-database-u.md`.** Confirmed on `main`: `backend/Makefile` `check` has no service-variable guard (the CI job has one at `.github/workflows/ci.yml` "Assert no service variables are set"), and `fmt-check` assigns `$$(gofmt -l .)` without checking the exit status, so a parse error prints and exits 0. Both are Makefile lines next to the ones the head plan rewrites, and the guard is the other half of the same hazard (a `TEST_*` export reaching a parallel `go test ./...`).

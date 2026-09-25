@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -18,3 +18,8 @@ A component test for `pages/login.vue` in the shape of `onboardingPage.test.ts`:
 ## Evidence
 - Plan under review: `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Task 2 Step 3, Design decision 3, Verification mutation table).
 - `frontend/pages/login.vue:35`; `ls frontend/tests/unit/` — no login page test; `frontend/tests/e2e/login.spec.ts` (service workers blocked per CODEMAP `shell`).
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** A real gap (no unit test mounts `pages/login.vue`; the e2e suite blocks service workers), no behaviour change. Plan it with `a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` as one `/login` branch: the component test the reviewer describes is also the natural place to prove the best-effort cache clear.

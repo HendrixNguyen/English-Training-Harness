@@ -1,8 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-25-run-01
+priority: medium
+plan: harness/plans/2026-09-25-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md
 ---
 # Name your plant at onboarding and see it greet you by name on the hub
 
@@ -30,3 +32,23 @@ Technical:
 - Code: `backend/internal/pet/repo.go` `stateColumns` (`COALESCE(p.plant_name, 'My Green Buddy')`), `backend/internal/pet` `Service.Ensure` (`INSERT … ON CONFLICT (user_id) DO NOTHING`), `backend/internal/onboarding` `AssessmentRequest` and the `onboarding.Pet` adapter in `cmd/api/main.go`; `frontend/pages/onboarding.vue:143` ("{{ result.pet_state.plant_name }} đã nảy mầm"), `frontend/utils/plant.ts` `speechLine`, `frontend/pages/index.vue` wilted banner.
 - Approved sibling that would host a later rename: `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md`.
 - Gamified pet ownership and personalisation as an engagement mechanic in language apps: https://blakecrosley.com/guides/design/duolingo ; https://darewell.co/en/duolingo-streaks-retention-secret/
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (feature slot 5 of 5; two-cap rule, owner 2026-09-25)._
+
+**Verdict: select, `priority: medium`.** Planned today: `harness/plans/2026-09-25-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md`, design `harness/designs/plant-name.md`. Stays `draft` for the owner's `/approve` (medium feature).
+
+**Is the Why real?** Confirmed against `origin/main` today. `backend/internal/pet/repo.go` `stateColumns` reads `COALESCE(p.plant_name, 'My Green Buddy')` and `ensureSQL` is `INSERT INTO pet_states (user_id) … ON CONFLICT (user_id) DO NOTHING`, so every plant is named in English by the DDL default and nothing in `onboarding` (`types.go` `AssessmentRequest`: `target_goal, notification_time, timezone, answers`) or anywhere else lets a learner set it. The name is already on the wire (`onboarding.PetState.PlantName`, `pet` `GET /pet/status`) and already rendered on the first Vietnamese screen after the quiz — `frontend/pages/onboarding.vue:143` "{{ result.pet_state.plant_name }} đã nảy mầm" — so today the result step reads "My Green Buddy đã nảy mầm". The hub's wilted banner and `/revive` heading hard-code "Cây xanh đang bị héo rũ!" (`pages/index.vue:34`, `pages/revive.vue:75`) and `utils/plant.ts` `speechLine` has no name input. The ownership argument holds for a retention mechanic (1st-thinking §1) and the fix is additive: one optional request field, no new endpoint, no migration (the DDL default stays; spec §3.2 must equal `0001_init`).
+
+**Achievable in one plan?** Yes — well under a day: ~6 backend files (types, service, fakes, tests, `pet` repo/service, `main.go` adapter), 5 frontend files, two spec lines, CODEMAP.
+
+**Decisions (fixed in the plan, not re-litigated):**
+- `AssessmentRequest.plant_name` optional; validated after trim to 1..30 **runes** (`400 invalid_request` via the existing `validate()`); absent/blank → `onboarding.DefaultPlantName = "Mầm Non"`, decided in `onboarding`, never the DDL's `'My Green Buddy'`.
+- `onboarding.Pet.Ensure` gains the name: `Ensure(ctx, userID, plantName string)` — the interface has one method, one adapter and one fake, so extending it is a smaller diff than a sibling `EnsureNamed` on the onboarding side. `""` means "create if missing, never touch an existing name" (the re-submit path passes it). On the `pet` side a **sibling** `Service.EnsureNamed` / `Repo.EnsureNamed` is added instead of widening `Service.Ensure`, which has four in-package callers and many tests; its SQL is `INSERT … (user_id, plant_name) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET plant_name = EXCLUDED.plant_name WHERE pet_states.plant_name IS DISTINCT FROM EXCLUDED.plant_name` — idempotent, 1:1. `petForOnboarding` in `main.go` adapts it.
+- The re-submit path (active roadmap → `200`, no write) stays a deliberate no-op for the name too; `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` (selected) owns that path.
+- Backend spec §6.1 request example gains `"plant_name": "Mầm Non"` and its 201 example's `plant_name` becomes `"Mầm Non"` so the one exchange stays consistent; 1st-thinking §7 gets the optional field in the escaped style (`plant\_name`). Backend spec wins for the wire.
+- Frontend: one optional field on the goal step ("Đặt tên cho cây của bạn", placeholder "Mầm Non"), trimmed, 1–30 chars of Unicode letters/digits/spaces, rejected inline before submit; `plant_name` is sent only when set; result step, hub name line, wilted banner, `/revive` heading and `speechLine` use the name. Vietnamese copy, sentence case. Design: `harness/designs/plant-name.md`.
+
+**Same-day overlaps (executor order):** the growth-moment plan (`growth-moment-after-every-task-…`, parallel today) also edits `utils/plant.ts` `speechLine` (new inputs) and `pages/index.vue`; the streak-shield plan edits `pages/index.vue` and `stores/pet.ts`. This plan keeps its `speechLine` change to one added `name` parameter with a default that leaves every existing output byte-identical, and its `index.vue` change to three one-line edits, so the merges are trivial. **Execute after those two.**
+
+**Dependencies:** none unbuilt. A later rename lives on `/settings` (approved 2026-09-24) — out of scope here.

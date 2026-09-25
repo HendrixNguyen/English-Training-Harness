@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md
 ---
 # A second SIGINT or SIGTERM during the 8 s shutdown drain is swallowed because stop is only deferred
 
@@ -30,3 +31,8 @@ visible now.
   `kill -INT`. The process was still alive after the second signal and exited only at the grace
   deadline (`exit=1 after 8.02s`).
 - The code-review skill independently flagged `main.go:48` (low).
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low, planned today, folded into `cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md`.** Confirmed: `main.go` only `defer stop()`s the `signal.NotifyContext` cancel, so the handler stays registered through the drain and a second Ctrl-C is swallowed. The fix is the documented `NotifyContext` idiom — call `stop()` as soon as the context is done, so the next signal gets Go's default disposition — one goroutine in `main`, and it lives in the same function the head plan rewrites. Verified live in that plan's Verification (`kill -TERM`, then `kill -INT` → immediate exit).

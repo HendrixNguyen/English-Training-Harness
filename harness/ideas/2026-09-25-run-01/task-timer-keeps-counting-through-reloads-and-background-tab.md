@@ -1,8 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-25-run-01
+priority: high
+plan: harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md
 ---
 # Task timer keeps counting through reloads and background tabs so studied minutes are never lost
 
@@ -33,3 +35,22 @@ Technical:
 - Code: `frontend/stores/quest.ts` (`timers`, `startTimer`, `tick`, `elapsedSeconds` — in-memory, tick-based), `frontend/pages/learn/[id].vue` (`setInterval(..., 1000)`, comment "the store keeps remainingSeconds, so re-entry resumes"), `frontend/stores/pet.ts` (`REVIVE_STORAGE_KEY` — the persisted-anchor pattern to copy).
 - CODEMAP `shell`: the store timers are described as per-task countdowns with no mention of persistence.
 - Chrome intensive throttling of hidden-page timers and the wall-clock fix: https://dev.to/work_hau_cb718f47075930f9/javascript-countdown-timers-why-setinterval-drifts-and-how-to-fix-it-26fe ; Firefox clamping breaking countdown scripts: https://bugzilla.mozilla.org/show_bug.cgi?id=652472 ; background-tab polling drift: https://dev.to/phpner/the-background-tab-bug-i-missed-in-my-javascript-polling-code-3ol3
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (feature slot 2 of 5; two-cap rule, owner 2026-09-25)._
+
+**Verdict: select, `priority: high`.** Lost studied minutes are user-facing data loss on the happy path: the countdown is the only source of `duration_seconds`, and a phone learner who switches apps mid-task (iOS suspends an installed PWA on app switch) comes back to a reset timer, while a throttled background tab under-counts real minutes — either way the day can miss the 30-minute target the plant is judged on and cost −30 health at midnight (backend spec §8). That outranks internal tidiness under the standing priority (owner, 2026-09-23).
+
+**Why, checked against the code today (`origin/main` as merged into this branch):**
+- `frontend/stores/quest.ts` — `interface Timer { totalSeconds: number; remainingSeconds: number }`; `tick(taskId, seconds = 1)` does `t.remainingSeconds = Math.max(0, t.remainingSeconds - seconds)`; `elapsedSeconds` is `t.totalSeconds - t.remainingSeconds`. In memory only, one decrement per tick — no `Date.now()`, no `localStorage` anywhere in the store.
+- `frontend/pages/learn/[id].vue:28` — `interval = setInterval(() => quest.tick(task.value!.id), 1000)`; line 35 says "the store keeps remainingSeconds, so re-entry resumes", which is true only within one page lifetime (a reload recreates the Pinia store with `timers: {}`).
+- `frontend/stores/pet.ts:22` — `REVIVE_STORAGE_KEY = 'aelp.revive'` with `storageOrNull()` + a `try/catch` in `hydrateChallenge()` is the persisted-anchor pattern; the timer gets the same treatment. `harness/designs/frontend-shell.md` §2.4 already promises "a re-entry resumes".
+- Backend spec §6.2: `duration_seconds` is client-reported and `clampDuration` (`utils/progress.ts`) bounds it to 1..3600, matching `quests.MaxDurationSeconds` (`backend/internal/quests/day.go:19`). Nothing on the wire changes.
+
+**Expected output achievable in one plan:** yes — one store, one page, tests, one CODEMAP sentence; half a day.
+
+**Decisions (fixed for the plan):** `Timer` becomes `{ startedAt: epoch-ms, totalSeconds, date }`; `remainingSeconds`/`elapsedSeconds` are computed from a `now` (injectable for tests) and `tick` only forces re-render. Persist at `localStorage['aelp.timers']` on start, remove on successful `complete()`, hydrate on store creation with the `storageOrNull` + `try/catch` guard; entries with `date !== daily.date` or a completed task are dropped. Posted `duration_seconds` stays `clampDuration(elapsed)`. `learn/[id].vue` recomputes on `visibilitychange` and `focus`; the only UI change is the existing "Hết giờ — Hoàn thành" label now appearing when wall-clock elapsed ≥ total, so no separate design doc. No backend change.
+
+**Dependencies:** none. **Overlap today:** the approved bug plan for the pet-state failure edits `ProgressResponse` in `stores/quest.ts` and `stores/pet.ts`; the growth-moment feature plan (slot 3) edits `complete()` and `stores/pet.ts`. This plan confines itself to the timer code paths and the timer-cleanup line in `complete()`, and the 14:00 run executes it before the growth-moment plan.
+
+**Planned today** — plan auto-approved (high feature, owner rule 2026-09-24).

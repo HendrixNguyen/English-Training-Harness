@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -36,3 +36,8 @@ slip through.
 - `backend/internal/pet/integration_test.go:242-260`: the mirror loop's comparison.
 - `backend/internal/quests/service.go:237-240`: the `TargetMet` error branch.
 - `backend/internal/pet/service_test.go:616`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Three test-only gaps in `pet`/`quests`, each confirmed against the named lines; no behaviour change. Plan them with the revive lost-update fix (`revive-s-absolute-save-erases-a-concurrent-ontargetmet-s-20-.md`), which rewrites the same `pet/integration_test.go` mirror loop.

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -21,3 +21,8 @@ Either (a) the error card on the quiz step offers "Sửa mục tiêu / giờ nh�
 - Plan under review: `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` (Design decision 2, Task 1).
 - `frontend/pages/onboarding.vue:16` (copy), `:91-106` (goal step is the only place goal/time render), `:108-135` (quiz step: no back control).
 - `backend/internal/onboarding/service.go:134-164` `validate()` — timezone, answers, question_id/option checks all map to `invalid_request`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Confirmed on `main`: the `invalid_request` copy in `frontend/pages/onboarding.vue` names the goal and reminder time, which render only on the goal step, and the quiz step has no way back. Decision: option (b) — the copy stops naming fields and says the request could not be accepted, reload and try again — is the honest minimum; a back-to-goal control is a design change for the ideator. One copy line and one test assertion; rides with the next frontend plan.

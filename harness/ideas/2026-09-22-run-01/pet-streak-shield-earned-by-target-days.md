@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-22-run-01
 priority: medium
+plan: harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md
 ---
 # Pet Streak Shield Earned by Target Days
 
@@ -36,3 +37,18 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Is the Why real?* Yes: the pet engine is pure loss aversion and the streak-break moment is the churn cluster; a shield earned only by seven consecutive met days ties the safety net to the behaviour being built.
 
 *Achievable in one plan?* Yes, about a day: migration `0004` (`shields INT NOT NULL DEFAULT 0 CHECK (shields BETWEEN 0 AND 2)`, `last_shield_used_on DATE`), the award on the success path and the consume on the miss path, `GET /pet/status` fields, the pet view's shield icon and spent marker (needs a small design note — `harness/designs/pet-shield.md`). *Constraint for the planner:* both verdict writers are single conditional SQL statements (`saveTargetMetSQL` after today's plan, `penaliseMissSQL`); the award must be folded into the success UPDATE (`shields = LEAST(2, shields + CASE WHEN (streak+1) % 7 = 0 THEN 1 ELSE 0 END)`) and the consume into the miss UPDATE (`shields > 0` → decrement and keep health/streak, else −30), or the once-per-day guarantee is lost. *Dependencies:* none unbuilt.
+
+_Evaluator, 2026-09-25 — daily decide (feature slot 1 of 5; two-cap rule, owner 2026-09-25)._
+
+**Select — medium (unchanged). Planned today:** `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md`, design `harness/designs/pet-streak-shield.md`. Oldest `selected` feature without a plan (waiting since 2026-09-22), so it takes the first feature slot.
+
+*Why, re-confirmed against `origin/main` today:* `backend/internal/pet/engine.go` `ApplyMiss` is still −30 / streak 0 / wilt at 0 with no safety net, and `penaliseMissSQL` in `repo.go` is the one conditional `UPDATE` that applies it; `saveTargetMetSQL` is the single conditional success write (streak+1 under `last_target_met_date < D`). Nothing between the two knows about a shield. The hub (`frontend/pages/index.vue`) shows plant, `HealthBar`, `SpeechBubble` and nothing that survives a miss. The Why stands.
+
+*Decisions taken for the planner (not to be re-litigated in the plan):*
+- Migration `0004_pet_shields`: `ALTER TABLE pet_states ADD COLUMN shields INT NOT NULL DEFAULT 0 CHECK (shields BETWEEN 0 AND 2), ADD COLUMN last_shield_used_on DATE;` + `.down.sql`; the backend spec's DDL gets the same block after the 0003 block; `store/integration_test.go` `versions` → 4, `want` gains `0004_pet_shields`; the `reset` down-loop is unchanged because 0004, like 0003, only adds columns to `pet_states`.
+- Award folded into `saveTargetMetSQL`: `shields = LEAST(2, shields + CASE WHEN (COALESCE(current_streak,0) + 1) % 7 = 0 THEN 1 ELSE 0 END)`. Consume folded into `penaliseMissSQL`: `shields > 0` → `shields - 1`, `last_shield_used_on = judged`, health/streak/stage unchanged, `judged_through` advanced; else the existing arithmetic. `ApplyTargetMet`/`ApplyMiss` gain the same logic; the fake mirrors it; `TestIntegrationVerdictWritesAreConditional` gains award/consume cases.
+- `PenaliseMiss` returns `(applied, shielded bool, err)` via `RETURNING COALESCE(last_shield_used_on = $2::date, FALSE)` so `Sweep`'s `penalised` count (the operator's log line) excludes shielded misses without a second read and stays right under concurrent sweepers; the pre-image `c.State.Shields` would be smaller but could lie in exactly the race this package is built around.
+- `State` gains `Shields int`, `LastShieldUsedOn *string`; `GET /pet/status` gains additive `shields` and `last_shield_used_on` (`YYYY-MM-DD` or null); backend spec §6.3 example updated. `Revive`/`ApplyRevive` untouched (a shielded miss never wilts).
+- Frontend per the design: `ShieldRow` under `HealthBar` (two always-drawn slots, `streak` for held, `mute` + tick for spent within 7 days, caption "Khiên đã đỡ cho ngày dd/mm."), `speechLine` earn line when `streak % 7 === 0 && shields > 0`; `PetStatus` gains the two fields. Reduced-motion safe, no confetti.
+
+*Dependencies:* none unbuilt. Same-day touch points: today's pet bug plan edits `stores/pet.ts` `applyProgress` and `stores/quest.ts`; the growth-moment feature plan (written in parallel) may edit `stores/pet.ts`/`stores/quest.ts` and `pages/index.vue` too — this plan adds two interface fields and one component line, and must not depend on either. *Achievable in one plan:* yes, about a day (migration + two SQL folds + spec/CODEMAP + one component + tests).

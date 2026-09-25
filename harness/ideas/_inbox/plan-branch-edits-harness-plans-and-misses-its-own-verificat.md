@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Process finding for the owner: every remedy is an edit to .agents/skills or .agents/roles, not an executor plan on an app branch; the three edits are listed in the 2026-09-25 decide report."
 ---
 # Plan branch edits harness/plans and misses its own Verification expectations
 
@@ -53,3 +54,8 @@ unless the skills change.
 - Branch `harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile`, commit `eb693c0` (`git diff origin/main...harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile -- harness/plans`).
 - `.agents/skills/harness-execute/SKILL.md` step 9.
 - Trailer check: `for c in $(git rev-list origin/main..harness/2026-09-24-medium-get-quests-daily-still-reads-is-target-met-from-the-volatile); do git cat-file -p $c | grep -c Co-Authored-By; done` prints 0 for all eight executor commits.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Reject — not executor work.** The three findings are real (the branch's `harness/plans` edit, the two Verification greps the plan got wrong, the unreported trailer miss), but every remedy is a change to `.agents/skills/*` or `.agents/roles/*` — the harness's own process text — which the owner edits, not a plan an executor implements on an app branch. Recorded for the owner in the 2026-09-25 decide report with the three concrete edits. Applied immediately by this evaluator without a plan: today's five plans direct no edit under `harness/` other than `CODEMAP.md`, and each Verification grep in them was run against `origin/main` before its expected output was written.

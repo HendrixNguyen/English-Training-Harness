@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md
 ---
 # The documented set -a env export also exports TEST_DATABASE_URL so a later make test drops the dev database
 
@@ -41,3 +42,8 @@ This is dev-only data loss, which is why it is medium rather than a blocker.
   (`DROP TABLE …`).
 - The plan's own Verification commands prefix every `go test` with
   `env -u … -u TEST_DATABASE_URL -u TEST_REDIS_URL`, which works around this same hazard.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium, planned today (head of the dev-loop group).** Confirmed on `main`: `backend/.env.example` ships `TEST_DATABASE_URL`/`TEST_REDIS_URL` uncommented and pointing at the same `english` database as `DATABASE_URL`, and both the file and the `Makefile` `run` comment tell the developer to `set -a; . ./.env; set +a` in their interactive shell; `internal/store/integration_test.go` is gated on `TEST_DATABASE_URL` and drops every table. Following the documented loop and then typing `make test` destroys the dev database, in parallel. Developer-workflow data loss ranks with user bugs (evaluator role, rule 3), and the owner is the developer who runs this loop. Root cause: the shutdown plan documented an export into the *interactive* shell where a per-recipe subshell was what it needed. Decision: `make run` sources `.env` inside its own recipe line (make runs each line in a fresh `/bin/sh`, so nothing leaks), `TEST_*` are commented out in `.env.example`, and the documented loop becomes plain `make run`. Two sibling Makefile/CI findings fold in: `make check` lacking the service-variable guard and `fmt-check` swallowing gofmt's exit 2 (`make-check-does-not-mirror-backend-unit-no-service-variable-.md`) and `-race` on `backend-integration` (`backend-integration-never-runs-race-though-its-pet-and-store.md`). Plan: `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md`.
