@@ -88,6 +88,7 @@ func TestAssessmentErrorMapping(t *testing.T) {
 		{"all providers failed", func(h *harness) { h.ai.replies[airouter.TaskPlacementTest] = nil }, spec61Request, 502, "ai_upstream_failed"},
 		{"bad output twice", func(h *harness) { h.ai.replies[airouter.TaskPlacementTest] = []string{"x", "y"} }, spec61Request, 502, "ai_bad_output"},
 		{"repo failure", func(h *harness) { h.repo.saveErr = errors.New("pg") }, spec61Request, 500, "internal_error"},
+		{"ai timed out", func(h *harness) { h.ai.timeout[airouter.TaskRoadmapGen] = true }, spec61Request, 504, "ai_timeout"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
