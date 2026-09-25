@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/providertimeout-of-30-s-makes-roadmap-generation-impossible-.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-25-high-providertimeout-of-30-s-makes-roadmap-generation-impossible-
 worktree: .worktrees/providertimeout-of-30-s-makes-roadmap-generation-impossible-
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"
 ---
 # Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan
 
