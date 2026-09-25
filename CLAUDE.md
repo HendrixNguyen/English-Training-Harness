@@ -24,7 +24,7 @@ Slash commands (`/ideate`, `/idea`, `/evaluate`, `/approve`, `/execute`, `/revie
 
 ## Planned architecture
 
-Two deployables on Railway, no shared code:
+Two deployables, no shared code, each built into its own image (`backend/Dockerfile`, `frontend/Dockerfile`; runbook `deploy/README.md`). Hosting today is the free split — API on Railway, Postgres on Supabase, Redis on Upstash, PWA on Cloudflare Pages; later the owner's Dokploy server runs the whole stack from `deploy/compose.yml`. Either way the API needs a host that never sleeps: the cron worker runs in-process.
 
 - **Frontend**: Nuxt 3 PWA (Vue 3, Pinia, Tailwind, `@vite-pwa/nuxt`, service worker for offline + Web Push).
 - **Backend**: single Go binary (Gin or Fiber) that also runs the cron worker in-process — the scheduler is not a separate service.
