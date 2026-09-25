@@ -24,9 +24,10 @@ const (
 
 // newServer wraps the router in an http.Server that main can shut down.
 // WriteTimeout is deliberately unset: POST /integrations/google/sync runs up
-// to google.SyncTimeout (60 s) and an onboarding assessment may spend several
-// airouter.Route calls of up to len(FallbackOrder) × ProviderTimeout each; a
-// server-wide write deadline would cut those responses off mid-flight.
+// to google.SyncTimeout (60 s) and an onboarding assessment runs each
+// airouter.Route call under airouter.TaskTimeout (180 s for the roadmap,
+// 30 s otherwise, one malformed-body retry each); a server-wide write
+// deadline would cut those responses off mid-flight.
 func newServer(h http.Handler) *http.Server {
 	return &http.Server{Handler: h, ReadHeaderTimeout: ReadHeaderTimeout, IdleTimeout: IdleTimeout}
 }

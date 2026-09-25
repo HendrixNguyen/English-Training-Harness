@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // Defaults for the two OpenAI-compatible vendors (§2.1, §6.2).
@@ -36,7 +37,7 @@ func NewOpenAICompatibleProvider(baseURL, apiKey, model string, client *http.Cli
 		model = DefaultOpenAIModel
 	}
 	if client == nil {
-		client = &http.Client{Timeout: ProviderTimeout}
+		client = &http.Client{} // no Timeout: the per-task deadline is in the context (timeouts.go)
 	}
 	return &OpenAICompatibleProvider{baseURL: strings.TrimRight(baseURL, "/"), apiKey: apiKey, model: model, client: client}
 }
@@ -51,7 +52,9 @@ func (o *OpenAICompatibleProvider) GenerateContent(ctx context.Context, systemPr
 		"response_format": map[string]string{"type": "json_object"},
 		"temperature":     0.2,
 	}
-	body, err := postJSON(ctx, o.client, o.baseURL+"/chat/completions", reqBody,
+	label := fmt.Sprintf("openai-compat(%s)", o.model)
+	started := time.Now()
+	body, err := postJSON(ctx, o.client, label, o.baseURL+"/chat/completions", reqBody,
 		map[string]string{"Authorization": "Bearer " + o.apiKey})
 	if err != nil {
 		return "", fmt.Errorf("openai-compat(%s): %w", o.model, err)
@@ -63,6 +66,10 @@ func (o *OpenAICompatibleProvider) GenerateContent(ctx context.Context, systemPr
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", fmt.Errorf("openai-compat(%s): decoding response: %w", o.model, err)
@@ -70,6 +77,7 @@ func (o *OpenAICompatibleProvider) GenerateContent(ctx context.Context, systemPr
 	if len(parsed.Choices) == 0 {
 		return "", fmt.Errorf("openai-compat(%s): empty choices", o.model)
 	}
+	logCall(ctx, label, started, parsed.Usage.PromptTokens, parsed.Usage.CompletionTokens)
 	return parsed.Choices[0].Message.Content, nil
 }
 

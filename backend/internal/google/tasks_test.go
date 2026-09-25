@@ -76,3 +76,20 @@ func TestTasksInsertTaskMapsReauth(t *testing.T) {
 		t.Errorf("err = %v, want ErrReauthRequired", err)
 	}
 }
+
+func TestTasksMapsAQuota403ToUpstreamNotReauth(t *testing.T) {
+	srv, _ := fakeGoogleAPI(t, map[string]struct {
+		Status int
+		Body   string
+	}{"POST /lists/l1/tasks": fakeAnswer(403, `{"error":{"code":403,"errors":[{"domain":"usageLimits","reason":"userRateLimitExceeded"}]}}`)})
+	c := NewHTTPTasksClient()
+	c.BaseURL = srv.URL
+	err := c.InsertTask(context.Background(), "tok", "l1", Task{Title: "Day 1"})
+	var up *UpstreamError
+	if !errors.As(err, &up) || up.Service != "tasks" || up.Status != 403 {
+		t.Fatalf("err = %v, want *UpstreamError{tasks, 403}", err)
+	}
+	if errors.Is(err, ErrReauthRequired) {
+		t.Fatal("a Tasks quota 403 must not force re-consent")
+	}
+}
