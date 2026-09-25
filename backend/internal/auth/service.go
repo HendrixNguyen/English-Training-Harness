@@ -38,7 +38,7 @@ func (s *Service) SignIn(ctx context.Context, code, redirectURI string) (SignInR
 
 	user, err := s.users.UpsertByGoogleID(ctx, profile.Sub, profile.Email, profile.Name, tok.RefreshToken)
 	if err != nil {
-		return SignInResult{}, err
+		return SignInResult{}, fmt.Errorf("auth: upserting google_id %s: %w", profile.Sub, err)
 	}
 
 	jwtToken, err := s.tokens.Issue(user.ID)
