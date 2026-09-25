@@ -9,7 +9,7 @@ Frontmatter per routine: `name`, `schedule` (5-field cron, owner's local time, A
 | Local | UTC | Routine | Produces |
 |---|---|---|---|
 | 02:00 | 19:00 (prev day) | [daily-ideate](daily-ideate.md) | a new run folder of `proposed` ideas |
-| 06:00 | 23:00 (prev day) | [daily-decide](daily-decide.md) | ≤5 plans for the day, bugs / mvp-slices / high features already `approved` |
+| 06:00 | 23:00 (prev day) | [daily-decide](daily-decide.md) | ≤5 bug plans + ≤5 feature plans for the day, bugs / mvp-slices / high features already `approved` |
 | 10:00 | 03:00 | [daily-bugfix-execute](daily-bugfix-execute.md) | `type: bug` plans → `done` on pushed `harness/*` branches |
 | 14:00 | 07:00 | [daily-feature-execute](daily-feature-execute.md) | `type: feature` / `mvp-slice` plans → `done` on pushed `harness/*` branches |
 | 20:00 | 13:00 | [daily-review](daily-review.md) | reviews, inbox bugs for tomorrow, the day's single code PR |
