@@ -3,10 +3,15 @@
 test:
 	go test ./...
 
-# The Go process does not read .env; export it first:
-#   set -a; . ./.env; set +a; make run
+# The Go process does not read .env. `make run` sources it here, in this
+# recipe's own shell (make runs each recipe line in a fresh /bin/sh), so
+# nothing from .env — least of all a TEST_* variable, which would un-gate the
+# destructive integration tests — leaks into your interactive shell.
+#   cp .env.example .env   # once; then edit, then:
+#   make run
 run:
-	go run ./cmd/api
+	@test -f .env || { echo ".env missing: cp .env.example .env, then edit it"; exit 1; }
+	set -a; . ./.env; set +a; exec go run ./cmd/api
 
 tidy:
 	go mod tidy
