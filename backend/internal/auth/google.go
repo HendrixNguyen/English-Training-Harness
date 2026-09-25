@@ -88,7 +88,7 @@ func (c *GoogleClient) Exchange(ctx context.Context, code, redirectURI string) (
 		return GoogleToken{}, err
 	}
 	if tok.AccessToken == "" {
-		return GoogleToken{}, fmt.Errorf("auth: Google returned no access token")
+		return GoogleToken{}, fmt.Errorf("%w: Google returned no access token", ErrGoogleRejected)
 	}
 	return tok, nil
 }
@@ -106,7 +106,7 @@ func (c *GoogleClient) UserInfo(ctx context.Context, accessToken string) (Google
 		return GoogleProfile{}, err
 	}
 	if p.Sub == "" || p.Email == "" {
-		return GoogleProfile{}, fmt.Errorf("auth: Google profile is missing sub or email")
+		return GoogleProfile{}, fmt.Errorf("%w: Google profile is missing sub or email", ErrGoogleRejected)
 	}
 	return p, nil
 }
@@ -121,6 +121,13 @@ func (c *GoogleClient) doJSON(req *http.Request, out any) error {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return fmt.Errorf("auth: reading %s response: %w", req.URL.Host, err)
+	}
+	// Any 4xx (including a 429 rate limit — rare enough on a per-user consent
+	// exchange that it does not get its own branch) is Google saying no, so it
+	// wraps ErrGoogleRejected; a 5xx or other transport failure is not the
+	// client's session to restart and falls through to a plain error.
+	if resp.StatusCode >= 400 && resp.StatusCode <= 499 {
+		return fmt.Errorf("%w: %s returned %d: %s", ErrGoogleRejected, req.URL.Host, resp.StatusCode, string(body))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("auth: %s returned %d: %s", req.URL.Host, resp.StatusCode, string(body))

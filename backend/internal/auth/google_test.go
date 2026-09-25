@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -99,5 +101,61 @@ func TestUserInfoRejectsAProfileWithoutSubOrEmail(t *testing.T) {
 
 	if _, err := c.UserInfo(context.Background(), "at"); err == nil {
 		t.Fatal("expected an error when sub/email are missing, got nil")
+	}
+}
+
+func TestExchangeWrapsAGoogle4xxAsRejected(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
+	}))
+	defer srv.Close()
+
+	c := &GoogleClient{TokenURL: srv.URL, HTTPClient: srv.Client()}
+
+	_, err := c.Exchange(context.Background(), "bad", "uri")
+	if err == nil {
+		t.Fatal("expected an error for a 400 from Google, got nil")
+	}
+	if !errors.Is(err, ErrGoogleRejected) {
+		t.Errorf("err = %v, want it to wrap ErrGoogleRejected", err)
+	}
+	if got := err.Error(); !strings.Contains(got, "invalid_grant") {
+		t.Errorf("err = %q, want it to contain Google's reason %q", got, "invalid_grant")
+	}
+}
+
+func TestExchangeDoesNotCallAGoogle5xxRejected(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	c := &GoogleClient{TokenURL: srv.URL, HTTPClient: srv.Client()}
+
+	_, err := c.Exchange(context.Background(), "code", "uri")
+	if err == nil {
+		t.Fatal("expected an error for a 502 from Google, got nil")
+	}
+	if errors.Is(err, ErrGoogleRejected) {
+		t.Errorf("err = %v, want it NOT to wrap ErrGoogleRejected (a 502 is ours, not Google's rejection)", err)
+	}
+}
+
+func TestUserInfoWithoutASubIsRejected(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"email":"a@example.com"}`))
+	}))
+	defer srv.Close()
+
+	c := &GoogleClient{UserInfoURL: srv.URL, HTTPClient: srv.Client()}
+
+	_, err := c.UserInfo(context.Background(), "at")
+	if err == nil {
+		t.Fatal("expected an error when sub is missing, got nil")
+	}
+	if !errors.Is(err, ErrGoogleRejected) {
+		t.Errorf("err = %v, want it to wrap ErrGoogleRejected", err)
 	}
 }
