@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 11:29. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 11:42. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -17,7 +17,7 @@ _none_
 
 ## Proposed
 
-- `harness/ideas/2026-09-25-run-01/containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build [high]
+_none_
 
 ## Selected
 
@@ -74,6 +74,7 @@ _none_
 
 ## Approved
 
+- `harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan [high]
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high]
 - `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium]
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium]
