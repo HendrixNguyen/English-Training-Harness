@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/parseorigins-accepts-frontend-origin-entries-no-browser-send.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-25-medium-parseorigins-accepts-frontend-origin-entries-no-browser-send
+worktree: .worktrees/parseorigins-accepts-frontend-origin-entries-no-browser-send
 ---
 # middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan
 
@@ -183,3 +185,26 @@ gh run list --branch "$(git branch --show-current)" --limit 1
 - **Railway previews:** with wildcards refused, a preview environment needs its exact origin in `FRONTEND_ORIGIN`. That is the honest state of the code today; suffix matching would be a feature (and would need the lookalike table extended, not loosened) — for the ideator, not this bug.
 - **IPv6 literals** (`http://[::1]:3000`) parse with `Hostname()` = `::1` and are unaffected by the three checks.
 - **Not touched:** `CORS` itself, `BodyLimit` (today's cmd/api plan edits its comment).
+
+## Execution summary
+
+Built exactly as planned, no deviations except one mechanical `gofmt` fixup (a fourth commit) that the plan's inline code snippet's comment alignment didn't match gofmt's own column rule for the new `TestParseOrigins` rows.
+
+**Plan verification (from `backend/`, `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL`):**
+- `go test ./internal/middleware/ -count=1 -race -v 2>&1 | grep -c '^--- PASS'` → `13` (as expected: 11 pre-existing + `TestParseOriginsSaysWhy` + `TestLookalikeOriginsGetNoCORSAndA403Preflight`).
+- `grep -c 'ToLower(u.Scheme)' internal/middleware/cors.go` → `0` (redundant condition removed).
+- `grep -n 'neverSentByABrowser' internal/middleware/cors.go` → the func def and its one call site.
+- `make check` → `fmt-check` silent, `vet` silent, `go test ./... -count=1 -race` → `ok` for all 13 packages (`cmd/api`, `airouter`, `auth`, `config`, `google`, `health`, `middleware`, `notify`, `onboarding`, `pet`, `quests`, `secrets`, `store`).
+- Live boot proof (scratch Postgres/Redis, `docker compose -p bf-origins`, ports 55444/56444): `FRONTEND_ORIGIN='https://*.up.railway.app'` → `config: middleware: FRONTEND_ORIGIN entries must be … : "https://*.up.railway.app" (wildcard hosts are not supported: list each preview origin explicitly)`, `exit=1`. `FRONTEND_ORIGIN='https://app.example.com:443'` → the default-port reason, `exit=1`. Both match the plan's expected text verbatim.
+- `grep -n 'default port' backend/.env.example harness/CODEMAP.md` → one hit in each.
+- `git diff --stat origin/main...HEAD -- harness/` → only `harness/CODEMAP.md` changed.
+- `python3 tools/harness/cli.py validate` → `exit=0`.
+
+**Runtime proof (step 8, beyond the plan's own Verification section):**
+- `go build -o /tmp/api-cors ./cmd/api` → built clean.
+- Full suite from a clean shell (`env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL`): `make check` green across all packages (above).
+- Booted the real binary against the scratch Postgres/Redis stack on a spare port (`PORT=58765`): log showed `cors: allowing [http://localhost:3000]`, then `listening on [::]:58765`. `curl` `GET /healthz` → `200`. `curl` `OPTIONS /api/v1/onboarding/quiz` with `Origin: http://localhost:3000` → `204` with `Access-Control-Allow-Origin: http://localhost:3000` and the full preflight header set. Same request with `Origin: http://localhost:3000:80` (an explicit default port — a lookalike, not the allow-listed origin) → `403`, no `Access-Control-Allow-Origin`.
+- Two boot-failure invocations above (wildcard, default port) — the destructive-sounding "refuse to boot" path was checked and does refuse, with the quoted entry and reason.
+- Cleanup verified: `kill` the app PID, `docker compose -p bf-origins down`, deleted the scratch `backend/.env`; `pgrep -fl api-cors` and `docker ps --filter name=bf-origins` both empty afterward.
+
+CI on `harness/2026-09-25-medium-parseorigins-accepts-frontend-origin-entries-no-browser-send`: all four jobs green (`harness-tooling`, `backend-unit`, `frontend`, `backend-integration`) — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36094226541

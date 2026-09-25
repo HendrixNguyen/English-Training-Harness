@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/the-documented-set-a-env-export-also-exports-test-database-u.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-25-medium-the-documented-set-a-env-export-also-exports-test-database-u
+worktree: .worktrees/the-documented-set-a-env-export-also-exports-test-database-u
 ---
 # Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan
 
@@ -185,4 +187,53 @@ gh run list --branch "$(git branch --show-current)" --limit 1
 - **`exec` in the `run` recipe** means `go run` replaces the recipe shell, so Ctrl-C reaches it exactly as before (`go run` forwards signals to the built binary — unchanged behaviour).
 - **`printenv "$v"`** exits 1 for an unset variable and prints an empty line for a set-but-empty one; the `-n` test treats both as "not set", matching the CI guard's `${!v:-}`.
 - **Why comment `TEST_*` out rather than point them at `english_test`?** A second database still needs `-p 1` discipline and a `createdb`; the command-line export for one target is the smallest honest loop and is what the Makefile already documents.
+
+## Execution summary
+
+Built exactly as designed, no deviations from the plan's design decisions or file structure.
+
+**Worktree/branch:** `.worktrees/the-documented-set-a-env-export-also-exports-test-database-u`, `harness/2026-09-25-medium-the-documented-set-a-env-export-also-exports-test-database-u`, based on freshly fetched `origin/main` (`f942e64`).
+
+**Task 1 — `make run` owns the export; `.env.example` stops shipping `TEST_*`:**
+- Reproduced the hazard first: `sh -c 'set -a; . ./.env.example; set +a; env | grep -c "^TEST_"'` → `2` (before fix).
+- Rewrote `run` to `@test -f .env || { … exit 1; }` then `set -a; . ./.env; set +a; exec go run ./cmd/api` on one recipe line; `.env.example`'s application-section comment updated; `TEST_DATABASE_URL`/`TEST_REDIS_URL` commented out with the pointer to `make test-integration`.
+- Verified: hazard command now → `0`; `make -n run` → the two expected lines.
+- **Runtime proof:** brought up an isolated dev stack (`COMPOSE_PROJECT_NAME=bf-envexport POSTGRES_PORT=55445 REDIS_PORT=56445 docker compose up -d --wait`), copied `.env.example` to `.env` with those ports plus dev `JWT_SECRET`/`ENCRYPTION_SECRET_KEY`/`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` filled in, ran `make run` in the background → log showed `listening on [::]:8080`; killed it; in the **same** invoking shell, `env | grep -c '^TEST_\|^DATABASE_URL\|^REDIS_URL'` → `0` (nothing leaked). Compose project torn down and scratch `.env` removed afterward.
+
+**Task 2 — `make check` mirrors `backend-unit`:**
+- Added `no-service-vars` (loops the four service vars, `printenv` test, one-line message + `exit 1`), `build`, fixed `fmt-check` to check `gofmt -l .`'s own exit status, and reordered `check: no-service-vars build fmt-check vet` + `test -race`.
+- `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL make check` → build/fmt-check/vet silent, all 13 packages `ok` under `-race`, exit 0.
+- `TEST_DATABASE_URL=x make check` → the one-line message naming `TEST_DATABASE_URL`, `exit=2`, no `go test` line ran (guard is first prerequisite).
+- Parse-error probe: `printf 'package probe\n\nfunc F( {}\n' > internal/zz_probe.go; make fmt-check` → gofmt's `expected ')'` message, then `gofmt -l failed`, `exit=2`; probe file removed, `git status --short` confirmed no leftover.
+
+**Task 3 — `-race` on the integration suite:**
+- `ci.yml`'s `backend-integration` step and `Makefile`'s `test-integration` both now run `go test ./... -count=1 -v -run Integration -p 1 -race`, with the comment explaining why (pet `Ensure`/`PenaliseMiss` and store `Migrate`, each driven from 8 goroutines).
+- Counted `TestIntegration*` funcs: `12` on today's `origin/main`.
+- **Runtime proof:** isolated stack (`COMPOSE_PROJECT_NAME=bf-envexport POSTGRES_PORT=55445 REDIS_PORT=56445 docker compose up -d --wait`), `TEST_DATABASE_URL=…55445… TEST_REDIS_URL=…56445… make test-integration` → all 12 `TestIntegration*` `--- PASS`, `0` `--- SKIP`, `0` `DATA RACE` matches in the log. Compose torn down afterward (`docker ps --filter name=bf-envexport` → empty).
+- `actionlint .github/workflows/ci.yml` → clean (no output).
+
+**Task 4 — CODEMAP:** updated the `cmd/api`, `backend-unit`, and `backend-integration` paragraphs per the plan's exact replacement text; `python3 tools/harness/cli.py validate` → exit 0.
+
+**Plan's Verification section — ran in full, all as expected:**
+```
+grep -n '^TEST_' .env.example                → no output
+sh -c '... env | grep -c "^TEST_"'           → 0
+make -n run | tail -1                        → set -a; . ./.env; set +a; exec go run ./cmd/api
+grep -n 'set -a' Makefile .env.example       → Makefile:14 (run recipe) only
+env -u DATABASE_URL … make check; echo exit  → exit=0, all packages ok under -race
+TEST_REDIS_URL=x make check                  → one-line "TEST_REDIS_URL is set" message; exit=2 (non-zero)
+grep -n '\-race' Makefile .github/workflows/ci.yml → 4 lines (check, test-integration, ci unit step, ci integration step)
+grep -n 'no-service-vars\|make run' harness/CODEMAP.md → the backend-unit bullet and the cmd/api paragraph
+git diff --stat origin/main...HEAD -- harness/ | grep -v CODEMAP → only the "1 file changed" summary line (no non-CODEMAP file named — CODEMAP.md is the sole harness/ file touched, confirmed by the unfiltered stat)
+python3 tools/harness/cli.py validate; echo exit → exit=0
+```
+
+**Definition-of-done runtime proof (step 8, beyond the plan's own verification):**
+- `go build ./...` (env stripped of all service/app vars) → clean.
+- Full unit suite `go test ./... -count=1 -race` (env stripped of `DATABASE_URL`, `REDIS_URL`, `TEST_DATABASE_URL`, `TEST_REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `JWT_SECRET`, `ENCRYPTION_SECRET_KEY`) → all 13 packages `ok`.
+- `python3 -m unittest discover -s tools/harness/tests -v` → 38 tests, `OK`.
+- Booted the real API end to end via `make run` against the isolated stack (see Task 1) and confirmed the `listening on` log line, then shut it down.
+- Cleanup verified: `pgrep -fl "cmd/api"` → empty; `docker ps --filter name=bf-envexport` → empty; scratch `backend/.env` removed.
+
+**Push and CI:** pushed `harness/2026-09-25-medium-the-documented-set-a-env-export-also-exports-test-database-u`. CI run [36094885712](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36094885712) — **all four jobs green**: `backend-unit` (1m16s), `frontend` (42s), `harness-tooling` (8s), `backend-integration` (2m32s, 12/12 `TestIntegration*` passed under `-race`, no skips).
 - **Out of scope:** `golangci-lint` (CODEMAP records what it would need), a `make integration-up` convenience target.

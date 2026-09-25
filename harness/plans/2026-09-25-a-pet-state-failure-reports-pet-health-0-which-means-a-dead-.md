@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-25-medium-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-
+worktree: .worktrees/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-
 ---
 # quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan
 
@@ -152,3 +154,39 @@ Mutation check (record the result): change `if typeof res.pet_health === 'number
 - **`GET /quests/daily` is untouched** — it never carried pet fields; the hub reads `GET /pet/status`.
 - **The §6.2 sample body still applies** to the success path; `TestProgressHandlerReturnsTheSpec62Body` stays as the contract test.
 - **The hub self-heals:** `pages/index.vue` calls `pet.load()` in `onMounted` (confirmed on `origin/main`), so after `/learn/:id` navigates back the plant is re-read from `GET /pet/status` anyway; the omitted fields only avoid the flash of a dead plant in between. No change there.
+
+## Execution summary
+
+**Built:** all three tasks, in order, each with a failing test written first.
+
+- Task 1 (backend): `service.go`'s `PetHealth`/`StreakCount` → `*int,omitempty`; `RecordProgress` now leaves both nil (and logs) on a failed `Pet.State` read instead of substituting `PetState{}`. `pet.go`'s `Pet` doc extended per the plan. `service_test.go` got the `petOf` helper (derefs to `-1` for nil) used at the three existing assertions plus the rewritten `TestAPetStateFailureDoesNotFailTheRequest`. `handler_test.go` got `TestProgressHandlerOmitsThePetFieldsWhenTheReadFails`.
+- Task 2 (frontend): `quest.ts`'s `ProgressResponse.pet_health`/`streak_count` → optional; `pet.ts`'s `applyProgress` assigns each field only when `typeof … === 'number'`. `petStore.test.ts` got the two new cases from the plan.
+- Task 3: `harness/CODEMAP.md`'s `quests` and `shell` paragraphs updated per the plan.
+
+**Deviations from the plan's file list (both required for the build/tests to pass, not optional polish):**
+1. `backend/internal/quests/integration_test.go` (not in the plan's File structure table) also referenced `out.PetHealth`/`out.StreakCount` as plain `int` and failed to compile after the `*int` change. Fixed with the same `petOf` helper the plan introduced for `service_test.go` (one assertion, `TestIntegrationEnsureCreatesExactlyOnePetRow`'s neighbor).
+2. `frontend/tests/unit/petStore.test.ts`'s existing `applyProgress updates health and streak…` case, and the two new cases, all read the module-level `status` fixture object by reference via `api.get.mockResolvedValue(status)`. `applyProgress` mutates `this.status` (== that same object) in place, so the first `applyProgress` test permanently corrupted the shared fixture (80/5 → 100/6) for every test running after it in the same file. Fixed by passing `{ ...status }` (a fresh copy) in all three `applyProgress` tests, so each is independent of execution order.
+
+**Verification (plan's Verification section, all as specified):**
+- `go test ./internal/quests/ -count=1 -race -v` → `ok`, no FAIL.
+- `grep -n 'omitempty' internal/quests/service.go` → 2 lines (`pet_health`, `streak_count`).
+- `grep -rn 'PetState{}' internal/quests/service.go` → no output.
+- `make check` (fmt-check, vet, `go test ./... -race`) → all 13 packages `ok`.
+- `npm run lint && npm run typecheck && npm run test:unit` → all clean; 16 files / 80 tests, `petStore.test.ts` at 8 (2 new + the pre-existing case now isolated from the shared-fixture bug above).
+- `grep -n 'pet_health?' stores/quest.ts` → 1 line.
+- `grep -n 'omitempty\|omitted' harness/CODEMAP.md` → the quests sentence.
+- `git diff --stat origin/main...HEAD -- harness/` → only `harness/CODEMAP.md` (2 insertions, 2 deletions).
+- `python3 tools/harness/cli.py validate` → `exit=0`.
+- Mutation check: flipped `typeof res.pet_health === 'number'` to `if (res.pet_health)` in `pet.ts` → "applyProgress still applies a real 0" went red as expected (`health_points: 80` instead of `0`); reverted, confirmed clean (`git status --short` empty).
+
+**Runtime proof (step 8, beyond the plan's own Verification):**
+- **Build:** `go build ./...` → clean.
+- **Full test suite from a clean shell:** `make check` (`env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL` implied by the shell used) → all 13 backend packages `ok` under `-race`; frontend `npm run lint && npm run typecheck && npm run test:unit` → clean, 80/80.
+- **Boot + real infra, scratch Docker project `bf-pet` (`COMPOSE_PROJECT_NAME=bf-pet`, `POSTGRES_PORT=55441`, `REDIS_PORT=56441`, scratch `backend/.env`):**
+  - `docker compose -p bf-pet up -d --wait --wait-timeout 120` → both `postgres`/`redis` healthy.
+  - Gated integration suite against the real services: `go test ./... -count=1 -v -run Integration -p 1` with `TEST_DATABASE_URL`/`TEST_REDIS_URL` pointed at the scratch stack → all pass, including `TestIntegrationDailyAndProgressAgainstRealServices` (the exact `RecordProgress` path this plan changed, against a real Postgres + Redis).
+  - Booted the real binary: `go run ./cmd/api` with the scratch env (`JWT_SECRET`, `ENCRYPTION_SECRET_KEY`, `GOOGLE_CLIENT_ID/SECRET` scratch values) → log shows `migrations applied: [0001_init 0002_google_sync 0003_pet_verdict_dates]` then `listening on [::]:8080`. `curl http://localhost:8080/healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`.
+  - **Cleanup:** killed the server (parent `go run` PID and the compiled child binary — `go run` spawns a child, so both had to be killed), confirmed with `pgrep -fl cmd/api`/`pgrep -fl go-build.*api` (both empty) and a failed `curl` (connection refused). `docker compose -p bf-pet down` removed both containers, the network, and the named volume was untouched (no `-v`, matches `make down`'s semantics). Removed the scratch `backend/.env`. `docker ps --filter name=bf-pet` → empty.
+
+**CI on the pushed branch:** `harness/2026-09-25-medium-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-`
+Run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36093609127 — **success**. All four jobs green: `frontend` (33s), `backend-unit` (1m12s), `backend-integration` (46s), `harness-tooling` (8s).
