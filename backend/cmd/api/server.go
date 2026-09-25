@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -65,4 +66,18 @@ func serve(ctx context.Context, srv *http.Server, ln net.Listener, grace time.Du
 	}
 	<-errc // Serve has returned http.ErrServerClosed
 	return nil
+}
+
+// waitWithin waits for wg up to d and reports whether it finished. main uses it
+// to join the background workers after the drain without letting a stuck
+// worker hold the process past Railway's kill window.
+func waitWithin(wg *sync.WaitGroup, d time.Duration) bool {
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return true
+	case <-time.After(d):
+		return false
+	}
 }

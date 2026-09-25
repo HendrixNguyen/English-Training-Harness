@@ -150,3 +150,27 @@ func TestNewServerBoundsHeaderReadsButNotWrites(t *testing.T) {
 		t.Fatalf("WriteTimeout = %s, want 0 (see newServer doc)", srv.WriteTimeout)
 	}
 }
+
+func TestWaitWithinReturnsTrueWhenTheGroupFinishes(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { defer wg.Done() }()
+	start := time.Now()
+	if !waitWithin(&wg, time.Second) {
+		t.Fatal("waitWithin returned false, want true when the group finishes")
+	}
+	if time.Since(start) >= time.Second {
+		t.Fatalf("waitWithin took %s, want well under the 1 s bound", time.Since(start))
+	}
+}
+
+func TestWaitWithinReturnsFalseWhenItDoesNot(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	blocked := make(chan struct{})
+	t.Cleanup(func() { close(blocked) })
+	go func() { defer wg.Done(); <-blocked }()
+	if waitWithin(&wg, 50*time.Millisecond) {
+		t.Fatal("waitWithin returned true, want false when the group is still running")
+	}
+}

@@ -6,10 +6,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -139,8 +141,9 @@ func main() {
 		time.Now,
 	)
 
+	var workers sync.WaitGroup
 	// Spec §8 hourly cron, in-process (§2.1). Sweeps at every :00 UTC.
-	go pet.RunHourly(ctx, petSvc)
+	workers.Go(func() { pet.RunHourly(ctx, petSvc) })
 
 	// Spec §2.1 reminder worker, in-process, polling the §4 queue:webpush:delay
 	// ZSET every 30 s. It starts only when both VAPID keys (spec §9) are set;
@@ -161,7 +164,7 @@ func main() {
 		time.Now,
 	)
 	if pushSender != nil {
-		go notify.RunWorker(ctx, notifySvc, notify.PollInterval)
+		workers.Go(func() { notify.RunWorker(ctx, notifySvc, notify.PollInterval) })
 	} else {
 		log.Printf("notify: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY unset; reminder settings are stored but no Web Push is sent")
 	}
@@ -202,8 +205,17 @@ func main() {
 		log.Fatalf("listen: %v", err)
 	}
 	log.Printf("listening on %s (GIN_MODE=%s)", ln.Addr(), cfg.GinMode)
-	if err := serve(ctx, newServer(r), ln, ShutdownGrace); err != nil {
-		log.Fatalf("server: %v", err)
+	err = serve(ctx, newServer(r), ln, ShutdownGrace)
+	switch {
+	case errors.Is(err, ErrDrainTimedOut):
+		log.Printf("server: %v", err) // planned stop that ran long: not fatal, exit 0 (see ErrDrainTimedOut)
+	case err != nil:
+		log.Fatalf("server: %v", err) // the listener died: nothing was serving
+	}
+	// Both workers return on ctx.Done(); bound the join so a worker stuck in a
+	// store call cannot hold the process past Railway's kill window.
+	if !waitWithin(&workers, ShutdownGrace) {
+		log.Printf("shutdown: background workers did not stop within %s; closing stores anyway", ShutdownGrace)
 	}
 	log.Printf("shutdown complete") // main returns: deferred pg.Close / rdb.Close run
 }
