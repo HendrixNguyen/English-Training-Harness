@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
@@ -40,6 +43,9 @@ func (f *fakeSessions) Get(_ context.Context, userID string) (string, error) {
 }
 
 func (f *fakeSessions) Delete(_ context.Context, userID string) error {
+	if f.err != nil {
+		return f.err
+	}
 	delete(f.vals, userID)
 	return nil
 }
@@ -68,5 +74,28 @@ func TestFakeSessionsSatisfiesSessionStore(t *testing.T) {
 	}
 	if _, err := s.Get(ctx, "u1"); err == nil {
 		t.Fatal("Get after Delete = nil error, want ErrNoSession")
+	}
+}
+
+func TestGetOnAnUnreachableRedisIsUnavailableNotNoSession(t *testing.T) {
+	// Nothing listens on port 1, so the dial fails immediately instead of
+	// timing out — but bound it anyway in case a firewall drops instead of
+	// refusing.
+	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"})
+	t.Cleanup(func() { _ = client.Close() })
+	s := &RedisSessionStore{Client: client}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := s.Get(ctx, "u1")
+	if err == nil {
+		t.Fatal("Get against an unreachable Redis = nil error, want ErrSessionStoreUnavailable")
+	}
+	if !errors.Is(err, ErrSessionStoreUnavailable) {
+		t.Errorf("err = %v, want it to wrap ErrSessionStoreUnavailable", err)
+	}
+	if errors.Is(err, ErrNoSession) {
+		t.Errorf("err = %v, want it NOT to wrap ErrNoSession (the store is down, not the key absent)", err)
 	}
 }

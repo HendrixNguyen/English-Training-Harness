@@ -33,7 +33,7 @@ func NewRedisSessionStore(r *store.Redis) *RedisSessionStore {
 
 func (s *RedisSessionStore) Put(ctx context.Context, userID, token string, ttl time.Duration) error {
 	if err := s.Client.Set(ctx, store.SessionKey(userID), token, ttl).Err(); err != nil {
-		return fmt.Errorf("auth: storing session: %w", err)
+		return fmt.Errorf("%w: storing session: %v", ErrSessionStoreUnavailable, err)
 	}
 	return nil
 }
@@ -44,14 +44,14 @@ func (s *RedisSessionStore) Get(ctx context.Context, userID string) (string, err
 		return "", ErrNoSession
 	}
 	if err != nil {
-		return "", fmt.Errorf("auth: reading session: %w", err)
+		return "", fmt.Errorf("%w: reading session: %v", ErrSessionStoreUnavailable, err)
 	}
 	return v, nil
 }
 
 func (s *RedisSessionStore) Delete(ctx context.Context, userID string) error {
 	if err := s.Client.Del(ctx, store.SessionKey(userID)).Err(); err != nil {
-		return fmt.Errorf("auth: deleting session: %w", err)
+		return fmt.Errorf("%w: deleting session: %v", ErrSessionStoreUnavailable, err)
 	}
 	return nil
 }
