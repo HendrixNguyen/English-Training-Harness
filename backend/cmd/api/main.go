@@ -51,6 +51,11 @@ func main() {
 	// stops on SIGINT/SIGTERM instead of leaking past process shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// signal.NotifyContext keeps the handler installed until stop() runs. Call
+	// it the moment the context is done, so a second SIGINT/SIGTERM during the
+	// drain gets Go's default disposition and ends the process at once
+	// ("press Ctrl-C again to force"). defer stop() stays for the error paths.
+	go func() { <-ctx.Done(); stop() }()
 
 	cfg, err := config.Load()
 	if err != nil {
