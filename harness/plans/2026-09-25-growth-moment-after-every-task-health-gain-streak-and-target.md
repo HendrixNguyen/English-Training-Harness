@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/growth-moment-after-every-task-health-gain-streak-and-target.md
-status: draft
+status: approved
 priority: medium
 merged: false
 design: harness/designs/growth-moment.md

@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md
-status: draft
+status: approved
 priority: medium
 merged: false
 design: harness/designs/plant-name.md

@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 21:52. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 22:00. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -88,14 +88,14 @@ _none_
 
 ## Planned (awaiting approval)
 
+_none_
+
+## Approved
+
 - `harness/plans/2026-09-25-growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub — Plan [medium]
 - `harness/plans/2026-09-25-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md` — Name your plant at onboarding and see it greet you by name on the hub — Plan [medium]
 - `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md` — pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan [medium]
 - `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium]
-
-## Approved
-
-_none_
 
 ## Executing
 
