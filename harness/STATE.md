@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 11:29. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 17:41. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,11 +13,12 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md` — Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS [high]
+- `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
 
 ## Proposed
 
-- `harness/ideas/2026-09-25-run-01/containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build [high]
+_none_
 
 ## Selected
 
@@ -89,6 +90,9 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan [high] (unreviewed)
+- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high] (unreviewed)
+- `harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan [high] (unreviewed)
 - `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (review: pass-with-bugs) (merged)
@@ -96,9 +100,6 @@ _none_
 - `harness/plans/2026-09-24-geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider joins every response part, names a non-STOP finish reason, surfaces a safety block, and asks for enough output tokens — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api amend: make the drain test observe the drain — it must fail when `srv.Shutdown` is gone — Plan [high] (review: pass) (merged)
-- `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs) (merged)
 
 ## Failed
 
