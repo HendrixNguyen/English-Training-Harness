@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -16,7 +18,9 @@ const ContextUserID = "user_id"
 // A token is accepted only when it (a) verifies against JWT_SECRET and carries
 // an exp, (b) is within its exp window, and (c) is byte-for-byte the token
 // stored at sess:{user_id}:token. (c) is what makes DEL a revocation and what
-// makes a new sign-in supersede the previous token.
+// makes a new sign-in supersede the previous token — and a session-store
+// failure that is not "absent" is 503, not 401 — a Redis blip must not sign
+// anyone out.
 func Require(tokens *TokenIssuer, sessions SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		raw := bearerToken(c.GetHeader("Authorization"))
@@ -30,7 +34,15 @@ func Require(tokens *TokenIssuer, sessions SessionStore) gin.HandlerFunc {
 			return
 		}
 		stored, err := sessions.Get(c.Request.Context(), userID)
-		if err != nil || stored != raw {
+		switch {
+		case errors.Is(err, ErrNoSession):
+			abortUnauthorized(c)
+			return
+		case err != nil:
+			log.Printf("auth: session store unavailable for user %s: %v", userID, err)
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "unavailable"})
+			return
+		case stored != raw:
 			abortUnauthorized(c)
 			return
 		}

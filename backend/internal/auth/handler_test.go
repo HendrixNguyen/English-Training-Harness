@@ -1,10 +1,14 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +16,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var errGoogleRejected = errors.New("google rejected the code")
+// errGoogleRejected wraps ErrGoogleRejected the way the Google leg does (see
+// google.go), so this file's existing 401 test still exercises the real
+// mapping instead of a plain unrelated error.
+var errGoogleRejected = fmt.Errorf("%w: 400 invalid_grant", ErrGoogleRejected)
 
 func newAuthRouter(svc *Service) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -116,5 +123,101 @@ func TestHandlerReturns401WhenGoogleRejectsTheCode(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401; body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandlerMapsEachFailureToItsStatus(t *testing.T) {
+	cases := []struct {
+		name       string
+		ex         *fakeExchanger
+		repo       *fakeRepo
+		sess       *fakeSessions
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "google rejected",
+			ex:         &fakeExchanger{err: fmt.Errorf("%w: 400", ErrGoogleRejected)},
+			repo:       newFakeRepo(),
+			sess:       newFakeSessions(),
+			wantStatus: http.StatusUnauthorized,
+			wantBody:   `"error":"google_auth_failed"`,
+		},
+		{
+			name:       "email taken",
+			ex:         &fakeExchanger{token: GoogleToken{AccessToken: "at"}, profile: GoogleProfile{Sub: "google-1", Email: "a@example.com"}},
+			repo:       &fakeRepo{err: ErrEmailTaken},
+			sess:       newFakeSessions(),
+			wantStatus: http.StatusConflict,
+			wantBody:   `"error":"email_in_use"`,
+		},
+		{
+			name:       "session store unavailable",
+			ex:         &fakeExchanger{token: GoogleToken{AccessToken: "at"}, profile: GoogleProfile{Sub: "google-1", Email: "a@example.com"}},
+			repo:       newFakeRepo(),
+			sess:       &fakeSessions{vals: map[string]string{}, ttls: map[string]time.Duration{}, err: fmt.Errorf("%w: dial", ErrSessionStoreUnavailable)},
+			wantStatus: http.StatusServiceUnavailable,
+			wantBody:   `"error":"unavailable"`,
+		},
+		{
+			name:       "repo transport failure",
+			ex:         &fakeExchanger{token: GoogleToken{AccessToken: "at"}, profile: GoogleProfile{Sub: "google-1", Email: "a@example.com"}},
+			repo:       &fakeRepo{err: errors.New("pg down")},
+			sess:       newFakeSessions(),
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   `"error":"internal_error"`,
+		},
+		{
+			name:       "exchange transport failure",
+			ex:         &fakeExchanger{err: errors.New("dial tcp: i/o timeout")},
+			repo:       newFakeRepo(),
+			sess:       newFakeSessions(),
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   `"error":"internal_error"`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := NewService(tc.ex, tc.repo, tc.sess, NewTokenIssuer("s", time.Now))
+			w := postJSON(t, newAuthRouter(svc), `{"code":"c","redirect_uri":"https://app/cb"}`)
+			if w.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d; body = %s", w.Code, tc.wantStatus, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), tc.wantBody) {
+				t.Errorf("body = %s, want it to contain %q", w.Body.String(), tc.wantBody)
+			}
+		})
+	}
+}
+
+func TestHandlerLogsTheFailureWithoutTheTokens(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	ex := &fakeExchanger{
+		token:   GoogleToken{AccessToken: "at-secret", RefreshToken: "rt-secret"},
+		profile: GoogleProfile{Sub: "google-1", Email: "a@example.com"},
+	}
+	repo := &fakeRepo{err: errors.New("pg down")}
+	svc := NewService(ex, repo, newFakeSessions(), NewTokenIssuer("super-secret-jwt-key", time.Now))
+
+	w := postJSON(t, newAuthRouter(svc), `{"code":"c","redirect_uri":"https://app/cb"}`)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body = %s", w.Code, w.Body.String())
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "auth: sign-in failed") {
+		t.Errorf("log = %q, want it to contain %q", got, "auth: sign-in failed")
+	}
+	if !strings.Contains(got, "google-1") {
+		t.Errorf("log = %q, want it to name the google id %q", got, "google-1")
+	}
+	for _, secret := range []string{"at-secret", "rt-secret", "super-secret-jwt-key"} {
+		if strings.Contains(got, secret) {
+			t.Errorf("log = %q, must not contain the secret %q", got, secret)
+		}
 	}
 }
