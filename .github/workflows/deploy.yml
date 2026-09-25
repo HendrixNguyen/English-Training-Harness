@@ -1,0 +1,116 @@
+name: Deploy
+
+# Delivery loop (AGENTS.md; deploy/README.md "Ship from production"): on a
+# push to the release branch `production` — which only ever receives
+# fast-forwards of main, by the nightly ship routine or the owner — build the
+# PWA and upload it to Cloudflare Pages, then smoke-check both public URLs.
+# The API is not touched here: Railway keeps auto-deploying it from `main` on
+# every push through its own GitHub connection (owner decision, 2026-09-25).
+# Never on main, never on harness/** branches, never on pull requests.
+# `production` commits have already passed CI on main; this workflow does not
+# re-run it.
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build the PWA but skip both deploys and the smoke checks
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One ship at a time and never cancelled: a cancelled run can leave Pages and
+# Railway on different commits.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+      PAGES_URL: ${{ vars.PAGES_URL }}
+      API_URL: ${{ vars.API_URL }}
+      # Public build-time values (Nuxt reads NUXT_PUBLIC_* while generating).
+      NUXT_PUBLIC_API_BASE: ${{ vars.NUXT_PUBLIC_API_BASE }}
+      NUXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NUXT_PUBLIC_GOOGLE_CLIENT_ID }}
+      NUXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NUXT_PUBLIC_VAPID_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          for v in NUXT_PUBLIC_API_BASE NUXT_PUBLIC_GOOGLE_CLIENT_ID NUXT_PUBLIC_VAPID_PUBLIC_KEY \
+                   PAGES_URL API_URL CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            [ -n "${!v:-}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::dry run with unset:$missing — see deploy/README.md 'Ship from production'"
+            else
+              echo "::error::not configured:$missing — see deploy/README.md 'Ship from production'"
+              exit 1
+            fi
+          fi
+          echo "dry_run=$DRY_RUN ref=$GITHUB_REF_NAME sha=$GITHUB_SHA"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate the static site
+        working-directory: frontend
+        run: |
+          npx nuxi generate
+          test -f .output/public/index.html
+          test -f .output/public/sw.js
+          test -f .output/public/manifest.webmanifest
+
+      - name: Upload the PWA to Cloudflare Pages
+        if: env.DRY_RUN != 'true'
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          npx --yes wrangler@4 pages deploy .output/public
+          --project-name english-learning --branch main
+
+      - name: Wait for the API
+        if: env.DRY_RUN != 'true'
+        run: |
+          for _ in $(seq 1 24); do
+            code=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "$API_URL/healthz" || true)
+            if [ "$code" = "200" ]; then echo "healthz: 200"; exit 0; fi
+            sleep 5
+          done
+          echo "::error::$API_URL/healthz did not answer 200 within 2 minutes"
+          exit 1
+
+      - name: Smoke-check the API
+        if: env.DRY_RUN != 'true'
+        run: deploy/smoke-api.sh "$API_URL" "$PAGES_URL"
+
+      - name: Smoke-check the PWA
+        if: env.DRY_RUN != 'true'
+        env:
+          # Deep links answer 404 on Pages until the inbox bug
+          # "pages-ignores-the-redirects-spa-rewrite-while-404-html-exist" is
+          # fixed; that one check warns instead of failing. Remove with the fix.
+          SMOKE_WEB_SPA_WARN: '1'
+        run: deploy/smoke-web.sh "$PAGES_URL"
