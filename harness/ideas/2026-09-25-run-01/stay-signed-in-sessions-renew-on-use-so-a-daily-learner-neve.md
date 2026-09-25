@@ -1,8 +1,9 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-25-run-01
+priority: high
 ---
 # Stay signed in: sessions renew on use so a daily learner never sees the Google consent screen again
 
@@ -28,3 +29,14 @@ Technical:
 - Code: `backend/internal/store/keys.go` `SessionTTL = 24 * time.Hour`; `backend/internal/auth/token.go` `TokenTTL = store.SessionTTL`; `backend/internal/auth/scopes.go` and `frontend/utils/googleAuth.ts` (`prompt=consent` on every login); `frontend/stores/auth.ts` `isAuthenticated: expiresAt > Date.now()`; `frontend/middleware/auth.global.ts` (expired session dropped → `/login`). CODEMAP `auth` ("accepts a token only if it verifies, is unexpired, and matches the stored session byte for byte").
 - Inbox context (not duplicated): `signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — single-session design stays as is.
 - Login friction as the top abandonment reason and 30-day mobile session guidance: https://www.corbado.com/blog/login-friction-kills-conversion ; https://www.descope.com/learn/post/session-timeout-best-practices ; user-reported churn from aggressive session expiry: https://support.discord.com/hc/en-us/community/posts/1500000234942
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (two-cap rule, owner 2026-09-25: ≤5 bug plans + ≤5 feature plans; this is a feature verdict)._
+
+**Select — high. Not planned today; first feature slot tomorrow (2026-09-26).**
+
+*Is the Why real?* Yes, and every learner hits it: `store.SessionTTL`/`auth.TokenTTL` are a hard 24 h with no refresh path (`backend/internal/auth/token.go`, `session.go`), the route guard drops an expired session, and `/login` builds its URL with `prompt=consent` (`auth.AuthCodeURL`, mirrored in `frontend/utils/googleAuth.ts`), so a learner who practises at the same hour each day sees Google's full consent screen daily — at the moment the reminder push brought them back. Backend spec §7's "24-hour TTL" reads naturally as an idle window; a sliding session keeps that guarantee and instant `DEL` revocation.
+
+*Achievable in one plan?* Yes, about a day: `Require` renews below half-life (new JWT, `SET` with full TTL, `X-Session-Token` + `X-Session-Expires-In` response headers), `middleware.CORS` exposes the two headers, `apiClient.ts` adopts the newest header and retries a `401` once after a renewal, the login page explains an expiry, backend spec §7 and CODEMAP updated. The single-session model stays as is (`signing-in-on-a-second-device…` is its own selected bug).
+
+*Why not today.* It rewrites `auth.Require` (`backend/internal/auth/middleware.go`), and today's approved bug plan `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` rewrites the same function (401 vs 503 on the session read). Executor worktrees are cut from `origin/main`, so two branches editing that function on the same day would conflict in tonight's daily merge. Tomorrow's plan is written against the merged `Require`, with its renewal branch placed after the new 503 branch. Decisions for that plan: renew at < ½ `TokenTTL` remaining, at most once per half-life per user; the old token is invalid the moment the key is overwritten (byte-for-byte rule unchanged); the client always adopts the latest header; `prefers` nothing new on the wire body — headers only, so backend spec §6.1's body is untouched.
