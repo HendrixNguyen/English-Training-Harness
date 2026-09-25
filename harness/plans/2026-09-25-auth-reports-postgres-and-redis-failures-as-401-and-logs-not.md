@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-25-medium-auth-reports-postgres-and-redis-failures-as-401-and-logs-not
+worktree: .worktrees/auth-reports-postgres-and-redis-failures-as-401-and-logs-not
 ---
 # auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan
 
@@ -249,3 +251,50 @@ Live proof (optional, record in the summary if run): boot the API against the is
 - **The 4xx rule includes 429.** A Google rate limit is "rejected" under decision 1 and answers 401; it is rare enough on a per-user consent exchange that a dedicated branch is not worth its test. Say so in the `doJSON` comment.
 - **Not touched:** the single-session model (`signing-in-on-a-second-device…` is planned next on this package; it edits `session.go`'s key shape, so land this first).
 - **Out of scope:** Google's raw error body in the log is fine (no tokens in an OAuth error body); scrubbing it is not needed.
+
+## Execution summary
+
+Built exactly per plan: `errors.go` with the three sentinels; `google.go` wraps a 4xx (including the 429 comment) and the two "missing field" errors with `ErrGoogleRejected`; `session.go`'s `Get`/`Put`/`Delete` wrap non-`redis.Nil` Redis errors with `ErrSessionStoreUnavailable`; `repo.go` maps Postgres `23505` on `users_email_key` to `ErrEmailTaken`; `service.go` names the google id on a repo failure; `handler.go` maps the four outcomes and logs once (`auth: sign-in failed: %v`); `middleware.go`'s `Require` answers `503` and leaves the session alone for any `Get` error that is not `ErrNoSession`, logging `auth: session store unavailable for user %s: %v`. `harness/CODEMAP.md`'s `auth` paragraph got the two sentences the plan specified — the only non-`internal/auth` file this branch touches.
+
+**Deviations from the plan (both cosmetic, no behaviour change):**
+1. This repo's `session_test.go` never had the gated `TestRedisSessionStore…` test the plan describes ("builds a RedisSessionStore over a real client... gated, skips locally"); no such test exists on `origin/main`. Added `TestGetOnAnUnreachableRedisIsUnavailableNotNoSession` as an ungated pure test instead (dials `127.0.0.1:1`, nothing listens there, so it fails immediately with no network dependency) — it exercises the same behaviour the plan's version would have.
+2. `handler_test.go`'s pre-existing `errGoogleRejected` fixture (`errors.New("google rejected the code")`) did not wrap the new `ErrGoogleRejected` sentinel, so under the new mapping it would have fallen through to the `500` default and broken `TestHandlerReturns401WhenGoogleRejectsTheCode`. Changed it to `fmt.Errorf("%w: 400 invalid_grant", ErrGoogleRejected)` so the fixture matches what the real Google leg now produces; the test's assertion (401) is unchanged.
+
+Task counts and package total matched the plan's estimates closely (32 pre-existing `func Test` vs the plan's assumed count, +10 new pure tests where two of the "new" ones — the two `TestSignInFails*` service tests — already passed on the pre-existing behaviour, as the plan anticipated and told me to keep them as regression pins).
+
+### Plan verification (from `backend/`)
+
+```
+env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./internal/auth/ -count=1 -race -v 2>&1 | grep -c '^--- PASS'
+# got: 41   (0 FAIL)
+grep -rn '"error": *"' internal/auth/*.go | grep -v _test | grep -o '"[a-z_]*"' | sort -u
+# got: "email_in_use" "error" "google_auth_failed" "internal_error" "invalid_request" "unauthorized" "unavailable"
+#   (the extra "error" token is the JSON key itself, matched by the same grep pattern — all six values are present)
+grep -n 'log\.Printf' internal/auth/handler.go internal/auth/middleware.go
+# got: exactly one line in each, as expected
+grep -n 'Token\|Secret' internal/auth/handler.go | grep 'log\.'
+# got: no output — no token/secret formatted into a log call
+grep -c '^func TestIntegration' internal/auth/integration_test.go
+# got: 2
+make check
+# got: fmt-check silent, vet silent, every package ok under -race (13 packages)
+cd .. && git diff --stat origin/main...HEAD -- harness/
+# got: only harness/CODEMAP.md (1 insertion, 1 deletion)
+python3 tools/harness/cli.py validate; echo "exit=$?"
+# got: exit=0
+```
+
+### Runtime proof (Definition of done, step 8)
+
+- **Build:** `go build ./...` and `go build -o /tmp/authapi ./cmd/api` both succeeded.
+- **Full suite, clean shell:** `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL make check` — `ok` for all 13 backend packages under `-race`; fmt-check and vet silent.
+- **Integration tests, isolated stack** (`COMPOSE_PROJECT_NAME=bf-auth POSTGRES_PORT=55442 REDIS_PORT=56442`): `docker compose up -d --wait`, then `go test ./internal/auth/ -run Integration -count=1 -v -p 1` → `--- PASS` for both `TestIntegrationUpsertCreatesThenPreservesTheLearnerState` and `TestIntegrationUpsertRejectsAnEmailOwnedByAnotherGoogleAccount`, 0 skip.
+- **Boot + exercise the broken path:** built `/tmp/authapi`, ran it against the isolated stack with a known `JWT_SECRET`, minted a session token directly through `auth.TokenIssuer`/`auth.RedisSessionStore` (a throwaway `cmd/proof-tmp`, deleted afterward — never committed), then:
+  - `GET /api/v1/pet/status` with the token while Redis was up → `500 internal_error` (the fake user id is not a real UUID/row; unrelated to auth — the middleware let the request through, i.e. no 401).
+  - `docker compose -p bf-auth stop redis`; same call → `503 {"error":"unavailable"}`, and the log line `auth: session store unavailable for user live-proof-user: auth: session store unavailable: reading session: dial tcp [::1]:56442: connect: connection refused`.
+  - `docker compose -p bf-auth start redis`; same token, same call → back to `500 internal_error` (never `401`) — the session survived the outage untouched, exactly the fix's intent.
+  - Cleaned up: killed the app process, `rm -rf cmd/proof-tmp`, `docker compose -p bf-auth down`, removed the scratch `backend/.env`. Verified with `pgrep -fl authapi` and `docker ps` — both empty.
+
+### CI
+
+Pushed `harness/2026-09-25-medium-auth-reports-postgres-and-redis-failures-as-401-and-logs-not`. Run [36093540852](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36093540852) — all green: `backend-unit`, `backend-integration` (integration tests ran, did not skip), `harness-tooling`, `frontend`.

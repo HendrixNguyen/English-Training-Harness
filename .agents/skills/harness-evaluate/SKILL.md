@@ -27,7 +27,7 @@ Bugs (`_inbox/`) and features (run folders) are ranked as **two separate lists**
 4. Append `## Evaluation` to the idea body (verdict, reasoning, dependencies, priority rationale).
 5. **Reject:** `python3 tools/harness/cli.py set <idea> status=rejected rejected_reason="<one sentence>"`. Done with this idea.
 6. **Select:** `python3 tools/harness/cli.py set <idea> status=selected priority=<high|medium|low>`.
-7. If the idea involves UI: write `harness/designs/<slug>.md` following the frontend-design skill. Keep it to layout, states, component list, and token choices — no code.
+7. If the idea's Expected output touches `frontend/` (feature **or** bug): spawn the designer role (load skill harness-design) on the idea and wait for `harness/designs/<slug>.md`. Do not write the design yourself; do not plan frontend tasks before it exists.
 8. If `type: bug`: apply systematic-debugging to locate root cause in the worktree-free main checkout (read-only). Record it in `## Evaluation`.
 9. `PLAN=$(python3 tools/harness/cli.py new-plan --idea <idea>)`. Fill the plan body using the writing-plans skill. If a design exists: `python3 tools/harness/cli.py set $PLAN design=harness/designs/<slug>.md`.
 10. **Auto-approve** (owner, 2026-09-24 — always on): if the idea is `type: bug` (any priority), `type: mvp-slice`, or `type: feature` with `priority: high`, run `python3 tools/harness/cli.py set $PLAN status=approved` so the executor can pick it up. Leave medium/low feature plans `draft` for the owner's `/approve`. Only approve a plan whose body is complete — tasks, paths, tests and `## Verification` filled in; an unfinished plan stays `draft`.
