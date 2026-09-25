@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/geminiprovider-drops-every-response-part-after-the-first-so-.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-24-medium-geminiprovider-drops-every-response-part-after-the-first-so-
 worktree: .worktrees/geminiprovider-drops-every-response-part-after-the-first-so-
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"

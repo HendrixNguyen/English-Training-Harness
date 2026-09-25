@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 )
 
 // FallbackOrder is the deterministic order Route tries providers other than
@@ -52,7 +53,8 @@ func (r *Router) Providers() []ProviderType {
 // in FallbackOrder, on absence or error. An unknown task prefers Gemini
 // (§6.2). With no providers it returns ErrNoProviders; when every attempt
 // fails it returns ErrAllProvidersFailed joined with each provider's error.
-// It stops as soon as ctx is done.
+// It stops as soon as ctx is done. Every attempt runs under the caller's
+// deadline, or TaskTimeout(task) when the caller set none.
 func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPrompt string) (string, error) {
 	if len(r.providers) == 0 {
 		return "", ErrNoProviders
@@ -61,6 +63,10 @@ func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPro
 	if !ok {
 		preferred = ProviderGemini
 	}
+
+	ctx, cancel := ensureDeadline(ctx, task)
+	defer cancel()
+	ctx = withTask(ctx, task)
 
 	order := []ProviderType{preferred}
 	for _, p := range FallbackOrder {
@@ -81,10 +87,12 @@ func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPro
 		if p != preferred {
 			log.Printf("airouter: fallback from %s to %s for task %s", preferred, p, task)
 		}
+		started := time.Now()
 		out, err := provider.GenerateContent(ctx, systemPrompt, userPrompt)
 		if err == nil {
 			return out, nil
 		}
+		log.Printf("airouter: %s failed for task %s after %.1fs: %v", p, task, time.Since(started).Seconds(), err)
 		errs = append(errs, fmt.Errorf("%s: %w", p, err))
 	}
 	if ctx.Err() != nil {

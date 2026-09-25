@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-25-high-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
 worktree: .worktrees/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"

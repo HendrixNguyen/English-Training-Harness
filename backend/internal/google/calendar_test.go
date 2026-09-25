@@ -150,9 +150,14 @@ func TestCalendarMapsStatusesToSentinelErrors(t *testing.T) {
 		Status int
 		Body   string
 	}{
-		"PATCH /calendars/primary/events/gone":      {404, `{"error":{"code":404}}`},
-		"PATCH /calendars/primary/events/forbidden": {403, `{"error":{"code":403,"message":"insufficient scopes"}}`},
-		"PATCH /calendars/primary/events/broken":    {500, `{"error":{"code":500}}`},
+		"PATCH /calendars/primary/events/gone":       {404, `{"error":{"code":404}}`},
+		"PATCH /calendars/primary/events/forbidden":  {403, `{"error":{"code":403,"message":"insufficient scopes"}}`},
+		"PATCH /calendars/primary/events/noscope":    {403, `{"error":{"code":403,"errors":[{"reason":"insufficientPermissions"}]}}`},
+		"PATCH /calendars/primary/events/throttled":  {403, `{"error":{"code":403,"errors":[{"domain":"usageLimits","reason":"rateLimitExceeded","message":"Rate Limit Exceeded"}]}}`},
+		"PATCH /calendars/primary/events/daily":      {403, `{"error":{"code":403,"errors":[{"reason":"dailyLimitExceeded"}]}}`},
+		"PATCH /calendars/primary/events/notjson403": {403, `<html>forbidden</html>`},
+		"PATCH /calendars/primary/events/toomany":    {429, `{"error":{"code":429,"errors":[{"reason":"rateLimitExceeded"}]}}`},
+		"PATCH /calendars/primary/events/broken":     {500, `{"error":{"code":500}}`},
 	})
 	c := NewHTTPCalendarClient()
 	c.BaseURL = srv.URL
@@ -161,11 +166,22 @@ func TestCalendarMapsStatusesToSentinelErrors(t *testing.T) {
 	if err := c.PatchEvent(ctx, "t", "gone", sampleEvent()); !errors.Is(err, ErrNotFound) {
 		t.Errorf("404: err = %v, want ErrNotFound", err)
 	}
-	if err := c.PatchEvent(ctx, "t", "forbidden", sampleEvent()); !errors.Is(err, ErrReauthRequired) {
-		t.Errorf("403: err = %v, want ErrReauthRequired", err)
+	for _, id := range []string{"forbidden", "noscope", "notjson403"} {
+		if err := c.PatchEvent(ctx, "t", id, sampleEvent()); !errors.Is(err, ErrReauthRequired) {
+			t.Errorf("403 %s: err = %v, want ErrReauthRequired", id, err)
+		}
 	}
 	var up *UpstreamError
-	if err := c.PatchEvent(ctx, "t", "broken", sampleEvent()); !errors.As(err, &up) || up.Service != "calendar" {
-		t.Errorf("500: err = %v, want *UpstreamError{calendar}", err)
+	for _, tc := range []struct {
+		id     string
+		status int
+	}{{"throttled", 403}, {"daily", 403}, {"toomany", 429}, {"broken", 500}} {
+		err := c.PatchEvent(ctx, "t", tc.id, sampleEvent())
+		if !errors.As(err, &up) || up.Service != "calendar" || up.Status != tc.status {
+			t.Errorf("%s: err = %v, want *UpstreamError{calendar, %d}", tc.id, err, tc.status)
+		}
+		if errors.Is(err, ErrReauthRequired) {
+			t.Errorf("%s: a quota/throttle answer must never be reauth", tc.id)
+		}
 	}
 }

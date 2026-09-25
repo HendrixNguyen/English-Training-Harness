@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-25-run-01/containerised-deploy-dockerfiles-production-compose-runbook-.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-25-high-containerised-deploy-dockerfiles-production-compose-runbook-
 worktree: /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.worktrees/containerised-deploy-dockerfiles-production-compose-runbook-
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"

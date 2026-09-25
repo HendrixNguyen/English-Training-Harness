@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/providertimeout-of-30-s-makes-roadmap-generation-impossible-.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-25-high-providertimeout-of-30-s-makes-roadmap-generation-impossible-
 worktree: .worktrees/providertimeout-of-30-s-makes-roadmap-generation-impossible-
 pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/30"

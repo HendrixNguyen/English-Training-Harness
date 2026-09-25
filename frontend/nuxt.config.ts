@@ -4,6 +4,11 @@ export default defineNuxtConfig({
   // per-user, so there is nothing to render on a server (design §5).
   ssr: false,
   devtools: { enabled: false },
+  // Emit `login.html`, not `login/index.html`: a directory index makes
+  // Cloudflare Pages 308 `/login?code=…` to `/login/?code=…`, which broke every
+  // Google sign-in on the live host (2026-09-25). Pages serves `/login` from
+  // the flat file with no redirect; the Caddy image's try_files is unaffected.
+  nitro: { prerender: { autoSubfolderIndex: false } },
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/eslint', '@vite-pwa/nuxt'],
   components: [{ path: '~/components', pathPrefix: false }],
   css: [
