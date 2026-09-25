@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestGeminiSendsTheSpec62RequestAndReturnsTheFirstPart(t *testing.T) {
+func TestGeminiSendsTheSpec62RequestAndReturnsTheText(t *testing.T) {
 	var gotPath, gotKey, gotCT string
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +51,56 @@ func TestGeminiSendsTheSpec62RequestAndReturnsTheFirstPart(t *testing.T) {
 	if gen["response_mime_type"] != "application/json" || gen["temperature"] != 0.2 {
 		t.Errorf("generationConfig = %v, want application/json and 0.2", gen)
 	}
+	if gen["maxOutputTokens"] != float64(GeminiMaxOutputTokens) || GeminiMaxOutputTokens < 16384 {
+		t.Errorf("maxOutputTokens = %v, want %d (≥ 16384: 84 tasks with content)", gen["maxOutputTokens"], GeminiMaxOutputTokens)
+	}
+}
+
+func TestGeminiJoinsEveryPartOfTheFirstCandidate(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// The Generative Language API may split one candidate's answer across
+		// parts; a roadmap split mid-object is not JSON unless re-joined.
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"a\":1,"},{"text":"\"b\":2}"}]},"finishReason":"STOP"}]}`))
+	}))
+	defer srv.Close()
+	p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+	out, err := p.GenerateContent(context.Background(), "s", "u")
+	if err != nil {
+		t.Fatalf("GenerateContent: %v", err)
+	}
+	if out != `{"a":1,"b":2}` {
+		t.Fatalf("out = %q, want the two parts concatenated in order", out)
+	}
+}
+
+func TestGeminiNamesANonStopFinishReason(t *testing.T) {
+	cases := map[string]struct {
+		body    string
+		wantErr string // "" = success
+	}{
+		"no finishReason (older responses)": {`{"candidates":[{"content":{"parts":[{"text":"{}"}]}}]}`, ""},
+		"STOP":                              {`{"candidates":[{"content":{"parts":[{"text":"{}"}]},"finishReason":"STOP"}]}`, ""},
+		"MAX_TOKENS with partial text":      {`{"candidates":[{"content":{"parts":[{"text":"{\"title\":\"Road"}]},"finishReason":"MAX_TOKENS"}]}`, "MAX_TOKENS"},
+		"SAFETY":                            {`{"candidates":[{"content":{"parts":[{"text":""}]},"finishReason":"SAFETY"}]}`, "SAFETY"},
+		"RECITATION":                        {`{"candidates":[{"content":{"parts":[{"text":"x"}]},"finishReason":"RECITATION"}]}`, "RECITATION"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.body)) }))
+			defer srv.Close()
+			p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+			out, err := p.GenerateContent(context.Background(), "s", "u")
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("err = %v, want success", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) || !strings.Contains(err.Error(), "finishReason") {
+				t.Fatalf("err = %v (out %q), want an error naming finishReason %s", err, out, tc.wantErr)
+			}
+		})
+	}
 }
 
 func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
@@ -64,6 +114,7 @@ func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 		"empty candidates": {200, `{"candidates":[]}`, "empty"},
 		"empty parts":      {200, `{"candidates":[{"content":{"parts":[]}}]}`, "empty"},
 		"not json":         {200, `<html>`, "decoding"},
+		"prompt blocked":   {200, `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]},"candidates":[]}`, "blockReason SAFETY"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -19,6 +19,13 @@ const ProviderTimeout = 30 * time.Second
 const (
 	DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com"
 	DefaultGeminiModel   = "gemini-2.5-flash"
+
+	// GeminiMaxOutputTokens sizes the answer for the largest thing we ask for:
+	// a 28-day roadmap, 84 tasks each carrying content (word lists, passages,
+	// questions). Without it the model's default budget truncates long
+	// roadmaps, which ParseRoadmap then rejects as malformed JSON. 2.5-class
+	// models accept up to 65536; 32768 leaves headroom for typed content.
+	GeminiMaxOutputTokens = 32768
 )
 
 // GeminiProvider calls models/{model}:generateContent in JSON mode.
@@ -54,6 +61,7 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 		"generationConfig": map[string]any{
 			"response_mime_type": "application/json",
 			"temperature":        0.2,
+			"maxOutputTokens":    GeminiMaxOutputTokens,
 		},
 	}
 	body, err := postJSON(ctx, g.client, url, reqBody, map[string]string{"x-goog-api-key": g.apiKey})
@@ -68,15 +76,33 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 					Text string `json:"text"`
 				} `json:"parts"`
 			} `json:"content"`
+			FinishReason string `json:"finishReason"`
 		} `json:"candidates"`
+		PromptFeedback struct {
+			BlockReason string `json:"blockReason"`
+		} `json:"promptFeedback"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", fmt.Errorf("gemini: decoding response: %w", err)
 	}
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
+		if br := parsed.PromptFeedback.BlockReason; br != "" {
+			// The prompt itself was refused: the one fact an operator needs.
+			return "", fmt.Errorf("gemini: empty response: blockReason %s", br)
+		}
 		return "", fmt.Errorf("gemini: empty response")
 	}
-	return parsed.Candidates[0].Content.Parts[0].Text, nil
+	// STOP (or absent, on older responses) is the only complete answer. Anything
+	// else — MAX_TOKENS, SAFETY, RECITATION, … — would otherwise surface downstream
+	// as "ParseRoadmap: unexpected end of JSON input" and burn a paid retry.
+	if fr := parsed.Candidates[0].FinishReason; fr != "" && fr != "STOP" {
+		return "", fmt.Errorf("gemini: finishReason %s (answer incomplete or refused)", fr)
+	}
+	var sb strings.Builder
+	for _, part := range parsed.Candidates[0].Content.Parts {
+		sb.WriteString(part.Text)
+	}
+	return sb.String(), nil
 }
 
 // postJSON is shared by both providers: marshal, POST, require 2xx, return the
