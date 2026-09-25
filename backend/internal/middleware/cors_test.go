@@ -152,10 +152,10 @@ func TestParseOrigins(t *testing.T) {
 		{"ftp://app.example.com", nil, true},
 		{"", nil, true},
 		{" , ", nil, true},
-		{"https://app.example.com:443", nil, true},          // browsers omit the default port from Origin
+		{"https://app.example.com:443", nil, true}, // browsers omit the default port from Origin
 		{"http://localhost:80", nil, true},
-		{"https://*.up.railway.app", nil, true},             // no wildcards: list each preview origin
-		{"https://app.example.com.", nil, true},             // trailing-dot FQDN
+		{"https://*.up.railway.app", nil, true}, // no wildcards: list each preview origin
+		{"https://app.example.com.", nil, true}, // trailing-dot FQDN
 		{"https://app.example.com:8443", []string{"https://app.example.com:8443"}, false},
 		{"http://localhost:443", []string{"http://localhost:443"}, false}, // 443 is not http's default
 	} {
