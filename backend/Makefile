@@ -62,6 +62,9 @@ down:
 # internal/store destructively drops/recreates the schema around its own
 # tests, so running packages' test binaries in parallel (go test's default)
 # races. See .github/workflows/ci.yml's backend-integration job.
+# -race: three of these tests drive shared code from eight goroutines (pet
+# Ensure and PenaliseMiss, store Migrate) — the only place the real
+# repositories are exercised concurrently.
 .PHONY: test-integration
 test-integration:
-	go test ./... -count=1 -v -run Integration -p 1
+	go test ./... -count=1 -v -run Integration -p 1 -race

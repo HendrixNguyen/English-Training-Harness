@@ -103,7 +103,10 @@ jobs:
           # another's, so results become order- and timing-dependent. -p 1
           # runs one package's test binary at a time; within a package,
           # tests still run in their own declared order/parallelism.
-          go test ./... -count=1 -v -run Integration -p 1 2>&1 | tee integration.log
+          # -race: three of these tests drive shared code from eight goroutines
+          # (pet Ensure and PenaliseMiss, store Migrate) — the only place the
+          # real repositories are exercised concurrently.
+          go test ./... -count=1 -v -run Integration -p 1 -race 2>&1 | tee integration.log
           want=$(grep -rho '^func TestIntegration[A-Za-z0-9_]*' --include='*_test.go' . | wc -l | tr -d ' ')
           got=$(grep -c '^--- PASS: TestIntegration' integration.log || true)
           if grep -q '^--- SKIP' integration.log; then
