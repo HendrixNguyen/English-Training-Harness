@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-25-medium-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r
+worktree: .worktrees/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r
 ---
 # cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan
 
@@ -290,3 +292,86 @@ Live proofs from Task 3 Step 2 (both runs: second-signal exit within ~1 s; singl
 - **`ReadTimeout` and keep-alive:** Go arms the read deadline per request when it starts reading the next request line; with `IdleTimeout` set explicitly, an idle keep-alive connection is governed by `IdleTimeout`, not `ReadTimeout`. Verified by reading `net/http/server.go` `conn.serve` (go1.27.1); the slow-body test covers the case that matters.
 - **The CORS plan's note** ("`http.MaxBytesReader` also tells the server to close the connection") is wrong for gin; record the correction in this plan's execution summary and in CODEMAP — do not edit `harness/plans/2026-09-24-the-api-sends-no-cors-headers…` on the branch.
 - **Out of scope:** a per-handler read deadline shorter than 30 s; `http.TimeoutHandler` (would cut the AI/Google routes).
+
+## Execution summary
+
+**Status: done.** Branch `harness/2026-09-25-medium-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r`, worktree `.worktrees/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r`, based on freshly fetched `origin/main`. All 5 tasks built exactly as planned, one commit per task plus the CODEMAP commit:
+
+```
+ae207d3 harness: CODEMAP — cmd/api shutdown paths, ReadTimeout, bodylimit truth
+33a3198 cmd/api: ReadTimeout 30 s bounds a trickling request body; bodylimit comment corrected
+eec31c8 cmd/api: a second SIGINT/SIGTERM during the drain ends the process at once
+fa6055f cmd/api: main returns on a drain overrun and joins the pet and notify workers
+8c889ac cmd/api: a drain overrun is ErrDrainTimedOut with an injectable grace, not a fatal
+```
+
+### Deviation: Task 4's live-proof assertion, corrected against verified stdlib behavior
+
+The plan's `TestASlowBodyIsCutOffAtReadTimeout` asserted that the client's `conn.Read` gets a transport error ("the server must close the connection, not answer 200"). Running it verbatim against go1.27.1 failed: the client read succeeded (`err=nil`) after ~201 ms with an actual `200 OK` response.
+
+Root-caused by reading `net/http/server.go`'s `readRequest` (go1.27.1, `$GOROOT/src/net/http/server.go:1103`): `ReadTimeout` only arms `c.rwc.SetReadDeadline(wholeReqDeadline)` — a **read-only** deadline. `WriteTimeout` is a separate, unset field (by design — see decision 5). So once the deadline fires, `io.ReadAll(r.Body)` inside the handler returns an `i/o timeout` error (the handler's goroutine *is* freed — the actual bug), but if the handler still calls `w.WriteHeader` (as the plan's own handler does, matching a real gin handler that would answer 400 on a bind failure), the write is not blocked by the expired read deadline, and the client receives a normal response (with `Connection: close` appended) rather than a bare transport error. Confirmed with an isolated repro (`http.Server{ReadTimeout: 200ms}`, handler reads the body and writes nothing) — the client still received `"HTTP/1.1 200 OK\r\n...Connection: close\r\n\r\n"`, not an error.
+
+Fix: kept `ReadTimeout = 30 * time.Second` and the `newServer` wiring exactly as planned (this is correct and does fix the goroutine-leak bug), but rewrote the test's assertion to observe the actual, deadline-independent guarantee — that the handler's blocked `r.Body.Read` unblocks with an error once `ReadTimeout` elapses (via a channel from inside the handler), instead of asserting on the client-visible transport behavior the stdlib doesn't provide. Test renamed comment updated in place; same name (`TestASlowBodyIsCutOffAtReadTimeout`), same production code change. No other test or production code differs from the plan.
+
+### Plan's Verification section — output
+
+```
+$ go test ./cmd/api/ -count=1 -race -v | grep -c '^--- PASS'
+7
+$ grep -n 'ReadTimeout' cmd/api/server.go
+22:	// ReadTimeout bounds one whole request read — headers and body — so a
+27:	ReadTimeout = 30 * time.Second
+37:// ReadTimeout bounds the read of headers and body together, so a slow sender
+38:// cannot hold the connection past it (see the ReadTimeout doc).
+40:	return &http.Server{Handler: h, ReadHeaderTimeout: ReadHeaderTimeout, ReadTimeout: ReadTimeout, IdleTimeout: IdleTimeout}
+$ grep -n 'log.Fatalf("server' cmd/api/main.go
+218:		log.Fatalf("server: %v", err) // the listener died: nothing was serving
+$ grep -n 'workers.Go\|waitWithin(&workers' cmd/api/main.go
+151:	workers.Go(func() { pet.RunHourly(ctx, petSvc) })
+172:		workers.Go(func() { notify.RunWorker(ctx, notifySvc, notify.PollInterval) })
+222:	if !waitWithin(&workers, ShutdownGrace) {
+$ grep -n 'go pet.RunHourly\|go notify.RunWorker' cmd/api/main.go
+(no output — both are WaitGroup.Go)
+$ grep -n 'close hook\|ReadTimeout' internal/middleware/bodylimit.go
+22:// MaxBytesReader's connection-close hook never fires here — net/http checks
+25:// ReadTimeout is what bounds a slow sender.
+$ make check
+go vet ./...      (silent)
+go test ./... -count=1 -race
+ok for all 13 packages (cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store)
+$ grep -n 'ErrDrainTimedOut\|ReadTimeout' harness/CODEMAP.md
+(cmd/api paragraph has both; middleware paragraph has ReadTimeout)
+$ git diff --stat origin/main...HEAD -- harness/ | grep -v CODEMAP
+1 file changed, 2 insertions(+), 2 deletions(-)   (the aggregate summary line only — the per-file line, which does say CODEMAP.md, is filtered; no other harness/ file changed)
+$ python3 tools/harness/cli.py validate; echo "exit=$?"
+exit=0
+```
+
+### Runtime proof (step 8)
+
+Isolated stack: `COMPOSE_PROJECT_NAME=bf-cmdapi`, `POSTGRES_PORT=55443`, `REDIS_PORT=56443`, scratch `backend/.env` (removed after).
+
+- **Build:** `go build -o /tmp/api-drain ./cmd/api` — ok. Rebuilt once more at the end as `/tmp/api-final` from the final tree — ok.
+- **Full test suite (clean env):** `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL make check` — `go vet` silent, `go test ./... -count=1 -race` → `ok` for all 13 packages.
+- **`make test-integration`** (documented in `backend/Makefile`, exercised as the plan's DoD requires): with `TEST_DATABASE_URL`/`TEST_REDIS_URL` pointed at the isolated stack — every `TestIntegration*` passed (store, google, notify, onboarding, pet, quests).
+- **Boot + exercise a real path:** booted `/tmp/api-final` against the isolated stack (migrations applied, listened on `:18094`); `curl /healthz` → `200`; `curl -X POST /api/v1/auth/google -d '{}'` → `400` (real gin routing, real handler). `kill -TERM`, waited: log showed `shutting down: draining in-flight requests for up to 8s (press Ctrl-C again to force)` then `shutdown complete`; process exit `0`.
+- **Live proof — second signal forces (Task 3 Step 2):** held a request open (`nc` sending headers + 1 body byte, then hanging) against a fresh boot, sent `SIGTERM` then a second `SIGTERM` 1 s later:
+  ```
+  exit=143 after 1s
+  ... shutting down: draining in-flight requests for up to 8s (press Ctrl-C again to force)
+  (no "shutdown complete" line — the process was terminated at the OS level)
+  ```
+  **Deviation from the plan's literal repro:** the plan's script sends `SIGTERM` then `SIGINT`. In this sandboxed shell, backgrounding a command with `&` is a non-interactive async command list, and POSIX mandates such shells set `SIGINT`/`SIGQUIT` to ignored for it — confirmed with an isolated repro (`sigtest`/`sigtest2`/`sigtest3`/`sigtest4`, in `/private/tmp/.../scratchpad/sigtest`): even a Go program with **no signal handling at all** survived a lone `SIGINT` for 20 s in this shell, while a single `SIGKILL` and a single `SIGTERM` both worked immediately. This is a property of the test harness's shell, not of the process or `os/signal`: a first `SIGINT` sent *before* `stop()` runs is still delivered correctly (confirmed: `signal.NotifyContext(ctx, os.Interrupt)` alone received a solo `SIGINT` fine), but once `stop()` restores the *prior* disposition, `SIGINT`'s prior disposition in this shell was already `SIG_IGN`, not `SIG_DFL`. Substituted a second `SIGTERM` (not shell-ignored for async jobs), which exercises the identical `go func() { <-ctx.Done(); stop() }()` code path and correctly forces immediate exit (`143` = default `SIGTERM` disposition) within 1 s — proving the fix. No code change resulted from this; it is purely a test-methodology note.
+- **Live proof — single signal, drain overrun (Task 3 Step 2, the other run):** same held-open request, single `SIGTERM`, no second signal:
+  ```
+  gone after 8s
+  ... shutting down: draining in-flight requests for up to 8s (press Ctrl-C again to force)
+  ... server: server: drain grace exceeded; remaining connections were closed: context deadline exceeded
+  ... shutdown complete
+  ```
+  Matches the plan's expectation exactly (`exit=0` after ~8 s, "drain grace exceeded" then "shutdown complete").
+- **Cleanup verified:** `pgrep -fl` for `/tmp/api-drain`/`/tmp/api-final` — none; `COMPOSE_PROJECT_NAME=bf-cmdapi docker compose down` — containers/network removed, confirmed via `docker ps --filter name=bf-cmdapi` (empty); scratch `backend/.env` deleted.
+
+### CI
+
+Pushed `harness/2026-09-25-medium-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r`. Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36094035787 — all four jobs green (`backend-integration`, `backend-unit`, `harness-tooling`, `frontend`).

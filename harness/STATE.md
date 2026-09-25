@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 08:10. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 11:36. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -77,11 +77,6 @@ _none_
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high]
 - `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium]
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium]
-- `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan [medium]
-- `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan [medium]
-- `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan [medium]
-- `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium]
-- `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium]
 
 ## Executing
 
@@ -89,16 +84,16 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` — Secrets at rest and at boot: AES-256-GCM for `users.google_refresh_token`, and a `JWT_SECRET` that must be 32 bytes — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-get-quests-daily-still-reads-is-target-met-from-the-volatile.md` — quests + pet: the daily screen reads the durable flag, and every verdict write is one conditional SQL statement — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-geminiprovider-drops-every-response-part-after-the-first-so-.md` — GeminiProvider joins every response part, names a non-STOP finish reason, surfaces a safety block, and asks for enough output tokens — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api amend: make the drain test observe the drain — it must fail when `srv.Shutdown` is gone — Plan [high] (review: pass) (merged)
-- `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-23-the-miss-sweep-judges-the-day-from-volatile-redis-and-ignore.md` — pet: own the day's verdict — durable once-per-day success, a civil-date sweep, and a revival that resolves its day — Plan [medium] (review: pass-with-bugs) (merged)
 
 ## Failed
 
