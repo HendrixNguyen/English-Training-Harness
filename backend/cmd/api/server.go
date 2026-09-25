@@ -19,6 +19,12 @@ const (
 	// ReadHeaderTimeout caps how long a client may take to send request
 	// headers (slowloris). Request bodies are bounded per handler, not here.
 	ReadHeaderTimeout = 10 * time.Second
+	// ReadTimeout bounds one whole request read — headers and body — so a
+	// client that sends headers promptly and then trickles a body cannot hold a
+	// goroutine and a connection indefinitely (POST /auth/google needs no
+	// token). It bounds reads only: handler responses may still take
+	// google.SyncTimeout or several AI calls (see newServer on WriteTimeout).
+	ReadTimeout = 30 * time.Second
 	// IdleTimeout closes keep-alive connections that sit idle.
 	IdleTimeout = 120 * time.Second
 )
@@ -28,8 +34,10 @@ const (
 // to google.SyncTimeout (60 s) and an onboarding assessment may spend several
 // airouter.Route calls of up to len(FallbackOrder) × ProviderTimeout each; a
 // server-wide write deadline would cut those responses off mid-flight.
+// ReadTimeout bounds the read of headers and body together, so a slow sender
+// cannot hold the connection past it (see the ReadTimeout doc).
 func newServer(h http.Handler) *http.Server {
-	return &http.Server{Handler: h, ReadHeaderTimeout: ReadHeaderTimeout, IdleTimeout: IdleTimeout}
+	return &http.Server{Handler: h, ReadHeaderTimeout: ReadHeaderTimeout, ReadTimeout: ReadTimeout, IdleTimeout: IdleTimeout}
 }
 
 // ErrDrainTimedOut is serve's answer when in-flight requests outlive the grace:

@@ -18,6 +18,11 @@ const MaxBodyBytes int64 = 64 << 10
 // answers with 400 invalid_request — instead of being allocated. Mount it on
 // the /api/v1 group *before* the routes are registered: Gin copies a group's
 // middleware into each route at registration time.
+//
+// MaxBytesReader's connection-close hook never fires here — net/http checks
+// an unexported interface that gin's ResponseWriter does not satisfy — so an
+// over-limit request answers 400 on a connection that stays open; cmd/api's
+// ReadTimeout is what bounds a slow sender.
 func BodyLimit(max int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Body != nil {

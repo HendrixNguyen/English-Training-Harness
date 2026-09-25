@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -141,13 +143,67 @@ func TestServeReturnsErrDrainTimedOutAndClosesTheStragglerWhenTheGraceRunsOut(t 
 
 // WriteTimeout must stay unset: google.SyncTimeout (60 s) and onboarding's AI
 // calls legitimately outlive any sane server-wide write deadline.
-func TestNewServerBoundsHeaderReadsButNotWrites(t *testing.T) {
+func TestNewServerBoundsReadsButNotWrites(t *testing.T) {
 	srv := newServer(http.NotFoundHandler())
 	if srv.ReadHeaderTimeout <= 0 || srv.IdleTimeout <= 0 {
 		t.Fatalf("ReadHeaderTimeout/IdleTimeout unset: %+v", srv)
 	}
+	if srv.ReadTimeout != ReadTimeout || ReadTimeout <= 0 {
+		t.Fatalf("ReadTimeout = %s, want %s (see newServer doc)", srv.ReadTimeout, ReadTimeout)
+	}
 	if srv.WriteTimeout != 0 {
 		t.Fatalf("WriteTimeout = %s, want 0 (see newServer doc)", srv.WriteTimeout)
+	}
+}
+
+// A client that sends headers promptly and then trickles a body (or never
+// finishes it) must not hold a goroutine indefinitely: POST /api/v1/auth/google
+// needs no token, so anyone can open one. ReadTimeout bounds the whole read —
+// headers and body — so the handler's blocked r.Body.Read unblocks with an
+// i/o timeout once the deadline elapses, instead of waiting forever for the
+// rest of the body.
+//
+// Deviation from the plan's literal assertion: ReadTimeout only arms
+// net/http's *read* deadline (net/http/server.go readRequest:
+// `c.rwc.SetReadDeadline(wholeReqDeadline)`), never a write deadline. Verified
+// against go1.27.1: once the deadline fires, io.ReadAll(r.Body) returns an
+// error and the handler's goroutine is freed (the actual bug this task
+// fixes), but the connection itself is not force-closed — if the handler
+// still writes a response (as this test's handler does, matching a real
+// gin handler that would reply 400), the client receives it normally (with
+// `Connection: close` appended) rather than a bare transport error. So the
+// observable, deadline-independent guarantee is that the handler's read
+// unblocks — that is what this test asserts, instead of the plan's "read =
+// transport error, not 200" (a stdlib behavior the plan's snippet assumed
+// but net/http does not provide with ReadTimeout alone).
+func TestASlowBodyIsCutOffAtReadTimeout(t *testing.T) {
+	readErr := make(chan error, 1)
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		readErr <- err
+		w.WriteHeader(http.StatusOK)
+	})
+	ln := listen(t)
+	srv := newServer(h)
+	srv.ReadTimeout = 200 * time.Millisecond // production is 30 s; the deadline is what is under test
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go func() { _ = serve(ctx, srv, ln, ShutdownGrace) }()
+
+	conn, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	fmt.Fprint(conn, "POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\n{") // headers + 1 byte, then nothing
+
+	select {
+	case err := <-readErr:
+		if err == nil {
+			t.Fatal("handler's body read returned nil, want an i/o timeout once ReadTimeout elapses")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler's body read did not unblock within 2s of a 200ms ReadTimeout; the goroutine is held indefinitely")
 	}
 }
 
