@@ -155,4 +155,17 @@ describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
     expect(w.text()).toContain('Câu 10 / 10')
     expect(w.text()).not.toContain('Trình độ của bạn')
   })
+
+  it('says the grading and roadmap can take a minute or two while the POST is pending', async () => {
+    let finish!: (v: unknown) => void
+    api.post.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const w = mountPage()
+    await flushPromises()
+    await completeQuiz(w)
+    expect(w.text()).toContain('thường mất 1–2 phút')
+    finish(ASSESSED)
+    await flushPromises()
+    expect(w.text()).not.toContain('thường mất 1–2 phút')
+    expect(w.text()).toContain('C1')
+  })
 })

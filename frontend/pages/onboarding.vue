@@ -131,6 +131,9 @@ async function finish() {
         <AppButton class="mt-6" block :disabled="!answers[current.id]" :loading="loading" @click="next">
           {{ isLast ? 'Hoàn thành' : 'Tiếp tục' }}
         </AppButton>
+        <p v-if="loading && isLast" class="mt-3 text-center text-sm text-mute" role="status">
+          Đang chấm bài và soạn lộ trình 28 ngày — thường mất 1–2 phút. Đừng đóng trang.
+        </p>
       </template>
     </AppCard>
 
