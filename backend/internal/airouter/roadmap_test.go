@@ -17,7 +17,7 @@ func validRoadmapJSON(t *testing.T, mutate func(r *Roadmap)) string {
 		for d := 1; d <= DaysPerModule; d++ {
 			day := Day{Title: fmt.Sprintf("Day %d", (m-1)*DaysPerModule+d)}
 			for _, tt := range TaskTypes {
-				day.Tasks = append(day.Tasks, Task{Type: tt, Title: tt + " task", DurationMinutes: 10, Content: json.RawMessage(`{"items":[]}`)})
+				day.Tasks = append(day.Tasks, Task{Type: tt, Title: tt + " task", DurationMinutes: 10, Content: SampleContent(tt)})
 			}
 			mod.Days = append(mod.Days, day)
 		}
@@ -80,6 +80,7 @@ func TestParseRoadmapRejects(t *testing.T) {
 		"empty task title":    validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].Title = "" }),
 		"absurd duration":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].DurationMinutes = 120 }),
 		"bad cefr":            validRoadmapJSON(t, func(r *Roadmap) { r.CEFRLevel = "B7" }),
+		"free-form content":   validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[0].Tasks[2].Content = json.RawMessage(`{"items":[]}`) }),
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {

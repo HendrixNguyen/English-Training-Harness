@@ -66,9 +66,10 @@ func invalid(format string, args ...any) error {
 // ParseRoadmap decodes a model response strictly: no markdown fences or
 // preamble (§6.1 constraint 1), no trailing tokens, exactly 4 modules × 7 days
 // × 3 tasks with the three task types each present once, non-empty task
-// titles, durations within (0, 30] (a missing duration becomes 10), and a
-// valid cefr_level. Unknown extra fields are tolerated. Nothing is stripped or
-// repaired — a non-conforming answer is the caller's cue to retry.
+// titles, durations within (0, 30] (a missing duration becomes 10), a valid
+// cefr_level, and typed, bounded `content` per task (see content.go). Unknown
+// extra fields are tolerated. Nothing is stripped or repaired — a
+// non-conforming answer is the caller's cue to retry.
 func ParseRoadmap(raw string) (Roadmap, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -124,6 +125,9 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 				}
 				if task.DurationMinutes < 1 || task.DurationMinutes > maxTaskMinutes {
 					return Roadmap{}, invalid("module %d day %d task %d duration %d is outside 1..%d", mi+1, di+1, ti+1, task.DurationMinutes, maxTaskMinutes)
+				}
+				if err := validateContent(*task, fmt.Sprintf("module %d day %d task %d", mi+1, di+1, ti+1)); err != nil {
+					return Roadmap{}, err
 				}
 			}
 		}
