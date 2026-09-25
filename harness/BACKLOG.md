@@ -7,7 +7,6 @@ Not a queue. Nothing here is `proposed`, so the evaluator never sees it and `nex
 **Parked:** 2026-09-25 by the owner — "Dokploy will be used later; the free VPS split comes first."
 **Trigger:** the owner's bare-metal Dokploy server exists and the "Containerised deploy" idea (harness/ideas/2026-09-25-run-01) is merged.
 
----
 ### Continuous delivery to Dokploy: images to GHCR and a deploy webhook on merge to main
 
 ## Why
