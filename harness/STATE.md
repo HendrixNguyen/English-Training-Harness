@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 21:20. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 21:23. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,6 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — 59 of 84 roadmap tasks render as raw JSON and the other 25 as blank flashcards or option-less questions, so a learner cannot do a single task [high]
 - `harness/ideas/_inbox/a-non-uuid-exercise-id-on-post-quests-progress-answers-500-i.md` — A non-UUID exercise_id on POST quests progress answers 500 instead of 400 or 404 [low]
 - `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
 - `harness/ideas/_inbox/caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Caddyfile serves index.html with a one-year immutable cache for missing /_nuxt assets [medium]
@@ -35,7 +36,9 @@ _none_
 
 ## Proposed
 
-_none_
+- `harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task [high]
+- `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
+- `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion [high]
 
 ## Selected
 
