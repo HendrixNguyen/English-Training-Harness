@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 23:19. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 06:45. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,33 +13,19 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-- `harness/ideas/_inbox/59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — 59 of 84 roadmap tasks render as raw JSON and the other 25 as blank flashcards or option-less questions, so a learner cannot do a single task [high]
 - `harness/ideas/_inbox/a-non-uuid-exercise-id-on-post-quests-progress-answers-500-i.md` — A non-UUID exercise_id on POST quests progress answers 500 instead of 400 or 404 [low]
 - `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
-- `harness/ideas/_inbox/caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Caddyfile serves index.html with a one-year immutable cache for missing /_nuxt assets [medium]
-- `harness/ideas/_inbox/deploy-compose-yml-drops-the-ai-provider-base-url-and-model-.md` — deploy/compose.yml drops the AI provider base-URL and model variables the live deployment depends on [medium]
-- `harness/ideas/_inbox/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` — Deploy smoke checks the PWA seconds after upload, when Pages' edge still serves hashed assets as no-store, so a good ship reports failure [high]
-- `harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md` — Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS [high]
 - `harness/ideas/_inbox/executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — Executor worktree nested under .claude/worktrees while plan frontmatter names .worktrees/<slug> [low]
-- `harness/ideas/_inbox/frontend-dist-symlink-left-by-nuxi-generate-is-not-gitignore.md` — frontend/dist symlink left by nuxi generate is not gitignored [low]
 - `harness/ideas/_inbox/gemini-thinking-tokens-share-maxoutputtokens-so-the-32768-bu.md` — Gemini thinking tokens share maxOutputTokens so the 32768 budget does not prevent roadmap truncation [medium]
 - `harness/ideas/_inbox/geminiprovider-returns-an-empty-string-as-success-when-a-sto.md` — GeminiProvider returns an empty string as success when a STOP candidate has only empty-text parts [low]
 - `harness/ideas/_inbox/google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent [low]
 - `harness/ideas/_inbox/no-test-pins-a-409-from-calendar-events-patch-to-502-google-.md` — No test pins a 409 from Calendar events.patch to 502 google_unavailable [low]
-- `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
-- `harness/ideas/_inbox/parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — ParseRoadmap day-sum rejection has no test; the 90- and 9-minute day rows fail on the task band [high]
 - `harness/ideas/_inbox/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback [medium]
-- `harness/ideas/_inbox/smoke-api-sh-stops-at-the-first-unreachable-check-instead-of.md` — smoke-api.sh stops at the first unreachable check instead of reporting every check [low]
-- `harness/ideas/_inbox/task-4-follow-up-smoke-web-has-no-login-return-trip-check-an.md` — Task 4 follow-up: smoke-web has no /login return-trip check and the deploy runbook still says Pages needs no _headers [medium]
-- `harness/ideas/_inbox/testparseroadmaprejects-checks-only-that-an-error-occurred-s.md` — TestParseRoadmapRejects checks only that an error occurred, so a row can pass for the wrong reason [low]
 - `harness/ideas/_inbox/web-image-runs-caddy-as-root-and-reinstalls-npm-deps-on-ever.md` — Web image runs Caddy as root and reinstalls npm deps on every source change [low]
-- `harness/ideas/_inbox/week-2-provenance-assertion-in-testexercisesflattens-repeats.md` — Week-2 provenance assertion in TestExercisesFlattens repeats the day-number check [low]
 
 ## Proposed
 
-- `harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task [high]
-- `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
-- `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion [high]
+_none_
 
 ## Selected
 
@@ -47,8 +33,6 @@ _none_
 - `harness/ideas/2026-09-22-run-01/spaced-repetition-vocabulary-review-in-the-daily-quest.md` — Spaced Repetition Vocabulary Review in the Daily Quest [low]
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
 - `harness/ideas/2026-09-24-run-01/ai-graded-writing-practice-through-the-essay-grading-route.md` — AI-graded writing practice through the essay_grading route [medium]
-- `harness/ideas/2026-09-24-run-01/day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint: CEFR re-assessment and the next roadmap [medium]
-- `harness/ideas/2026-09-25-run-01/stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: sessions renew on use so a daily learner never sees the Google consent screen again [high]
 - `harness/ideas/_inbox/a-multi-day-sweep-outage-collapses-every-missed-day-into-one.md` — A multi-day sweep outage collapses every missed day into one penalty [medium]
 - `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
 - `harness/ideas/_inbox/a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` — A rejected CacheStorage delete now fails sign-in for a user who is already signed in [low]
@@ -93,10 +77,19 @@ _none_
 - `harness/plans/2026-09-25-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md` — Name your plant at onboarding and see it greet you by name on the hub — Plan [medium]
 - `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md` — pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan [medium]
 - `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium]
+- `harness/plans/2026-09-26-day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint (backend): `POST /api/v1/roadmaps/next` re-grades the level and replaces the roadmap; `GET /quests/daily` says `roadmap_complete` — Plan [medium]
+- `harness/plans/2026-09-26-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: `.infisical.json` in the repo, an "Env source of truth" runbook section, Railway sync by Infisical — Plan [medium]
 
 ## Approved
 
-_none_
+- `harness/plans/2026-09-26-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — Roadmap regeneration: `POST /api/v1/roadmaps/regenerate` replaces the active roadmap (optionally one CEFR step up or down) so a roadmap stored before the typed-content contract can be re-made — Plan [high]
+- `harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — Level-true content: the roadmap prompt carries a CEFR descriptor and the goal's register, and a deterministic placement floor stops a 10/10 learner being graded A2 — Plan [high]
+- `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` — Pages ship is honest: wait for the edge before the smoke check, no `404.html` on Pages so deep links answer 200, and the `/login` return-trip check — Plan [high]
+- `harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md` — Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan [high]
+- `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — airouter amend: `TestParseRoadmapRejects` proves the day-sum rule — rows only the day budget can reject, keyed by reason — Plan [high]
+- `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high]
+- `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan [high]
+- `harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan [medium]
 
 ## Executing
 
@@ -113,7 +106,7 @@ _none_
 - `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` — auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [high] (unreviewed)
 
 ## Failed
 

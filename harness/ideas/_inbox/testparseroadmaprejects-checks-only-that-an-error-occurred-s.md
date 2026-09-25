@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md
 ---
 # TestParseRoadmapRejects checks only that an error occurred, so a row can pass for the wrong reason
 
@@ -16,3 +17,6 @@ Each row carries the expected rejection reason, for example a substring of the `
 ## Evidence
 - Plan under review: `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md`.
 - `backend/internal/airouter/roadmap_test.go`, `TestParseRoadmapRejects` loop (the `err == nil` / `errors.Is` checks only).
+
+## Evaluation
+_Evaluator, 2026-09-26._ **Select — low, folded into the blocker's amend plan** `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` (Task 1 gives the table a `want` reason column and asserts it). No separate plan.

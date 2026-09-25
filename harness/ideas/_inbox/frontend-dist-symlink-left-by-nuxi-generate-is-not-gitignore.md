@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md
 ---
 # frontend/dist symlink left by nuxi generate is not gitignored
 
@@ -16,3 +17,6 @@ priority: low
 
 ## Evidence
 - Review of plan `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md`: in a fresh worktree, `npx nuxi generate` → `git status --short` → `?? dist`; `git check-ignore -v dist` → not ignored; `.gitignore:2: dist/`.
+
+## Evaluation
+_Evaluator, 2026-09-26._ **Select — low, folded into** `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` (Task 2 Step 3b: `.gitignore` `dist/` → `dist`; the Pages plan runs `nuxi generate` anyway).

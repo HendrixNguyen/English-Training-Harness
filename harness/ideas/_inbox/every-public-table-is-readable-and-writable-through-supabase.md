@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: human
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md
 ---
 # Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS
 
@@ -28,3 +29,14 @@ $ psql … -c "select grantee, count(*) from information_schema.role_table_grant
 anon|56  authenticated|56  service_role|56
 ```
 Supabase docs: https://supabase.com/docs/guides/database/postgres/row-level-security ; advisor lint `rls_disabled_in_public`: https://supabase.com/docs/guides/database/database-advisors?lint=0013_rls_disabled_in_public
+
+## Evaluation
+_Evaluator, 2026-09-26 — daily decide (bug queue, ranked #3: security)._
+
+**Select — high.**
+
+*Is the Why real?* Yes — Supabase exposes `public` through PostgREST with full grants to `anon`/`authenticated`, the owner verified 8 tables × 7 privileges, and the only thing standing between the anon key and `users` (encrypted refresh tokens) is the owner's hand-applied `ENABLE ROW LEVEL SECURITY`. The next `CREATE TABLE` reopens it. Security outranks tidiness (AGENTS.md standing priority).
+
+*Root cause.* `backend/internal/store/migrations/0001_init.up.sql` … `0003` create tables with no RLS and no grant changes; nothing in the repo knows Supabase's extra roles exist. The Go API connects as `postgres` (`rolbypassrls = t`) on Supabase and as the owner on plain Postgres, so enabling RLS with no policies is invisible to the app on both targets.
+
+*Smallest correct fix.* Migration `0004_rls` (the idea says `0002`; `0002`/`0003` exist) enabling RLS on all eight tables; a `DO $$` block revoking `anon`/`authenticated` grants only where those roles exist; a unit test enforcing the convention (every table any up-migration creates is RLS-enabled by some up-migration); the integration migration test asserting `pg_tables.rowsecurity` for all eight after `Migrate`; the spec DDL and runbook updated. One plan, ≈2.5 h.

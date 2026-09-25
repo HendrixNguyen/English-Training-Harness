@@ -18,3 +18,6 @@ A service- or handler-level test where `fakeCalendar` returns `ErrAlreadyExists`
 - `backend/internal/google/handler_test.go` on the plan branch: `TestSyncHandlerMapsAnUnconsumed409To502` (tasks fake only)
 - `backend/internal/google/service.go:92-100` (insert 409 → patch)
 - Idea: `harness/ideas/_inbox/every-google-409-now-becomes-500-internal-error-instead-of-5.md` *Expected output*
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Test-only gap on a merged branch; fold into the `google` plan above.

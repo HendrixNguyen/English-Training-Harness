@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-25-run-01
 priority: high
+plan: harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md
 ---
 # Stay signed in: sessions renew on use so a daily learner never sees the Google consent screen again
 
@@ -40,3 +41,5 @@ _Evaluator, 2026-09-25 — daily decide (two-cap rule, owner 2026-09-25: ≤5 bu
 *Achievable in one plan?* Yes, about a day: `Require` renews below half-life (new JWT, `SET` with full TTL, `X-Session-Token` + `X-Session-Expires-In` response headers), `middleware.CORS` exposes the two headers, `apiClient.ts` adopts the newest header and retries a `401` once after a renewal, the login page explains an expiry, backend spec §7 and CODEMAP updated. The single-session model stays as is (`signing-in-on-a-second-device…` is its own selected bug).
 
 *Why not today.* It rewrites `auth.Require` (`backend/internal/auth/middleware.go`), and today's approved bug plan `harness/plans/2026-09-25-auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md` rewrites the same function (401 vs 503 on the session read). Executor worktrees are cut from `origin/main`, so two branches editing that function on the same day would conflict in tonight's daily merge. Tomorrow's plan is written against the merged `Require`, with its renewal branch placed after the new 503 branch. Decisions for that plan: renew at < ½ `TokenTTL` remaining, at most once per half-life per user; the old token is invalid the moment the key is overwritten (byte-for-byte rule unchanged); the client always adopts the latest header; `prefers` nothing new on the wire body — headers only, so backend spec §6.1's body is untouched.
+
+_Evaluator, 2026-09-26 — planned today (first feature slot, as promised)._ The `auth-reports-postgres-and-redis-failures-as-401` branch is still **not** on `origin/main` (unreviewed), so the same-function conflict remains; the plan isolates the renewal in a new `renew.go` with a single call site in `Require` after the byte-for-byte check, so the eventual merge is a one-line conflict. The login-page copy is a frontend touch — design note requested from the designer.
