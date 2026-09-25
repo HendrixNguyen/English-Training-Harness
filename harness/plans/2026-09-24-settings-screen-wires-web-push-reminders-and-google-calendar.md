@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-24-run-01/settings-screen-wires-web-push-reminders-and-google-calendar.md
-status: approved
+status: done
 priority: medium
 merged: false
 design: harness/designs/settings.md
+branch: harness/2026-09-25-medium-settings-screen-wires-web-push-reminders-and-google-calendar
+worktree: .worktrees/settings-screen-wires-web-push-reminders-and-google-calendar
 ---
 # Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan
 
@@ -1005,3 +1007,28 @@ Expected: all four green; unit output lists `pushClient`, `settingsStore`, `useR
 
 - **Production inertness:** until `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` are set on Railway and `NUXT_PUBLIC_VAPID_PUBLIC_KEY` matches, the switch is hidden by design. CORS plan (2026-09-24) must be merged for the calls to work from the PWA origin.
 - **Follow-ups (not this ticket):** `GET /api/v1/settings` to prefill on a second device; a Playwright spec stubbing both routes; an unsubscribe endpoint if stale rows ever matter (today the server prunes on 404/410).
+
+## Execution summary
+
+Built exactly as planned, all 6 tasks, one commit each, in `.worktrees/settings-screen-wires-web-push-reminders-and-google-calendar` on branch `harness/2026-09-25-medium-settings-screen-wires-web-push-reminders-and-google-calendar` (dated today per skill step 4, not the plan header's 2026-09-24).
+
+**Deviations (all within plan intent, documented here per skill step 7):**
+1. `composables/useReminders.ts` — `pushManager().subscribe({ applicationServerKey: ... })` needed `as BufferSource` on the VAPID key bytes: TS 5.9.3's `lib.dom.d.ts` narrows `ArrayBufferView`'s `buffer` to `ArrayBuffer`, while `Uint8Array.from()` types its result as `Uint8Array<ArrayBufferLike>`. The runtime value is unchanged (still a plain `Uint8Array`); only the compile-time type needed narrowing, checked in `useReminders.test.ts`'s "subscribes with the VAPID key bytes" assertion, which reads the raw bytes at runtime and still passes.
+2. `tests/unit/useReminders.test.ts` — the plan's `win.Notification.permission = 'default'` line doesn't compile under strict TS (`permission` is `readonly` in `lib.dom`'s `Notification` interface); cast to `{ permission: NotificationPermission }` for that one assignment on the test fake.
+3. `pages/settings.vue` — added two lines resetting `settings.saveError`/`settings.syncError` to `null` synchronously in `<script setup>` (before first render, not in `onMounted`, so it lands before the template's first evaluation). Needed to make the plan's own "409 offers re-consent … 502 and 500 offer retry" test pass: that test re-mounts the page in place after a simulated Google re-consent hand-off, and without a reset the Pinia store (same active instance across the two mounts in one test) kept the prior `reauth_required` error, so the "Đồng bộ với Google" button was never found for the second mount. This also matches the design intent that a fresh visit to `/settings` shouldn't show a stale, unpersisted alert from an earlier session.
+
+No other deviation from the plan's file list, interfaces, or copy strings.
+
+**Verification (from `frontend/`, clean install):**
+```
+npm ci && npm run lint && npm run typecheck && npm run test:unit && npm run build
+```
+All four green. `npm run test:unit`: 20 files, 108 tests passed, including `pushClient` (6), `settingsStore` (7), `useReminders` (9), `settingsPage` (8), and the updated `onboardingPage` (8, with the new ghost-link assertion). `npm run build` produced `.output/public` + `.output/server` and the PWA service worker (52 precache entries) without warnings beyond the expected `Vue warn: Failed to resolve component: NuxtLink` in the onboarding test (harmless — `NuxtLink` isn't stubbed there and Vue still renders its slot text, which is what the assertion reads).
+
+**Runtime proof (step 8):**
+- Booted the real app: `npm run dev` on port 3143 (per orchestrator instructions), with a scratch `frontend/.env` (`NUXT_PUBLIC_API_BASE=http://localhost:8143`, `NUXT_PUBLIC_GOOGLE_CLIENT_ID=stub-client-id`, deleted afterwards, never committed — it's gitignored). `curl http://localhost:3143/` → 200, served the real Nuxt SPA shell with `<title>Học 30 phút</title>` and `window.__NUXT__.config.public` showing the wired runtime config (`apiBase`, `googleClientId`).
+- Interactive browser automation was denied in this unattended run (no human present to grant the Browser-pane permission prompt), so the real click-through path was exercised instead through `settingsPage.test.ts`, which mounts the actual `pages/settings.vue` + `AppSwitch`/`AppCard`/`AppButton`/`SpeechBubble` component tree and drives every design-doc state (`off`→`on` via a real switch click, time-change → "Lưu giờ nhắc" → `saveTime`, `denied`/`unsupported`/`no-key`, Google sync success/`409`/`502`/`500` including the re-consent button building the real `accounts.google.com` URL) through real DOM events — only the network layer (`useApi`) is mocked, matching this codebase's established test pattern (CODEMAP `shell`).
+- Ran a local stub of the two real endpoints (`backend spec §6.4`) on port 8143 (per orchestrator instructions: local stub acceptable since the real backend needs `VAPID_*`/Google secrets) and hit them with `curl` using the exact request bodies `stores/settings.ts` sends: `POST /api/v1/settings/notifications` with the flat `{notification_time, timezone, push_subscription:{endpoint,p256dh,auth}}` → `{status:"updated", notification_time, next_reminder_at}`; `POST /api/v1/integrations/google/sync` → `{status:"synced", calendar_event_id, tasks_created_count}`; a CORS preflight (`OPTIONS` with `Origin: http://localhost:3143`) → `204` with the right `Access-Control-Allow-*` headers. Confirms the wire contract end-to-end outside the mocked unit tests.
+- Cleanup: killed the dev server and stub API processes, deleted the scratch `frontend/.env`; `pgrep -fl "nuxi dev|stub-api.js"` → nothing running; `git status --short` in the worktree → clean. No Docker Compose was needed (frontend-only plan, no backend code touched).
+
+**CI:** pushed `harness/2026-09-25-medium-settings-screen-wires-web-push-reminders-and-google-calendar`; run green on all four jobs (`harness-tooling`, `backend-integration`, `backend-unit`, `frontend`): https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36108138415
