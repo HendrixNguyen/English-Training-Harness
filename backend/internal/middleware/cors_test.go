@@ -112,6 +112,30 @@ func TestTheEchoedOriginIsTheMatchedOneNeverAWildcardOrTheList(t *testing.T) {
 	}
 }
 
+func TestLookalikeOriginsGetNoCORSAndA403Preflight(t *testing.T) {
+	for _, origin := range []string{
+		"null",                             // opaque origin (sandboxed iframe, file://)
+		"https://app.example.com.evil.com", // suffix
+		"https://evilapp.example.com",      // prefix
+		"http://app.example.com",           // scheme downgrade
+		"https://app.example.com:443",      // explicit default port
+		"https://app.example.com/",         // trailing slash
+		"HTTPS://APP.EXAMPLE.COM",          // not what a browser sends; must not match either
+	} {
+		t.Run(origin, func(t *testing.T) {
+			r := newCORSRouter(t, app)
+			pre := do(t, r, http.MethodOptions, "/api/v1/quests/daily", map[string]string{"Origin": origin, "Access-Control-Request-Method": "GET"})
+			if pre.Code != http.StatusForbidden || pre.Header().Get("Access-Control-Allow-Origin") != "" {
+				t.Fatalf("preflight from %q: status %d, allow-origin %q; want 403 and none", origin, pre.Code, pre.Header().Get("Access-Control-Allow-Origin"))
+			}
+			act := do(t, r, http.MethodGet, "/api/v1/onboarding/quiz", map[string]string{"Origin": origin})
+			if act.Header().Get("Access-Control-Allow-Origin") != "" {
+				t.Fatalf("actual request from %q carried Allow-Origin %q", origin, act.Header().Get("Access-Control-Allow-Origin"))
+			}
+		})
+	}
+}
+
 func TestParseOrigins(t *testing.T) {
 	for _, tc := range []struct {
 		in   string
