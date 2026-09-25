@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 14:36. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 15:00. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,7 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-- `harness/ideas/_inbox/cloudflare-pages-serves-404-for-deep-links-and-no-cache-head.md` — Cloudflare Pages serves 404 for deep links and no-cache headers differ from the Caddy image, so smoke-web fails on the live site [medium]
+_none_
 
 ## Proposed
 
@@ -74,6 +74,7 @@ _none_
 
 ## Approved
 
+- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high]
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high]
 - `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium]
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium]

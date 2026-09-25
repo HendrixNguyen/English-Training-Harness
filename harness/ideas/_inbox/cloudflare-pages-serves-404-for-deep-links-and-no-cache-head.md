@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: human
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md
 ---
 # Cloudflare Pages serves 404 for deep links and no-cache headers differ from the Caddy image, so smoke-web fails on the live site
 
@@ -28,3 +29,16 @@ ok   hashed asset found: 1
 FAIL asset cache-control: expected 'public, max-age=31536000, immutable', got 'public, max-age=0, must-revalidate'
 ```
 Pages docs: `_redirects` and `_headers` files in the build output — https://developers.cloudflare.com/pages/configuration/redirects/ , https://developers.cloudflare.com/pages/configuration/headers/
+
+## Evaluation
+**Verdict: select, `priority: medium`, folded into the plan for `nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md`.**
+
+*Is the Why real?* Yes — the smoke output is first-hand (4 of 7 checks fail on the live Pages URL). The 404 status on deep links and the `max-age=0, must-revalidate` on hashed chunks are Pages defaults; the runbook's claim that Pages needs no `_headers` is wrong. Frontend spec §3 requires `sw.js`/manifest to be served fresh and assets long-cached; the Caddy image does it (`frontend/Caddyfile`), Pages does not.
+
+*Root cause (read-only):* `frontend/public/` holds only icons — there is no `_redirects` and no `_headers`, so Pages serves its defaults; `nuxi generate` emits `404.html`, which switches Pages out of its implicit SPA mode (Pages docs: without a top-level `404.html` it would fall back to `/`) and makes it answer unknown routes with that file and a 404 status.
+
+*Fix:* `frontend/public/_redirects` (`/*  /index.html  200`) and `frontend/public/_headers` (`/_nuxt/*` immutable; `/sw.js` and `/manifest.webmanifest` `no-cache`). Nuxt copies `public/` verbatim into `.output/public`; the Caddy image serves the two files as inert text and keeps its own rules, so Target B and the CI `docker-images` job are unchanged. The `_headers` values are copied from `frontend/Caddyfile` so the two hosts stay identical.
+
+*Why the same plan:* it is the same defect — the Pages target was declared equivalent to the Caddy image without being exercised — and the sign-in bug's `autoSubfolderIndex` change touches the same generate output. The runbook correction (`deploy/README.md` Target A) and the 7/7 smoke run are conditional on `deploy/` being present on the executor's base (see the head idea's Evaluation).
+
+*Priority rationale:* `medium` as filed — the app still renders behind the 404 and slow revalidation; it does not block a user the way the 308 does.
