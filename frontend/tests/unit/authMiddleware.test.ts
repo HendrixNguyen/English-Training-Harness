@@ -72,3 +72,39 @@ describe('middleware/auth.global — expired session (the daily sign-out path)',
     expect(navigateTo).not.toHaveBeenCalled()
   })
 })
+
+describe('middleware/auth.global — trailing slash from a static host (Pages 308 → /login/, fix 2026-09-25)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    navigateTo.mockReset()
+  })
+
+  it('treats /login/?code=…&state=… like /login: no redirect, no sign-out, so the Google code survives', async () => {
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    const login = { path: '/login/', query: { code: 'c', state: 's' } } as unknown as RouteLocationNormalized
+
+    guard(login, login)
+    await Promise.resolve()
+
+    expect(navigateTo).not.toHaveBeenCalled()
+    expect(await caches.has(API_STATE_CACHE)).toBe(true) // signOut() was not called
+  })
+
+  it('sends a signed-in user on /login/ home, exactly as on /login', () => {
+    persistSession(Date.now() + 60_000)
+    const login = { path: '/login/', query: {} } as RouteLocationNormalized
+
+    guard(login, login)
+
+    expect(navigateTo).toHaveBeenCalledWith('/', { replace: true })
+  })
+
+  it('still guards a protected route written with a trailing slash', () => {
+    const roadmap = { path: '/roadmap/', query: {} } as RouteLocationNormalized
+
+    guard(roadmap, roadmap)
+
+    expect(navigateTo).toHaveBeenCalledWith('/login', { replace: true })
+  })
+})
