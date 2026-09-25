@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 07:53. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 08:10. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -17,20 +17,16 @@ _none_
 
 ## Proposed
 
-- `harness/ideas/2026-09-25-run-01/growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub
-- `harness/ideas/2026-09-25-run-01/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md` — Name your plant at onboarding and see it greet you by name on the hub
-- `harness/ideas/2026-09-25-run-01/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion
-- `harness/ideas/2026-09-25-run-01/stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: sessions renew on use so a daily learner never sees the Google consent screen again
-- `harness/ideas/2026-09-25-run-01/task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost
+_none_
 
 ## Selected
 
 - `harness/ideas/2026-09-22-run-01/adaptive-reminder-timing-and-pre-decay-rescue-push.md` — Adaptive Reminder Timing and Pre-Decay Rescue Push [low]
-- `harness/ideas/2026-09-22-run-01/pet-streak-shield-earned-by-target-days.md` — Pet Streak Shield Earned by Target Days [medium]
 - `harness/ideas/2026-09-22-run-01/spaced-repetition-vocabulary-review-in-the-daily-quest.md` — Spaced Repetition Vocabulary Review in the Daily Quest [low]
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
 - `harness/ideas/2026-09-24-run-01/ai-graded-writing-practice-through-the-essay-grading-route.md` — AI-graded writing practice through the essay_grading route [medium]
 - `harness/ideas/2026-09-24-run-01/day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint: CEFR re-assessment and the next roadmap [medium]
+- `harness/ideas/2026-09-25-run-01/stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: sessions renew on use so a daily learner never sees the Google consent screen again [high]
 - `harness/ideas/_inbox/a-multi-day-sweep-outage-collapses-every-missed-day-into-one.md` — A multi-day sweep outage collapses every missed day into one penalty [medium]
 - `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
 - `harness/ideas/_inbox/a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` — A rejected CacheStorage delete now fails sign-in for a user who is already signed in [low]
@@ -71,10 +67,14 @@ _none_
 
 ## Planned (awaiting approval)
 
-_none_
+- `harness/plans/2026-09-25-growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub — Plan [medium]
+- `harness/plans/2026-09-25-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md` — Name your plant at onboarding and see it greet you by name on the hub — Plan [medium]
+- `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md` — pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan [medium]
+- `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium]
 
 ## Approved
 
+- `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high]
 - `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium]
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium]
 - `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md` — quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan [medium]
