@@ -63,6 +63,7 @@ async function completeQuiz(w: VueWrapper) {
 describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    localStorage.clear()
     api.get.mockReset()
     api.post.mockReset()
     navigateTo.mockReset()
@@ -97,6 +98,8 @@ describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
     })
     expect(w.text()).toContain('Trình độ của bạn: C1')
     expect(w.text()).toContain('Cây Thử đã nảy mầm')
+    expect(w.text()).toContain('Bật nhắc học và đồng bộ Google')
+    expect(JSON.parse(localStorage.getItem('aelp.settings')!).notificationTime).toBe('20:00')
   })
 
   it('names a 429 rate_limited honestly and keeps the learner on the quiz with their answers', async () => {

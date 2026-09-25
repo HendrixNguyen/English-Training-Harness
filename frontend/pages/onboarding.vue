@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useOnboardingApi, type AssessmentResponse, type QuizQuestion } from '~/composables/useOnboardingApi'
 import { useQuestStore } from '~/stores/quest'
+import { useSettingsStore } from '~/stores/settings'
 import { ApiError } from '~/utils/apiClient'
 
 const GOALS = [
@@ -19,6 +20,7 @@ function assessErrorMessage(e: unknown): string {
 
 const api = useOnboardingApi()
 const quest = useQuestStore()
+const settings = useSettingsStore()
 
 const step = ref<'goal' | 'quiz' | 'result'>('goal')
 const goal = ref<string | null>(null)
@@ -70,6 +72,7 @@ async function next() {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       answers: Object.entries(answers.value).map(([question_id, selected_option]) => ({ question_id, selected_option })),
     })
+    settings.rememberTime(time.value)
     step.value = 'result'
   } catch (e) {
     error.value = assessErrorMessage(e) // answers are kept
@@ -145,6 +148,9 @@ async function finish() {
       <AppButton class="mt-4" block @click="finish">
         Xem nhiệm vụ hôm nay
       </AppButton>
+      <NuxtLink to="/settings" class="mt-3 block text-sm text-mute underline-offset-2 hover:underline">
+        Bật nhắc học và đồng bộ Google →
+      </NuxtLink>
     </AppCard>
 
     <p v-if="error" class="mt-3 rounded-card border border-alert/40 bg-alert/10 px-4 py-3 text-sm text-alert" role="alert">
