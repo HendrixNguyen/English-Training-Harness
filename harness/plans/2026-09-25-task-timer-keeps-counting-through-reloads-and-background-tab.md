@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/task-timer-keeps-counting-through-reloads-and-background-tab.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-25-high-task-timer-keeps-counting-through-reloads-and-background-tab
+worktree: .worktrees/task-timer-keeps-counting-through-reloads-and-background-tab
 ---
 # Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan
 
@@ -220,3 +222,56 @@ Mutation checks (record each result, then revert):
 - **Multiple tabs.** Two tabs on the same task share one anchor via `aelp.timers`; the second tab's `startTimer` is a no-op on an existing key. Each tab's `complete()` clears the entry; a second post is rejected or double-counts exactly as it does today (not in scope).
 - **No `storage` event listener.** Cross-tab live sync is unnecessary for a countdown that is recomputed from the anchor on every tick and on focus.
 - **Backend spec §6.2, frontend spec §7.3 and `harness/designs/frontend-shell.md` §2.4** remain accurate; §2.4's "a re-entry resumes" is now true across reloads, which CODEMAP records.
+
+## Execution summary
+
+Built exactly as planned across all three tasks; no deviation from the file structure or design decisions.
+
+**Task 1** (`frontend/stores/quest.ts`, `frontend/tests/unit/questStore.test.ts`) — wrote the six new wall-clock/persistence cases plus the storage assertion added to the existing `complete` case, verbatim from the plan. Red confirmed first (`npm run test:unit -- questStore` → 7 failing: missing `TIMER_STORAGE_KEY`, `startTimer`'s third argument, `remainingSeconds` not a function). Implemented `Timer{startedAt,totalSeconds,date}`, `TIMER_STORAGE_KEY`, `storageOrNull`/`readTimers`/`writeTimers`, state `timers: readTimers()` + `nowMs: Date.now()`, and the `startTimer`/`tick`/`elapsedSeconds`/`remainingSeconds`/`pruneTimers` actions exactly as specified. One small deviation from the literal code block: `elapsedSeconds`/`remainingSeconds` take `now?: number` and resolve `now ?? this.nowMs` inside the body instead of a `now = this.nowMs` default parameter — TS reports `TS2683 'this' implicitly has type 'any'` on a default-parameter expression that references `this` inside a Pinia options-API action; the resolved-inside-body form is typecheck-clean and behaviorally identical. `load()` calls `this.pruneTimers()` right after assigning `this.daily`; `complete()` adds `writeTimers(this.timers)` after the existing `Reflect.deleteProperty`. 10/10 tests green.
+
+**Task 2** (`frontend/pages/learn/[id].vue`, `frontend/tests/unit/learnPage.test.ts`, new) — wrote `learnPage.test.ts` per the plan (`vi.stubGlobal('useRoute', …)` / `vi.stubGlobal('navigateTo', …)` before importing the page; `AppButton`/`AppCard`/`ContentViewer`/`CountdownTimer`/`StateBlock` registered). Red confirmed (`NaN:NaN`, `remainingSeconds` gone). Implemented `remaining = computed(() => quest.remainingSeconds(id.value))`, `sync()` calling `quest.tick()` wired to both `visibilitychange` and `focus` (added/removed in `onMounted`/`onBeforeUnmount`), `buttonLabel`'s gate changed to `timer.value && remaining.value === 0`, `complete()` posts `quest.elapsedSeconds(task.value.id, Date.now())`, and the button's `:disabled` becomes `task.is_completed || !online || (!finished && (!timer || remaining !== 0))`. Test file deviation: `ContentViewer`'s own inner button also renders the text "Hoàn thành" for the raw-content fallback branch (`content_json: {}`), so `w.findAll('button').find(b => b.text().includes('Hoàn thành'))` was ambiguous — resolved by selecting the page's own button via `w.find('button.mt-4')` (the class Vue's attrs-fallthrough merges onto `AppButton`'s root element), a test-only fix not mentioned in the plan. 2/2 tests green.
+
+Folding note (per the plan's Step 4): `npm run typecheck` failed after Task 1 alone (`pages/learn/[id].vue` still referenced `Timer.remainingSeconds`), so Task 2's Step 3 was done in the same commit as Task 1, as the plan anticipated.
+
+**Task 3** (`harness/CODEMAP.md`) — replaced the `stores/quest.ts` clause in the `shell` paragraph with the plan's exact wording naming the wall-clock anchor, `localStorage['aelp.timers']`, pruning, and the `/learn/:id` resync. `cli.py validate` exit 0. No other `harness/` file touched.
+
+**Verification (from `frontend/`, clean shell):**
+```
+npm run lint && npm run typecheck && npm run test:unit
+# ESLint: No issues found; nuxi typecheck: no errors; 17 files / 85 tests passed
+grep -c '^  it(' tests/unit/questStore.test.ts   → 10
+grep -c '^  it(' tests/unit/learnPage.test.ts    → 2
+grep -n "aelp.timers" stores/quest.ts            → 2 lines, not the plan's expected 1 — see Notes below
+grep -c 'remainingSeconds' stores/quest.ts       → 1
+grep -n 'Date.now()' stores/quest.ts             → 3 lines (nowMs, startTimer default, tick default)
+grep -n 'setInterval\|visibilitychange\|focus' "pages/learn/[id].vue"  → 6 lines
+grep -n 'elapsedSeconds(task.value.id, Date.now())' "pages/learn/[id].vue"  → 1 line
+grep -c "remainingSeconds" components/learn/CountdownTimer.vue  → 3 (file unchanged)
+git diff --stat origin/main...HEAD -- backend/ frontend/stores/pet.ts frontend/utils/progress.ts  → no output
+git diff --stat origin/main...HEAD -- harness/ | grep -v CODEMAP  → no output
+grep -c "aelp.timers" harness/CODEMAP.md  → 1
+python3 tools/harness/cli.py validate; echo exit=$?  → exit=0
+```
+
+**Note on the one grep mismatch:** the plan's verification expects `grep -n "aelp.timers" stores/quest.ts` to return exactly 1 line, but it returns 2 — the plan's own Step 3 code block specifies a doc-comment on `startTimer` that itself contains the literal string "aelp.timers" (`/** Idempotent: … across reloads via aelp.timers. … */`), in addition to the `TIMER_STORAGE_KEY` line. Both lines were copied verbatim from the plan's prescribed code, so this is an inconsistency inside the plan's own verification script, not a deviation in the implementation — flagging rather than silently "fixing" it by rewording the plan's specified comment.
+
+**Mutation checks (all four, run and reverted; working tree confirmed clean via `git diff --stat`/`git status` after each):**
+1. `elapsedSeconds`: replaced the real delta with `this.nowMs === at ? 0 : Math.max(0, Math.floor((at - t.startedAt) / 1000))` → the wall-clock case's 20-tick assertion (`expect(q.elapsedSeconds('ex-2')).toBe(18)`) failed (got `0`). Reverted.
+2. Deleted `this.pruneTimers()` from `load()` → both "load drops a timer…" cases failed (`ex-1`/other-day entries survived). Reverted.
+3. Deleted `writeTimers(this.timers)` from `complete()` → the `complete posts the §6.2 body…` storage assertion failed (`localStorage.getItem(TIMER_STORAGE_KEY)` stayed non-empty instead of `'{}'`). Reverted.
+4. Removed the `visibilitychange` listener registration in `[id].vue` → both `learnPage` cases failed (label never flips, `api.post` never called since the button stayed disabled). Reverted.
+
+**Runtime proof (Definition of done, step 8):**
+- Build: `npm run build` → exit 0, "✨ Build complete!" (Nitro `node-server` preset, `.output/server/index.mjs`).
+- Whole suite, clean shell: `npm run test:unit` → 17 files / 85 tests passed (not just this plan's new tests).
+- Real end-to-end path, real browser, no mocks: built the app, ran `PORT=3141 HOST=127.0.0.1 NUXT_PUBLIC_API_BASE=http://127.0.0.1:8199 node .output/server/index.mjs`, and a local Python stub HTTP server on port 8199 answering `GET /api/v1/quests/daily` (one task, `duration_minutes: 3`) and `POST /api/v1/quests/progress` (logs the posted body). Seeded `localStorage['aelp.auth']` in a real Chromium tab, navigated to `/learn/ex-2`:
+  1. Countdown rendered `02:57` on load, ticked down to `02:41` after 16 real seconds — the interval works against the real wall clock.
+  2. Full page navigation (simulated reload) to the same URL showed `02:34`, continuing from the real elapsed time rather than resetting to `03:00` — confirmed by reading `localStorage['aelp.timers']`, whose `startedAt` stayed fixed across the reload.
+  3. Rewrote `startedAt` in `localStorage` to 15 minutes in the past (simulating a PWA resumed long after suspension) and reloaded: the countdown showed `00:00` in the alert color and the button read "Hết giờ — Hoàn thành", enabled, on the very first render after reload — screenshot taken.
+  4. Clicked the button: the stub server's request log recorded `{"exercise_id": "ex-2", "duration_seconds": 917}` — the real elapsed wall-clock time, not the clamped 180s task duration — and the app navigated to `/`; `localStorage['aelp.timers']` was `'{}'` afterward.
+- Documented commands: `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build` all ran as documented in a clean shell, all exit 0.
+- Cleanup: `pkill` on both the Nitro server and the Python stub; `pgrep -fl` for both and `lsof -iTCP:3141`/`lsof -iTCP:8199` all confirmed empty afterward. Browser tab closed.
+
+**Push and CI:** pushed `harness/2026-09-25-high-task-timer-keeps-counting-through-reloads-and-background-tab`. No PR opened (daily-PR rule). CI run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36106803353 — `backend-unit`, `backend-integration`, `frontend`, `harness-tooling` all green.
+
+**Note (orchestrator overrides for this run):** per instructions, skipped the lock/unlock step (orchestrator holds the plan lock) and did not run `cli.py state` or `git commit` in ROOT — only `cli.py set` and this summary were applied to ROOT's copy of the plan.

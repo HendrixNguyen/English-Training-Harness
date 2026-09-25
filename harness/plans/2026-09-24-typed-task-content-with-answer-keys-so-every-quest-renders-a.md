@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-24-run-01/typed-task-content-with-answer-keys-so-every-quest-renders-a.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-25-medium-typed-task-content-with-answer-keys-so-every-quest-renders-a
+worktree: .worktrees/typed-task-content-with-answer-keys-so-every-quest-renders-a
 ---
 # Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan
 
@@ -477,3 +479,39 @@ Expected: no gofmt output; `ok …/internal/airouter`; whole backend PASS. Push;
 - **Part 2 (frontend)** — a separate plan after this merges: `utils/content.ts` gains typed branches (`reading` shows the passage; questions grade locally against `answer`, show `explanation`, end with "4/5"); decide then whether a score is persisted (new `daily_progress` field or `exercises` column + spec DDL) — nothing here forecloses either.
 - Larger answers: Bug ticket B3 (Gemini `maxOutputTokens 32768`) makes this safer; if `ai_bad_output` rates rise after both land, the first knob is `MaxPracticeQuestions`/passage length, the second is the model.
 - Spaced repetition (`spaced-repetition-vocabulary-review…`, selected low) can now key on `words[].term`; re-rank it after this merges.
+
+## Execution summary
+
+Built exactly per plan: Tasks 1–5 implemented and committed one per plan step, no deviations from the interfaces, bounds, or file structure specified. Branch derived per skill step 4 using today's date (2026-09-25) rather than the plan header's 2026-09-24: `harness/2026-09-25-medium-typed-task-content-with-answer-keys-so-every-quest-renders-a`. One extra commit beyond the plan's five: `gofmt -w` had reformatted the long `cases := map[string]Task{...}` literal in Task 2's rejection table after the initial commit (multi-line struct literals gofmt normally collapses only when they fit; this one didn't) — committed separately as "airouter: gofmt content_test.go" rather than silently amending. `origin/main` did not yet have Bug ticket B2 when the worktree was cut, so the plan's conflict-note merge step was not needed.
+
+**Plan verification (as specified):**
+```
+$ cd backend && gofmt -l . ; go vet ./... && go test -timeout 120s ./internal/airouter -count=1 -run 'Content|Schema|ParseRoadmap' -v 2>&1 | grep -E '^(--- FAIL|ok|FAIL)'
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter	0.414s
+
+$ go test -timeout 300s ./...
+ok  	.../backend/cmd/api
+ok  	.../backend/internal/airouter
+ok  	.../backend/internal/auth
+ok  	.../backend/internal/config
+ok  	.../backend/internal/google
+ok  	.../backend/internal/health
+ok  	.../backend/internal/middleware
+ok  	.../backend/internal/notify
+ok  	.../backend/internal/onboarding
+ok  	.../backend/internal/pet
+ok  	.../backend/internal/quests
+ok  	.../backend/internal/secrets
+ok  	.../backend/internal/store
+```
+No gofmt output; whole backend PASS.
+
+**Runtime proof (Definition of done, step 8):**
+1. **Build** — `go build -o /tmp/typed-content-api ./cmd/api` — clean, no errors/warnings.
+2. **Whole suite, clean shell** — `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL -u GEMINI_API_KEY -u OPENAI_API_KEY -u DEEPSEEK_API_KEY -u JWT_SECRET -u ENCRYPTION_SECRET_KEY -u GOOGLE_CLIENT_ID -u GOOGLE_CLIENT_SECRET go test -timeout 300s ./... -count=1` — all 13 packages `ok`. Also ran `make check` (CI's exact `fmt-check && vet && go test ./... -count=1 -race`) — green.
+3. **Boots and answers** — scratch `backend/.env` with `COMPOSE_PROJECT_NAME=typed-content`, `POSTGRES_PORT=55442`, `REDIS_PORT=56442`, `PORT=8142`; `docker compose up -d --wait --wait-timeout 120` (project `typed-content` only); built binary run with those vars — logged `migrations applied: [0001_init 0002_google_sync 0003_pet_verdict_dates]` then `listening on [::]:8142`. `curl --max-time 10 http://localhost:8142/healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`. `curl .../api/v1/onboarding/quiz` → `401 {"error":"unauthorized"}` (correct — no session), proving routing/middleware live.
+4. **Documented commands** — `make check` (green, above); `make test-integration` with `TEST_DATABASE_URL=postgres://english:english@localhost:55442/...` / `TEST_REDIS_URL=redis://localhost:56442/0` pointed at the scratch stack — all Integration tests passed, including `TestIntegrationSaveAssessmentPersists84ExercisesAndDeactivatesPrevious` in `internal/onboarding`, which exercises exactly the fixture this plan changed (`fixtureRoadmap` → `airouter.SampleContent`) end to end against a live Postgres. No GEMINI/OPENAI/DEEPSEEK key was available in this environment, so the plan's *optional* live `POST /onboarding/assessment` + `psql` check was not run; `/healthz` plus the onboarding integration test are the real path exercised instead.
+5. **CI on the branch** — green, all 4 jobs (`harness-tooling`, `backend-unit`, `frontend`, `backend-integration`): https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36106459659
+6. **Cleanup** — killed the app process (`pgrep -fl typed-content-api` empty afterward), `docker compose down` for project `typed-content` (`docker ps --filter name=typed-content` empty afterward), deleted the scratch `backend/.env`; `git status --short` in the worktree clean before pushing.
+
+**Branch:** `harness/2026-09-25-medium-typed-task-content-with-answer-keys-so-every-quest-renders-a` — pushed, no PR opened.
