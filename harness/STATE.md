@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 15:00. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 15:12. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -74,7 +74,6 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high]
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high]
 - `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium]
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium]
@@ -90,6 +89,7 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high] (unreviewed)
 - `harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan [high] (unreviewed)
 - `harness/plans/2026-09-24-the-api-sends-no-cors-headers-so-the-deployed-pwa-on-its-own.md` — API edge: a CORS allow-list for the PWA's origin, bounded request bodies, and a `/healthz` that names no secrets — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` — ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan [medium] (unreviewed)
@@ -99,7 +99,6 @@ _none_
 - `harness/plans/2026-09-24-every-google-403-becomes-409-reauth-required-so-a-quota-erro.md` — Google sync: quota 403s stop forcing re-consent, unconsumed 409s stop surfacing as 500, and the route logs what Google said — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-24-cmd-api-drain-test-passes-with-srv-shutdown-deleted-so-the-s.md` — cmd/api amend: make the drain test observe the drain — it must fail when `srv.Shutdown` is gone — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-24-ci-never-runs-gofmt-so-three-files-on-main-are-unformatted-a.md` — CI: a `gofmt` gate and the race detector in `backend-unit` — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-24-a-cleared-reminder-time-field-dead-ends-onboarding-on-an-opa.md` — frontend: close the 2026-09-23 review follow-ups on `/onboarding`, sign-in and `/revive` — Plan [medium] (review: pass-with-bugs) (merged)
 
 ## Failed
 

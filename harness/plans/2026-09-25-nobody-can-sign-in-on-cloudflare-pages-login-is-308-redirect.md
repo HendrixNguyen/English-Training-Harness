@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-25-high-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
+worktree: .worktrees/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
 ---
 # Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan
 
@@ -260,3 +262,79 @@ The proof on the live host is the owner's (no cloud accounts for agents): after 
 - **`_redirects` `/*` and real files.** The Pages docs do not spell out asset-vs-rewrite precedence; the `/* /index.html 200` rewrite is Cloudflare's documented SPA idiom and is what the folded idea's owner asked for. If the owner's live smoke shows a real file (`/login`, a `/_nuxt/*.js`) being answered with `index.html`, the fallback is to drop `_redirects` and instead delete `404.html` from the generate output (Pages then falls into its implicit SPA mode) — a follow-up inbox item, not a change to this plan.
 - **Caddy image unchanged.** `try_files {path} /index.html` serves `login.html` for `/login` only because Caddy's `try_files` tries `{path}` literally — `/login` is not a file, so it falls to `index.html`, which is the SPA shell and renders the login page as before. Behaviour is identical to today; `_redirects`/`_headers` are served as plain files if requested and nothing links to them.
 - **Out of scope:** the e2e `tests/e2e/login.spec.ts` (Playwright, local-only), Google Console settings (owner), any change to `pages/login.vue`'s `redirectUri` (it is already `origin + '/login'`, which is the correct flat path).
+
+## Execution summary
+
+Built in `.worktrees/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect` on branch `harness/2026-09-25-high-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect`, based on freshly fetched `origin/main` (`959cb5f`). All tasks executed task-by-task with tests first, one commit per task:
+
+- `5a9dd2b` — Task 1: `normalisePath()` in `middleware/auth.global.ts`; 3 new tests in `authMiddleware.test.ts`.
+- `b20bf3f` — Task 2: `nitro.prerender.autoSubfolderIndex: false` in `nuxt.config.ts`.
+- `88e7c4a` — Task 3: `frontend/public/_redirects` and `frontend/public/_headers`.
+- `3b51a45` — Task 5: `harness/CODEMAP.md` shell bullet updated (the only `harness/` file touched on the branch).
+
+**Deviations:**
+- **Task 4 skipped**, exactly per the plan's conditional: `test -f deploy/smoke-web.sh` was false on this base (`git ls-tree origin/main deploy` is empty — the containerised-deploy branch carrying it has not merged yet). Not improvised, nothing merged or cherry-picked from that branch.
+- **Development worktree location**: the orchestrator's instruction specified `WT=/Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.worktrees/$SLUG` (a sibling of the main checkout). This session's sandbox only permits edits inside its own worktree subtree (`.claude/worktrees/harness-daily-execute-154026/…`), so the executor worktree was created nested at `.claude/worktrees/harness-daily-execute-154026/.worktrees/$SLUG` instead — still branched from the same freshly fetched `origin/main` commit (`959cb5f`), matching what other concurrent sessions in this repo already do. The plan's `worktree` frontmatter reflects this nested path.
+- **`frontend/Caddyfile` not present on this base** (same non-merge as `deploy/`), so the `_redirects`/`_headers` values could not be independently diffed against it; they were written verbatim from the plan's own Step 1/Step 2 content blocks, which the plan states are copies of the Caddyfile values.
+
+**Plan Verification section — full output:**
+```
+$ npm run lint && npm run typecheck && npm run test:unit 2>&1 | tail -4
+ESLint: No issues found
+typecheck: clean (nuxi typecheck)
+Test Files  16 passed (16)
+     Tests  81 passed (81)
+
+$ npx vitest run tests/unit/authMiddleware.test.ts --reporter=verbose 2>&1 | grep -E 'trailing slash|passed'
+✓ … middleware/auth.global — trailing slash from a static host (Pages 308 → /login/, fix 2026-09-25) > treats /login/?code=…&state=… like /login … (x3)
+Test Files  1 passed (1)
+     Tests  7 passed (7)
+
+$ grep -n 'normalisePath(to.path)' middleware/auth.global.ts
+15:  if (normalisePath(to.path) === '/login') {
+
+$ grep -n 'autoSubfolderIndex: false' nuxt.config.ts
+11:  nitro: { prerender: { autoSubfolderIndex: false } },
+
+$ npm run build >/dev/null 2>&1 && echo build-ok
+build-ok
+
+$ rm -rf .output && npx nuxi generate >/dev/null 2>&1
+$ find .output/public -maxdepth 2 -name '*.html' | sort
+200.html 404.html index.html login.html onboarding.html revive.html roadmap.html settings.html
+(no */index.html)
+
+$ test ! -d .output/public/login && echo no-login-dir
+no-login-dir
+
+$ diff public/_redirects .output/public/_redirects && diff public/_headers .output/public/_headers && echo copied
+copied
+
+$ grep -c '_redirects\|_headers' .output/public/sw.js
+0
+
+$ git status --short | grep -c '^?? .output' ; true
+0
+
+$ cd .. ; test -f deploy/smoke-web.sh || echo 'Task 4 skipped: deploy/ not on base'
+Task 4 skipped: deploy/ not on base
+
+$ git diff --stat origin/main...HEAD -- harness/
+harness/CODEMAP.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+(only CODEMAP.md changed)
+
+$ python3 tools/harness/cli.py validate; echo "exit=$?"
+exit=0
+
+$ gh run list --branch harness/2026-09-25-high-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect --limit 1
+CI · 36111481381 — all 4 jobs green (harness-tooling, frontend, backend-integration, backend-unit)
+```
+
+**Runtime proof (harness-execute step 8 / executor role definition-of-done, frontend layer):**
+- Build: `npm run build` → `build-ok`, no errors/warnings introduced.
+- Whole suite (not just new tests): `npm run test:unit` → 16 files, 81 passed, from a clean `npm ci` install.
+- Boot and answer a real path: `rm -rf .output dist && npx nuxi generate`, then `python3 -m http.server 18091 --directory .output/public &`; `curl -s --max-time 5 -o /tmp/login_resp.html -w "HTTP_STATUS:%{http_code}"  http://127.0.0.1:18091/login.html` → `HTTP_STATUS:200`, body is the Nuxt app shell (`<title>Học 30 phút</title>`). `.output/public/login/` does not exist (`no-login-dir-confirmed`); `.output/public/_redirects` and `.output/public/_headers` are present (228 B / 247 B). Server killed afterward; `pgrep -fl "http.server"` confirmed empty — no leftover process.
+- Every documented command run as documented: all commands in the plan's Verification block above, run verbatim, in this worktree.
+- CI green on the branch: run `36111481381`, https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36111481381 — `harness-tooling`, `frontend`, `backend-integration`, `backend-unit` all passed.
+- No backend boot was needed (frontend-only plan); no cloud accounts used. The live-host proof (`curl` against `https://english-learning-e6a.pages.dev`) is explicitly the owner's, per the plan, and was not attempted here.
