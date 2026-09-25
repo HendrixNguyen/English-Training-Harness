@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 15:12. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 15:16. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,7 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
 
 ## Proposed
 
