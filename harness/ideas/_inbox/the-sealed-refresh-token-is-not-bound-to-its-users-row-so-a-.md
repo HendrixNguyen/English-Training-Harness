@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -19,3 +19,8 @@ priority: low
 - Plan: `harness/plans/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md` (review: `harness/reviews/2026-09-24-google-refresh-token-is-stored-in-plaintext-backend-spec-7-r.md`).
 - `backend/internal/secrets/secrets.go:71`: `b.aead.Seal(nonce, nonce, []byte(plain), nil)`, and `:86` `b.aead.Open(nil, raw[:n], raw[n:], nil)`. The AAD is nil in both.
 - `backend/internal/google/token.go:41`: `refreshTokenSQL` reads only the ciphertext by `id`, with nothing that ties it to the row.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Confirmed on `main`: `secrets.Box.Seal`/`Open` pass `nil` AAD. It is a genuine defence-in-depth gap (an attacker who can write `users` but has no key can transplant a ciphertext), but the precondition is already a database write compromise, and the fix needs a `v2:` format with a compatibility path for `v1:` rows. Decision recorded for the plan: AAD = `google_id`, `v2:` prefix, `Open` accepts both, a moved-row test. Plan it together with the sealing-test gaps (`refresh-token-sealing-tests-miss-the-sealer-error-path-and-a.md`) as one `secrets`/`auth` branch on a day the `auth` package is otherwise quiet — today's auth error-mapping plan touches `repo.go`'s neighbours.

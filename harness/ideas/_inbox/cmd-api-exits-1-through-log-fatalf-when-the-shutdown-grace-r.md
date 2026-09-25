@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md
 ---
 # cmd/api exits 1 through log.Fatalf when the shutdown grace runs out, skipping the deferred pg and rdb Close
 
@@ -47,3 +48,8 @@ not lost work. It is still an Expected-output item the plan did not carry.
   trickles over 12 s: `kill -TERM`, then the log shows
   `server: shutdown: context deadline exceeded` and `exit=1 after 8.02s`.
 - The code-review skill independently flagged `server.go:55` / `main.go:184` (medium).
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium, planned today (head of the cmd/api group).** Confirmed on `main`: `backend/cmd/api/server.go` `serve` returns `fmt.Errorf("shutdown: %w", err)` after `srv.Close()`, and `main.go` answers any non-nil `serve` error with `log.Fatalf` — so the one shutdown path that needs the deferred `pg.Close()`/`rdb.Close()` most (connections still open) is the one that skips them, and a Railway redeploy during a 60 s Google sync is logged as a crash. `go pet.RunHourly` and `go notify.RunWorker` are never joined (both do return on `ctx.Done()`, so the cost is log noise, but the idea's clause is unmet). Root cause: `serve` folds "the drain timed out and I force-closed" into the same error class as "the listener died", and `main` treats every error as fatal. Decision: `serve` returns a sentinel `ErrDrainTimedOut` for the overrun; `main` logs it and returns normally (exit 0 — the stop was planned, the log line is the signal); a listener error stays fatal. The grace becomes a parameter so the overrun branch gets a unit test with a 100 ms grace. The two goroutines are joined through a `sync.WaitGroup` bounded by the grace. Two sibling findings on the same two files are folded in: the second-signal swallow (`a-second-sigint-or-sigterm-during-the-8-s-shutdown-drain-is-.md`) and the missing `ReadTimeout` (`a-slow-request-body-still-holds-its-goroutine-indefinitely-n.md`). Plan: `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md`.

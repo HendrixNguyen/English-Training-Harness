@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md
 ---
 # A slow request body still holds its goroutine indefinitely: no server ReadTimeout, and MaxBytesReader's connection-close hook never fires through gin's writer
 
@@ -22,3 +23,8 @@ The plan's *Notes* also say that "`http.MaxBytesReader` also tells the server to
 - `harness/plans/2026-09-23-main-go-installs-a-signal-handler-with-no-server-shutdown-so.md` L31/L45: `ReadHeaderTimeout` and `IdleTimeout` only; `grep -n 'ReadTimeout' ` on that plan finds no `ReadTimeout` setting.
 - `backend/internal/middleware/bodylimit.go:24`: `http.MaxBytesReader(c.Writer, c.Request.Body, max)` passes gin's wrapper. The type assertion is at `go1.27.1 $GOROOT/src/net/http/request.go:1266-1270`.
 - Live, on the branch binary (review run, API :18092): a 70 000-byte `POST /api/v1/auth/google` returns `HTTP/1.1 400 Bad Request` / `{"error":"invalid_request"}` with **no** `Connection: close` header.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — medium, planned today, folded into `cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md`.** Confirmed on `main`: `newServer` sets `ReadHeaderTimeout` and `IdleTimeout` only, and `middleware.BodyLimit` hands `http.MaxBytesReader` gin's `c.Writer`, which does not satisfy net/http's unexported `requestTooLarger` (checked at `$GOROOT/src/net/http/request.go:1266` on go1.27.1), so the "close the connection" claim in the CORS plan's notes is false. `POST /api/v1/auth/google` is unauthenticated, so the goroutine-per-trickling-body is reachable by anyone. Decision: `ReadTimeout = 30 s` on the server (covers headers + body for the whole request; it does not bound handler writes, so the no-`WriteTimeout` rationale is untouched), and the doc/comment claim about the close hook is **corrected rather than worked around** — gin's writer cannot be unwrapped to `*http.response` from a middleware, and with a read deadline the connection is bounded anyway. Same file (`server.go`) as the head, hence the fold.

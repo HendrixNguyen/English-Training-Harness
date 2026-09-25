@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md
 ---
 
 # A Pet.State failure reports pet_health 0 which means a dead plant
@@ -50,3 +51,7 @@ because the pet slice will otherwise have to guess.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Still true on `main`: `quests/service.go:133-137` substitutes `PetState{}` on error, and the frontend's `pet.applyProgress` writes `pet_health: 0` straight into the plant hub — a transient `pet_states` read failure shows a dead plant right after a successful session. Fix: `pet_health`/`streak_count` become `*int` with `omitempty` (frontend `applyProgress` already tolerates missing fields by guarding on `this.status`; verify and adjust the store to skip `undefined`). Pet is the retention mechanism; a false death is the worst message we can show. Small, self-contained plan in `quests` + one store guard.
+
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Planned today (still medium).** Re-confirmed on `main` (2026-09-25): `quests/service.go` still substitutes `PetState{}` when `s.pet.State` fails, `ProgressResult.PetHealth`/`StreakCount` are plain `int`, and `frontend/stores/pet.ts` `applyProgress` writes `res.pet_health` straight into `status.health_points` — a transient `pet_states` read shows a dead plant on the hub right after a successful session. Smallest self-contained fix in the queue with direct retention impact: the two fields become `*int` with `omitempty`, the store skips an absent field, and the `Pet` interface documents that a missing row is not an error (`pet.QuestHook.State` already goes through `Ensure`). Plan: `harness/plans/2026-09-25-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md`.

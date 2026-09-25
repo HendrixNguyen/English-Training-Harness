@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -41,3 +41,8 @@ One of the following, and the plan should say which:
   `$GOMODCACHE/github.com/gin-gonic/gin@v1.12.0/mode.go:52-75` (`init` → `SetMode` → `panic`).
 - Reviewer run, 2026-09-24: `GIN_MODE=verbose /tmp/rev-shutdown-api` printed
   `panic: gin mode unknown: verbose (available mode: debug release test)` and `exit=2`.
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
+
+**Select — low. Not planned today.** Confirmed: gin v1.12's package `init` reads `GIN_MODE` and panics before `config.Load` runs, so the `config.go` comment and the test message describe a guard that does not exist. Decision: accept gin's panic and correct the three documents (`config.go` comment, test message, `.env.example`) — a stdlib-only leaf package that inits first is clever but adds a second place `GIN_MODE` is parsed. Plan it with `config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` as one `config` messages branch.

@@ -1,8 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-25-run-01
+priority: medium
+plan: harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md
 ---
 # Roadmap tree shows the real plan: module and day titles with true per-day completion
 
@@ -34,3 +36,24 @@ Technical:
 - Code: `frontend/utils/roadmap.ts` (`state: day < today ? 'completed' : …` and the comment "There is no per-day completion endpoint, so 'completed' means 'before today' — open question"), `frontend/pages/roadmap.vue`, `frontend/components/roadmap/RoadmapNode.vue`; backend `airouter.RoadmapSchema` (`{title, cefr_level, modules[4]{week,title,focus,days[7]{title,tasks[3]{…}}}}`), `google` package's `Day N: title · title · title` and `due` date rule (CODEMAP), `quests` `day_number` calendar-day rule (`day.go`).
 - Prior run: `harness/ideas/2026-09-24-run-01/day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` wants `/roadmap` to list completed roadmaps as history; this idea gives it the outline read it can extend.
 - Progress visibility as a retention lever in learning apps: https://userpilot.com/blog/app-retention-strategies/
+
+## Evaluation
+_Evaluator, 2026-09-25 — daily decide (feature slot 4 of 5; two-cap rule, owner 2026-09-25)._
+
+**Verdict: select, `priority: medium`.** The Why is real and confirmed against the current tree, not inferred:
+
+- `frontend/utils/roadmap.ts` derives all 28 nodes from one integer and documents the lie itself: `state: day < today ? 'completed' : day === today ? 'today' : 'locked'` under the comment *"There is no per-day completion endpoint, so 'completed' means 'before today' — derived from GET /quests/daily day_number (open question)."* `harness/designs/frontend-shell.md` §2.5 and the CODEMAP `shell` paragraph (`/roadmap` "derived from `day_number`; no per-day endpoint") record the same open question. So a skipped day 2 is a ⭐ "Đã hoàn thành" while the pet lost 30 health for it — the two retention surfaces contradict each other on the happy path.
+- No day has a name: `RoadmapNode.vue` renders glyph + "Ngày n" + one of three fixed strings. The names exist — `roadmaps.roadmap_json` is the `airouter.Roadmap` that `onboarding.PgRepo.SaveAssessment` marshals (`{title, cefr_level, modules[4]{week,title,focus,days[7]{title,tasks[3]{type,title,duration_minutes,content}}}}`), and `google` already renders "Day N: title · title · title" from it into Google Tasks, so the plan is visible in Google and invisible in the app.
+- The join exists: `daily_progress` is unique on `(user_id, date)` with `minutes_spent`, `is_target_met` (`0001_init.up.sql`), written by `quests.RecordProgress` for the user's local date. Read-only, no AI call, no new write, no migration.
+
+**Achievable in one plan:** yes — one additive backend read in the package that already owns `roadmaps`/`exercises`/`daily_progress` reads and the day arithmetic, plus a frontend page/store/util rewrite of ~200 lines. Medium, not high: nothing is blocked and no data is at risk; it is the first thing a returning learner sees that is wrong, which is clear retention value (role: `medium` = clear retention/learning value).
+
+**Decisions taken (the plan carries them; not to be re-litigated):**
+1. `GET /api/v1/roadmap` lives in `quests` behind `auth.Require()`, body `{roadmap_id, title, cefr_level, created_at, day_number, modules[4]{week, title, focus, days[7]{day_number, date, title, tasks[3]{task_type, title, duration_minutes}, minutes_spent, is_target_met}}}`; exercise `content_json` is not included; `404 no_active_roadmap` like `/quests/daily`. Backend spec §6.2 wins for the wire; both spec files gain the route in their escaped style. `quests` stays inside its boundary: `roadmaps`, `daily_progress`, `users.timezone`; no pet tables, no Redis for this read.
+2. `date` for day N = local date of `roadmaps.created_at` + N−1 in `users.timezone` — the inverse of `DayNumber` (`day.go`) and the rule `google.DayDue` already applies to Tasks `due`. One new helper `DayDate` in `day.go` built on the same `startOfDay`; the plan pins the round-trip `DayNumber(created, at(DayDate(created, n)), loc) == n` on `day_test.go`'s DST fixtures so the tree and the daily suite can never disagree about which date a day is.
+3. Frontend: a new `stores/roadmap.ts` (not a section of `quest.ts` — different resource and lifecycle, and today's bug plan `2026-09-25-a-pet-state-failure…` edits `stores/quest.ts`); `utils/roadmap.ts` `roadmapNodes(outline)` takes the outline (which carries per-day progress) instead of an integer; states `completed` / `partial` ("12/30 phút") / `missed` / `today` / `locked`; module headers; tap-to-expand task titles with durations; "Đã hoàn thành 9/28 ngày"; today scrolls into view; empty state and "Tạo lộ trình 28 ngày" unchanged; `/api/v1/roadmap` joins the NetworkFirst `api-state` cache. Design: `harness/designs/roadmap-tree.md`.
+4. Same-day overlap: the approved bug plan above edits `quests/service.go` (`ProgressResult`, the tail of `RecordProgress`), `service_test.go`, appends to `handler_test.go`, and edits `stores/quest.ts` + `stores/pet.ts`. This plan adds new files and new functions only, appends nothing to `handler_test.go`/`service_test.go`, and never reorders or reformats an existing declaration, so the daily integration merge is clean.
+
+**Dependencies:** none — everything it reads is on `origin/main`. The 2026-09-24 idea *day-28 checkpoint* (selected, unplanned) may later extend this read with roadmap history; nothing here waits on it.
+
+**Status:** planned today — `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` (`draft`; medium feature → owner's `/approve`).
