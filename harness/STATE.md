@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 06:33. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 07:53. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -17,7 +17,11 @@ _none_
 
 ## Proposed
 
-_none_
+- `harness/ideas/2026-09-25-run-01/growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub
+- `harness/ideas/2026-09-25-run-01/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md` — Name your plant at onboarding and see it greet you by name on the hub
+- `harness/ideas/2026-09-25-run-01/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion
+- `harness/ideas/2026-09-25-run-01/stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: sessions renew on use so a daily learner never sees the Google consent screen again
+- `harness/ideas/2026-09-25-run-01/task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost
 
 ## Selected
 
