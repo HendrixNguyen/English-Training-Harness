@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-25-high-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo
+worktree: .worktrees/ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo
 ---
 # Ship on merge: a deploy workflow that builds the PWA and uploads it to Cloudflare Pages on every push to main, then smoke-checks both public URLs — Plan
 
@@ -430,3 +432,36 @@ git diff --stat origin/main...HEAD                                # only deploy.
 - The Dokploy CD backlog entry (`harness/BACKLOG.md`) becomes a second job in this same file (GHCR push + webhook, also on `production`) when Target B exists; keep `ship` self-contained so that job can sit beside it.
 - Until the owner disconnects Railway's GitHub source, a `main` merge still rebuilds the API once and the nightly ship rebuilds it again from the same commit — harmless duplication, not a failure.
 - The Railway step waits for the build (`--ci`), not for the health-checked swap; the `/healthz` poll and `smoke-api.sh` prove the public URL is healthy, and Railway's own healthcheck (`/healthz`, Target A) gates the swap. A `200` from the previous deployment during the swap is therefore possible; a bad new build never replaces a good one.
+
+## Execution summary
+
+Built: `.github/workflows/deploy.yml` (new), `deploy/smoke-web.sh` (`SMOKE_WEB_SPA_WARN` knob), `.agents/routines/daily-ship.md` (new) + `.agents/routines/README.md`, `deploy/README.md` + `AGENTS.md` + `harness/CODEMAP.md`, and the bootstrap of the `production` branch — in worktree `.worktrees/ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo` on branch `harness/2026-09-25-high-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo`, base `origin/main` at `68529ad`.
+
+**Deviation — owner revised mid-execution (Railway stays as-is).** After Task 1 was committed the coordinator relayed an owner decision made mid-execution: Railway keeps auto-deploying the API from `main` through its existing GitHub connection; it is not disconnected and not touched by this workflow. Applied throughout, before any task depending on it was written (so no rework):
+- **Task 1** (`deploy.yml`): no Railway CLI step, no `RAILWAY_TOKEN` secret; the "Check configuration" step's required-variable list drops to `NUXT_PUBLIC_API_BASE`, `NUXT_PUBLIC_GOOGLE_CLIENT_ID`, `NUXT_PUBLIC_VAPID_PUBLIC_KEY`, `PAGES_URL`, `API_URL`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (seven items, not eight). Commit message shortened to "ships the PWA to Cloudflare Pages" (not "the API to Railway and the PWA…") and its body states the Railway decision. The header comment and the "Wait for the API" / smoke-api steps are unchanged — the workflow still waits for and smoke-checks the API's public URL, which is live via Railway's own deploy, it just never deploys it.
+- **Task 3** (routine + README row): `daily-ship.md`'s prose and step 6 report line say it ships the PWA only and that the API is already live via Railway's own trigger; the README row reads "one `Deploy` run (PWA + smoke checks)" instead of "(API + PWA + smoke checks)".
+- **Task 4** (docs): `deploy/README.md`'s new "Ship from `production`" section, the *Owner checklist* and the smoke-check bullet drop the Railway-disconnect step and the `RAILWAY_TOKEN` secret/table row (two secrets now: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`); a new sentence states the API ships on every merge to `main` via Railway's own GitHub trigger, unchanged. The Target A "API on Railway" paragraph itself needed no edit — it already described a GitHub-connected service, which is now also the final state, so the plan's originally-scripted "source disconnected from GitHub" edit was simply not applied. `AGENTS.md`'s CI bullet and `harness/CODEMAP.md`'s Deploy entry both say the workflow ships the PWA only and that the API already ships via Railway's own trigger.
+- Everything else in the plan (Task 2's smoke knob, Design decisions 1/2/6/8/9, the PWA-only build/deploy/smoke chain, the bootstrap of `production`) is unchanged.
+- The idea file's `## Evaluation` gained one line recording this (see below); its frontmatter was not touched.
+
+Task-by-task verification output (from the worktree, `origin/main` = `68529ad`):
+
+**Task 1** — `actionlint .github/workflows/deploy.yml` → `actionlint ok`; trigger/concurrency/jobs: `["push", "workflow_dispatch"]` / `{"branches"=>["production"]}` / `{"group"=>"deploy", "cancel-in-progress"=>false}` / `["ship"]`; `grep -c 'main\]\|harness/\*\*\|pull_request:'` → `1` (only the header comment). PWA build proof: `cd frontend && npm ci && NUXT_PUBLIC_API_BASE=https://api.example.test NUXT_PUBLIC_GOOGLE_CLIENT_ID=ci-only NUXT_PUBLIC_VAPID_PUBLIC_KEY=ci-only npx nuxi generate` → `[nitro] ✔ Generated public .output/public`, service worker built, `generate ok`.
+
+**Task 2** — `sh -n deploy/smoke-web.sh` → `parses`. Live-URL runs against `https://english-learning-e6a.pages.dev`: strict run — `FAIL spa fallback (/learn/abc): expected '200', got '404'`, every other line `ok`, `strict exit=1`; `SMOKE_WEB_SPA_WARN=1` run — `WARN spa fallback (/learn/abc): expected '200', got '404' (SMOKE_WEB_SPA_WARN=1)`, every other line `ok`, `warn exit=0`. The deep-link 404 bug is still open, exactly as the plan expected.
+
+**Task 3** — `sed -n '1,12p' .agents/routines/daily-ship.md` shows `schedule: "0 22 * * *"` / `schedule_utc: "0 15 * * *"`; `grep -n 'daily-ship\|production' .agents/routines/README.md` shows the table row and the push-exception rule.
+
+**Task 4** — `grep -n 'Ship from `production`'` / `'SMOKE_WEB_SPA_WARN'` / `'daily-ship'` across `deploy/README.md`, `AGENTS.md`, `harness/CODEMAP.md`, `.github/workflows/deploy.yml`, `deploy/smoke-web.sh`, `.agents/routines/README.md` all land where intended (see deviation note for the revised secret/variable counts); `grep -n 'Pushing `production`' AGENTS.md` → one hit; `grep -n RAILWAY_TOKEN deploy/README.md .github/workflows/deploy.yml` → no matches (deviation).
+
+**Task 5 / bootstrap** — `python3 tools/harness/cli.py validate` → exit 0 (run both in the worktree and in ROOT). `git ls-remote --heads origin production` was empty before the bootstrap; `git push origin origin/main:refs/heads/production` created it at **`68529ad167082e07f9ace5b935f8725aeedea3e7`** (== `origin/main`). Pushed the plan branch; CI run [36153516171](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36153516171) — `backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling` all `success`; no `Deploy` run appeared for the branch (confirmed via `gh run list --branch <branch>`), as expected since `deploy.yml` triggers only on `production`. `git diff --stat origin/main...HEAD` touches exactly `.agents/routines/{README.md,daily-ship.md}`, `.github/workflows/deploy.yml`, `AGENTS.md`, `deploy/README.md`, `deploy/smoke-web.sh`, `harness/CODEMAP.md` — no app code.
+
+**Runtime proof (executor role, Definition of done):**
+1. **Builds** — the PWA build the runner will run (`npm ci && npx nuxi generate` with placeholder `NUXT_PUBLIC_*`) succeeded and produced `.output/public/{index.html,sw.js,manifest.webmanifest}` with the placeholder value baked in.
+2. **No new test suite** — this plan adds no app code and no unit tests; `backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling` (the existing suite) all ran and passed on the pushed branch (CI run above) — that is the whole suite, not just what this plan touched.
+3. **Boots and answers** — not applicable in the executor-run sense (no app binary in this plan); the equivalent proof is `deploy/smoke-web.sh` making real HTTP requests against the live Pages URL and getting real, differentiated results (200s, one 404), and `actionlint` parsing the real workflow file GitHub Actions will run.
+4. **Every documented command works, as documented** — `actionlint`, the `nuxi generate` build proof, both live `smoke-web.sh` runs, and the `production` bootstrap command were all run exactly as written in the plan/README, in this worktree, producing the outputs above.
+5. **CI green on the branch** — CI run `36153516171`, `conclusion: success`, all 5 jobs green, linked above.
+6. Nothing was started that needed stopping (no server, no compose stack) — `pgrep`/`docker ps` after the run show nothing created by this task.
+
+First real Deploy run: owner step after merge — see Verification (Cloudflare token/vars, first `dry_run` dispatch, then the fast-forward push or the 22:00 routine).
