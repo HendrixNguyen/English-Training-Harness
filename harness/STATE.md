@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 12:03. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 14:36. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,7 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/cloudflare-pages-serves-404-for-deep-links-and-no-cache-head.md` — Cloudflare Pages serves 404 for deep links and no-cache headers differ from the Caddy image, so smoke-web fails on the live site [medium]
 
 ## Proposed
 
