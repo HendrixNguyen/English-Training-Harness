@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 23:19. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 02:23. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -40,6 +40,11 @@ _none_
 - `harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task [high]
 - `harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync [medium]
 - `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion [high]
+- `harness/ideas/2026-09-26-run-01/google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` — (untitled)
 
 ## Selected
 
