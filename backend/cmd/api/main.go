@@ -202,7 +202,7 @@ func main() {
 		log.Fatalf("listen: %v", err)
 	}
 	log.Printf("listening on %s (GIN_MODE=%s)", ln.Addr(), cfg.GinMode)
-	if err := serve(ctx, newServer(r), ln); err != nil {
+	if err := serve(ctx, newServer(r), ln, ShutdownGrace); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 	log.Printf("shutdown complete") // main returns: deferred pg.Close / rdb.Close run

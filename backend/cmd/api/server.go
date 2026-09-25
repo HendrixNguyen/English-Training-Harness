@@ -31,11 +31,18 @@ func newServer(h http.Handler) *http.Server {
 	return &http.Server{Handler: h, ReadHeaderTimeout: ReadHeaderTimeout, IdleTimeout: IdleTimeout}
 }
 
-// serve runs srv on ln until ctx is done, then drains it within ShutdownGrace.
+// ErrDrainTimedOut is serve's answer when in-flight requests outlive the grace:
+// the remaining connections were force-closed. main logs it and returns
+// normally (exit 0 — the stop was planned; the log line is the signal), so the
+// deferred pg/rdb Close calls run, unlike a log.Fatalf.
+var ErrDrainTimedOut = errors.New("server: drain grace exceeded; remaining connections were closed")
+
+// serve runs srv on ln until ctx is done, then drains it within grace.
 // It returns nil on a clean shutdown (Serve's own http.ErrServerClosed is the
-// normal exit, not an error) and the listener error otherwise, so main can
-// return — letting its deferred pg/rdb Close calls run — instead of Fatalf-ing.
-func serve(ctx context.Context, srv *http.Server, ln net.Listener) error {
+// normal exit, not an error), ErrDrainTimedOut if the grace ran out before the
+// drain finished, and the listener error otherwise, so main can return —
+// letting its deferred pg/rdb Close calls run — instead of Fatalf-ing.
+func serve(ctx context.Context, srv *http.Server, ln net.Listener, grace time.Duration) error {
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
 
@@ -48,12 +55,13 @@ func serve(ctx context.Context, srv *http.Server, ln net.Listener) error {
 	case <-ctx.Done():
 	}
 
-	log.Printf("shutting down: draining in-flight requests for up to %s", ShutdownGrace)
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), ShutdownGrace)
+	log.Printf("shutting down: draining in-flight requests for up to %s (press Ctrl-C again to force)", grace)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		_ = srv.Close() // grace exceeded: close what is left so the process still exits
-		return fmt.Errorf("shutdown: %w", err)
+		<-errc          // Serve has returned; do not leak its goroutine
+		return fmt.Errorf("%w: %v", ErrDrainTimedOut, err)
 	}
 	<-errc // Serve has returned http.ErrServerClosed
 	return nil

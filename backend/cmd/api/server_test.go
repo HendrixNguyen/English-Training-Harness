@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"sync"
@@ -38,7 +39,7 @@ func TestServeStopsOnContextCancelAndDrainsInFlightRequests(t *testing.T) {
 	ln := listen(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- serve(ctx, newServer(h), ln) }()
+	go func() { done <- serve(ctx, newServer(h), ln, ShutdownGrace) }()
 
 	code := make(chan int, 1)
 	go func() {
@@ -83,9 +84,59 @@ func TestServeStopsOnContextCancelAndDrainsInFlightRequests(t *testing.T) {
 func TestServeReturnsAListenerError(t *testing.T) {
 	ln := listen(t)
 	_ = ln.Close() // Serve on a closed listener fails at once
-	if err := serve(context.Background(), newServer(http.NotFoundHandler()), ln); err == nil {
+	if err := serve(context.Background(), newServer(http.NotFoundHandler()), ln, ShutdownGrace); err == nil {
 		t.Fatal("serve returned nil for a dead listener")
 	}
+}
+
+// A redeploy during a long-running request (e.g. a 60 s google.SyncTimeout
+// call) must not hang the process forever: serve force-closes what remains
+// once the grace runs out and returns ErrDrainTimedOut instead of the fatal
+// generic error the fast path used to return, so main can log it and still
+// run the deferred pg/rdb Close calls (exit 0 — the stop was planned).
+func TestServeReturnsErrDrainTimedOutAndClosesTheStragglerWhenTheGraceRunsOut(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+		w.WriteHeader(http.StatusOK)
+	})
+	ln := listen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- serve(ctx, newServer(h), ln, 100*time.Millisecond) }()
+
+	code := make(chan int, 1)
+	go func() {
+		resp, err := http.Get("http://" + ln.Addr().String() + "/")
+		if err != nil {
+			code <- -1
+			return
+		}
+		_ = resp.Body.Close()
+		code <- resp.StatusCode
+	}()
+
+	<-started
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrDrainTimedOut) {
+			t.Fatalf("serve returned %v, want ErrDrainTimedOut", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("serve did not return after the grace ran out")
+	}
+	// The straggler was force-closed: the client sees an error, not a 200.
+	if got := <-code; got != -1 {
+		t.Fatalf("in-flight request got %d, want a transport error after srv.Close()", got)
+	}
+	unblock()
 }
 
 // WriteTimeout must stay unset: google.SyncTimeout (60 s) and onboarding's AI
