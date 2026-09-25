@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 11:36. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 11:37. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -17,7 +17,7 @@ _none_
 
 ## Proposed
 
-_none_
+- `harness/ideas/2026-09-25-run-01/containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build [high]
 
 ## Selected
 
