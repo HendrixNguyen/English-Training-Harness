@@ -16,15 +16,31 @@ run:
 tidy:
 	go mod tidy
 
-# What CI's backend-unit job runs, so a branch can be checked before it is pushed.
-.PHONY: fmt-check vet check
+# What CI's backend-unit job runs, so a branch can be checked before it is
+# pushed — including its first step: the unit suite must prove it needs no
+# service (an exported TEST_* would also un-gate the destructive integration
+# tests and run them without -p 1).
+.PHONY: no-service-vars build fmt-check vet check
+no-service-vars:
+	@for v in DATABASE_URL REDIS_URL TEST_DATABASE_URL TEST_REDIS_URL; do \
+	  if [ -n "$$(printenv "$$v")" ]; then \
+	    echo "$$v is set: make check mirrors CI's backend-unit, which runs with no service variables (unset $$v, or run it in a subshell)"; exit 1; \
+	  fi; \
+	done
+
+build:
+	go build ./...
+
+# gofmt -l exits 2 on a file it cannot parse and lists nothing; fail on that
+# too, or a syntax error would pass this check (the message is already on stderr).
 fmt-check:
-	@unformatted=$$(gofmt -l .); if [ -n "$$unformatted" ]; then echo "gofmt -l:"; echo "$$unformatted"; exit 1; fi
+	@unformatted=$$(gofmt -l .) || { echo "gofmt -l failed (see above)"; exit 1; }; \
+	if [ -n "$$unformatted" ]; then echo "gofmt -l:"; echo "$$unformatted"; exit 1; fi
 
 vet:
 	go vet ./...
 
-check: fmt-check vet
+check: no-service-vars build fmt-check vet
 	go test ./... -count=1 -race
 
 # Ports come from .env (copy .env.example). Set REDIS_PORT / POSTGRES_PORT there
