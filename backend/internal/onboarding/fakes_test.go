@@ -42,21 +42,42 @@ func (f *fakeRepo) SaveAssessment(_ context.Context, _ string, a Assessment) (st
 
 type fakeQuiz struct {
 	staged  map[string][]Answer
+	level   map[string]string
 	lastTTL time.Duration
 	cleared int
 }
 
-func newFakeQuiz() *fakeQuiz { return &fakeQuiz{staged: map[string][]Answer{}} }
+func newFakeQuiz() *fakeQuiz { return &fakeQuiz{staged: map[string][]Answer{}, level: map[string]string{}} }
 
 func (f *fakeQuiz) StageAnswers(_ context.Context, userID string, answers []Answer, ttl time.Duration) error {
 	f.staged[userID] = answers
+	delete(f.level, userID) // DEL + HSET in the real store
 	f.lastTTL = ttl
 	return nil
+}
+
+func (f *fakeQuiz) StageLevel(_ context.Context, userID, level string, _ time.Duration) error {
+	f.level[userID] = level
+	return nil
+}
+
+func (f *fakeQuiz) StagedLevel(_ context.Context, userID string, answers []Answer) (string, error) {
+	level, staged := f.level[userID], f.staged[userID]
+	if level == "" || len(staged) != len(answers) {
+		return "", nil
+	}
+	for i := range answers {
+		if staged[i] != answers[i] {
+			return "", nil
+		}
+	}
+	return level, nil
 }
 
 func (f *fakeQuiz) Clear(_ context.Context, userID string) error {
 	f.cleared++
 	delete(f.staged, userID)
+	delete(f.level, userID)
 	return nil
 }
 

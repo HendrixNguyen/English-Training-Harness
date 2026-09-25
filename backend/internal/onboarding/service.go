@@ -71,17 +71,28 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		return AssessmentResult{}, err
 	}
 
-	if err := s.quiz.StageAnswers(ctx, userID, req.Answers, store.PlacementQuizTTL); err != nil {
+	// A re-submit with the same answers after a failed roadmap step reuses
+	// the level graded then (it sits in the quiz hash for the TTL).
+	level, err := s.quiz.StagedLevel(ctx, userID, req.Answers)
+	if err != nil {
 		return AssessmentResult{}, err
 	}
-
-	var level string
-	if err := s.routeJSON(ctx, airouter.TaskPlacementTest, PlacementSystemPrompt, PlacementUserPrompt(req.Answers), func(raw string) error {
-		lvl, err := ParsePlacement(raw)
-		level = lvl
-		return err
-	}); err != nil {
-		return AssessmentResult{}, err
+	if level == "" {
+		if err := s.quiz.StageAnswers(ctx, userID, req.Answers, store.PlacementQuizTTL); err != nil {
+			return AssessmentResult{}, err
+		}
+		if err := s.routeJSON(ctx, airouter.TaskPlacementTest, PlacementSystemPrompt, PlacementUserPrompt(req.Answers), func(raw string) error {
+			lvl, err := ParsePlacement(raw)
+			level = lvl
+			return err
+		}); err != nil {
+			return AssessmentResult{}, err
+		}
+		if err := s.quiz.StageLevel(ctx, userID, level, store.PlacementQuizTTL); err != nil {
+			log.Printf("onboarding: staging level for %s: %v", userID, err) // a retry grades again
+		}
+	} else {
+		log.Printf("onboarding: reusing the staged level %s for %s", level, userID)
 	}
 
 	var roadmap airouter.Roadmap

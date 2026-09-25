@@ -76,6 +76,9 @@ func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 	if h.quiz.cleared != 1 || len(h.quiz.staged) != 0 {
 		t.Error("quiz hash not cleared after success")
 	}
+	if h.quiz.level["u1"] != "" {
+		t.Error("the staged level must go with the hash on success")
+	}
 	// The generation prompt is the airouter constant and carries the graded level and goal.
 	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
 	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "B1") || !strings.Contains(gen, "IELTS 7.0 Preparation") {
@@ -264,5 +267,54 @@ func TestAssessPassesACallerCancellationThroughUnchanged(t *testing.T) {
 	_, err := h.svc.Assess(gone, "u1", validRequest())
 	if !errors.Is(err, context.Canceled) || errors.Is(err, ErrAITimeout) {
 		t.Fatalf("err = %v, want context.Canceled and not ErrAITimeout", err)
+	}
+}
+
+func TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry(t *testing.T) {
+	h := newHarness(t)
+	h.ai.replies[airouter.TaskRoadmapGen] = nil // every roadmap call fails → ErrAllProvidersFailed
+
+	if _, err := h.svc.Assess(ctx, "u1", validRequest()); !errors.Is(err, airouter.ErrAllProvidersFailed) {
+		t.Fatalf("first Assess: %v, want ErrAllProvidersFailed", err)
+	}
+	if h.quiz.level["u1"] != "B1" || len(h.repo.saved) != 0 || h.quiz.cleared != 0 {
+		t.Fatalf("after the failed roadmap: level=%q saved=%d cleared=%d; want the level staged, nothing written, hash kept", h.quiz.level["u1"], len(h.repo.saved), h.quiz.cleared)
+	}
+
+	h.ai.replies[airouter.TaskRoadmapGen] = []string{fixtureRoadmapJSON(t)}
+	h.ai.calls[airouter.TaskRoadmapGen] = 0
+	out, err := h.svc.Assess(ctx, "u1", validRequest())
+	if err != nil || !out.Created || out.AssessedLevel != "B1" {
+		t.Fatalf("retry: %+v, %v; want a created roadmap at the staged level", out, err)
+	}
+	if h.ai.calls[airouter.TaskPlacementTest] != 1 {
+		t.Errorf("placement graded %d times, want 1 — the retry must reuse the staged level", h.ai.calls[airouter.TaskPlacementTest])
+	}
+	if h.limiter.calls != 2 {
+		t.Errorf("limiter calls = %d, want 2 (one slot per assessment call, retry included)", h.limiter.calls)
+	}
+	if len(h.repo.saved) != 1 || h.repo.saved[0].CEFRLevel != "B1" || h.quiz.cleared != 1 || h.quiz.level["u1"] != "" {
+		t.Errorf("after the retry: saved=%d cleared=%d level=%q", len(h.repo.saved), h.quiz.cleared, h.quiz.level["u1"])
+	}
+}
+
+func TestAssessGradesAgainWhenTheRetryChangesAnAnswer(t *testing.T) {
+	h := newHarness(t)
+	h.ai.replies[airouter.TaskRoadmapGen] = nil
+	if _, err := h.svc.Assess(ctx, "u1", validRequest()); err == nil {
+		t.Fatal("first Assess succeeded; the fixture should fail at the roadmap")
+	}
+
+	h.ai.replies[airouter.TaskPlacementTest] = []string{`{"cefr_level":"B1"}`, `{"cefr_level":"A2"}`}
+	h.ai.replies[airouter.TaskRoadmapGen] = []string{fixtureRoadmapJSON(t)}
+	h.ai.calls[airouter.TaskRoadmapGen] = 0
+	req := validRequest()
+	req.Answers[0].SelectedOption = "A" // q1 has options A-D; B is correct
+	out, err := h.svc.Assess(ctx, "u1", req)
+	if err != nil || out.AssessedLevel != "A2" {
+		t.Fatalf("retry with changed answers: %+v, %v; want a fresh grade", out, err)
+	}
+	if h.ai.calls[airouter.TaskPlacementTest] != 2 {
+		t.Errorf("placement graded %d times, want 2", h.ai.calls[airouter.TaskPlacementTest])
 	}
 }
