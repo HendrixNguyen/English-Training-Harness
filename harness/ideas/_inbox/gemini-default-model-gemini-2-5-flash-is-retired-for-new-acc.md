@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: human
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md
 ---
 # Gemini default model gemini-2.5-flash is retired for new accounts, so a fresh deploy fails every placement test with 502
 
@@ -28,3 +29,6 @@ $ railway logs --service api --deployment | tail -2
 [GIN] 2026/09/25 - 08:23:16 | 502 | 1.08s | POST "/api/v1/onboarding/assessment"      # no provider line before it
 ```
 `backend/internal/airouter/gemini.go:21` (`DefaultGeminiModel`), `:48` (`v1beta/models/{model}:generateContent`); `backend/internal/onboarding/handler.go:49–53` (503 `ai_unavailable`, 502 `ai_bad_output` / `ai_upstream_failed`); `backend/internal/airouter/router.go:82` (fallback log).
+
+## Evaluation
+**Verdict: select, `priority: high`; planned together with the ProviderTimeout bug** (`harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md`). Root cause, read-only on `origin/main`: `backend/internal/airouter/gemini.go:21` `DefaultGeminiModel = "gemini-2.5-flash"`, which Google now answers 404 for new accounts; the 404 body does reach the error (`postJSON`, `gemini.go:106-107`, status + 512 chars), but nobody logs it — `Router.Route` logs only fallbacks (`router.go:82`) and `onboarding/handler.go:52` maps the joined error straight to 502, so `railway logs` shows a bare `[GIN] 502`. There is no retry inside a provider; fallback exists only across providers (`router.go:73-89`), so a single-key deploy fails outright on Google's 503 "high demand". The fix lands in the same `postJSON`/driver code the timeout fix rewrites: default model `gemini-3.8-flash` (Google's own pointer; `GEMINI_MODEL` still overrides), one retry after a 2 s backoff on 429/502/503/504 bounded by the caller's deadline, and per-call log lines with elapsed time, token usage and — on failure — upstream status plus the first 200 chars of the body, never the key. Folding keeps the plan under half a day and avoids two branches editing `gemini.go` on the same day.

@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 16:18. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-25 16:33. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,9 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-- `harness/ideas/_inbox/gemini-default-model-gemini-2-5-flash-is-retired-for-new-acc.md` — Gemini default model gemini-2.5-flash is retired for new accounts, so a fresh deploy fails every placement test with 502 [high]
 - `harness/ideas/_inbox/pages-ignores-the-redirects-spa-rewrite-while-404-html-exist.md` — Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404 [medium]
-- `harness/ideas/_inbox/providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — ProviderTimeout of 30 s makes roadmap generation impossible on every non-Gemini provider, so onboarding 502s after the placement test [high]
 
 ## Proposed
 
@@ -76,6 +74,7 @@ _none_
 
 ## Approved
 
+- `harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan [high]
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high]
 - `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md` — Settings screen: daily Web Push reminder and Google Calendar/Tasks sync wired to the shipped backend — Plan [medium]
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` — Typed task content (backend half): a per-type `content` schema with answer keys, asked for in the prompt and enforced by `ParseRoadmap` — Plan [medium]
