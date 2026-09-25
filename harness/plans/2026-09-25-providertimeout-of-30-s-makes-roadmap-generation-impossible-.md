@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/providertimeout-of-30-s-makes-roadmap-generation-impossible-.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-25-high-providertimeout-of-30-s-makes-roadmap-generation-impossible-
+worktree: .worktrees/providertimeout-of-30-s-makes-roadmap-generation-impossible-
 ---
 # Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan
 
@@ -1111,3 +1113,111 @@ test -f deploy/README.md && grep -n GEMINI_MODEL deploy/README.md || echo 'Task 
 The proof on the live host is the owner's after the daily PR merges: one real onboarding with `GEMINI_API_KEY` unset and `OPENAI_API_KEY` set must return 201 in well under 180 s, and `railway logs` must show the `ok …s tokens …` line for the roadmap.
 
 CI on the pushed `harness/*` branch (`gh run list --branch <branch>`) must be green: `backend-unit`, `backend-integration` (runs the new `TEST_REDIS_URL` test and fails on a skip), `harness-tooling`.
+
+## Execution summary
+
+Built and executed exactly as the plan's 7 tasks specify, in
+`.worktrees/providertimeout-of-30-s-makes-roadmap-generation-impossible-` on
+`harness/2026-09-25-high-providertimeout-of-30-s-makes-roadmap-generation-impossible-`,
+based on freshly fetched `origin/main` (`959cb5f`). One commit per task, in order.
+
+**Base-branch conflict note resolved as predicted:** `grep -n finishReason backend/internal/airouter/gemini.go`
+on `origin/main` had no hit, so the geminiprovider response-struct branch had not merged; Task 4 applied to
+`gemini.go`'s struct as it stood on main. `git ls-tree origin/main deploy` was empty, so Task 5 Step 5 (the
+`deploy/README.md` env-table row) was skipped and recorded, per the plan's own conditional rule — no merge or
+cherry-pick of either branch.
+
+### Deviations
+- After Task 3's edit, `gofmt` flagged `internal/onboarding/fakes_test.go`'s `newFakeQuiz` one-liner (too long
+  for gofmt's wrap rule) when `make check` ran during Task 4. Fixed with `gofmt -w` and folded into the Task 4
+  commit (`b09919e`) with a note, since `make check` must stay green after every task and the file had no other
+  content changes.
+- No other deviations. All test names, function bodies, log-line formats, and file paths matched the plan
+  verbatim; no task needed reinterpretation.
+
+### Verification (plan's `## Verification` block, run from the worktree root)
+
+```
+cd backend && make check
+  → ok for cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store
+
+cd backend && grep -rn ProviderTimeout . ; echo "exit=$?"
+  → no matches, exit=1
+
+cd backend && grep -rn 'gemini-2.5-flash' . ../CLAUDE.md
+  → only in gemini.go's comment, gemini_test.go's retirement-message fixtures/assertions, .env.example's comment,
+    and CLAUDE.md's new paragraph — all "retired" remarks, no live default
+
+cd backend && go test ./internal/airouter/ ./internal/onboarding/ -run 'Timeout|Deadline|Retr|KeepsTheGrade|GradesAgain|Logs' -count=1 -race -v | grep -E '^(--- |ok|FAIL)'
+  --- PASS: TestGeminiRetriesOnceOn503AndLogsElapsedAndTokens (0.00s)
+  --- PASS: TestGeminiDoesNotRetryA404AndReportsGooglesMessageTruncated (0.00s)
+  --- PASS: TestGeminiRetryBackoffRespectsTheDeadline (0.05s)
+  --- PASS: TestTaskTimeoutsMatchTheMeasuredProviders (0.00s)
+  --- PASS: TestRouteKeepsACallerDeadlineInsteadOfWideningIt (0.00s)
+  --- PASS: TestProvidersObeyTheContextDeadlineNotAClientTimeout (0.71s)
+  ok  	.../internal/airouter	2.110s
+  --- PASS: TestAssessRetriesOnceOnABadGradeThenFailsWithoutWriting (0.00s)
+  --- PASS: TestAssessGivesEachAICallItsOwnDeadline (0.00s)
+  --- PASS: TestAssessReportsADeadlineHitAsAITimeoutWithoutWriting (0.00s)
+  --- PASS: TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry (0.00s)
+  --- PASS: TestAssessGradesAgainWhenTheRetryChangesAnAnswer (0.00s)
+  ok  	.../internal/onboarding	1.631s
+
+cd frontend && npm run lint && npm run test:unit
+  → eslint clean; 16 files, 79/79 tests passed (incl. the new waiting-copy test)
+
+git diff --stat origin/main...HEAD -- harness/ | grep -v CODEMAP
+  → empty (only harness/CODEMAP.md touched, as required)
+
+test -f deploy/README.md && grep -n GEMINI_MODEL deploy/README.md || echo 'Task 5 step 5 skipped: deploy/ not on base'
+  → Task 5 step 5 skipped: deploy/ not on base
+```
+
+### Runtime proof (definition-of-done §8, backend `make up` was available)
+
+Ran the full local-boot curl proof with a throwaway Python fake provider on `127.0.0.1:18090` (scratchpad,
+never committed), `COMPOSE_PROJECT_NAME=aelp-timeout-rp`, `POSTGRES_PORT=15532`, `REDIS_PORT=16479`, API on
+`PORT=18081` (8080 was already held by another local instance), `GEMINI_API_KEY` unset, `OPENAI_API_KEY=fake`,
+`OPENAI_BASE_URL=http://127.0.0.1:18090/v1`. Session auth needed one addition the plan's step 3 didn't spell
+out: `Require` also checks the Redis `sess:{user_id}:token` key, so the throwaway `cmd/minttoken` JWT alone
+401'd until `redis-cli SET sess:<user id>:token <jwt> EX 86400` matched it.
+
+1. **Fresh onboarding, fake sleeps 35 s on the roadmap call:**
+   `201 35.087206s` (`assessed_level: B1`, a `roadmap_id`). API log:
+   ```
+   airouter: fallback from gemini to openai for task placement_test
+   airouter: openai-compat(gpt-4o-mini) task=placement_test ok 0.0s tokens prompt=1 completion=1
+   airouter: fallback from gemini to openai for task roadmap_generation
+   airouter: openai-compat(gpt-4o-mini) task=roadmap_generation ok 35.0s tokens prompt=100 completion=4500
+   [GIN] 201 | 35.08s | POST "/api/v1/onboarding/assessment"
+   ```
+   Before this plan the same shape of call 502'd at ~34 s (the old 30 s `ProviderTimeout`).
+
+2. **Roadmap 503s once then succeeds** (`DELETE FROM roadmaps` first): `201 4.048188s`, log shows
+   `airouter: openai-compat(gpt-4o-mini): status 503: {"error": {"message": "high demand"}}; retrying once in 2s`
+   followed by a successful `ok 4.0s` line.
+
+3. **Roadmap 503s on every call** (`DELETE FROM roadmaps` first): `502 {"error":"ai_upstream_failed"}` in
+   `2.051670s`, log shows
+   `airouter: openai failed for task roadmap_generation after 2.0s: openai-compat(gpt-4o-mini): status 503: {"error": {"message": "high demand"}}`.
+   `redis-cli HGETALL quiz:placement:<user id>` → `q1 B _level B1` (the grade survived the failed roadmap step).
+
+4. **Same request repeated, fake healthy:** `201 0.035096s`. Log shows
+   `onboarding: reusing the staged level B1 for <user id>` and **no** `task=placement_test` line — the retry
+   skipped grading. `HGETALL quiz:placement:<user id>` afterward is empty (cleared on success).
+
+The 504 `ai_timeout` path (Task 2) was not re-proven live — it would need a real ~180 s wait for no additional
+signal — and is instead covered by `TestAssessReportsADeadlineHitAsAITimeoutWithoutWriting` and
+`TestAssessmentErrorMapping/ai_timed_out`, both passing above.
+
+**Cleanup verified:** `pkill`'d the fake provider and the `go run`-spawned `exe/api` binary (the latter needed
+an extra `lsof -t :18081 | kill` — `pkill -f "go run"` alone leaves the compiled child running), `docker compose
+down` + `docker volume rm aelp-timeout-rp_postgres_data`, `docker ps` / `pgrep -fl "cmd/api\|fake_provider"`
+both empty afterward, `rm -rf backend/cmd/minttoken`, `rm -f backend/.env`, `git status --short` clean.
+
+### CI
+
+Pushed `harness/2026-09-25-high-providertimeout-of-30-s-makes-roadmap-generation-impossible-`.
+Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36120925682 — **green**:
+`backend-unit` (1m13s), `frontend` (44s), `harness-tooling` (7s), `backend-integration` (40s, ran the new
+`TEST_REDIS_URL`-gated `TestIntegrationQuizStoreStagesAndReusesTheGradedLevel` without skipping).
