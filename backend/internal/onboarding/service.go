@@ -15,6 +15,11 @@ import (
 // ErrInvalidRequest wraps every validation failure (400).
 var ErrInvalidRequest = errors.New("onboarding: invalid request")
 
+// ErrAITimeout means an AI call did not finish inside airouter.TaskTimeout.
+// The handler maps it to 504 ai_timeout; a caller's own cancellation is
+// passed through untouched.
+var ErrAITimeout = errors.New("onboarding: AI call timed out")
+
 // DailyMinutes is the study commitment the roadmap prompt is built for (§1).
 const DailyMinutes = 30
 
@@ -39,7 +44,8 @@ func NewService(repo Repo, quiz QuizStore, limiter airouter.RateLimiter, ai Gene
 
 // Assess validates, short-circuits when a roadmap is already active, then
 // grades, generates and persists — both AI calls before any write, so a
-// failure writes nothing.
+// failure writes nothing. Each AI call runs under its own airouter.TaskTimeout
+// budget (180 s for the roadmap, 30 s otherwise); a budget hit is ErrAITimeout.
 func (s *Service) Assess(ctx context.Context, userID string, req AssessmentRequest) (AssessmentResult, error) {
 	if err := validate(req); err != nil {
 		return AssessmentResult{}, err
@@ -114,7 +120,7 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 func (s *Service) routeJSON(ctx context.Context, task airouter.TaskType, system, user string, parse func(string) error) error {
 	var last error
 	for attempt := 0; attempt < 2; attempt++ {
-		raw, err := s.ai.Route(ctx, task, system, user)
+		raw, err := s.route(ctx, task, system, user)
 		if err != nil {
 			return err
 		}
@@ -129,6 +135,22 @@ func (s *Service) routeJSON(ctx context.Context, task airouter.TaskType, system,
 		return last
 	}
 	return fmt.Errorf("%w: %v", ErrBadAIOutput, last)
+}
+
+// route runs one Route call under the task's own budget (airouter.TaskTimeout:
+// 180 s for the roadmap, 30 s otherwise) and names a deadline of ours
+// ErrAITimeout. If the parent context is done the client is gone, and that
+// error is returned as is.
+func (s *Service) route(ctx context.Context, task airouter.TaskType, system, user string) (string, error) {
+	budget := airouter.TaskTimeout(task)
+	actx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	raw, err := s.ai.Route(actx, task, system, user)
+	if err != nil && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		log.Printf("onboarding: %s did not finish inside %s", task, budget)
+		return "", fmt.Errorf("%w: %s after %s", ErrAITimeout, task, budget)
+	}
+	return raw, err
 }
 
 func validate(req AssessmentRequest) error {

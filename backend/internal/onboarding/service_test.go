@@ -229,3 +229,40 @@ func TestAssessSurfacesARepoFailure(t *testing.T) {
 		t.Fatalf("err = %v, want the repo error", err)
 	}
 }
+
+func TestAssessGivesEachAICallItsOwnDeadline(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.svc.Assess(ctx, "u1", validRequest()); err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	within := func(got, want time.Duration) bool { return got > want-2*time.Second && got <= want }
+	if b := h.ai.budgets[airouter.TaskPlacementTest]; len(b) != 1 || !within(b[0], airouter.DefaultTaskTimeout) {
+		t.Errorf("placement budget = %v, want ≈ %s", b, airouter.DefaultTaskTimeout)
+	}
+	if b := h.ai.budgets[airouter.TaskRoadmapGen]; len(b) != 1 || !within(b[0], airouter.RoadmapTimeout) {
+		t.Errorf("roadmap budget = %v, want ≈ %s (not the 30 s that 502'd on 2026-09-25)", b, airouter.RoadmapTimeout)
+	}
+}
+
+func TestAssessReportsADeadlineHitAsAITimeoutWithoutWriting(t *testing.T) {
+	h := newHarness(t)
+	h.ai.timeout[airouter.TaskRoadmapGen] = true
+
+	_, err := h.svc.Assess(ctx, "u1", validRequest())
+	if !errors.Is(err, ErrAITimeout) {
+		t.Fatalf("err = %v, want ErrAITimeout", err)
+	}
+	if len(h.repo.saved) != 0 {
+		t.Error("a timed-out roadmap wrote an assessment")
+	}
+}
+
+func TestAssessPassesACallerCancellationThroughUnchanged(t *testing.T) {
+	h := newHarness(t)
+	gone, cancel := context.WithCancel(ctx)
+	cancel() // the client disconnected
+	_, err := h.svc.Assess(gone, "u1", validRequest())
+	if !errors.Is(err, context.Canceled) || errors.Is(err, ErrAITimeout) {
+		t.Fatalf("err = %v, want context.Canceled and not ErrAITimeout", err)
+	}
+}

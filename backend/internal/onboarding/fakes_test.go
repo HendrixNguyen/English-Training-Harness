@@ -87,23 +87,32 @@ func (f *fakePet) Ensure(context.Context, string) (PetState, error) {
 type scriptedProvider struct {
 	replies map[airouter.TaskType][]string
 	calls   map[airouter.TaskType]int
-	prompts map[airouter.TaskType][]string // system|user per call
+	prompts map[airouter.TaskType][]string        // system|user per call
+	budgets map[airouter.TaskType][]time.Duration // time left on ctx at each call
+	timeout map[airouter.TaskType]bool            // answer as a model that outlives its deadline
 }
 
 func newScripted() *scriptedProvider {
-	return &scriptedProvider{replies: map[airouter.TaskType][]string{}, calls: map[airouter.TaskType]int{}, prompts: map[airouter.TaskType][]string{}}
+	return &scriptedProvider{replies: map[airouter.TaskType][]string{}, calls: map[airouter.TaskType]int{},
+		prompts: map[airouter.TaskType][]string{}, budgets: map[airouter.TaskType][]time.Duration{}, timeout: map[airouter.TaskType]bool{}}
 }
 
 // task is smuggled through the system prompt: the placement and roadmap
 // prompts are distinct constants, so the fake tells them apart by content.
-func (p *scriptedProvider) GenerateContent(_ context.Context, system, user string) (string, error) {
+func (p *scriptedProvider) GenerateContent(ctx context.Context, system, user string) (string, error) {
 	task := airouter.TaskRoadmapGen
 	if system == PlacementSystemPrompt {
 		task = airouter.TaskPlacementTest
 	}
 	p.prompts[task] = append(p.prompts[task], system+"|"+user)
+	if dl, ok := ctx.Deadline(); ok {
+		p.budgets[task] = append(p.budgets[task], time.Until(dl))
+	}
 	i := p.calls[task]
 	p.calls[task]++
+	if p.timeout[task] {
+		return "", fmt.Errorf("scripted: %s outlived its deadline: %w", task, context.DeadlineExceeded)
+	}
 	if i >= len(p.replies[task]) {
 		return "", fmt.Errorf("scripted: no reply %d for %s", i, task)
 	}
