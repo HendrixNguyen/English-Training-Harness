@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/containerised-deploy-dockerfiles-production-compose-runbook-.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-25-high-containerised-deploy-dockerfiles-production-compose-runbook-
+worktree: /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.worktrees/containerised-deploy-dockerfiles-production-compose-runbook-
 ---
 # Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan
 
@@ -787,3 +789,60 @@ All from the worktree root, no cloud account needed. Docker Desktop must be runn
 - If `docker build --pull` of `golang:1.25-alpine` fails to resolve, check `backend/go.mod`'s `go` line and use the matching minor; do not downgrade the module.
 - If `npm ci` inside the image fails with `ERESOLVE`, the lockfile and `package.json` disagree — that is a frontend bug to file, not something to fix with `--legacy-peer-deps` in the Dockerfile.
 - Compose `.env` parsing: keep comments on their own lines in `deploy/.env.example`.
+
+## Execution summary
+
+Built exactly as planned. All 7 tasks completed, committed one per task, in `backend/Dockerfile`, `frontend/Dockerfile` + `Caddyfile`, `deploy/smoke-api.sh` + `deploy/smoke-web.sh`, `deploy/compose.yml` + `.env.example`, `.github/workflows/ci.yml` (`docker-images` job), `deploy/README.md`, and doc updates (README.md, CLAUDE.md, AGENTS.md, backend spec §9, harness/CODEMAP.md). No app code under `backend/internal/`, `backend/cmd/` or `frontend/` source changed.
+
+**Deviations:**
+1. Task 5's CI snippet as written in the plan (`for i in $(seq 1 20); do curl ...; done`) failed `actionlint` with a shellcheck `SC2034` (unused loop variable `i`). Fixed by renaming the loop variable to `_` — a one-token change within the plan's intent, not a loosened check. actionlint is clean after the fix.
+2. `docker compose -f deploy/compose.yml config -q` without an env file reported a different missing `:?` variable on different runs (`POSTGRES_PASSWORD` in most runs, once `FRONTEND_ORIGIN`, once `NUXT_PUBLIC_API_BASE`) rather than deterministically naming `POSTGRES_PASSWORD` as the plan's expected output shows. This is Compose's own interpolation-order nondeterminism (confirmed by running the same command repeatedly), not a defect in `compose.yml` — every run still failed non-zero with a real `:?` guard message, which is the property that matters (the guards work; the *specific* first-named variable is not load-bearing).
+3. `docker compose -f deploy/compose.yml config` on this machine's Compose v2.39.2 prints ports/healthchecks as expanded YAML objects (`published: "18080"` / `target: 8080`) rather than the plan's `"18080:8080"` shorthand string. Confirmed by grep against the expanded fields instead — the published ports, `--appendonly`, `redis_data` and `FRONTEND_ORIGIN` were all correct.
+
+No other deviations. Every code reference in the runbook was checked to exist; `cli.py validate` and the doc cross-reference count (5, plan required ≥5) both passed.
+
+### Plan `## Verification` output (all 9 items, run from the worktree root)
+
+1. **Both images build** — `aelp-api:local` and `aelp-web:local` both ended `naming to docker.io/library/aelp-…:local`. Sizes: `aelp-api:local` 55MB, `aelp-web:local` 86.3MB.
+2. **API binary runs in its image** — `2026/09/25 04:59:47 config: DATABASE_URL is required`, `exit=1`.
+3. **Compose config refuses a blank, accepts a filled env** — no-env run: non-zero exit with a `:?` guard error (see deviation 2 above); filled scratch `deploy/.env`: `config ok`.
+4. **Stack boots locally, both smoke checks pass**:
+   ```
+   NAME                            STATUS
+   aelp-deploy-verify-api-1        Up (healthy)
+   aelp-deploy-verify-postgres-1   Up (healthy)
+   aelp-deploy-verify-redis-1      Up (healthy)
+   aelp-deploy-verify-web-1        Up (healthy)
+
+   api-1  | migrations applied: [0001_init 0002_google_sync 0003_pet_verdict_dates]
+   api-1  | cors: allowing [http://localhost:18081]
+   api-1  | listening on [::]:8080 (GIN_MODE=release)
+
+   smoke-api.sh: ok healthz status 200, ok healthz body 1, ok auth/google empty body 400,
+                 ok preflight status 204, ok preflight allow-origin, ok preflight foreign origin 403
+                 -> api exit=0
+   smoke-web.sh: ok index 200, ok spa fallback 200, ok sw.js present 200, ok sw.js cache-control no-cache,
+                 ok manifest cache-control no-cache, ok hashed asset found, ok asset cache-control immutable
+                 -> web exit=0
+   ```
+5. **Redis persistence** — `appendonly` / `yes`.
+6. **Tear down, leave nothing** — `docker compose down -v` removed all 4 containers, both volumes, the network; `docker ps` count 0; `git status --short` showed no `.env` staged.
+7. **Workflow valid, docker-images steps pass locally** — `actionlint ok` (after deviation 1's fix); all 5 `run:` blocks (API build, API-run check, web build, web check incl. `deploy/smoke-web.sh`, compose config with/without env) exited 0.
+8. **Existing suites untouched** — backend `make check` (gofmt clean, vet clean, `go test ./... -count=1 -race`): all 13 packages `ok`. Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test:unit` 16 files / 78 tests passed, `npm run build` succeeded.
+9. **CI on the pushed branch** — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36096793213 — conclusion `success`, all 5 jobs green: `backend-unit`, `backend-integration`, `harness-tooling`, `frontend`, `docker-images`.
+
+### Runtime proof (executing-plans/harness-execute skill step 8)
+
+- Built both images from a clean `docker build --pull`.
+- Ran the full backend suite (`make check`, race detector on, no service env vars exported) and the full frontend suite (`lint && typecheck && test:unit && build`) — not just plan-added tests.
+- Booted the real 4-service stack (`postgres`, `redis`, `api`, `web`) via `docker compose -f deploy/compose.yml up -d --build --wait`, exercised it end to end with both smoke scripts against `http://127.0.0.1:18080` / `18081`, and inspected the API's own boot log lines (migrations applied, CORS allow-list, listening address).
+- Ran every command the plan documents a human to run: both direct `docker build`s, the API no-env run, both `compose config` guard checks (blank and filled), the CI job's five `run:` blocks locally, `actionlint`.
+- Cleaned up after every stage: `docker compose down -v` + volume/network removal confirmed, `deploy/.env` deleted, `aelp-web-smoke`/`web` throwaway containers stopped and confirmed absent from `docker ps`, `COMPOSE_PROJECT_NAME` unset. Used the unique `aelp-deploy-verify` project name and ports `18080`/`18081` throughout, since `8080`/`6379` are held by unrelated processes on this machine (confirmed via `lsof` before starting).
+
+### Push and CI
+
+Pushed `harness/2026-09-25-high-containerised-deploy-dockerfiles-production-compose-runbook-` to `origin`. No PR opened (owner takes one PR per day). CI run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36096793213 — green.
+
+### Owner checklist (not executed here)
+
+`deploy/README.md`'s *Owner checklist* — creating the Supabase/Upstash/Railway/Cloudflare Pages accounts, generating and storing secrets, wiring the Google OAuth console, and running the smoke scripts against public URLs — is explicitly the owner's hand-off, per the plan's own Notes ("Owner checklist is not executed by the executor"). None of it was attempted.
