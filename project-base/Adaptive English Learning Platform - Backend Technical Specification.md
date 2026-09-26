@@ -281,6 +281,23 @@ func NewRouter() (*Router, error) {
 {"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff", "pet_state": {"plant_name": "My Green Buddy", "health_points": 100, "stage": "sprout"}}
 ```
 
+* POST /api/v1/roadmaps/regenerate (added 2026-09-26)  
+  * Description: Replaces the caller's active roadmap with a freshly generated one, at the current CEFR level or one step up/down, using the same generation path, parser and rate limiter as onboarding. One transaction: sets users.cefr\_current, deactivates the previous roadmap (kept for history) and inserts the new roadmap with its 84 exercises. day\_number restarts at 1\.  
+  * Request Headers: Authorization: Bearer \<JWT\>, Content-Type: application/json (body optional)  
+  * Request Body:
+
+```json
+{"cefr_level": "B1"}
+```
+
+  * Response (201 Created):
+
+```json
+{"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff"}
+```
+
+  * Errors: 400 invalid\_request (cefr\_level not in the enum, or more than one step from the current level), 404 no\_active\_roadmap (never onboarded — use POST /onboarding/assessment), 429 rate\_limited, 503 ai\_unavailable, 502 ai\_bad\_output, 504 ai\_timeout, 502 ai\_upstream\_failed, 500 internal\_error.
+
 ## **6.2 Quests & Progress Endpoints**
 
 * GET /api/v1/quests/daily  
