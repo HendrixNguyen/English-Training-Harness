@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md
-status: approved
+status: done
 priority: high
 merged: false
 design: harness/designs/stay-signed-in.md
+branch: harness/2026-09-26-high-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve
+worktree: .worktrees/stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve
 ---
 # Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan
 
@@ -139,3 +141,42 @@ Design acceptance (`harness/designs/stay-signed-in.md` §8):
 - [ ] Offline, a cache-served `quests/daily` / `pet/status` response carries no `X-Session-Token`.
 - [ ] The Vitest/Playwright tests named in §8 exist and pass.
 Manual (reviewer, live or local): sign in, set `expiresAt` in `aelp.auth` to now + 11 h, load `/`, see `X-Session-Token` in the network tab and no re-render; set `expiresAt` in the past, reload `/`, read the sentence; "Đăng xuất" → gone.
+
+## Execution summary
+
+**Built.** All five tasks landed as separate commits on `harness/2026-09-26-high-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve`, each preceded by a failing test:
+
+1. `auth: Require renews a session below half-life (X-Session-Token); old token invalid at once` — `token.go` gained `Claims` (subject + expiry; `Verify` now wraps it), `renew.go` (`RenewBelow = TokenTTL/2`, `maybeRenew`, `HeaderSessionToken`/`HeaderSessionExpiresIn`), `middleware.go`'s `Require` calls `maybeRenew` once after the existing `stored != raw` check. Six new tests in `renew_test.go` (half-life boundary at exactly half and one second under, old-token rejection after renewal, no renewal on a revoked session or an expired token, and a failed `Put` serving the request on the old token with one log line and no header).
+2. `middleware: CORS exposes X-Session-Token and X-Session-Expires-In` — one `c.Header` call in the allowed non-preflight branch (a string literal, per the plan's note that `middleware` must not import `auth`), one new test asserting present/absent across allowed, preflight and foreign-origin cases.
+3. `web: adopt X-Session-Token silently, retry a 401 once after a renewal, never cache the header` — `apiClient.ts` gained `onRenew` and the one-retry-on-401 logic; `stores/auth.ts` gained `renew()` (guarded against non-positive `expiresIn`/no user, never calls `clearApiCache`); `useApi.ts` wires it; `service-worker/sw.ts`'s `api-state` `NetworkFirst` strategy gained a `cacheWillUpdate` plugin backed by a new pure `service-worker/apiStateCache.ts::stripSessionHeaders`.
+4. `web: /login?reason=expired explains the 24-hour idle expiry` — `middleware/auth.global.ts` now redirects with `?reason=expired` only when a *stored* token was present but expired (a missing token still gets a bare `/login`); new `utils/loginReason.ts::loginNotice`; `pages/login.vue` renders the `⏳` `AppCard` between the tagline and the Google button.
+5. `docs: sliding session in the backend spec and CODEMAP` — backend spec §7 gained the idle-window sentence; CODEMAP `auth`, `middleware` and `shell` entries updated.
+
+**Deviations:**
+- `service-worker/apiStateCache.ts` is a new file the plan's file-structure table didn't list (only `sw.ts` + a new test were named). Extracted `stripSessionHeaders` into it — mirroring the existing `push.ts` split — because `sw.ts` runs top-level `self.__WB_MANIFEST` service-worker setup that a Vitest/happy-dom environment can't boot; a plain exported function is what `tests/unit/swApiState.test.ts` (named in the plan) actually needed to import.
+- `TestRequireDoesNotRenewAtOrAboveHalfLife` covers both "one second above half" (named in the plan) and "exactly half" (named only in Review Focus #1) as subtests, so both the step-1 bullet and the review checklist are satisfied by one test function.
+- `renew_test.go` uses its own `fakeRenewSessions` (map + `putErr` + `putCalls`) rather than `session_test.go`'s shared `fakeSessions`, whose single `err` field would also fail the `Get` that `Require` does just before `maybeRenew` — needed to isolate a failing `Put` from a failing `Get`.
+
+**Verification (all green, from a clean shell):**
+```
+cd backend && go build ./... && gofmt -l . && go vet ./... && go test -timeout 120s ./... -count=1 -race
+  → ok for all 13 packages (cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store); gofmt -l empty; go vet clean.
+cd backend && make test-integration (TEST_DATABASE_URL/TEST_REDIS_URL against the isolated stack below)
+  → 12 Integration tests pass, including auth's own TestIntegrationUpsertCreatesThenPreservesTheLearnerState (unaffected).
+cd frontend && npm ci && npm run lint && npm run typecheck && npm run test:unit && npm run build && npx playwright test tests/e2e/login.spec.ts
+  → ESLint: no issues; typecheck: clean; 18 test files / 92 tests pass (incl. the new apiClient, authStore, loginReason, swApiState, and the updated authMiddleware suites); npm run build succeeds (including the sw.ts workbox build); 5/5 Playwright tests pass, including the two new login.spec.ts cases.
+```
+
+**Runtime proof (COMPOSE_PROJECT_NAME=stay-signed-in, Postgres 55613 / Redis 56613 / API 8613):**
+- Booted `docker compose -p stay-signed-in up -d --wait` (Postgres+Redis healthy), then `go run ./cmd/api` on PORT=8613 with a scratch `.env` (JWT_SECRET, ENCRYPTION_SECRET_KEY, dummy Google client id/secret, FRONTEND_ORIGIN=http://localhost:3613) — migrations applied, API listening.
+- Real user path exercised end to end: issued a JWT (via a throwaway `cmd/devtoken` helper using the running server's own `JWT_SECRET`, deleted afterwards — never committed) whose remaining life was one second under `TokenTTL/2`, seeded it into Redis as `sess:dev-user-1:token`, then `curl`ed a guarded endpoint with `Origin: http://localhost:3613`:
+  - Response carried `X-Session-Token` (a fresh, different JWT), `X-Session-Expires-In: 86400`, and `Access-Control-Expose-Headers: X-Session-Token, X-Session-Expires-In`.
+  - A second request with the **old** token → `401`.
+  - A request with the **new** token → succeeds at the auth layer with no further renewal header (not yet below half-life).
+  - An `OPTIONS` preflight to the same origin → `204` with no `Access-Control-Expose-Headers` (present only on the actual request, as designed).
+- `npx playwright test tests/e2e/login.spec.ts` additionally boots the real built Nuxt server (`node .output/server/index.mjs`) and drives it with a real Chromium browser — the `/login?reason=expired` and `/login` (no reason) cases render through the actual page, not a mock.
+- Cleanup verified: `docker compose -p stay-signed-in down` (containers + network removed, `docker ps` empty for the project), the API process on port 8613 killed (`lsof -i :8613` empty), the scratch `backend/.env` and the throwaway `backend/cmd/devtoken/` deleted, `git status --short` clean before pushing.
+
+**CI:** pushed `harness/2026-09-26-high-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve`; run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36227582887 — all five jobs green (`docker-images`, `backend-integration`, `harness-tooling`, `backend-unit`, `frontend`).
+
+No PR opened (owner takes one PR per day per AGENTS.md).
