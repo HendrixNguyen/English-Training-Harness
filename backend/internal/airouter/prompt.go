@@ -44,13 +44,20 @@ const RoadmapSchema = `{
 }
 "modules" has exactly 4 entries, each "days" exactly 7, each "tasks" exactly 3 with the three types in that order. "content" is free-form JSON for the task material (word lists, passages, prompts).`
 
-// RoadmapUserPrompt is the user turn for TaskRoadmapGen.
+// RoadmapUserPrompt is the user turn for TaskRoadmapGen. It carries a CEFR
+// descriptor (LevelGuidance) and the goal's register so a B1 Business
+// English learner gets workplace tasks, not "Good morning / one, two,
+// three" — the guidance lives here, not in RoadmapSystemPrompt, which stays
+// the §6.1 text verbatim (prompt_test.go pins it).
 func RoadmapUserPrompt(cefrLevel, targetGoal string, dailyMinutes int) string {
 	return fmt.Sprintf(`Learner profile:
 - Current CEFR level: %s
 - Target goal: %s
 - Daily study time: %d minutes
 
+Write every task for a %s learner. %s
+Every task must use the language of the learner's goal ("%s"): its situations, vocabulary and register. Day 1 starts inside that goal — never generic greetings, numbers or classroom basics unless the level is A1.
+
 Produce the 28-day roadmap as JSON with exactly this schema:
-%s`, cefrLevel, targetGoal, dailyMinutes, RoadmapSchema)
+%s`, cefrLevel, targetGoal, dailyMinutes, cefrLevel, LevelGuidance(cefrLevel), targetGoal, RoadmapSchema)
 }
