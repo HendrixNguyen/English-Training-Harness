@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { tokens } from '~/tailwind.config'
 
 /**
- * 48-px button (design §5). Depth is a hard, blurless bottom shadow in the
+ * 48-px button (design §5). Depth is a hard, sharp-edged bottom shadow in the
  * variant's `-deep` colour; pressed drops it to 2px with no transition
  * (design §3 "pressed within 100ms: no transitions on press"). `loading`
  * keeps the label in the DOM at `opacity-0` (so the button's width never
