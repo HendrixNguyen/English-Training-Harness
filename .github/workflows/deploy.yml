@@ -115,10 +115,11 @@ jobs:
       - name: Generate the static site
         working-directory: frontend
         run: |
-          npx nuxi generate
+          npm run generate:pages
           test -f .output/public/index.html
           test -f .output/public/sw.js
           test -f .output/public/manifest.webmanifest
+          test ! -f .output/public/404.html
 
       # `--branch main` names the Pages project's production slot (set when the
       # project was created), not the git branch: any other value would land

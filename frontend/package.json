@@ -12,6 +12,7 @@
     "typecheck": "nuxi typecheck",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "generate:pages": "nuxi generate && rm -f .output/public/404.html",
     "pwa:assets": "pwa-assets-generator"
   },
   "dependencies": {
