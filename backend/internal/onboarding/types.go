@@ -43,3 +43,17 @@ type AssessmentResult struct {
 	PetState      PetState `json:"pet_state"`
 	Created       bool     `json:"-"`
 }
+
+// RegenerateRequest is the POST /api/v1/roadmaps/regenerate body (backend
+// spec §6.1.3, added by this plan). CEFRLevel is optional; omitted means the
+// current level.
+type RegenerateRequest struct {
+	CEFRLevel string `json:"cefr_level"`
+}
+
+// RegenerateResult is the §6.1.3 response.
+type RegenerateResult struct {
+	Status        string `json:"status"`
+	AssessedLevel string `json:"assessed_level"`
+	RoadmapID     string `json:"roadmap_id"`
+}

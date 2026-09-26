@@ -318,3 +318,106 @@ func TestAssessGradesAgainWhenTheRetryChangesAnAnswer(t *testing.T) {
 		t.Errorf("placement graded %d times, want 2", h.ai.calls[airouter.TaskPlacementTest])
 	}
 }
+
+func TestRegenerateReplacesTheActiveRoadmapAtTheCurrentLevel(t *testing.T) {
+	h := newHarness(t)
+	h.repo.activeID = "rm-existing"
+	h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "Business English"}
+
+	out, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{})
+	if err != nil {
+		t.Fatalf("Regenerate: %v", err)
+	}
+	if h.ai.calls[airouter.TaskRoadmapGen] != 1 || h.ai.calls[airouter.TaskPlacementTest] != 0 {
+		t.Errorf("AI calls = %v, want one roadmap call and no placement call", h.ai.calls)
+	}
+	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
+	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "Current CEFR level: B1") || !strings.Contains(gen, "Business English") {
+		t.Errorf("roadmap prompt = %.160s…", gen)
+	}
+	if len(h.repo.replaceCalls) != 1 || h.repo.replaceCalls[0].level != "B1" {
+		t.Errorf("replaceCalls = %+v, want one call at B1", h.repo.replaceCalls)
+	}
+	if out.Status != "success" || out.AssessedLevel != "B1" || out.RoadmapID != h.repo.nextID {
+		t.Errorf("out = %+v", out)
+	}
+	if h.limiter.calls != 1 {
+		t.Errorf("limiter calls = %d, want 1", h.limiter.calls)
+	}
+}
+
+func TestRegenerateAcceptsOneStepAndRejectsTwo(t *testing.T) {
+	cases := []struct {
+		current, requested string
+		wantErr            bool
+	}{
+		{"B1", "B2", false},
+		{"B1", "A2", false},
+		{"B1", "C1", true},
+		{"A1", "A1", false},
+		{"C2", "B2", true},
+		{"B1", "b2", true},
+		{"B1", "", false}, // omitted → current level
+	}
+	for _, tc := range cases {
+		t.Run(tc.current+"->"+tc.requested, func(t *testing.T) {
+			h := newHarness(t)
+			h.repo.activeID = "rm-existing"
+			h.repo.profile = Profile{CEFRCurrent: tc.current, TargetGoal: "goal"}
+
+			_, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{CEFRLevel: tc.requested})
+			if tc.wantErr {
+				if !errors.Is(err, ErrInvalidRequest) {
+					t.Fatalf("err = %v, want ErrInvalidRequest", err)
+				}
+				if h.limiter.calls != 0 || h.ai.calls[airouter.TaskRoadmapGen] != 0 {
+					t.Errorf("rejected request had side effects: limiter=%d ai=%v", h.limiter.calls, h.ai.calls)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestRegenerateWithoutAnActiveRoadmapIs404(t *testing.T) {
+	h := newHarness(t)
+	// h.repo.activeID left empty: ActiveRoadmapID returns ok=false.
+
+	_, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{})
+	if !errors.Is(err, ErrNoActiveRoadmap) {
+		t.Fatalf("err = %v, want ErrNoActiveRoadmap", err)
+	}
+	if h.limiter.calls != 0 || len(h.ai.calls) != 0 {
+		t.Errorf("404 path had side effects: limiter=%d ai=%v", h.limiter.calls, h.ai.calls)
+	}
+}
+
+func TestRegenerateAIFailureWritesNothing(t *testing.T) {
+	h := newHarness(t)
+	h.repo.activeID = "rm-existing"
+	h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+	h.ai.replies[airouter.TaskRoadmapGen] = nil // scripted returns an error → router: all providers failed
+
+	_, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{})
+	if !errors.Is(err, airouter.ErrAllProvidersFailed) {
+		t.Fatalf("err = %v, want ErrAllProvidersFailed", err)
+	}
+	if len(h.repo.replaceCalls) != 0 {
+		t.Error("provider failure wrote a roadmap")
+	}
+
+	h2 := newHarness(t)
+	h2.repo.activeID = "rm-existing"
+	h2.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+	h2.ai.replies[airouter.TaskRoadmapGen] = []string{`{"modules":[]}`, `{"modules":[]}`}
+
+	if _, err := h2.svc.Regenerate(ctx, "u1", RegenerateRequest{}); !errors.Is(err, ErrBadAIOutput) {
+		t.Fatalf("err = %v, want ErrBadAIOutput", err)
+	}
+	if len(h2.repo.replaceCalls) != 0 {
+		t.Error("malformed roadmap wrote something")
+	}
+}

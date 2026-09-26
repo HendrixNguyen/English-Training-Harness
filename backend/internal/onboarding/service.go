@@ -20,6 +20,15 @@ var ErrInvalidRequest = errors.New("onboarding: invalid request")
 // passed through untouched.
 var ErrAITimeout = errors.New("onboarding: AI call timed out")
 
+// ErrNoActiveRoadmap means Regenerate was called by a user who never
+// onboarded (no active roadmap to replace). The handler maps it to 404
+// no_active_roadmap.
+var ErrNoActiveRoadmap = errors.New("onboarding: no active roadmap")
+
+// cefrOrder is the CEFR scale, used by stepAllowed to bound Regenerate's
+// level change to one step either way.
+var cefrOrder = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
+
 // DailyMinutes is the study commitment the roadmap prompt is built for (§1).
 const DailyMinutes = 30
 
@@ -123,6 +132,74 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		log.Printf("onboarding: clearing quiz hash for %s: %v", userID, err) // it expires anyway
 	}
 	return AssessmentResult{Status: "success", AssessedLevel: level, RoadmapID: roadmapID, PetState: pet, Created: true}, nil
+}
+
+// Regenerate replaces the caller's active roadmap with a fresh one — at the
+// current CEFR level, or one step up/down — using the same generation path
+// and limiter as Assess. It writes nothing until the roadmap has parsed
+// (ReplaceRoadmap is the only write, one transaction).
+func (s *Service) Regenerate(ctx context.Context, userID string, req RegenerateRequest) (RegenerateResult, error) {
+	if _, ok, err := s.repo.ActiveRoadmapID(ctx, userID); err != nil {
+		return RegenerateResult{}, err
+	} else if !ok {
+		return RegenerateResult{}, ErrNoActiveRoadmap
+	}
+
+	profile, err := s.repo.Profile(ctx, userID)
+	if err != nil {
+		return RegenerateResult{}, err
+	}
+
+	level := req.CEFRLevel
+	if level == "" {
+		level = profile.CEFRCurrent
+	}
+	if !cefrLevels[level] || !stepAllowed(profile.CEFRCurrent, level) {
+		return RegenerateResult{}, fmt.Errorf("%w: cefr_level must be within one step of %s", ErrInvalidRequest, profile.CEFRCurrent)
+	}
+
+	if err := s.limiter.Allow(ctx, userID); err != nil {
+		return RegenerateResult{}, err
+	}
+
+	var roadmap airouter.Roadmap
+	if err := s.routeJSON(ctx, airouter.TaskRoadmapGen, airouter.RoadmapSystemPrompt, airouter.RoadmapUserPrompt(level, profile.TargetGoal, DailyMinutes), func(raw string) error {
+		rm, err := airouter.ParseRoadmap(raw)
+		roadmap = rm
+		return err
+	}); err != nil {
+		return RegenerateResult{}, err
+	}
+
+	roadmapID, err := s.repo.ReplaceRoadmap(ctx, userID, level, roadmap)
+	if err != nil {
+		return RegenerateResult{}, err
+	}
+	log.Printf("onboarding: regenerated roadmap %s for %s at %s", roadmapID, userID, level)
+	return RegenerateResult{Status: "success", AssessedLevel: level, RoadmapID: roadmapID}, nil
+}
+
+// stepAllowed reports whether requested is current or one CEFR step away
+// (A1..C2). Both must be known levels; an unknown level is never allowed.
+func stepAllowed(current, requested string) bool {
+	ci, ri := indexOf(cefrOrder, current), indexOf(cefrOrder, requested)
+	if ci < 0 || ri < 0 {
+		return false
+	}
+	d := ci - ri
+	if d < 0 {
+		d = -d
+	}
+	return d <= 1
+}
+
+func indexOf(levels []string, level string) int {
+	for i, l := range levels {
+		if l == level {
+			return i
+		}
+	}
+	return -1
 }
 
 // routeJSON calls the router and parses; a malformed body is retried once,
