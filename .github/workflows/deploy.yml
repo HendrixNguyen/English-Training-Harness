@@ -155,13 +155,27 @@ jobs:
         if: env.DRY_RUN != 'true'
         run: deploy/smoke-api.sh "$API_URL" "$PAGES_URL"
 
+      - name: Wait for the Pages edge
+        if: env.DRY_RUN != 'true'
+        # A fresh Pages deployment serves its hashed assets as no-store for a
+        # short window (ship of 2026-09-25 failed on exactly that, then passed
+        # two minutes later). Wait, bounded, for the two signals the smoke
+        # check asserts; on timeout fall through and let it fail honestly.
+        run: |
+          start=$(date +%s)
+          for _ in $(seq 1 18); do
+            asset=$(curl -sS --max-time 10 "$PAGES_URL/" | grep -o '/_nuxt/[^"]*\.js' | head -1 || true)
+            cc=$(curl -sS --max-time 10 -I "$PAGES_URL$asset" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}' || true)
+            spa=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$PAGES_URL/learn/abc" || true)
+            if [ -n "$asset" ] && [ "$cc" = "public, max-age=31536000, immutable" ] && [ "$spa" = "200" ]; then
+              echo "edge ready after $(( $(date +%s) - start ))s"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::edge not ready after $(( $(date +%s) - start ))s (asset='$asset' cache-control='$cc' /learn/abc=$spa) — running the smoke check anyway"
+
       - name: Smoke-check the PWA
         if: env.DRY_RUN != 'true'
-        env:
-          # Deep links answer 404 on Pages until the inbox bug
-          # "pages-ignores-the-redirects-spa-rewrite-while-404-html-exist" is
-          # fixed; that one check warns instead of failing. Remove with the fix.
-          SMOKE_WEB_SPA_WARN: '1'
         run: deploy/smoke-web.sh "$PAGES_URL"
 
       # Only a green ship from production is a release; a manual redeploy or
