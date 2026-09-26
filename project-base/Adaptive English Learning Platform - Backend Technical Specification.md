@@ -267,18 +267,18 @@ func NewRouter() (*Router, error) {
 ```
 
 * POST /api/v1/onboarding/assessment  
-  * Description: Submitting placement quiz answers, invoking Gemini AI for CEFR grading, generating 28-day roadmap JSON, and creating initial pet state.  
+  * Description: Submitting placement quiz answers, invoking Gemini AI for CEFR grading, generating 28-day roadmap JSON, and creating initial pet state. plant_name is optional — trimmed, 1–30 characters; blank or absent names the plant "Mầm Non" (the DDL default is not used by this endpoint).  
   * Request Headers: Authorization: Bearer \<JWT\>, Content-Type: application/json  
   * Request Body:
 
 ```json
-{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}
+{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "plant_name": "Mầm Non", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}
 ```
 
   * Response (201 Created):
 
 ```json
-{"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff", "pet_state": {"plant_name": "My Green Buddy", "health_points": 100, "stage": "sprout"}}
+{"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff", "pet_state": {"plant_name": "Mầm Non", "health_points": 100, "stage": "sprout"}}
 ```
 
 ## **6.2 Quests & Progress Endpoints**
