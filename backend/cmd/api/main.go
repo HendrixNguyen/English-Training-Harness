@@ -196,6 +196,7 @@ func main() {
 	)
 	guarded.GET("/onboarding/quiz", onboarding.QuizHandler())
 	guarded.POST("/onboarding/assessment", onboarding.AssessmentHandler(onboardingSvc))
+	guarded.POST("/roadmaps/regenerate", onboarding.RegenerateHandler(onboardingSvc))
 
 	ln, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {

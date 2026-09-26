@@ -3,6 +3,7 @@ package onboarding
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,6 +21,7 @@ func newRouter(svc *Service, userID string) *gin.Engine {
 	g := r.Group("/api/v1", func(c *gin.Context) { c.Set(auth.ContextUserID, userID); c.Next() })
 	g.GET("/onboarding/quiz", QuizHandler())
 	g.POST("/onboarding/assessment", AssessmentHandler(svc))
+	g.POST("/roadmaps/regenerate", RegenerateHandler(svc))
 	return r
 }
 
@@ -30,6 +32,24 @@ func post(r *gin.Engine, body string) *httptest.ResponseRecorder {
 	r.ServeHTTP(w, req)
 	return w
 }
+
+// postRegenerate posts to POST /api/v1/roadmaps/regenerate. body == nil sends
+// no body at all (ContentLength 0), matching a bare POST with no JSON.
+func postRegenerate(r *gin.Engine, body *string) *httptest.ResponseRecorder {
+	var reader io.Reader
+	if body != nil {
+		reader = strings.NewReader(*body)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/roadmaps/regenerate", reader)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func strPtr(s string) *string { return &s }
 
 // spec61Request is the backend spec §6.1 example body with the bank's ids.
 const spec61Request = `{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}`
@@ -101,5 +121,94 @@ func TestAssessmentErrorMapping(t *testing.T) {
 				t.Errorf("status = %d body = %s, want %d %s", w.Code, w.Body.String(), tc.status, tc.code)
 			}
 		})
+	}
+}
+
+func TestRegenerateHandlerNoBodyKeepsTheCurrentLevel(t *testing.T) {
+	h := newHarness(t)
+	h.repo.activeID = "rm-existing"
+	h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+
+	w := postRegenerate(newRouter(h.svc, "u1"), nil)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+	}
+	want := `{"status":"success","assessed_level":"B1","roadmap_id":"rm-new"}`
+	if strings.TrimSpace(w.Body.String()) != want {
+		t.Errorf("body =\n%s\nwant\n%s", w.Body.String(), want)
+	}
+}
+
+func TestRegenerateHandlerWithLevelReturns201(t *testing.T) {
+	h := newHarness(t)
+	h.repo.activeID = "rm-existing"
+	h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+
+	w := postRegenerate(newRouter(h.svc, "u1"), strPtr(`{"cefr_level":"B2"}`))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
+	}
+	want := `{"status":"success","assessed_level":"B2","roadmap_id":"rm-new"}`
+	if strings.TrimSpace(w.Body.String()) != want {
+		t.Errorf("body =\n%s\nwant\n%s", w.Body.String(), want)
+	}
+}
+
+func TestRegenerateHandlerErrorMapping(t *testing.T) {
+	cases := []struct {
+		name   string
+		setup  func(h *harness)
+		body   *string
+		status int
+		code   string
+	}{
+		{"two steps away", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+			h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+		}, strPtr(`{"cefr_level":"C1"}`), 400, "invalid_request"},
+		{"malformed json", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+		}, strPtr(`nonsense`), 400, "invalid_request"},
+		{"no active roadmap", nil, nil, 404, "no_active_roadmap"},
+		{"rate limited", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+			h.limiter.err = airouter.ErrRateLimited
+		}, nil, 429, "rate_limited"},
+		{"no providers", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+			h.svc = NewService(h.repo, h.quiz, h.limiter, airouter.NewRouterWithProviders(nil), h.pet, fixedClock(sept22))
+		}, nil, 503, "ai_unavailable"},
+		{"bad output twice", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+			h.ai.replies[airouter.TaskRoadmapGen] = []string{"x", "y"}
+		}, nil, 502, "ai_bad_output"},
+		{"ai timed out", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+			h.ai.timeout[airouter.TaskRoadmapGen] = true
+		}, nil, 504, "ai_timeout"},
+		{"all providers failed", func(h *harness) {
+			h.repo.activeID = "rm-existing"
+			h.ai.replies[airouter.TaskRoadmapGen] = nil
+		}, nil, 502, "ai_upstream_failed"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			if tc.setup != nil {
+				tc.setup(h)
+			}
+			w := postRegenerate(newRouter(h.svc, "u1"), tc.body)
+			if w.Code != tc.status || !strings.Contains(w.Body.String(), `"error":"`+tc.code+`"`) {
+				t.Errorf("status = %d body = %s, want %d %s", w.Code, w.Body.String(), tc.status, tc.code)
+			}
+		})
+	}
+}
+
+func TestRegenerateHandlerRequiresAuth(t *testing.T) {
+	h := newHarness(t)
+	w := postRegenerate(newRouter(h.svc, ""), nil)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
 	}
 }
