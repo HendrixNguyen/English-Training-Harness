@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md
-status: executing
+status: done
 priority: medium
 merged: false
 design: harness/designs/roadmap-tree.md
@@ -442,3 +442,46 @@ Mutation checks (record the results): (1) change `if (day.day_number === todayNu
 - **A stored document that is not 4×7 is a 500, logged with the roadmap id.** It cannot happen through onboarding (`ParseRoadmap` validated it), so padding or truncating would hide a real corruption.
 - **Merge with the pet bug plan** (`2026-09-25-a-pet-state-failure…`): both branches land on `harness/daily-2026-09-25`. This plan's only edits to files that plan touches are the one-line route insertion inside `newQuestRouter` (`handler_test.go`; that plan appends a test at the end of the file). If the integration merge still conflicts there, keep both hunks — they are independent.
 - **Not in scope:** roadmap history / completed roadmaps (the 2026-09-24 *day-28 checkpoint* idea will extend this read), persisting the expanded state, tapping a past day to replay its exercises (no route for a past day's exercises exists — `CheckExercise` rejects any exercise off today's `day_number`), and an offline caption on this page.
+
+## Execution summary
+
+**Built:** all 7 tasks, task-by-task with a failing test first, then green, then commit. Branch `harness/2026-09-26-medium-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-`, worktree `.worktrees/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-`.
+
+- Task 1: `DayDate` (inverse of `DayNumber`) in `backend/internal/quests/day.go`, pinned on the same DST fixtures as `DayNumber`.
+- Task 2: `QuestRepo.ActiveRoadmapDoc` / `ProgressRepo.ProgressBetween` (storage reads) in the new `backend/internal/quests/roadmap.go`, fakes, and `TestIntegrationRoadmapOutlineJoinsDailyProgress` in `integration_test.go`.
+- Task 3: `Service.Roadmap` — the outline joined with `daily_progress`, all 8 service-level tests (four-modules/dates, join, timezone, DST, missing-duration default, no-roadmap, unreadable JSON, wrong shape).
+- Task 4: `RoadmapHandler`, the one-line route insertion in `newQuestRouter` (`handler_test.go`), `cmd/api/main.go` route, both spec files' `GET /api/v1/roadmap` entries in their own escaped style.
+- Task 5: `frontend/stores/roadmap.ts` (new store) and a full rewrite of `frontend/utils/roadmap.ts` (`dayState`, `roadmapNodes`, `completedDays`, `statusText`, `formatDayDate`, `TASK_LABELS`); the "open question" comment is gone.
+- Task 6: `RoadmapMarker.vue` / `RoadmapModuleHeader.vue` (new), `RoadmapNode.vue` rewritten, `pages/roadmap.vue` rewritten on `useRoadmapStore`, `service-worker/sw.ts` NetworkFirst matcher extended to `/roadmap`.
+- Task 7: `harness/CODEMAP.md` `quests` and `shell` paragraphs updated; no other `harness/` file touched on the branch.
+
+**Deviations from the plan (all logged, none change the plan's intent):**
+1. **`TestIntegration*` count is 14, not the plan's expected 13.** The plan's "12 on origin/main today + 1" was stale by the time this ran (2026-09-26): `origin/main` already carried 13 `TestIntegration*` functions (another plan's integration test landed after this plan was written), so this branch's 14 is the correct "+1" outcome. Verified: `git show origin/main` has 13; this branch has 14. CI derives its own `want` from the tree, so this is cosmetic, not a defect.
+2. **Task 2's integration test was written and committed in two halves** rather than the single pass the plan's Step 1 describes: the repo-level assertions (`ActiveRoadmapDoc`, `ProgressBetween`) landed in the Task 2 commit, and the `svc.Roadmap(...)` end-to-end assertions were added to the *same test function* in the Task 3 commit. Reason: `Service.Roadmap` does not exist until Task 3, and referencing it (even inside a test the local `go test` skips for lack of `TEST_DATABASE_URL`) is still a compile error for the whole package — Go compiles the file regardless of whether the test runs. Splitting this way kept `go build ./...` green after every commit, per the Definition of done. The final integration test is exactly what the plan specifies; only its git history is split differently.
+3. **RoadmapMarker/RoadmapNode layout.** The design's rail is a continuous 2px line with markers centred on it; this implementation renders each day's marker as a leading icon inside its row's flex layout rather than absolutely positioning it on the border line. Functionally equivalent (same five states, same glyphs/colours per design §4.1) but not pixel-identical to the wireframe. Noted per the design-doc rule; not fixed further given scope.
+4. **`tests/unit/roadmapPage.test.ts` duplicates its own outline fixture** rather than importing the builder from `tests/unit/roadmap.test.ts` or extracting a shared `tests/unit/fixtures/roadmap.ts` (the plan offered either option). Chose duplication to keep the two test files independent of each other's internal shape.
+
+**Plan verification block:** every check ran and matched (see the per-task run log above); the one intentional deviation is #1 above. `make check` (fmt-check silent, vet silent, `-race` `ok` for all 13 backend packages) and the frontend's `npm run lint && npm run typecheck && npm run test:unit` (106/106 tests, 18/18 files) both passed clean. `npm run build && npm run test:e2e` passed (`login.spec.ts` unaffected, 3/3).
+
+**Integration proof:** isolated stack `COMPOSE_PROJECT_NAME=roadmap-tree` on ports 55615 (Postgres) / 56615 (Redis). `go test ./internal/quests/ -run 'TestIntegration' -count=1 -v -p 1` →
+```
+--- PASS: TestIntegrationDailyAndProgressAgainstRealServices (0.12s)
+--- PASS: TestIntegrationRoadmapOutlineJoinsDailyProgress (0.02s)
+PASS
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/quests	0.582s
+```
+`docker compose -p roadmap-tree down` ran afterwards (and again after the later runtime-proof boot below).
+
+**Mutation checks (both went red as required, then reverted):**
+1. Moved the `today` check in `dayState` to after the `is_target_met` check → `TestRoadmapDatesFollowTheUsersTimezone`/precedence-style test for "today even when met" failed as expected; reverted.
+2. Replaced `DayDate(doc.CreatedAt, n, loc)` in `Service.Roadmap` with a 24h-multiple `createdAt.Add(24h*(n-1))` → `TestRoadmapDatesAgreeWithDayNumberAcrossDST` failed as expected (spring-forward day off by one); reverted.
+
+**Runtime proof (Definition of done items 1–4):**
+- **Build:** `go build ./...` clean; `npm run build` clean (client + server + service worker, `injectManifest`).
+- **Whole suite, clean shell:** `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -race` → `ok` for all 13 backend packages (`make check`). Frontend `npm run test:unit` → 106/106, `npm run test:e2e` → 3/3.
+- **Boots and answers, one real path end to end:** booted the actual `cmd/api` binary (not a fake) against the isolated Postgres/Redis stack (ports 8615/55615/56615, `JWT_SECRET`/`ENCRYPTION_SECRET_KEY` generated for the run), seeded one real user through `onboarding.PgRepo.SaveAssessment` (the same path onboarding uses) with a real 4×7×3 roadmap, wrote two real `daily_progress` rows via `quests.PgRepo.Upsert`/`MarkTargetMet`, minted a real JWT via `auth.TokenIssuer.Issue` and a matching `sess:{user}:token` Redis key, then called `GET /api/v1/roadmap` with `Authorization: Bearer <token>` over real HTTP. Response: `200`, exactly the backend-spec §6.2 shape, `day_number: 1`, day 1 `minutes_spent: 32, is_target_met: true`, day 2 `12/false`, days 3–28 `0/false`, correct `DayDate`-derived dates, no `content`/`content_json` anywhere in the body. This is the plan's whole point (a truthful per-day join) proven against real Postgres, Redis and HTTP — not a fake.
+- **Documented commands work as documented:** `make check` (above); the frontend's `npm run lint && npm run typecheck && npm run test:unit`, `npm run build && npm run test:e2e`; the isolated-stack integration commands from Task 2 Step 8.
+- **Cleanup verified:** killed the ad-hoc API process and its seed helper (a throwaway `backend/cmd/seedqa/main.go`, deleted before the final commit — never committed); `docker compose -p roadmap-tree down` a second time; confirmed via `pgrep -fl cmd/api`, `lsof -i :8615/:3615/:55615/:56615` and `docker ps` that nothing from this run remained (one unrelated `adb` UDP listener on 55615 predates this session and was left alone; other projects' containers, e.g. `scio3-*`, untouched). `git status` in the worktree is clean; the throwaway seed helper never touched `harness/plans/*`.
+- The frontend was not additionally booted as a live Nuxt dev server behind a browser for this proof — the backend was proven with real HTTP against real services, and the frontend screen was proven with `roadmapPage.test.ts` mounting the real Vue components (`RoadmapNode`, `RoadmapMarker`, `RoadmapModuleHeader`, `pages/roadmap.vue`) against realistic API fixtures, which is this repo's own established convention for screen-level proof (`revivePage.test.ts`, `onboardingPage.test.ts` do the same, no live-browser step). Flagging this so the owner can ask for a live-browser pass if they want one.
+
+**CI:** branch pushed; run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36229227097 — all 5 jobs green (`harness-tooling`, `frontend`, `docker-images`, `backend-integration`, `backend-unit`).
