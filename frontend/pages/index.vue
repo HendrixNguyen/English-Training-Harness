@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useGrowthMoment } from '~/composables/useGrowthMoment'
 import { usePetStore } from '~/stores/pet'
 import { useQuestStore } from '~/stores/quest'
 import { speechLine } from '~/utils/plant'
 
 const quest = useQuestStore()
 const pet = usePetStore()
+const { start, chips, grow, pulse, displayHealth, displayStage } = useGrowthMoment()
 
 onMounted(() => {
+  start(pet.consumeDelta())
   void Promise.all([pet.load(), quest.load()])
 })
 
 const bubble = computed(() => pet.status
-  ? speechLine({ stage: pet.status.stage, health: pet.status.health_points, targetMet: quest.targetMet })
+  ? speechLine({
+      stage: pet.status.stage,
+      health: pet.status.health_points,
+      targetMet: quest.targetMet,
+      accumulatedSeconds: quest.accumulatedSeconds,
+      streak: pet.status.current_streak,
+      lastPracticedAt: pet.status.last_practiced_at,
+    })
   : '')
 
 function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked' | 'open' {
@@ -24,7 +34,7 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
 
 <template>
   <main class="mx-auto max-w-md px-4 pb-8">
-    <AppHeader :streak="pet.status?.current_streak ?? null" />
+    <AppHeader :streak="pet.status?.current_streak ?? null" :pulse="pulse" />
 
     <NuxtLink
       v-if="pet.isWilted"
@@ -35,12 +45,15 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
       <span class="text-sm underline">Cứu cây ngay</span>
     </NuxtLink>
 
-    <AppCard class="mb-4">
+    <AppCard class="relative mb-4">
       <StateBlock v-if="pet.loading && !pet.status" state="loading" />
       <StateBlock v-else-if="pet.error && !pet.status" state="error" message="Không tải được cây của bạn." action="Thử lại" @action="pet.load()" />
       <template v-else-if="pet.status">
-        <PlantSvg :stage="pet.status.stage" :health="pet.status.health_points" />
-        <HealthBar class="mt-3" :health="pet.status.health_points" />
+        <TransitionGroup name="chip" tag="div" class="absolute right-4 top-4 flex flex-col items-end gap-1.5" aria-live="polite">
+          <GrowthChip v-for="c in chips" :key="c.tone" :text="c.text" :tone="c.tone" />
+        </TransitionGroup>
+        <PlantSvg :stage="displayStage(pet.status.stage)" :health="displayHealth(pet.status.health_points)" :grow="grow" />
+        <HealthBar class="mt-3" :health="displayHealth(pet.status.health_points)" />
         <SpeechBubble v-if="bubble !== '…'" :line="bubble" />
       </template>
     </AppCard>
@@ -73,3 +86,21 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
     </template>
   </main>
 </template>
+
+<style scoped>
+@media (prefers-reduced-motion: no-preference) {
+  .chip-enter-active {
+    transition: opacity 200ms ease-out, transform 200ms ease-out;
+  }
+  .chip-leave-active {
+    transition: opacity 200ms ease-out;
+  }
+  .chip-enter-from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  .chip-leave-to {
+    opacity: 0;
+  }
+}
+</style>
