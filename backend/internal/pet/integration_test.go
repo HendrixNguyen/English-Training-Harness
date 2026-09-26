@@ -113,6 +113,99 @@ func TestIntegrationEnsureCreatesExactlyOnePetRow(t *testing.T) {
 	}
 }
 
+// TestIntegrationEnsureNamedWritesOnceAndKeepsTheNameOnRepeat proves
+// ensureNamedSQL against a real database: the ON CONFLICT DO UPDATE creates
+// or renames the 1:1 row, an empty name is Ensure, and a repeated name with
+// the IS DISTINCT FROM guard is a no-op write.
+func TestIntegrationEnsureNamedWritesOnceAndKeepsTheNameOnRepeat(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("TEST_DATABASE_URL is unset; run `make up` and export it to run integration tests")
+	}
+	ctx := context.Background()
+
+	pg, err := store.NewPostgres(ctx, url)
+	if err != nil {
+		t.Fatalf("NewPostgres: %v", err)
+	}
+	t.Cleanup(pg.Close)
+	if _, err := store.Migrate(ctx, pg.Migrator(), store.MigrationsFS); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	const gid = "google-pet-named-integration"
+	_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid)
+	var userID string
+	if err := pg.Pool.QueryRow(ctx,
+		`INSERT INTO users (email, google_id, target_goal, timezone) VALUES ($1, $2, '', 'Asia/Ho_Chi_Minh') RETURNING id`,
+		"pet-named@example.com", gid).Scan(&userID); err != nil {
+		t.Fatalf("inserting user: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid) })
+
+	repo := NewPgRepo(pg.Pool)
+	svc := NewService(repo, newFakeChallenges(), newFakeStudy(), time.Now)
+
+	// Eight concurrent EnsureNamed(same name): one row, zero errors.
+	var wg sync.WaitGroup
+	errs := make(chan error, 8)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := svc.EnsureNamed(ctx, userID, "Mầm Non"); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent EnsureNamed: %v", err)
+	}
+
+	var n int
+	if err := pg.Pool.QueryRow(ctx, `SELECT count(*) FROM pet_states WHERE user_id = $1`, userID).Scan(&n); err != nil {
+		t.Fatalf("counting rows: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("pet_states rows = %d, want 1", n)
+	}
+
+	st, err := repo.Get(ctx, userID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if st.PlantName != "Mầm Non" || st.HealthPoints != 100 || st.Stage != StageSprout {
+		t.Errorf("fresh named row = %+v, want Mầm Non/100/sprout", st)
+	}
+
+	// An empty name is exactly Ensure: keeps the name.
+	if st, err = svc.EnsureNamed(ctx, userID, ""); err != nil || st.PlantName != "Mầm Non" {
+		t.Errorf("EnsureNamed(\"\") = %+v, %v; want the name kept", st, err)
+	}
+
+	// A different name renames the row.
+	if st, err = svc.EnsureNamed(ctx, userID, "Lá Xanh"); err != nil || st.PlantName != "Lá Xanh" {
+		t.Errorf("EnsureNamed(Lá Xanh) = %+v, %v; want the name replaced", st, err)
+	}
+	if err := pg.Pool.QueryRow(ctx, `SELECT count(*) FROM pet_states WHERE user_id = $1`, userID).Scan(&n); err != nil {
+		t.Fatalf("counting rows: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("pet_states rows after rename = %d, want 1", n)
+	}
+
+	// The IS DISTINCT FROM guard makes a repeated name a no-op write.
+	tag, err := pg.Pool.Exec(ctx, ensureNamedSQL, userID, "Lá Xanh")
+	if err != nil {
+		t.Fatalf("repeat ensureNamedSQL: %v", err)
+	}
+	if tag.RowsAffected() != 0 {
+		t.Errorf("RowsAffected on an unchanged name = %d, want 0", tag.RowsAffected())
+	}
+}
+
 // The service's once-per-day guarantees are SQL predicates, not Go checks;
 // this test is what proves them. It also pins PgRepo.PenaliseMiss's SQL
 // arithmetic to ApplyMiss.
