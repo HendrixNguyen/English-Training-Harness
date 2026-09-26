@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
 import { ApiError } from '~/utils/apiClient'
+import { stageForStreak } from '~/utils/plant'
 
 /** Backend spec §6.3 GET /pet/status. */
 export interface PetStatus {
@@ -26,6 +27,17 @@ interface Challenge {
   startSeconds: number
 }
 
+/** What the last progress response changed — the hub's growth moment reads it once (design growth-moment §3). */
+export interface GrowthDelta {
+  healthFrom: number
+  healthTo: number
+  streakFrom: number
+  streakTo: number
+  stageFrom: string
+  stageTo: string
+  targetMetNow: boolean
+}
+
 function storageOrNull(): Storage | null {
   return typeof localStorage === 'undefined' ? null : localStorage
 }
@@ -37,6 +49,7 @@ export const usePetStore = defineStore('pet', {
     error: null as string | null,
     challenge: null as Challenge | null,
     notWilted: false,
+    lastDelta: null as GrowthDelta | null,
   }),
   getters: {
     isWilted: s => s.status !== null && (s.status.health_points <= 0 || s.status.stage === 'wilted'),
@@ -53,10 +66,33 @@ export const usePetStore = defineStore('pet', {
         this.loading = false
       }
     },
-    applyProgress(res: { pet_health: number, streak_count: number }) {
+    /**
+     * §6.2 progress response. Either pet field is absent when the backend's pet
+     * read failed (CODEMAP quests) — then it is neither applied nor counted.
+     * `targetMetChanged` comes from `useQuestStore.complete()`.
+     */
+    applyProgress(res: { pet_health?: number, streak_count?: number, targetMetChanged?: boolean }) {
+      this.lastDelta = null
       if (!this.status) return
-      this.status.health_points = res.pet_health
-      this.status.current_streak = res.streak_count
+      const from = { health: this.status.health_points, streak: this.status.current_streak, stage: this.status.stage }
+      if (typeof res.pet_health === 'number') this.status.health_points = res.pet_health
+      if (typeof res.streak_count === 'number') this.status.current_streak = res.streak_count
+      // Stage after: the same table the backend's SaveTargetMet writes; GET /pet/status on the hub confirms it.
+      // Recompute only when health or streak actually moved — a stored `stage` that predates this
+      // table (or a load raced by the backend) must not flip on a call where nothing changed.
+      if (typeof res.pet_health === 'number' && typeof res.streak_count === 'number' && (res.pet_health !== from.health || res.streak_count !== from.streak)) {
+        this.status.stage = stageForStreak(res.streak_count, res.pet_health)
+      }
+      const to = { health: this.status.health_points, streak: this.status.current_streak, stage: this.status.stage }
+      const targetMetNow = res.targetMetChanged === true
+      if (to.health === from.health && to.streak === from.streak && to.stage === from.stage && !targetMetNow) return
+      this.lastDelta = { healthFrom: from.health, healthTo: to.health, streakFrom: from.streak, streakTo: to.streak, stageFrom: from.stage, stageTo: to.stage, targetMetNow }
+    },
+    /** The hub takes the delta once; a reload or a second visit sees the steady state. */
+    consumeDelta(): GrowthDelta | null {
+      const d = this.lastDelta
+      this.lastDelta = null
+      return d
     },
     hydrateChallenge() {
       const raw = storageOrNull()?.getItem(REVIVE_STORAGE_KEY)
