@@ -12,7 +12,7 @@ onMounted(() => {
 })
 
 const bubble = computed(() => pet.status
-  ? speechLine({ stage: pet.status.stage, health: pet.status.health_points, targetMet: quest.targetMet })
+  ? speechLine({ stage: pet.status.stage, health: pet.status.health_points, targetMet: quest.targetMet, streak: pet.status.current_streak, shields: pet.status.shields })
   : '')
 
 function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked' | 'open' {
@@ -41,6 +41,7 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
       <template v-else-if="pet.status">
         <PlantSvg :stage="pet.status.stage" :health="pet.status.health_points" />
         <HealthBar class="mt-3" :health="pet.status.health_points" />
+        <ShieldRow class="mt-2" :shields="pet.status.shields" :last-used-on="pet.status.last_shield_used_on" :today="quest.daily?.date" />
         <SpeechBubble v-if="bubble !== '…'" :line="bubble" />
       </template>
     </AppCard>
