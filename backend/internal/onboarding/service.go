@@ -88,6 +88,15 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		}); err != nil {
 			return AssessmentResult{}, err
 		}
+		// The bank's own correct answers set a deterministic floor: the AI's
+		// grade can never be lowered, but a learner whose answers prove a
+		// higher level is never graded below it.
+		if floor := GradeFloor(req.Answers); floor != level {
+			if raised := maxLevel(level, floor); raised != level {
+				log.Printf("onboarding: placement %s raised to %s by the answer floor for %s", level, raised, userID)
+				level = raised
+			}
+		}
 		if err := s.quiz.StageLevel(ctx, userID, level, store.PlacementQuizTTL); err != nil {
 			log.Printf("onboarding: staging level for %s: %v", userID, err) // a retry grades again
 		}

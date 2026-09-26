@@ -38,11 +38,15 @@ func newHarness(t *testing.T) *harness {
 func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 	h := newHarness(t)
 
+	// validRequest() answers every bank item correctly, so GradeFloor is C1 —
+	// higher than the scripted grader's B1 — and the placement floor raises
+	// the assessed level to C1 (a 10/10 learner cannot be graded below what
+	// their own answers prove).
 	out, err := h.svc.Assess(ctx, "u1", validRequest())
 	if err != nil {
 		t.Fatalf("Assess: %v", err)
 	}
-	if !out.Created || out.Status != "success" || out.AssessedLevel != "B1" || out.RoadmapID != "rm-new" {
+	if !out.Created || out.Status != "success" || out.AssessedLevel != "C1" || out.RoadmapID != "rm-new" {
 		t.Errorf("out = %+v", out)
 	}
 	if out.PetState != (PetState{PlantName: "My Green Buddy", HealthPoints: 100, Stage: "sprout"}) {
@@ -52,8 +56,8 @@ func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 		t.Fatalf("saved %d assessments, want 1", len(h.repo.saved))
 	}
 	a := h.repo.saved[0]
-	if a.CEFRLevel != "B1" || a.TargetGoal != "IELTS 7.0 Preparation" || a.Timezone != "Asia/Ho_Chi_Minh" || a.NotificationTime != "20:00:00" {
-		t.Errorf("assessment = %+v, want the §6.1 request fields", a)
+	if a.CEFRLevel != "C1" || a.TargetGoal != "IELTS 7.0 Preparation" || a.Timezone != "Asia/Ho_Chi_Minh" || a.NotificationTime != "20:00:00" {
+		t.Errorf("assessment = %+v, want the §6.1 request fields (raised to the floor C1)", a)
 	}
 	if ex := a.Roadmap.Exercises(); len(ex) != 84 || !strings.Contains(string(ex[0].ContentJSON), `"title"`) || !strings.Contains(string(ex[0].ContentJSON), `"duration_minutes":10`) {
 		t.Errorf("exercises = %d rows, first content %s; want 84 with title and duration_minutes", len(ex), ex[0].ContentJSON)
@@ -79,9 +83,10 @@ func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 	if h.quiz.level["u1"] != "" {
 		t.Error("the staged level must go with the hash on success")
 	}
-	// The generation prompt is the airouter constant and carries the graded level and goal.
+	// The generation prompt is the airouter constant and carries the raised
+	// (floored) level and goal.
 	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
-	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "B1") || !strings.Contains(gen, "IELTS 7.0 Preparation") {
+	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "C1") || !strings.Contains(gen, "IELTS 7.0 Preparation") {
 		t.Errorf("roadmap prompt = %.120s…", gen)
 	}
 }
@@ -277,15 +282,17 @@ func TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry(t *test
 	if _, err := h.svc.Assess(ctx, "u1", validRequest()); !errors.Is(err, airouter.ErrAllProvidersFailed) {
 		t.Fatalf("first Assess: %v, want ErrAllProvidersFailed", err)
 	}
-	if h.quiz.level["u1"] != "B1" || len(h.repo.saved) != 0 || h.quiz.cleared != 0 {
-		t.Fatalf("after the failed roadmap: level=%q saved=%d cleared=%d; want the level staged, nothing written, hash kept", h.quiz.level["u1"], len(h.repo.saved), h.quiz.cleared)
+	// validRequest() answers every bank item correctly, so the placement
+	// floor (C1) raises the graded B1 before it is staged.
+	if h.quiz.level["u1"] != "C1" || len(h.repo.saved) != 0 || h.quiz.cleared != 0 {
+		t.Fatalf("after the failed roadmap: level=%q saved=%d cleared=%d; want the raised level staged, nothing written, hash kept", h.quiz.level["u1"], len(h.repo.saved), h.quiz.cleared)
 	}
 
 	h.ai.replies[airouter.TaskRoadmapGen] = []string{fixtureRoadmapJSON(t)}
 	h.ai.calls[airouter.TaskRoadmapGen] = 0
 	out, err := h.svc.Assess(ctx, "u1", validRequest())
-	if err != nil || !out.Created || out.AssessedLevel != "B1" {
-		t.Fatalf("retry: %+v, %v; want a created roadmap at the staged level", out, err)
+	if err != nil || !out.Created || out.AssessedLevel != "C1" {
+		t.Fatalf("retry: %+v, %v; want a created roadmap at the staged (raised) level", out, err)
 	}
 	if h.ai.calls[airouter.TaskPlacementTest] != 1 {
 		t.Errorf("placement graded %d times, want 1 — the retry must reuse the staged level", h.ai.calls[airouter.TaskPlacementTest])
@@ -293,8 +300,63 @@ func TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry(t *test
 	if h.limiter.calls != 2 {
 		t.Errorf("limiter calls = %d, want 2 (one slot per assessment call, retry included)", h.limiter.calls)
 	}
-	if len(h.repo.saved) != 1 || h.repo.saved[0].CEFRLevel != "B1" || h.quiz.cleared != 1 || h.quiz.level["u1"] != "" {
+	if len(h.repo.saved) != 1 || h.repo.saved[0].CEFRLevel != "C1" || h.quiz.cleared != 1 || h.quiz.level["u1"] != "" {
 		t.Errorf("after the retry: saved=%d cleared=%d level=%q", len(h.repo.saved), h.quiz.cleared, h.quiz.level["u1"])
+	}
+}
+
+// TestAssessRaisesTheAILevelToTheFloor: the AI grades A2 but the bank
+// answers are all correct (GradeFloor == C1), so the deterministic floor
+// wins — a 10/10 learner cannot be staged, generated for or persisted below
+// what their own answers prove.
+func TestAssessRaisesTheAILevelToTheFloor(t *testing.T) {
+	h := newHarness(t)
+	h.ai.replies[airouter.TaskPlacementTest] = []string{`{"cefr_level":"A2"}`}
+
+	out, err := h.svc.Assess(ctx, "u1", validRequest())
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	if out.AssessedLevel != "C1" {
+		t.Errorf("AssessedLevel = %q, want the floor C1", out.AssessedLevel)
+	}
+	if h.repo.saved[0].CEFRLevel != "C1" {
+		t.Errorf("saved CEFRLevel = %q, want C1", h.repo.saved[0].CEFRLevel)
+	}
+	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
+	if !strings.Contains(gen, "C1") {
+		t.Errorf("roadmap prompt = %.160s…, want the raised level C1", gen)
+	}
+	if h.quiz.level["u1"] != "" {
+		t.Error("the staged level must go with the hash on success")
+	}
+}
+
+// TestAssessKeepsAHigherAILevel: the floor never lowers the AI's own grade.
+func TestAssessKeepsAHigherAILevel(t *testing.T) {
+	h := newHarness(t)
+	h.ai.replies[airouter.TaskPlacementTest] = []string{`{"cefr_level":"B2"}`}
+	req := validRequest()
+	// Only the A1 pair right: GradeFloor stops at A1, well below the AI's B2.
+	for i := range req.Answers {
+		if req.Answers[i].QuestionID == "q1" || req.Answers[i].QuestionID == "q2" {
+			continue
+		}
+		q, _ := Lookup(req.Answers[i].QuestionID)
+		for opt := range q.Options {
+			if opt != q.Correct {
+				req.Answers[i].SelectedOption = opt
+				break
+			}
+		}
+	}
+
+	out, err := h.svc.Assess(ctx, "u1", req)
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	if out.AssessedLevel != "B2" {
+		t.Errorf("AssessedLevel = %q, want the AI's own B2 kept", out.AssessedLevel)
 	}
 }
 

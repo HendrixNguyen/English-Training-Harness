@@ -50,6 +50,71 @@ func PlacementUserPrompt(answers []Answer) string {
 
 var cefrLevels = map[string]bool{"A1": true, "A2": true, "B1": true, "B2": true, "C1": true, "C2": true}
 
+// cefrOrder is the fixed ladder GradeFloor and maxLevel walk. C2 is reachable
+// only through the AI grader — the placement Bank tops out at C1, so the
+// floor never reaches it (see GradeFloor).
+var cefrOrder = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
+
+// GradeFloor derives a deterministic floor from the bank's own correct
+// answers, independent of the AI grader: a learner who answers both items of
+// a level correctly has proven at least that level. It walks the ladder from
+// A1, requiring both items of a level correct to advance past it, and stops
+// at the first level that fails — so a wrong A1 item caps the floor at A1
+// even if every later item is right. It never returns below A1 and, because
+// the bank has no C2 items, never above C1; unknown question ids are
+// skipped (validate has already rejected them upstream; this stays
+// defensive).
+func GradeFloor(answers []Answer) string {
+	correct := map[string]int{}
+	total := map[string]int{}
+	for _, q := range Bank {
+		total[q.Level]++
+	}
+	for _, a := range answers {
+		q, ok := Lookup(a.QuestionID)
+		if !ok {
+			continue
+		}
+		if q.Correct == a.SelectedOption {
+			correct[q.Level]++
+		}
+	}
+	floor := "A1"
+	for _, level := range cefrOrder {
+		if total[level] == 0 || correct[level] != total[level] {
+			break
+		}
+		floor = level
+	}
+	return floor
+}
+
+// maxLevel returns whichever of a, b sits higher in cefrOrder. An unknown
+// level loses to a known one so a stray value never wins by accident.
+func maxLevel(a, b string) string {
+	ai, aok := cefrIndex(a)
+	bi, bok := cefrIndex(b)
+	if !aok {
+		return b
+	}
+	if !bok {
+		return a
+	}
+	if ai >= bi {
+		return a
+	}
+	return b
+}
+
+func cefrIndex(level string) (int, bool) {
+	for i, l := range cefrOrder {
+		if l == level {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 // ParsePlacement decodes {"cefr_level": "..."} strictly: no fence, no
 // preamble, no trailing tokens, level in the §3.2 enum (case-sensitive).
 func ParsePlacement(raw string) (string, error) {
