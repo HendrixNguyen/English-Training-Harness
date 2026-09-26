@@ -31,13 +31,13 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
-// petForOnboarding adapts *pet.Service to onboarding.Pet. onboarding defines
-// its own PetState so it never imports pet (pet imports quests; quests' tests
-// import onboarding — an import here would be a cycle).
+// petForOnboarding adapts *pet.Service.EnsureNamed to onboarding.Pet.
+// onboarding defines its own PetState so it never imports pet (pet imports
+// quests; quests' tests import onboarding — an import here would be a cycle).
 type petForOnboarding struct{ svc *pet.Service }
 
-func (p petForOnboarding) Ensure(ctx context.Context, userID string) (onboarding.PetState, error) {
-	st, err := p.svc.Ensure(ctx, userID)
+func (p petForOnboarding) Ensure(ctx context.Context, userID, plantName string) (onboarding.PetState, error) {
+	st, err := p.svc.EnsureNamed(ctx, userID, plantName)
 	if err != nil {
 		return onboarding.PetState{}, err
 	}
