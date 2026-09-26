@@ -121,7 +121,7 @@ func TestMigrateAppliesPendingVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Migrate() = %v, want nil error", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_pet_shields"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("applied = %v, want %v", got, want)
 	}
 	if m.ensured != 1 {
@@ -258,6 +258,25 @@ func TestMigration0003AddsPetVerdictDates(t *testing.T) {
 	for _, w := range []string{"DROP COLUMN IF EXISTS last_target_met_date", "DROP COLUMN IF EXISTS judged_through"} {
 		if !strings.Contains(down, w) {
 			t.Errorf("0003_pet_verdict_dates.down.sql is missing %q", w)
+		}
+	}
+}
+
+func TestMigration0004AddsPetShields(t *testing.T) {
+	up := readMigration(t, "0004_pet_shields.up.sql")
+	for _, w := range []string{
+		"ALTER TABLE pet_states",
+		"ADD COLUMN shields INT NOT NULL DEFAULT 0 CHECK (shields BETWEEN 0 AND 2)",
+		"ADD COLUMN last_shield_used_on DATE",
+	} {
+		if !strings.Contains(up, w) {
+			t.Errorf("0004_pet_shields.up.sql is missing %q", w)
+		}
+	}
+	down := readMigration(t, "0004_pet_shields.down.sql")
+	for _, w := range []string{"DROP COLUMN IF EXISTS shields", "DROP COLUMN IF EXISTS last_shield_used_on"} {
+		if !strings.Contains(down, w) {
+			t.Errorf("0004_pet_shields.down.sql is missing %q", w)
 		}
 	}
 }

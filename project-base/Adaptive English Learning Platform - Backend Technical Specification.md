@@ -158,6 +158,11 @@ CREATE TABLE google_sync (
 ALTER TABLE pet_states
     ADD COLUMN last_target_met_date DATE,
     ADD COLUMN judged_through DATE;
+
+-- Added by migration 0004 (streak shield): one shield per 7th consecutive met day, max 2; spent in place of a miss penalty.
+ALTER TABLE pet_states
+    ADD COLUMN shields INT NOT NULL DEFAULT 0 CHECK (shields BETWEEN 0 AND 2),
+    ADD COLUMN last_shield_used_on DATE;
 ```
 
 \---
