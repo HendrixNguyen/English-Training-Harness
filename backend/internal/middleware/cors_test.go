@@ -110,6 +110,27 @@ func TestTheEchoedOriginIsTheMatchedOneNeverAWildcardOrTheList(t *testing.T) {
 	}
 }
 
+func TestCORSExposesTheSessionHeaders(t *testing.T) {
+	const want = "X-Session-Token, X-Session-Expires-In"
+
+	get := do(t, newCORSRouter(t, app), http.MethodGet, "/api/v1/onboarding/quiz", map[string]string{"Origin": app})
+	if got := get.Header().Get("Access-Control-Expose-Headers"); got != want {
+		t.Errorf("allowed origin, actual request: Expose-Headers = %q, want %q", got, want)
+	}
+
+	preflight := do(t, newCORSRouter(t, app), http.MethodOptions, "/api/v1/onboarding/quiz", map[string]string{
+		"Origin": app, "Access-Control-Request-Method": "GET",
+	})
+	if got := preflight.Header().Get("Access-Control-Expose-Headers"); got != "" {
+		t.Errorf("preflight: Expose-Headers = %q, want none", got)
+	}
+
+	foreign := do(t, newCORSRouter(t, app), http.MethodGet, "/api/v1/onboarding/quiz", map[string]string{"Origin": "https://evil.example"})
+	if got := foreign.Header().Get("Access-Control-Expose-Headers"); got != "" {
+		t.Errorf("foreign origin: Expose-Headers = %q, want none", got)
+	}
+}
+
 func TestParseOrigins(t *testing.T) {
 	for _, tc := range []struct {
 		in   string

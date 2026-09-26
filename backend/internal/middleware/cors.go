@@ -88,6 +88,11 @@ func CORS(allowed []string) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
+		// auth.HeaderSessionToken / auth.HeaderSessionExpiresIn (middleware must
+		// not import auth): a browser hides response headers from JS unless the
+		// server lists them here, and Require's silent session renewal needs
+		// the PWA to read both.
+		c.Header("Access-Control-Expose-Headers", "X-Session-Token, X-Session-Expires-In")
 		c.Next()
 	}
 }
