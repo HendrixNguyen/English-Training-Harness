@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-26 14:44. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 14:47. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -88,12 +88,11 @@ _none_
 - `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — airouter amend: `TestParseRoadmapRejects` proves the day-sum rule — rows only the day budget can reject, keyed by reason — Plan [high]
 - `harness/plans/2026-09-25-growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub — Plan [medium]
 - `harness/plans/2026-09-25-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md` — Name your plant at onboarding and see it greet you by name on the hub — Plan [medium]
-- `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium]
 - `harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan [medium]
 
 ## Executing
 
-- `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md` — pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan [medium]
+- `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium]
 - `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high]
 
 ## Done (last 10)
@@ -104,10 +103,10 @@ _none_
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high] (unreviewed)
 - `harness/plans/2026-09-25-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md` — Ship on merge: a deploy workflow that builds the PWA and uploads it to Cloudflare Pages on every push to main, then smoke-checks both public URLs — Plan [high] (unreviewed)
 - `harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan [high] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md` — pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md` — Containerised deploy: Dockerfiles, production compose, runbook and CI image build — Plan [high] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-25-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md` — cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan [medium] (unreviewed)
 
 ## Failed
 
