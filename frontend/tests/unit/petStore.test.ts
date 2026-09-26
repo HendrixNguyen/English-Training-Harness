@@ -7,7 +7,7 @@ vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
 
 const { REVIVE_SECONDS, REVIVE_STORAGE_KEY, usePetStore } = await import('~/stores/pet')
 
-const status = { plant_name: 'My Green Buddy', health_points: 80, stage: 'sprout', current_streak: 5, last_practiced_at: '2026-09-21T20:15:00Z' }
+const status = { plant_name: 'My Green Buddy', health_points: 80, stage: 'sprout', current_streak: 5, last_practiced_at: '2026-09-21T20:15:00Z', shields: 0, last_shield_used_on: null }
 
 describe('usePetStore', () => {
   beforeEach(() => {
@@ -24,6 +24,14 @@ describe('usePetStore', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/pet/status')
     expect(pet.status?.health_points).toBe(80)
     expect(pet.isWilted).toBe(false)
+  })
+
+  it('load exposes shields and last_shield_used_on', async () => {
+    api.get.mockResolvedValue({ ...status, shields: 1, last_shield_used_on: '2026-09-24' })
+    const pet = usePetStore()
+    await pet.load()
+    expect(pet.status?.shields).toBe(1)
+    expect(pet.status?.last_shield_used_on).toBe('2026-09-24')
   })
 
   it('isWilted when health is 0 or stage is wilted', async () => {

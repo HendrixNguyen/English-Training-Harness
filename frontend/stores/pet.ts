@@ -9,6 +9,9 @@ export interface PetStatus {
   stage: string
   current_streak: number
   last_practiced_at: string | null
+  /** streak shield (backend spec §6.3, additive): 0–2 held; the local YYYY-MM-DD a shield was last spent for, or null. */
+  shields: number
+  last_shield_used_on: string | null
 }
 
 /** Backend spec §6.3 POST /pet/revive 200 body. */
