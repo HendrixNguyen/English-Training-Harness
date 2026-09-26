@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-26-high-every-public-table-is-readable-and-writable-through-supabase
+worktree: .worktrees/every-public-table-is-readable-and-writable-through-supabase
 ---
 # Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan
 
@@ -119,3 +121,25 @@ diff <(sed -n '/-- Added by migration 0004/,/END \$\$;/p' "../project-base/Adapt
 git push -u origin harness/2026-09-26-high-every-public-table-is-readable-and-writable-through-supabase   # backend-unit + backend-integration green
 ```
 Live proof after the ship (owner, recorded in the Execution summary as a follow-up, not run by the executor): Supabase Security Advisor shows 0 `rls_disabled_in_public`; `SET ROLE anon; SELECT count(*) FROM users;` → permission denied.
+
+## Execution summary
+
+Built exactly per plan: `0004_rls.up.sql`/`.down.sql` (ENABLE/DISABLE RLS on all 8 tables + guarded `DO $$` revoking `anon`/`authenticated` grants), `TestMigration0004EnablesRLSOnEveryTable` and `TestEveryTableCreatedByAMigrationHasRLS` (convention test) in `migrations_test.go`, `TestIntegrationMigrateLeavesNoTableWithoutRLS` in `integration_test.go`, spec §3.2 DDL block + prose, `deploy/README.md` Supabase paragraph + owner checklist box, `harness/CODEMAP.md` `store` bullet. Three commits: `87080bd` (migration + unit tests), `2e03010` (integration test), `94d8870` (docs).
+
+**Deviations:**
+- Migrate.Apply runs each `*.up.sql` as one `tx.Exec` (confirmed by `0001_init`, which already relies on multi-statement execution in one call), so the `DO $$ … $$` block needed no adaptation — noted in the plan as an open question, resolved by inspection, no design change.
+- Two pre-existing tests not named in the plan also hardcode the applied-migrations list and would have broken on `go build`/`go test ./...` once `0004_rls` existed: `TestMigrateAppliesPendingVersions` (`migrations_test.go`) and `TestIntegrationConcurrentMigrateDoesNotRace`'s `const versions = 3` (`integration_test.go`). Updated both to include `0004_rls` — required for a green `go test ./...`, not a scope change.
+- The convention-test regex initially false-positived on its own migration's prose comment ("every future CREATE TABLE is followed by ENABLE ROW LEVEL SECURITY" matched `CREATE TABLE is`); fixed by stripping `-- ` line comments before matching (`stripSQLComments`) rather than reworking the comment wording, since the plan's own convention comment is worth keeping verbatim in the SQL file.
+
+**Plan Verification:** all commands run as specified (worktree slug `every-public-table-is-readable-and-writable-through-supabase`, `COMPOSE_PROJECT_NAME=rls`, ports 55452/56399/18091 per the routine's instructions rather than the plan's placeholder). `go build ./... && gofmt -l . && go vet ./...` clean. `go test ./internal/store -run 'Migration|EveryTable' -v`: all PASS including the two new tests. `go test ./... -run Integration -p 1 -count=1 -v` against the migrated (RLS-enabled) DB: every package's integration tests PASS — `store`, `airouter`, `auth`, `google`, `notify`, `onboarding`, `pet`, `quests` — proving the API's own reads/writes are unaffected by RLS. `psql`-equivalent (`docker exec … psql`) confirmed all 8 tables `rowsecurity = t` after `Migrate`. The DDL-identity diff on the `DO $$ … END $$;` block (spec vs. migration) is byte-identical (exit 0).
+
+**Red→green evidence:**
+- `TestMigration0004EnablesRLSOnEveryTable` / `TestEveryTableCreatedByAMigrationHasRLS`: moved `0004_rls.{up,down}.sql` aside → both FAIL (`EveryTableCreated` names all 8 tables as missing RLS, reproducing the underlying bug — every table Supabase exposes has no RLS). Restored the files → both PASS.
+- Convention-bites proof (Review Focus #1): added a throwaway `0099_x.up.sql` with `CREATE TABLE x (id int);` → `TestEveryTableCreatedByAMigrationHasRLS` FAILS naming `x`; deleted the file → PASS again.
+- `TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent` against the live compose DB, before editing its expected list: FAILED (`applied [... 0004_rls], want [...]` — the old hardcoded list), confirming the new migration runs; updated the expectation → PASS.
+
+**Runtime proof:** `go build ./...`, `gofmt -l .`, `go vet ./...` clean. Full unit suite in a clean shell (`env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -race`): all 13 packages `ok`. Booted the real API binary (`go run`-built, `cmd/api`) against the migrated compose DB (`COMPOSE_PROJECT_NAME=rls`, Postgres 55452, Redis 56399, API 18091) — `/healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`. Exercised a normal authenticated path end to end: inserted a `users` row directly, issued a real JWT via `auth.TokenIssuer.Issue` and a matching Redis session via `auth.RedisSessionStore.Put` (both from a throwaway `cmd/rlsproof` program inside the module, deleted afterward — never committed), then `GET /api/v1/pet/status` with that bearer token → `200`, and the resulting `pet_states` row was confirmed in Postgres (`INSERT … ON CONFLICT DO NOTHING` succeeded under RLS via the API's own `postgres` role, proving the app is unaffected). `docker exec … psql … pg_tables` showed `rowsecurity = t` for all 8 tables. Cleaned up: killed the API process (`pgrep -fl` confirmed gone), `docker compose down` (project `rls`; `docker ps --filter name=rls` empty afterward), removed the scratch `backend/.env` and the throwaway `cmd/rlsproof` (never staged/committed).
+
+**CI:** pushed `harness/2026-09-26-high-every-public-table-is-readable-and-writable-through-supabase`. Run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36217414467 — all 5 jobs green (`backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling`).
+
+**Left for the owner:** apply this migration to the live Supabase project (the hand-applied 2026-09-25 SQL-editor stopgap already has RLS on, but `0004_rls` must still run there to register in `schema_migrations` and to revoke the `anon`/`authenticated` grants, which the stopgap did not do) and then disable Supabase's Data API / remove `public` from *Exposed schemas* (`deploy/README.md` owner checklist). After that: verify in Supabase Security Advisor (0 `rls_disabled_in_public`) and `SET ROLE anon; SELECT count(*) FROM users;` → permission denied, per this plan's "Live proof after the ship" note.
