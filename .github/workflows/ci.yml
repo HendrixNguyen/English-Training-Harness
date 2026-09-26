@@ -183,7 +183,7 @@ jobs:
           for _ in $(seq 1 20); do curl -sf --max-time 2 http://127.0.0.1:18081/healthz >/dev/null && break; sleep 1; done
           docker run --rm --entrypoint sh aelp-web:ci -c 'grep -rql "api.example.test" /srv' \
             || { echo "::error::NUXT_PUBLIC_API_BASE build arg did not reach the generated site"; exit 1; }
-          deploy/smoke-web.sh http://127.0.0.1:18081
+          SMOKE_WEB_ASSET_404=1 deploy/smoke-web.sh http://127.0.0.1:18081
           docker stop web
       - name: Production compose file is valid
         run: |
