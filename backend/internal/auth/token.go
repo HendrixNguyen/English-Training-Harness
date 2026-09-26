@@ -42,9 +42,10 @@ func (t *TokenIssuer) Issue(userID string) (string, error) {
 	return signed, nil
 }
 
-// Verify checks the signature and expiry, requires an exp claim, and returns
-// the subject.
-func (t *TokenIssuer) Verify(token string) (string, error) {
+// Claims checks the signature and expiry, requires an exp claim, and returns
+// the subject and the expiry — Require's renewal check needs the latter,
+// Verify does not.
+func (t *TokenIssuer) Claims(token string) (string, time.Time, error) {
 	parsed, err := jwt.ParseWithClaims(token, &jwt.RegisteredClaims{},
 		func(tok *jwt.Token) (any, error) {
 			if _, ok := tok.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -57,11 +58,18 @@ func (t *TokenIssuer) Verify(token string) (string, error) {
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return "", fmt.Errorf("auth: verifying token: %w", err)
+		return "", time.Time{}, fmt.Errorf("auth: verifying token: %w", err)
 	}
 	claims, ok := parsed.Claims.(*jwt.RegisteredClaims)
 	if !ok || claims.Subject == "" {
-		return "", fmt.Errorf("auth: token has no subject")
+		return "", time.Time{}, fmt.Errorf("auth: token has no subject")
 	}
-	return claims.Subject, nil
+	return claims.Subject, claims.ExpiresAt.Time, nil
+}
+
+// Verify checks the signature and expiry, requires an exp claim, and returns
+// the subject.
+func (t *TokenIssuer) Verify(token string) (string, error) {
+	userID, _, err := t.Claims(token)
+	return userID, err
 }

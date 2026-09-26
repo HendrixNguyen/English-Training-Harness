@@ -17,6 +17,12 @@ const ContextUserID = "user_id"
 // an exp, (b) is within its exp window, and (c) is byte-for-byte the token
 // stored at sess:{user_id}:token. (c) is what makes DEL a revocation and what
 // makes a new sign-in supersede the previous token.
+//
+// A sliding session: once the token has less than RenewBelow left, Require
+// issues a fresh one, stores it (replacing the old one, per (c)) and returns
+// it in X-Session-Token / X-Session-Expires-In — see maybeRenew. A learner
+// who opens the app at least once a day therefore never re-authenticates;
+// 24 h of absence still expires the session (backend spec §7).
 func Require(tokens *TokenIssuer, sessions SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		raw := bearerToken(c.GetHeader("Authorization"))
@@ -24,7 +30,7 @@ func Require(tokens *TokenIssuer, sessions SessionStore) gin.HandlerFunc {
 			abortUnauthorized(c)
 			return
 		}
-		userID, err := tokens.Verify(raw)
+		userID, exp, err := tokens.Claims(raw)
 		if err != nil {
 			abortUnauthorized(c)
 			return
@@ -34,6 +40,7 @@ func Require(tokens *TokenIssuer, sessions SessionStore) gin.HandlerFunc {
 			abortUnauthorized(c)
 			return
 		}
+		maybeRenew(c, tokens, sessions, userID, exp)
 		c.Set(ContextUserID, userID)
 		c.Next()
 	}
