@@ -7,7 +7,7 @@ const text = computed(() => formatCountdown(props.remainingSeconds))
 </script>
 
 <template>
-  <span aria-live="off">
+  <span class="inline-flex items-baseline gap-1" aria-live="off">
     <span class="font-body text-sm text-ink-1">Thời gian:</span>
     <span class="font-display text-xl tabular-nums" :class="remainingSeconds === 0 ? 'text-ember' : 'text-ink-0'">{{ text }}</span>
   </span>
