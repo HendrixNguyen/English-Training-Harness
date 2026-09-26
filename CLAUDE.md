@@ -16,6 +16,7 @@ Two things live here today:
 python3 -m unittest discover -s tools/harness/tests -v   # harness tooling tests (stdlib only, no deps)
 python3 -m unittest tools.harness.tests.test_cli -v     # one module
 python3 tools/harness/cli.py validate                    # exit 1 on malformed harness artifacts
+python3 tools/harness/cli.py doctor                      # check CLIs, MCP servers, plugins, roles and hooks against .agents/toolchain.json
 python3 tools/harness/cli.py state                       # regenerate harness/STATE.md
 python3 tools/harness/cli.py context                     # session briefing; the SessionStart hook runs it with --hook
 ```
