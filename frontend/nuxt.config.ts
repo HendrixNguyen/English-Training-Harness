@@ -12,9 +12,19 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/eslint', '@vite-pwa/nuxt'],
   components: [{ path: '~/components', pathPrefix: false }],
   css: [
-    '@fontsource-variable/fraunces/index.css',
-    '@fontsource/source-sans-3/400.css',
-    '@fontsource/source-sans-3/600.css',
+    // Retro kit faces (design §2): per-subset files only, so Vite emits
+    // exactly nine woff2 and the service-worker precache carries nothing
+    // else. `latin` covers A–Z, `vietnamese` the Vietnamese code points and
+    // tone marks — both are required for the app's copy.
+    '@fontsource/vt323/latin-400.css',
+    '@fontsource/vt323/latin-ext-400.css',
+    '@fontsource/vt323/vietnamese-400.css',
+    '@fontsource/nunito/latin-400.css',
+    '@fontsource/nunito/latin-ext-400.css',
+    '@fontsource/nunito/vietnamese-400.css',
+    '@fontsource/nunito/latin-700.css',
+    '@fontsource/nunito/latin-ext-700.css',
+    '@fontsource/nunito/vietnamese-700.css',
     '~/assets/css/main.css',
   ],
   app: {
