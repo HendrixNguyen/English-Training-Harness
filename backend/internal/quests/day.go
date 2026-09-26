@@ -76,3 +76,13 @@ func startOfDay(t time.Time, loc *time.Location) time.Time {
 	l := t.In(loc)
 	return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, loc)
 }
+
+// DayDate is the inverse of DayNumber: the YYYY-MM-DD of roadmap day n
+// (1-based) in the user's timezone — the local date of created_at plus n-1
+// calendar days. It is the key GET /roadmap joins daily_progress on, and the
+// same rule google.DayDue applies to Google Tasks `due`. Calendar days again,
+// not 24-hour multiples: AddDate re-resolves the wall-clock date, so a
+// spring-forward or fall-back day is still one day.
+func DayDate(createdAt time.Time, n int, loc *time.Location) string {
+	return startOfDay(createdAt, loc).AddDate(0, 0, n-1).Format("2006-01-02")
+}

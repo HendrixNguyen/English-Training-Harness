@@ -136,3 +136,64 @@ func TestRoadmapLength(t *testing.T) {
 		t.Errorf("RoadmapDays = %d, want 28 (spec §6.1: 4 modules x 7 days)", RoadmapDays)
 	}
 }
+
+func TestDayDateIsTheInverseOfDayNumberAcrossDST(t *testing.T) {
+	at := func(loc *time.Location, y int, m time.Month, d int) time.Time {
+		return time.Date(y, m, d, 9, 0, 0, 0, loc)
+	}
+	tests := []struct {
+		zone    string
+		created [3]int // y, m, d — 09:00 local
+	}{
+		{"Europe/London", [3]int{2026, 3, 25}},
+		{"Europe/London", [3]int{2026, 10, 20}},
+		{"America/New_York", [3]int{2026, 3, 5}},
+		{"America/New_York", [3]int{2026, 10, 28}},
+		{"Australia/Sydney", [3]int{2026, 9, 29}},
+		{"Australia/Sydney", [3]int{2026, 4, 1}},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s %04d-%02d-%02d", tt.zone, tt.created[0], tt.created[1], tt.created[2]), func(t *testing.T) {
+			loc := Location(tt.zone)
+			if loc == time.UTC {
+				t.Fatalf("Location(%q) fell back to UTC — tzdata missing on this machine", tt.zone)
+			}
+			created := at(loc, tt.created[0], time.Month(tt.created[1]), tt.created[2])
+			for n := 1; n <= RoadmapDays; n++ {
+				d := DayDate(created, n, loc)
+				parsed, err := time.ParseInLocation("2006-01-02", d, loc)
+				if err != nil {
+					t.Fatalf("DayDate(%d) = %q: %v", n, d, err)
+				}
+				parsed = parsed.Add(9 * time.Hour)
+				if got := DayNumber(created, parsed, loc); got != n {
+					t.Errorf("DayNumber(created, DayDate(created, %d)) = %d, want %d (date %q)", n, got, n, d)
+				}
+			}
+		})
+	}
+
+	loc := Location("Europe/London")
+	created := at(loc, 2026, time.March, 25)
+	if got := DayDate(created, 5, loc); got != "2026-03-29" {
+		t.Errorf("DayDate(london 2026-03-25, 5) = %q, want 2026-03-29 (the spring-forward day itself)", got)
+	}
+	if got := DayDate(created, 28, loc); got != "2026-04-21" {
+		t.Errorf("DayDate(london 2026-03-25, 28) = %q, want 2026-04-21", got)
+	}
+}
+
+func TestDayDateStartsOnTheLocalCreationDate(t *testing.T) {
+	// 18:30 UTC on 2026-09-01 is already 01:30 on 2026-09-02 in Ho Chi Minh City.
+	created := time.Date(2026, time.September, 1, 18, 30, 0, 0, time.UTC)
+
+	if got := DayDate(created, 1, Location("UTC")); got != "2026-09-01" {
+		t.Errorf("DayDate(UTC, 1) = %q, want 2026-09-01", got)
+	}
+	if got := DayDate(created, 1, Location("Asia/Ho_Chi_Minh")); got != "2026-09-02" {
+		t.Errorf("DayDate(Asia/Ho_Chi_Minh, 1) = %q, want 2026-09-02 — a roadmap created late in the day still counts that day as day 1, in the learner's zone", got)
+	}
+	if got := DayDate(created, 2, Location("Asia/Ho_Chi_Minh")); got != "2026-09-03" {
+		t.Errorf("DayDate(Asia/Ho_Chi_Minh, 2) = %q, want 2026-09-03", got)
+	}
+}
