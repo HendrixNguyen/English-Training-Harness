@@ -9,8 +9,14 @@ const quest = useQuestStore()
 const pet = usePetStore()
 const { start, chips, grow, pulse, displayHealth, displayStage } = useGrowthMoment()
 
+// Pinia state survives the SPA navigation from /learn/:id, so pet.status
+// already holds the *after* values by this component's very first render —
+// consumeDelta() must run before that render (not in onMounted, which fires
+// after it) or the first paint shows the after-value, not the before-value
+// the growth moment is built on.
+start(pet.consumeDelta())
+
 onMounted(() => {
-  start(pet.consumeDelta())
   void Promise.all([pet.load(), quest.load()])
 })
 

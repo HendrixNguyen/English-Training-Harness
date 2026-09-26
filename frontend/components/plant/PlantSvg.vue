@@ -28,19 +28,19 @@ const label = computed(() => `Cây đang ở giai đoạn ${norm.value.stage}, m
     <ellipse cx="80" cy="112" rx="30" ry="5" class="fill-ink/70 dark:fill-paper/50" />
 
     <g data-plant :class="{ 'plant-grow': grow }">
-      <Transition name="stage" mode="out-in">
-        <g v-if="norm.stage === 'seed'" data-stage="seed">
+      <Transition name="stage" mode="out-in" type="transition">
+        <g v-if="norm.stage === 'seed'" key="seed" data-stage="seed">
           <path d="M62 112c0-8 8-12 18-12s18 4 18 12z" class="fill-ink/50" />
           <circle cx="80" cy="106" r="3" class="fill-ink" />
         </g>
 
-        <g v-else-if="norm.stage === 'sprout'" data-stage="sprout" class="plant-sway">
+        <g v-else-if="norm.stage === 'sprout'" key="sprout" data-stage="sprout" class="plant-sway">
           <path d="M80 110V78" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none" />
           <path d="M80 86c-18 0-26-12-26-22 16 0 26 8 26 22z" fill="currentColor" />
           <path d="M80 80c18 0 26-12 26-22-16 0-26 8-26 22z" fill="currentColor" />
         </g>
 
-        <g v-else-if="norm.stage === 'sapling'" data-stage="sapling" class="plant-sway">
+        <g v-else-if="norm.stage === 'sapling'" key="sapling" data-stage="sapling" class="plant-sway">
           <path d="M80 110V50" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none" />
           <path d="M80 96c-16 0-22-10-22-18 14 0 22 7 22 18z" fill="currentColor" />
           <path d="M80 84c16 0 22-10 22-18-14 0-22 7-22 18z" fill="currentColor" />
@@ -49,7 +49,7 @@ const label = computed(() => `Cây đang ở giai đoạn ${norm.value.stage}, m
           <path d="M80 50c-8-6-10-14-8-20 8 4 10 12 8 20z" fill="currentColor" />
         </g>
 
-        <g v-else-if="norm.stage === 'flowering'" data-stage="flowering" class="plant-sway">
+        <g v-else-if="norm.stage === 'flowering'" key="flowering" data-stage="flowering" class="plant-sway">
           <path d="M80 110V44" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none" />
           <path d="M80 96c-16 0-22-10-22-18 14 0 22 7 22 18z" fill="currentColor" />
           <path d="M80 84c16 0 22-10 22-18-14 0-22 7-22 18z" fill="currentColor" />
@@ -60,7 +60,7 @@ const label = computed(() => `Cây đang ở giai đoạn ${norm.value.stage}, m
           <circle cx="80" cy="40" r="6" class="fill-streak" />
         </g>
 
-        <g v-else-if="norm.stage === 'fruitful'" data-stage="fruitful" class="plant-sway">
+        <g v-else-if="norm.stage === 'fruitful'" key="fruitful" data-stage="fruitful" class="plant-sway">
           <path d="M80 110V40" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none" />
           <path d="M80 98c-20 0-28-12-28-22 18 0 28 9 28 22z" fill="currentColor" />
           <path d="M80 86c20 0 28-12 28-22-18 0-28 9-28 22z" fill="currentColor" />
@@ -72,7 +72,7 @@ const label = computed(() => `Cây đang ở giai đoạn ${norm.value.stage}, m
           <circle cx="96" cy="70" r="7" class="fill-streak" />
         </g>
 
-        <g v-else data-stage="wilted" class="plant-droop origin-[80px_110px]">
+        <g v-else key="wilted" data-stage="wilted" class="plant-droop origin-[80px_110px]">
           <path d="M80 110c0-24 6-40 14-52" stroke="currentColor" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.7" />
           <path d="M84 94c-14 4-22-4-24-12 12-2 20 4 24 12z" fill="currentColor" opacity="0.6" />
           <path d="M90 76c14 2 20-6 20-14-12 0-18 6-20 14z" fill="currentColor" opacity="0.6" />
