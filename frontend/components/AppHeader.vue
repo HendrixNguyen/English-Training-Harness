@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '~/stores/auth'
 
-defineProps<{ streak?: number | null }>()
+defineProps<{ streak?: number | null, pulse?: boolean }>()
 
 const auth = useAuthStore()
 const menuOpen = ref(false)
@@ -40,9 +40,26 @@ async function signOut() {
       <NuxtLink to="/roadmap" class="text-sm text-mute underline-offset-2 hover:underline">
         Lộ trình
       </NuxtLink>
-      <span v-if="streak !== null && streak !== undefined" class="rounded-full bg-streak/15 px-3 py-1 text-sm font-semibold text-streak">
+      <span
+        v-if="streak !== null && streak !== undefined"
+        data-streak-chip
+        class="rounded-full bg-streak/15 px-3 py-1 text-sm font-semibold text-streak"
+        :class="{ 'streak-pulse': pulse }"
+      >
         🔥 Streak: {{ streak }} ngày
       </span>
     </div>
   </header>
 </template>
+
+<style scoped>
+@media (prefers-reduced-motion: no-preference) {
+  .streak-pulse {
+    animation: streak-pulse 500ms ease-out 1;
+  }
+}
+@keyframes streak-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+</style>
