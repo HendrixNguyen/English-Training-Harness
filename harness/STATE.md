@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-26 21:53. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 02:26. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -30,6 +30,11 @@ _none_
 - `harness/ideas/2026-09-26-run-01/install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — (untitled)
 - `harness/ideas/2026-09-26-run-01/level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — (untitled)
 - `harness/ideas/2026-09-26-run-01/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` — (untitled)
+- `harness/ideas/2026-09-27-run-01/adaptive-placement-a-30-item-a1c2-ladder-replaces-the-fixed-.md` — Adaptive placement: a 30-item A1–C2 ladder replaces the fixed ten questions every learner and every day-28 re-check sees
+- `harness/ideas/2026-09-27-run-01/answers-are-remembered-server-graded-accuracy-per-task-feeds.md` — Answers are remembered: server-graded accuracy per task feeds the world map, task swaps and the day-28 checkpoint
+- `harness/ideas/2026-09-27-run-01/kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md` — Khó quá / dễ quá: swap one task for a level-fitted replacement through the unused exercise_generation route
+- `harness/ideas/2026-09-27-run-01/region-clear-an-end-of-week-recap-on-the-hub-with-days-met-m.md` — Region clear: an end-of-week recap on the hub with days met, minutes, words and the plant's stage
+- `harness/ideas/2026-09-27-run-01/tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md` — Tap a hard word: Vietnamese glosses on every reading passage so the learner never leaves the room to translate
 
 ## Selected
 
