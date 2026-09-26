@@ -1,0 +1,17 @@
+# Project-scoped Codex config (Codex loads it for trusted projects). Adapter of .agents/toolchain.json.
+# Skills: Codex reads .agents/skills natively; instructions come from AGENTS.md.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+
+[mcp_servers.railway]
+command = "railway"
+args = ["mcp"]
+
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"

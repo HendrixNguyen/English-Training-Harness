@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-
+worktree: .worktrees/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-
 ---
 # Pages ship is honest: wait for the edge before the smoke check, no `404.html` on Pages so deep links answer 200, and the `/login` return-trip check — Plan
 
@@ -106,3 +108,78 @@ docker build -t aelp-web:pages --build-arg NUXT_PUBLIC_API_BASE=https://api.exam
 git push -u origin harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-   # CI green incl. docker-images (which runs smoke-web.sh)
 ```
 **Live evidence, next nightly ship (reviewer reads the Deploy run):** step "Wait for the Pages edge" prints `edge ready after Ns`; "Smoke-check the PWA" prints 8 `ok` lines including `spa fallback (/learn/abc): 200` and `login return trip (/login?code&state): 200`; `curl -o /dev/null -w '%{http_code}' https://english-learning-e6a.pages.dev/learn/abc` → `200`.
+
+## Execution summary
+
+Built in worktree `.worktrees/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-` on branch `harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-`, base `origin/main`. Three commits, matching the three tasks:
+
+- `65a6860` — Task 1: the "Wait for the Pages edge" step (≤ 90 s, polling every 5 s, non-failing) inserted between "Smoke-check the API" and "Smoke-check the PWA"; `SMOKE_WEB_SPA_WARN` env block deleted from the latter.
+- `e305840` — Task 2: `frontend/package.json` gained `generate:pages` (`nuxi generate && rm -f .output/public/404.html`); the workflow's "Generate the static site" step now runs it and asserts `404.html` is gone; `deploy/smoke-web.sh`'s SPA check went back to a plain strict `check`; `frontend/public/_redirects` comment updated; `.gitignore`'s `dist/` → `dist` so the symlink `nuxi generate` leaves is actually ignored.
+- `8931708` — Task 3: `deploy/smoke-web.sh` gained the `/login?code&state` return-trip check (no `-L`); `deploy/README.md` Target A paragraph and *Smoke check* bullet rewritten; `harness/CODEMAP.md` Deploy bullet updated.
+
+**Deviations from the plan, both within its stated intent:**
+1. Task 2 Step 2 (plain SPA check) and Task 3 Step 1 (login check) were written in one edit to `deploy/smoke-web.sh` and landed in the Task 2 commit rather than split across the Task 2 and Task 3 commits the plan implies. No functional difference — both checks are present and correct; only the git-history granularity differs from a strict per-task split.
+2. `deploy/README.md` had two more `SMOKE_WEB_SPA_WARN` references beyond the Target A paragraph and *Smoke check* bullet the plan named explicitly: the "Ship from `production`" narrative paragraph (`npx nuxi generate` → `npm run generate:pages`, `smoke-web.sh (with SMOKE_WEB_SPA_WARN=1)` → the edge-wait + strict smoke-web description) and the owner-checklist "First ship" bullet (`one WARN spa fallback line is expected` → `"Wait for the Pages edge" prints edge ready after Ns`). Left unfixed, the plan's own Verification grep (`grep -n 'SMOKE_WEB_SPA_WARN' -r .github deploy frontend/public`, which recurses into `deploy/README.md`) would not have said "gone" — fixed both to keep the runbook internally consistent and the verification honest.
+
+**Verification (this plan's block, run in the worktree):**
+```
+$ grep -n 'SMOKE_WEB_SPA_WARN' -r .github deploy frontend/public || echo "gone"
+gone
+
+$ grep -n 'generate:pages' frontend/package.json .github/workflows/deploy.yml
+frontend/package.json:15:    "generate:pages": "nuxi generate && rm -f .output/public/404.html",
+.github/workflows/deploy.yml:118:          npm run generate:pages
+
+$ grep -n 'Wait for the Pages edge' -A 3 .github/workflows/deploy.yml
+159:      - name: Wait for the Pages edge
+160-        if: env.DRY_RUN != 'true'
+161-        # A fresh Pages deployment serves its hashed assets as no-store for a
+162-        # short window (ship of 2026-09-25 failed on exactly that, then passed
+
+$ actionlint .github/workflows/deploy.yml
+(no output — ok)
+
+$ cd frontend && NUXT_PUBLIC_API_BASE=https://api.example.test npm run generate:pages && test ! -f .output/public/404.html && cd ..
+(build succeeds; test exits 0 — no 404.html)
+
+$ docker build -t aelp-web:pages --build-arg NUXT_PUBLIC_API_BASE=https://api.example.test frontend && docker run -d --rm --name web-pages -p 18082:80 aelp-web:pages && sleep 2 && deploy/smoke-web.sh http://127.0.0.1:18082; docker stop web-pages
+ok   index: 200
+ok   login return trip (/login?code&state): 200
+ok   spa fallback (/learn/abc): 200
+ok   sw.js present: 200
+ok   sw.js cache-control: no-cache
+ok   manifest cache-control: no-cache
+ok   hashed asset found: 1
+ok   asset cache-control: public, max-age=31536000, immutable
+exit=0
+web-pages   (container stopped, no leftover — confirmed with `docker ps`)
+
+$ git push -u origin harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-
+new branch pushed; CI triggered
+```
+
+**Reproduction — red before the fix (Task 2), captured against the pre-fix worktree:**
+```
+$ NUXT_PUBLIC_API_BASE=https://api.example.test npx nuxi generate   # plain generate, unpatched package.json
+...
+[nitro]   ├─ /404.html (22ms)
+$ test -f .output/public/404.html && echo "RED: 404.html present"
+RED: 404.html present (Pages would use 404 mode, not implicit SPA)
+$ git status --short
+?? frontend/dist
+$ git check-ignore -v frontend/dist; echo "exit=$?"
+exit=1   # dist/ (with slash) does not match the symlink frontend/dist
+```
+After the fix: `npm run generate:pages` leaves no `404.html`; `git status --short` is empty after generate; `git check-ignore -v frontend/dist` → `.gitignore:2:dist	frontend/dist`. A plain `npx nuxi generate` afterwards still produces `404.html` (confirmed unchanged, Task 2 Step 4's second assertion).
+
+**Runtime proof (executor role, Definition of done):**
+1. **Builds** — `npm run build` (Node 20-equivalent, local Node 22.20.0) completes clean, no new warnings.
+2. **Whole suite** — `npm run test:unit`: 16 files, 82 tests, all passed.
+3. **Boots and answers** — the Caddy image (`docker build … frontend`, `docker run -p 18082:80`) served `/`, `/login?code=x&state=y`, `/learn/abc`, `/sw.js`, `/manifest.webmanifest` and a hashed `/_nuxt/*.js` asset, all correct per `deploy/smoke-web.sh`'s 8/8 `ok`; container stopped and removed afterward (`--rm`), confirmed absent via `docker ps -a`.
+4. **Every documented command** — `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build`, `npm run generate:pages` (both with and without the `404.html` regression check), the plan's docker build/run/smoke sequence, and `actionlint` — all run exactly as documented, all green.
+5. **CI green on the branch** — GitHub Actions run [36216016619](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36216016619) on `harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-` at commit `89317081ca9d324d74daac4e8e62cdaf27065c38` (`8931708` short): `backend-unit`, `backend-integration`, `docker-images`, `harness-tooling`, `frontend` all passed (`docker-images`'s "Web image serves the PWA with the right cache headers" step exercises `deploy/smoke-web.sh` against the Caddy image, so the login check and the removed `SMOKE_WEB_SPA_WARN` knob are proven in CI too, not just locally). No backend changes were made by this plan; those jobs were unaffected and stayed green.
+6. **No orphan processes/containers** — `docker ps` / `docker ps -a` show nothing of this run's; `frontend/.output` and `frontend/dist` removed from the worktree after each local verification pass; `git status --short` is empty before push.
+
+Pushed branch `harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-` at commit `8931708` (local short hash) / `89317081ca9d324d74daac4e8e62cdaf27065c38` (full, post-fetch by GitHub). CI run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36216016619 — **success**.
+
+**Left for the owner:** the plan's "Live evidence, next nightly ship" line is not verifiable by the executor (no Pages/Railway secrets in a worktree) — the owner/reviewer should read the next `Deploy` workflow run for the "Wait for the Pages edge" timing and the live `/learn/abc` 200, as the plan's Verification section says.

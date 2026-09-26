@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-26-medium-caddyfile-serves-index-html-with-a-one-year-immutable-cache-
+worktree: .worktrees/caddyfile-serves-index-html-with-a-one-year-immutable-cache-
 ---
 # Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan
 
@@ -129,3 +131,27 @@ docker compose -p <slug> -f deploy/compose.yml --env-file <scratch .env> config 
 grep -n 'BASE_URL\|_MODEL' deploy/.env.example deploy/README.md | wc -l                          # ≥ 12
 git push -u origin harness/2026-09-26-medium-caddyfile-serves-index-html-with-a-one-year-immutable-cache-   # CI green incl. docker-images
 ```
+
+## Execution summary
+
+Built exactly the three tasks named in the plan; no deviations from the File structure table (`git diff --stat origin/main..HEAD` matches it file-for-file: `.github/workflows/ci.yml`, `deploy/.env.example`, `deploy/README.md`, `deploy/compose.yml`, `deploy/smoke-api.sh`, `deploy/smoke-web.sh`, `frontend/Caddyfile`, `frontend/public/_headers`, `harness/CODEMAP.md`).
+
+- **Task 1 (Caddy 404 + no-cache shell):** `header @exists Cache-Control …` gated on an `@exists file` matcher inside `handle /_nuxt/*` (no `try_files` fallback in that block) was enough on the first try — a `curl -i` on a missing chunk came back `404` with no `Cache-Control` header at all, so the plan's fallback option (`route { header …; file_server }` + `@missing not file` → `respond 404`) was not needed.
+- **Task 2 (AI vars + VAPID_SUBJECT):** as specified — six `${VAR:-}` entries added to `compose.yml` after `DEEPSEEK_API_KEY`, `VAPID_SUBJECT: ${VAPID_SUBJECT:-}` (was `:-mailto:admin@example.com`), matching `.env.example` and README rows, README's Target B paragraph gained the one sentence about `OPENAI_BASE_URL`/`OPENAI_MODEL` matching Railway.
+- **Task 3 (smoke-api.sh):** `|| true` appended to all four curl-assignment lines; no other line changed.
+
+**Runtime proof (in the worktree, all torn down afterward):**
+- `deploy/smoke-api.sh http://127.0.0.1:1 http://x` → 5 `FAIL` lines, `exit=1` (was a bare `curl: (7) … exit=7` before the fix — confirmed red on the unpatched script first).
+- Built `aelp-web:b5-red` from the unpatched Caddyfile first: `curl -i` on `/_nuxt/old-deleted-chunk.js` came back `200` with `Cache-Control: public, max-age=31536000, immutable`, and `curl -I /` had no `Cache-Control` header at all — red, reproducing both bugs.
+- Rebuilt as `aelp-web:b5` with the fixed Caddyfile: `SMOKE_WEB_ASSET_404=1 deploy/smoke-web.sh http://127.0.0.1:18083` → all 9 checks `ok`, `exit=0`; `curl -i` on the missing chunk → `404` with no immutable header; `curl -I /` and `curl -I /learn/abc` → `Cache-Control: no-cache`.
+- `docker compose -p caddy-harden -f deploy/compose.yml config` with a scratch `.env` (`OPENAI_BASE_URL=https://openrouter.ai/api/v1`, `OPENAI_MODEL=x`, rest blank) showed all six variables plus `VAPID_SUBJECT: ""` under `api.environment`.
+- Full compose stack (`COMPOSE_PROJECT_NAME=caddy-harden`, `API_PORT=18182 WEB_PORT=18183`) brought up with `--wait --wait-timeout 240`: `deploy/smoke-api.sh http://127.0.0.1:18182 http://localhost:18183` → 6 `ok` lines against a real, reachable API; `SMOKE_WEB_ASSET_404=1 deploy/smoke-web.sh http://127.0.0.1:18183` → 9 `ok` lines. Torn down with `docker compose down -v`; scratch `deploy/.env` deleted; `docker ps -a --filter name=caddy-harden` empty afterward.
+- `grep -n 'BASE_URL\|_MODEL' deploy/.env.example deploy/README.md | wc -l` → 15 (≥ 12 required).
+- `python3 -m unittest discover -s tools/harness/tests` → 38 tests, OK (unaffected by this plan, run as a sanity check since `harness/CODEMAP.md` was touched).
+- Pushed `harness/2026-09-26-medium-caddyfile-serves-index-html-with-a-one-year-immutable-cache-`; CI run [36216572852](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36216572852) — **success** (`docker-images`, `backend-unit`, `frontend`, `harness-tooling`, `backend-integration` all green).
+
+**Deviations:** none from the plan's tasks or file list.
+
+**Overlap with the deploy-smoke branch (B4, `harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-`, not yet in `origin/main`):** confirmed at start that `origin/main`'s `deploy/smoke-web.sh` still had the `SMOKE_WEB_SPA_WARN` knob (B4 not merged yet), so this plan's guidance to merge B4 first did not apply. This branch only *appended* two new checks to `smoke-web.sh` (`index cache-control`, the guarded `missing asset is 404`) right before `exit $fail`, and only touched `deploy/README.md`'s *Environment* table and the Target B paragraph — never the SPA block, the login check, or the Target A Pages paragraph that B4 edits. `.github/workflows/ci.yml`'s `docker-images` job line was also touched here (added `SMOKE_WEB_ASSET_404=1`); B4 should not need that same line, but the daily integration merge should check it doesn't collide.
+
+Nothing left for the owner beyond the standard daily-PR merge; no production secrets or deploys were touched.
