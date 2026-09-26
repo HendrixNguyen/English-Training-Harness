@@ -677,6 +677,8 @@ return parsedResp.Choices\[0\].Message.Content, nil
 
 \* \*\*POST /api/v1/quests/progress\*\*: Records completed task minutes, updates Redis counter and daily progress.
 
+\* \*\*GET /api/v1/roadmap\*\*: Fetches the active 28-day roadmap outline (module and day titles, task titles and durations) joined with per-day completion, for the roadmap tree.
+
 \* \*\*GET /api/v1/pet/status\*\*: Retrieves current plant stage, health percentage, and active streak.
 
 \* \*\*POST /api/v1/pet/revive\*\*: Triggers a 15-minute revival challenge when plant health hits 0%.

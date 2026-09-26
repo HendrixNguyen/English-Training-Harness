@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -265,5 +267,104 @@ func TestRoadmapWithTheWrongShapeFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "modules") {
 		t.Errorf("err = %v, want it to mention modules", err)
+	}
+}
+
+func TestRoadmapHandlerReturnsTheSpec62Body(t *testing.T) {
+	h := newRoadmapHarness(t, time.Date(2026, time.September, 10, 10, 0, 0, 0, time.UTC))
+
+	w := httptest.NewRecorder()
+	newQuestRouter(h.svc, "u1").ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/roadmap", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding: %v (%s)", err, w.Body.String())
+	}
+	wantTopKeys := []string{"roadmap_id", "title", "cefr_level", "created_at", "day_number", "modules"}
+	if len(body) != len(wantTopKeys) {
+		t.Errorf("top-level keys = %v, want exactly %v", keysOf(body), wantTopKeys)
+	}
+	for _, k := range wantTopKeys {
+		if _, ok := body[k]; !ok {
+			t.Errorf("missing top-level key %q", k)
+		}
+	}
+	modules, ok := body["modules"].([]any)
+	if !ok || len(modules) != 4 {
+		t.Fatalf("modules = %+v, want 4 entries", body["modules"])
+	}
+	wantModuleKeys := []string{"week", "title", "focus", "days"}
+	wantDayKeys := []string{"day_number", "date", "title", "tasks", "minutes_spent", "is_target_met"}
+	wantTaskKeys := []string{"task_type", "title", "duration_minutes"}
+	for _, mRaw := range modules {
+		m := mRaw.(map[string]any)
+		if len(m) != len(wantModuleKeys) {
+			t.Errorf("module keys = %v, want %v", keysOf(m), wantModuleKeys)
+		}
+		days, ok := m["days"].([]any)
+		if !ok || len(days) != 7 {
+			t.Fatalf("days = %+v, want 7 entries", m["days"])
+		}
+		for _, dRaw := range days {
+			d := dRaw.(map[string]any)
+			if len(d) != len(wantDayKeys) {
+				t.Errorf("day keys = %v, want %v", keysOf(d), wantDayKeys)
+			}
+			tasks, ok := d["tasks"].([]any)
+			if !ok || len(tasks) != 3 {
+				t.Fatalf("tasks = %+v, want 3 entries", d["tasks"])
+			}
+			for _, tRaw := range tasks {
+				task := tRaw.(map[string]any)
+				if len(task) != len(wantTaskKeys) {
+					t.Errorf("task keys = %v, want %v", keysOf(task), wantTaskKeys)
+				}
+			}
+		}
+	}
+	if strings.Contains(w.Body.String(), `"content`) {
+		t.Errorf("body leaks exercise content: %s", w.Body.String())
+	}
+}
+
+// keysOf is a test-only helper for readable failure messages.
+func keysOf(m map[string]any) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+func TestRoadmapHandlerReturns404WithoutARoadmap(t *testing.T) {
+	h := newRoadmapHarness(t, time.Date(2026, time.September, 10, 10, 0, 0, 0, time.UTC))
+	h.quests.roadmap = nil
+
+	w := httptest.NewRecorder()
+	newQuestRouter(h.svc, "u1").ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/roadmap", nil))
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"error":"no_active_roadmap"`) {
+		t.Errorf("body = %s, want the no_active_roadmap error", w.Body.String())
+	}
+}
+
+func TestRoadmapHandlerReturns500OnAnUnreadableDocument(t *testing.T) {
+	h := newRoadmapHarness(t, time.Date(2026, time.September, 10, 10, 0, 0, 0, time.UTC))
+	h.quests.roadmapJSON = json.RawMessage(`{`)
+
+	w := httptest.NewRecorder()
+	newQuestRouter(h.svc, "u1").ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/roadmap", nil))
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body = %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"error":"internal_error"`) {
+		t.Errorf("body = %s, want the internal_error error", w.Body.String())
 	}
 }

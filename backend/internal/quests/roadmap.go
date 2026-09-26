@@ -10,11 +10,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 )
 
 // RoadmapDoc is the §3.2 roadmaps row with its roadmap_json: the
@@ -203,4 +207,27 @@ func (s *Service) Roadmap(ctx context.Context, userID string) (RoadmapOutline, e
 		DayNumber: day,
 		Modules:   modules,
 	}, nil
+}
+
+// RoadmapHandler serves GET /api/v1/roadmap (backend spec §6.2). Mount behind
+// auth.Require().
+func RoadmapHandler(svc *Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := auth.UserID(c)
+		if userID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		outline, err := svc.Roadmap(c.Request.Context(), userID)
+		switch {
+		case errors.Is(err, ErrNoActiveRoadmap):
+			c.JSON(http.StatusNotFound, gin.H{"error": "no_active_roadmap"})
+		case err != nil:
+			log.Printf("quests: roadmap outline for user %s: %v", userID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		default:
+			c.JSON(http.StatusOK, outline)
+		}
+	}
 }

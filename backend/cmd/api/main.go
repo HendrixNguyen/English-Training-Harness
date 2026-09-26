@@ -173,6 +173,7 @@ func main() {
 	guarded := v1.Group("", auth.Require(tokens, sessions))
 	guarded.GET("/quests/daily", quests.DailyHandler(questSvc))
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
+	guarded.GET("/roadmap", quests.RoadmapHandler(questSvc))
 	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
 	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
 	guarded.POST("/settings/notifications", notify.SettingsHandler(notifySvc))

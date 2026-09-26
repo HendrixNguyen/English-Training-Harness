@@ -307,6 +307,17 @@ func NewRouter() (*Router, error) {
 {"daily_seconds_spent": 1200, "daily_minutes_spent": 20, "is_target_met": false, "pet_health": 100, "streak_count": 5}
 ```
 
+* GET /api/v1/roadmap  
+  * Description: Fetching the active 28-day roadmap outline (4 modules x 7 days, 3 task titles per day, no exercise content) joined with per-day progress from daily\_progress, for the roadmap tree screen. date is the user's local date of the roadmap's created\_at plus day\_number \- 1.  
+  * Request Headers: Authorization: Bearer \<JWT\>  
+  * Response (200 OK):
+
+```json
+{"roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff", "title": "Business English for meetings", "cefr_level": "B1", "created_at": "2026-09-22T13:05:00Z", "day_number": 3, "modules": [{"week": 1, "title": "Everyday small talk", "focus": "Greetings and introductions", "days": [{"day_number": 1, "date": "2026-09-22", "title": "Meeting a new colleague", "tasks": [{"task_type": "vocabulary", "title": "10 Key Business Email Phrasings", "duration_minutes": 10}, {"task_type": "reading", "title": "Two sample emails", "duration_minutes": 10}, {"task_type": "practice", "title": "Write a reply", "duration_minutes": 10}], "minutes_spent": 32, "is_target_met": true}]}]}
+```
+
+  * Response (404 Not Found): {"error": "no\_active\_roadmap"}  
+
 ## **6.3 Pet State & Revival Endpoints**
 
 * GET /api/v1/pet/status  

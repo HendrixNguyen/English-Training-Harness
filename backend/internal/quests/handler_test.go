@@ -26,6 +26,7 @@ func newQuestRouter(svc *Service, userID string) *gin.Engine {
 	g := r.Group("/api/v1", inject)
 	g.GET("/quests/daily", DailyHandler(svc))
 	g.POST("/quests/progress", ProgressHandler(svc))
+	g.GET("/roadmap", RoadmapHandler(svc))
 	return r
 }
 
