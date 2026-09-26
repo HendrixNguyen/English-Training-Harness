@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-26 10:35. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 10:38. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -25,7 +25,11 @@ _none_
 
 ## Proposed
 
-_none_
+- `harness/ideas/2026-09-26-run-01/google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — (untitled)
+- `harness/ideas/2026-09-26-run-01/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` — (untitled)
 
 ## Selected
 
