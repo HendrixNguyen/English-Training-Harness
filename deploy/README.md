@@ -32,7 +32,7 @@ The three `NUXT_PUBLIC_*` values are baked into the static site at build time (N
 
 **API on Railway** — new service from the GitHub repo, **Root Directory `backend`**, builder **Dockerfile**, healthcheck path `/healthz`, **App Sleeping off** (the cron worker and reminder queue run in-process — a sleeping service never decays plants or fires reminders), `GOMEMLIMIT=64MiB`, plus the API rows of the table above. Budget: Railway Free is $1/month of usage with no card; when it is spent Railway shows "workloads stopped" and the API is down until the month resets or the owner upgrades to Hobby ($5); logs are kept 3 days.
 
-**Postgres on Supabase** — free project; use the **session-mode pooler** connection string (`postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres`, port **5432** not 6543) with `?sslmode=require` — Railway egress is IPv4-only and the direct `db.<ref>.supabase.co` host is IPv6-only on the free tier. The API runs migrations at boot. Supabase pauses a free project after 7 idle days; the daily cron keeps it awake.
+**Postgres on Supabase** — free project; use the **session-mode pooler** connection string (`postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres`, port **5432** not 6543) with `?sslmode=require` — Railway egress is IPv4-only and the direct `db.<ref>.supabase.co` host is IPv6-only on the free tier. The API runs migrations at boot. Supabase pauses a free project after 7 idle days; the daily cron keeps it awake. Migration `0004_rls` enables row-level security on every table and revokes `anon`/`authenticated` grants at boot; the SQL-editor stopgap of 2026-09-25 is superseded. Owner step: Project Settings → Data API → disable (or remove `public` from *Exposed schemas*) — the API never uses PostgREST.
 
 **Redis on Upstash** — free database, copy the **`rediss://`** URL (TLS) into `REDIS_URL`. Free tier is 500K commands/month; the reminder worker's poll is ≈86K/month.
 
@@ -129,6 +129,7 @@ Run after every deploy:
 ## Owner checklist
 
 - [ ] Create the Supabase project; copy the session-mode pooler connection string.
+- [ ] After the API's first boot against it (migration `0004_rls` has run): Project Settings → Data API → disable (or remove `public` from *Exposed schemas*) — the API connects directly and never uses PostgREST.
 - [ ] Create the Upstash Redis database; copy the `rediss://` URL.
 - [ ] Generate secrets — `openssl rand -base64 32` for `JWT_SECRET`, `openssl rand -hex 32` for `ENCRYPTION_SECRET_KEY`, `npx web-push generate-vapid-keys` for the VAPID pair — store them in a password manager, never in the repo.
 - [ ] Create the Railway service (root `backend`, builder Dockerfile, App Sleeping off, healthcheck `/healthz`), set every API variable from the table above, note the generated domain.
