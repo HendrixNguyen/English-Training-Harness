@@ -22,3 +22,6 @@ On `main` today a hanging Gemini on the placement test costs 30 s, and then Open
 - `backend/internal/airouter/router.go:67-99` on branch `harness/2026-09-25-high-providertimeout-of-30-s-makes-roadmap-generation-impossible-` (`c4c8873`): one `ensureDeadline` ctx passed to every `provider.GenerateContent(ctx, …)`. `backend/internal/onboarding/service.go:155-165` `route()` sets one `TaskTimeout` ctx per `Route` call.
 - Reviewer probe (throwaway test, deleted): `hang` provider as `ProviderGemini` (blocks on `<-ctx.Done()`), immediate `{}` provider as `ProviderOpenAI`, `Route(ctx 200ms, TaskPlacementTest)` → `out="" err=context deadline exceeded fallbackCalls=0`.
 - No existing test covers "preferred hangs, fallback succeeds". `TestRouteGivesTheRoadmapMoreThan30SecondsAndOtherTasksExactly30` uses a single provider, and `budgeted` returns instantly instead of consuming the budget.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Real regression of the router's fallback guarantee, reproduced by the reviewer — but production runs a single provider (OpenRouter), so the fallback never runs today. Tomorrow's bug queue, top with the Gemini thinking item; fix = per-attempt cap derived from the remaining budget plus the `preferred hangs, fallback answers` router test.

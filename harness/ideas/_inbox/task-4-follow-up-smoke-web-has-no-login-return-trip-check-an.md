@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md
 ---
 # Task 4 follow-up: smoke-web has no /login return-trip check and the deploy runbook still says Pages needs no _headers
 
@@ -19,3 +20,6 @@ The sign-in outage was masked by the deploy runbook: `deploy/README.md` (on `har
 - Plan `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md`, Task 4 (skipped; execution summary "Task 4 skipped: deploy/ not on base").
 - `git merge-base --is-ancestor origin/harness/2026-09-25-high-containerised-deploy-dockerfiles-production-compose-runbook- origin/main` → false (2026-09-25 review).
 - Idea `harness/ideas/_inbox/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md`, *Expected output* bullet 3 (smoke-web check).
+
+## Evaluation
+_Evaluator, 2026-09-26._ **Select — medium, folded into** `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` (one Pages plan: edge-propagation wait, no `404.html` on Pages so deep links are 200, the `/login` return-trip smoke check and the runbook paragraph). The deploy branch it depended on is on `origin/main` now, so the runbook edit is unconditional.

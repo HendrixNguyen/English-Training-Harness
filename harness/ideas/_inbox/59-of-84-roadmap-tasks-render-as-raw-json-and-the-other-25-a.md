@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: human
 run: _inbox
 priority: high
+plan: harness/plans/2026-09-26-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md
 ---
 # 59 of 84 roadmap tasks render as raw JSON and the other 25 as blank flashcards or option-less questions, so a learner cannot do a single task
 
@@ -37,3 +38,21 @@ practice day 1 content:  {"instruction": "Practice greeting a colleague using th
 reading day 1 content:   {"passage": "Anna: Good morning, I'm Anna from Marketing.\nJohn: Nice to meet you…"}
 ```
 `frontend/utils/content.ts:2-35` (expects `term`/`definition`, `prompt`/`options`; else `raw`), `components/learn/ContentViewer.vue:39-72` (`<pre>` for raw), `pages/learn/[id].vue:44-47,112` (button disabled until `remainingSeconds === 0`). Frontend spec §7.3 wireframe; §6.1 design system.
+
+## Evaluation
+_Evaluator, 2026-09-26 — daily decide (bug queue, ranked #2 after the blocker)._
+
+**Select — high. Planned today: the backend regenerate route; the frontend half is retro plan 3 tomorrow.**
+
+*Is the Why real?* Yes — the owner's live roadmap, counted from the database: 59/84 tasks render as `<pre>` JSON, 22 flashcards have no `term`, 6 questions have no options. This is the happy path for every learner and nothing else in the queue comes close.
+
+*What already exists.* The backend contract the idea asks for is built: plan `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md` is `done` on `origin/harness/2026-09-25-medium-typed-task-content-with-answer-keys-so-every-quest-renders-a` (`content.go` types + bounds, `RoadmapSchema` demands them, `ParseRoadmap` enforces them; `term` not `english`, `options{A..D}` + `answer` + `explanation`). It is not on `main` yet — it rides tonight's daily PR. Its priority is raised to high here so the daily merge carries it first.
+
+*What is still missing, in three parts:*
+1. **Regenerating the stored roadmap** — nothing can replace the owner's broken roadmap: `POST /onboarding/assessment` returns the existing active roadmap with `200` and no AI call. This is the plan written today (bug queue): `POST /api/v1/roadmaps/regenerate` in the `onboarding` package (it owns `roadmaps`/`exercises` writes and `users.cefr_current`), optional `cefr_level` one step up or down (the calibration tap in `harness/designs/retro-onboarding.md` needs exactly that), the `ratelimit:ai` slot, `TaskRoadmapGen` with the current prompt, one transaction that deactivates the old roadmap and inserts the new one with its 84 exercises. Once the typed-content branch is on `main`, one call gives the owner a roadmap the frontend can render.
+2. **The frontend half** — `ContentViewer` per type, instant feedback, completion by doing, never a `<pre>`. This is `harness/designs/retro-learning-room.md` = retro plan 3 (`harness/designs/retro-README.md`), which needs the kit (retro plan 1, today's feature queue) and the typed contract on `main`. Neither is on `main` today, so a learning-room plan written now would be built twice (v1 shell today, retro shell tomorrow) and would conflict with the kit plan on `pages/learn/[id].vue`. It is written tomorrow, in the bug queue, against merged code.
+3. **Content pitched at the learner's level** — the a-session feature idea; planned today in the feature queue (`RoadmapUserPrompt` level/goal guidance).
+
+*Root cause (regeneration gap).* `backend/internal/onboarding/service.go:54-65` — `Assess` short-circuits on `ActiveRoadmapID`; `repo.go` has `SaveAssessment` (users update + deactivate + insert) but no roadmap-only replace; no other package writes `roadmaps`.
+
+*Priority.* High — first real learner, cannot complete a single task.

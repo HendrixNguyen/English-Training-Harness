@@ -17,3 +17,6 @@ The executor built plan `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudfla
 ## Evidence
 - `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` frontmatter `worktree:` vs *Execution summary* → *Deviations* bullet 2.
 - `git worktree list` → `…/.claude/worktrees/harness-daily-execute-154026/.worktrees/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect 3b51a45 [harness/2026-09-25-high-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect]`; `ls .worktrees/nobody-can-sign-in-…` → No such file or directory.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Harness tooling, not app code; real but low. Plan when a tooling slot exists: `stale-worktrees` reads `git worktree list --porcelain` and the executor records the real path.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md
 ---
 # deploy/compose.yml drops the AI provider base-URL and model variables the live deployment depends on
 
@@ -21,3 +22,6 @@ The runbook and AGENTS.md call `deploy/.env.example` + `deploy/compose.yml` "one
 - `grep -o '"[A-Z_]*"' backend/internal/config/*.go backend/internal/airouter/*.go` lists all six variables. `deploy/compose.yml` lines 36-56 (`api.environment`) have none of them.
 - Reproduced: I appended `OPENAI_BASE_URL=…` and `OPENAI_MODEL=…` to a scratch `deploy/.env` and booted the stack (project `aelp-rev-deploy`). Both `docker compose -f deploy/compose.yml config | grep -c 'OPENAI_BASE_URL\|OPENAI_MODEL'` and `docker compose exec api env | grep -c …` returned `0`.
 - The live AI setup (OpenRouter in the OPENAI slot) is the owner's 2026-09-25 choice, recorded with the live deployment.
+
+## Evaluation
+_Evaluator, 2026-09-26._ **Select — medium, folded into** `harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` (the Dokploy hardening plan: Caddyfile miss handling + shell `no-cache`, the six AI base-URL/model variables through compose and the runbook table, `smoke-api.sh` reporting every check). The deploy branch it was filed against is on `origin/main` now.

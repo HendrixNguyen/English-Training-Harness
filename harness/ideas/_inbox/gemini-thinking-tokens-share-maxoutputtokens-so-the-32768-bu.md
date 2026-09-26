@@ -35,3 +35,6 @@ comment says which models it applies to.
 - Plan under review: `harness/plans/2026-09-24-geminiprovider-drops-every-response-part-after-the-first-so-.md` — *Notes and open questions*, first bullet; Task 4.
 - `backend/internal/airouter/gemini.go` on branch `harness/2026-09-24-medium-geminiprovider-drops-every-response-part-after-the-first-so-` (@87ea60f): `generationConfig` has `maxOutputTokens` and no `thinkingConfig`.
 - Public reports that Flash thinking tokens consume `maxOutputTokens` and produce empty/`MAX_TOKENS` answers: https://github.com/valentinfrlch/ha-llmvision/issues/609, https://discuss.ai.google.dev/t/max-output-tokens-isnt-respected-when-using-gemini-2-5-flash-model/106708, https://medium.com/@devanshtiwari365/gemini-2-5-flash-was-returning-37-tokens-i-spent-a-day-figuring-out-why-c7c22ac3734f. Not reproduced against the live API (no Gemini key in this environment) — confirm with one real roadmap call reading `usageMetadata.thoughtsTokenCount`.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Real (Flash counts thinking tokens against `maxOutputTokens`), but Gemini is not configured in production (OpenRouter only), so no learner is affected today. First bug slot tomorrow together with the per-task-deadline item: one `thinkingConfig.thinkingBudget` + request test.

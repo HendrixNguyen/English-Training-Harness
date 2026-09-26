@@ -1,7 +1,7 @@
 ---
 idea: harness/ideas/2026-09-24-run-01/typed-task-content-with-answer-keys-so-every-quest-renders-a.md
 status: done
-priority: medium
+priority: high
 merged: false
 branch: harness/2026-09-25-medium-typed-task-content-with-answer-keys-so-every-quest-renders-a
 worktree: .worktrees/typed-task-content-with-answer-keys-so-every-quest-renders-a
