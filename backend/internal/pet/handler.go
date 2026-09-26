@@ -19,10 +19,14 @@ type statusResponse struct {
 	HealthPoints    int        `json:"health_points"`
 	CurrentStreak   int        `json:"current_streak"`
 	LastPracticedAt *time.Time `json:"last_practiced_at"`
+	// Shields and LastShieldUsedOn are additive (streak shield plan);
+	// last_shield_used_on is null until the first spend.
+	Shields          int     `json:"shields"`
+	LastShieldUsedOn *string `json:"last_shield_used_on"`
 }
 
 func toStatus(s State) statusResponse {
-	out := statusResponse{PlantName: s.PlantName, Stage: s.Stage, HealthPoints: s.HealthPoints, CurrentStreak: s.CurrentStreak}
+	out := statusResponse{PlantName: s.PlantName, Stage: s.Stage, HealthPoints: s.HealthPoints, CurrentStreak: s.CurrentStreak, Shields: s.Shields, LastShieldUsedOn: s.LastShieldUsedOn}
 	if s.LastPracticedAt != nil {
 		u := s.LastPracticedAt.UTC()
 		out.LastPracticedAt = &u

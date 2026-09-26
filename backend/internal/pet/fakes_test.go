@@ -89,6 +89,9 @@ func (f *fakeRepo) Save(_ context.Context, userID string, s State) error {
 	} else {
 		s.LastTargetMetDate = cur.LastTargetMetDate
 	}
+	// saveSQL never writes shields/last_shield_used_on (plan decision 4): only
+	// the verdict writers move them.
+	s.Shields, s.LastShieldUsedOn = cur.Shields, cur.LastShieldUsedOn
 	f.states[userID] = s
 	return nil
 }
@@ -113,19 +116,20 @@ func (f *fakeRepo) SaveTargetMet(_ context.Context, userID string, now time.Time
 	return true, nil
 }
 
-func (f *fakeRepo) PenaliseMiss(_ context.Context, userID, judged string, now time.Time) (bool, error) {
+func (f *fakeRepo) PenaliseMiss(_ context.Context, userID, judged string, now time.Time) (bool, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.writeErr(userID); err != nil {
-		return false, err
+		return false, false, err
 	}
 	cur, ok := f.states[userID]
 	if !ok || !dateBefore(cur.JudgedThrough, judged) {
-		return false, nil
+		return false, false, nil
 	}
 	f.saved++
+	shielded := cur.Shields > 0
 	f.states[userID] = ApplyMiss(cur, now, judged)
-	return true, nil
+	return true, shielded, nil
 }
 
 func (f *fakeRepo) MarkJudged(_ context.Context, userID, judged string) (bool, error) {

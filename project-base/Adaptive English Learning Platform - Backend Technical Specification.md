@@ -316,11 +316,12 @@ func NewRouter() (*Router, error) {
 
 * GET /api/v1/pet/status  
   * Description: Retrieving plant stage, health %, and streak count.  
+  * shields (0\-2) and last\_shield\_used\_on (YYYY\-MM\-DD or null) are additive (streak shield, 2026\-09\-25): one shield is earned on every 7th consecutive met day and one is spent, in place of the miss penalty, on a missed day.  
   * Request Headers: Authorization: Bearer \<JWT\>  
   * Response (200 OK):
 
 ```json
-{"plant_name": "My Green Buddy", "health_points": 80, "stage": "sprout", "current_streak": 5, "last_practiced_at": "2026-09-21T20:15:00Z"}
+{"plant_name": "My Green Buddy", "health_points": 80, "stage": "sprout", "current_streak": 5, "last_practiced_at": "2026-09-21T20:15:00Z", "shields": 1, "last_shield_used_on": null}
 ```
 
 * POST /api/v1/pet/revive  

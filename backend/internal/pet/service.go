@@ -136,7 +136,8 @@ func (s *Service) Revive(ctx context.Context, userID string) (ReviveResult, erro
 // counter for it reads >= 1800s; a spared day is recorded (MarkJudged) so it
 // is never re-read. Otherwise PenaliseMiss applies §8's inactivity logic in
 // one conditional UPDATE, so N concurrent sweepers penalise once and the
-// count returned is the number of writes that applied.
+// count returned is the number of penalties that applied — a shielded miss
+// (the shield spent, the plant untouched) writes the row but is not counted.
 //
 // First contact: a pet with no judged_through yet is judged only for days it
 // existed (LocalDate(updated_at) <= judged — updated_at is the creation stamp
@@ -185,12 +186,12 @@ func (s *Service) Sweep(ctx context.Context, now time.Time) (int, error) {
 			continue
 		}
 
-		applied, err := s.repo.PenaliseMiss(ctx, c.UserID, judged, now)
+		applied, shielded, err := s.repo.PenaliseMiss(ctx, c.UserID, judged, now)
 		if err != nil {
 			fail(c.UserID, err)
 			continue
 		}
-		if applied {
+		if applied && !shielded {
 			penalised++
 		}
 	}

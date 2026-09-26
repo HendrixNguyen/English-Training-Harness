@@ -91,7 +91,7 @@ func TestIntegrationEnsureCreatesExactlyOnePetRow(t *testing.T) {
 		t.Errorf("LastTargetMetDate = %v, want 2026-09-22", st.LastTargetMetDate)
 	}
 	for i := 0; i < 4; i++ {
-		if _, err := repo.PenaliseMiss(ctx, userID, fmt.Sprintf("2026-09-2%d", 3+i), time.Now()); err != nil {
+		if _, _, err := repo.PenaliseMiss(ctx, userID, fmt.Sprintf("2026-09-2%d", 3+i), time.Now()); err != nil {
 			t.Fatalf("PenaliseMiss %d: %v", i+1, err)
 		}
 	}
@@ -174,7 +174,7 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ok, err := repo.PenaliseMiss(ctx, userID, "2026-09-23", now)
+			ok, _, err := repo.PenaliseMiss(ctx, userID, "2026-09-23", now)
 			if err != nil {
 				t.Errorf("concurrent PenaliseMiss: %v", err)
 			}
@@ -198,7 +198,7 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 	if ok, err := repo.MarkJudged(ctx, userID, "2026-09-24"); err != nil || !ok {
 		t.Fatalf("MarkJudged = (%t, %v)", ok, err)
 	}
-	if ok, _ := repo.PenaliseMiss(ctx, userID, "2026-09-24", now); ok {
+	if ok, _, _ := repo.PenaliseMiss(ctx, userID, "2026-09-24", now); ok {
 		t.Error("PenaliseMiss applied to a day already marked judged")
 	}
 	if ok, _ := repo.MarkJudged(ctx, userID, "2026-09-20"); ok {
@@ -211,7 +211,7 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 		if err := repo.Save(ctx, userID, pre); err != nil {
 			t.Fatalf("Save pre-image %d: %v", i, err)
 		}
-		if _, err := repo.PenaliseMiss(ctx, userID, judged, now); err != nil {
+		if _, _, err := repo.PenaliseMiss(ctx, userID, judged, now); err != nil {
 			t.Fatalf("PenaliseMiss %d: %v", i, err)
 		}
 		got, _ := repo.Get(ctx, userID)
@@ -229,7 +229,7 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 	if err := repo.Save(ctx, userID, pre); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	if ok, _ := repo.PenaliseMiss(ctx, userID, "2026-10-04", now); !ok {
+	if ok, _, _ := repo.PenaliseMiss(ctx, userID, "2026-10-04", now); !ok {
 		t.Fatal("PenaliseMiss for 2026-10-04 did not apply")
 	}
 	if ok, err := repo.SaveTargetMet(ctx, userID, now, "2026-10-05"); err != nil || !ok {
@@ -269,6 +269,49 @@ func TestIntegrationVerdictWritesAreConditional(t *testing.T) {
 	}
 	if st.LastTargetMetDate == nil || *st.LastTargetMetDate != "2026-11-04" {
 		t.Errorf("Save with a nil marker moved last_target_met_date to %v, want 2026-11-04 kept (GREATEST ignores NULL)", st.LastTargetMetDate)
+	}
+
+	// 6. Shields: award every 7th met day capped at 2, spend before the penalty,
+	//    fall through when none is held — SQL held to ApplyTargetMet/ApplyMiss.
+	//    Save never writes shields (decision 4), so pre-images are set directly.
+	setShields := func(streak, shields int) {
+		if _, err := pg.Pool.Exec(ctx, `UPDATE pet_states SET health_points = 100, current_streak = $2, stage = 'flowering', shields = $3, last_shield_used_on = NULL WHERE user_id = $1`, userID, streak, shields); err != nil {
+			t.Fatalf("setting shields: %v", err)
+		}
+	}
+	for i, tt := range []struct{ streak, shields, want int }{{6, 0, 1}, {13, 1, 2}, {20, 2, 2}, {7, 1, 1}} {
+		setShields(tt.streak, tt.shields)
+		d := fmt.Sprintf("2026-12-%02d", i+1)
+		pre, _ := repo.Get(ctx, userID)
+		if ok, err := repo.SaveTargetMet(ctx, userID, now, d); err != nil || !ok {
+			t.Fatalf("SaveTargetMet %d = (%t, %v)", i, ok, err)
+		}
+		got, _ := repo.Get(ctx, userID)
+		if want := ApplyTargetMet(pre, now, d); got.Shields != want.Shields || got.Shields != tt.want || got.LastShieldUsedOn != nil {
+			t.Errorf("award from streak %d / shields %d: SQL %d, ApplyTargetMet %d, want %d (last used must stay NULL)", tt.streak, tt.shields, got.Shields, want.Shields, tt.want)
+		}
+	}
+	setShields(21, 2)
+	pre, _ = repo.Get(ctx, userID)
+	applied, shielded, err := repo.PenaliseMiss(ctx, userID, "2026-12-10", now)
+	if err != nil || !applied || !shielded {
+		t.Fatalf("shielded PenaliseMiss = (%t, %t, %v), want (true, true, nil)", applied, shielded, err)
+	}
+	st, _ = repo.Get(ctx, userID)
+	if want := ApplyMiss(pre, now, "2026-12-10"); st.HealthPoints != 100 || st.CurrentStreak != 21 || st.Stage != StageFlowering || st.Shields != 1 || st.LastShieldUsedOn == nil || *st.LastShieldUsedOn != "2026-12-10" || *st.JudgedThrough != "2026-12-10" || st.Shields != want.Shields {
+		t.Errorf("shielded miss = %+v, want the plant untouched, shields 1, last used and judged through 2026-12-10 (ApplyMiss: shields %d)", st, want.Shields)
+	}
+	if applied, shielded, _ := repo.PenaliseMiss(ctx, userID, "2026-12-10", now); applied || shielded {
+		t.Error("a repeat PenaliseMiss for a shielded day must be a no-op")
+	}
+	if applied, shielded, _ := repo.PenaliseMiss(ctx, userID, "2026-12-11", now); !applied || !shielded {
+		t.Error("the second shield must be spent on the next missed day")
+	}
+	pre, _ = repo.Get(ctx, userID)
+	applied, shielded, _ = repo.PenaliseMiss(ctx, userID, "2026-12-12", now)
+	st, _ = repo.Get(ctx, userID)
+	if want := ApplyMiss(pre, now, "2026-12-12"); !applied || shielded || st.HealthPoints != want.HealthPoints || st.HealthPoints != 70 || st.CurrentStreak != 0 || st.Shields != 0 || *st.LastShieldUsedOn != "2026-12-11" {
+		t.Errorf("unshielded miss = (%t, %t) %+v, want (true, false) 70/0, shields 0, last used kept at 2026-12-11", applied, shielded, st)
 	}
 
 	cands, err := repo.SweepCandidates(ctx)

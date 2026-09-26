@@ -313,19 +313,23 @@ func TestSweepJudgesEachPetsOwnLocalYesterday(t *testing.T) {
 	seed("utc-short", "UTC", 40, 1, "2026-09-21")
 	seed("hcm-done", "Asia/Ho_Chi_Minh", 100, 9, "2026-09-22") // the 17:00Z tick already judged its 22nd
 	seed("hcm-late", "Asia/Ho_Chi_Minh", 100, 9, "2026-09-21") // that tick was missed (a restart): catch up now
+	seed("utc-shielded", "UTC", 100, 9, "2026-09-21")
 	d := "2026-09-22"
 	st := h.repo.states["utc-met-marker"]
 	st.LastTargetMetDate = &d
 	h.repo.states["utc-met-marker"] = st
 	h.study.set("utc-met-counter", "2026-09-22", 1800)
 	h.study.set("utc-short", "2026-09-22", 1799)
+	sst := h.repo.states["utc-shielded"]
+	sst.Shields = 1
+	h.repo.states["utc-shielded"] = sst
 
 	n, err := h.svc.Sweep(ctx, midnite)
 	if err != nil {
 		t.Fatalf("Sweep: %v", err)
 	}
 	if n != 3 {
-		t.Errorf("penalised %d, want 3 (utc-missed, utc-short, hcm-late)", n)
+		t.Errorf("penalised %d, want 3 (utc-missed, utc-short, hcm-late; utc-shielded is a shielded miss, not counted)", n)
 	}
 	want := map[string]struct {
 		health, streak int
@@ -337,6 +341,7 @@ func TestSweepJudgesEachPetsOwnLocalYesterday(t *testing.T) {
 		"utc-short":       {10, 0, "2026-09-22"},  // 1799s is a miss
 		"hcm-done":        {100, 9, "2026-09-22"}, // nothing to do
 		"hcm-late":        {70, 0, "2026-09-22"},  // judged at 07:00 local, one tick is never lost
+		"utc-shielded":    {100, 9, "2026-09-22"}, // the shield took the hit
 	}
 	for user, w := range want {
 		got := h.repo.states[user]
@@ -346,6 +351,29 @@ func TestSweepJudgesEachPetsOwnLocalYesterday(t *testing.T) {
 	}
 	if !h.repo.states["utc-missed"].UpdatedAt.Equal(midnite) {
 		t.Error("a penalised pet must be stamped with the sweep's clock")
+	}
+}
+
+func TestSweepSpendsAShieldInsteadOfPenalising(t *testing.T) {
+	h := newHarness(midnite)
+	h.repo.states["u1"] = State{HealthPoints: 100, CurrentStreak: 9, Stage: StageFlowering, Shields: 1, UpdatedAt: midnite.Add(-72 * time.Hour), JudgedThrough: judgedThrough("2026-09-21")}
+
+	n, err := h.svc.Sweep(ctx, midnite) // judges the 22nd, which was missed
+	if err != nil {
+		t.Fatalf("Sweep: %v", err)
+	}
+	got := h.repo.states["u1"]
+	if n != 0 || got.HealthPoints != 100 || got.CurrentStreak != 9 || got.Stage != StageFlowering {
+		t.Errorf("n=%d state=%+v; want 0 penalised and the plant untouched — the shield took the hit", n, got)
+	}
+	if got.Shields != 0 || got.LastShieldUsedOn == nil || *got.LastShieldUsedOn != "2026-09-22" || got.JudgedThrough == nil || *got.JudgedThrough != "2026-09-22" {
+		t.Errorf("shields=%d last used=%v judged=%v; want 0 / 2026-09-22 / 2026-09-22", got.Shields, got.LastShieldUsedOn, got.JudgedThrough)
+	}
+	if n, _ := h.svc.Sweep(ctx, midnite.Add(time.Hour)); n != 0 || h.repo.states["u1"].Shields != 0 {
+		t.Error("a second sweep the same day must be a no-op")
+	}
+	if n, _ := h.svc.Sweep(ctx, midnite.AddDate(0, 0, 1)); n != 1 || h.repo.states["u1"].HealthPoints != 70 || h.repo.states["u1"].CurrentStreak != 0 {
+		t.Errorf("with no shield left the 23rd is penalised: n=%d state=%+v", n, h.repo.states["u1"])
 	}
 }
 

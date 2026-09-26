@@ -51,11 +51,13 @@ func TestStatusReturnsTheSpec63BodyAndCreatesTheRow(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 	var body struct {
-		PlantName       string  `json:"plant_name"`
-		Stage           string  `json:"stage"`
-		HealthPoints    int     `json:"health_points"`
-		CurrentStreak   int     `json:"current_streak"`
-		LastPracticedAt *string `json:"last_practiced_at"`
+		PlantName        string  `json:"plant_name"`
+		Stage            string  `json:"stage"`
+		HealthPoints     int     `json:"health_points"`
+		CurrentStreak    int     `json:"current_streak"`
+		LastPracticedAt  *string `json:"last_practiced_at"`
+		Shields          int     `json:"shields"`
+		LastShieldUsedOn *string `json:"last_shield_used_on"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decoding: %v (%s)", err, w.Body.String())
@@ -63,8 +65,14 @@ func TestStatusReturnsTheSpec63BodyAndCreatesTheRow(t *testing.T) {
 	if body.PlantName != "My Green Buddy" || body.Stage != "sprout" || body.HealthPoints != 100 || body.CurrentStreak != 0 || body.LastPracticedAt != nil {
 		t.Errorf("body = %+v, want the fresh-pet defaults with last_practiced_at null", body)
 	}
+	if body.Shields != 0 || body.LastShieldUsedOn != nil {
+		t.Errorf("body = %+v, want shields 0 and last_shield_used_on null on a fresh pet", body)
+	}
 	if !strings.Contains(w.Body.String(), `"last_practiced_at":null`) {
 		t.Errorf("last_practiced_at must be present and null on a fresh pet: %s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"last_shield_used_on":null`) {
+		t.Errorf("last_shield_used_on must be present and null on a fresh pet: %s", w.Body.String())
 	}
 	if h.repo.ensured != 1 {
 		t.Errorf("Ensure called %d times, want 1", h.repo.ensured)
@@ -74,13 +82,25 @@ func TestStatusReturnsTheSpec63BodyAndCreatesTheRow(t *testing.T) {
 func TestStatusFormatsLastPracticedAtAsUTCRFC3339(t *testing.T) {
 	h := newHarness(sept22)
 	at := time.Date(2026, time.September, 21, 20, 15, 0, 0, time.UTC)
-	h.repo.states["u1"] = State{PlantName: "My Green Buddy", HealthPoints: 80, Stage: StageSprout, CurrentStreak: 5, LastPracticedAt: &at}
+	h.repo.states["u1"] = State{PlantName: "My Green Buddy", HealthPoints: 80, Stage: StageSprout, CurrentStreak: 5, LastPracticedAt: &at, Shields: 1}
 
 	w := do(newPetRouter(h.svc, "u1"), http.MethodGet, "/api/v1/pet/status", "")
 	// Exactly the §6.3 example.
-	want := `{"plant_name":"My Green Buddy","stage":"sprout","health_points":80,"current_streak":5,"last_practiced_at":"2026-09-21T20:15:00Z"}`
+	want := `{"plant_name":"My Green Buddy","stage":"sprout","health_points":80,"current_streak":5,"last_practiced_at":"2026-09-21T20:15:00Z","shields":1,"last_shield_used_on":null}`
 	if strings.TrimSpace(w.Body.String()) != want {
 		t.Errorf("body =\n%s\nwant\n%s", w.Body.String(), want)
+	}
+}
+
+func ptr(s string) *string { return &s }
+
+func TestStatusReportsASpentShieldDate(t *testing.T) {
+	h := newHarness(sept22)
+	h.repo.states["u1"] = State{HealthPoints: 100, Stage: StageFlowering, CurrentStreak: 9, Shields: 0, LastShieldUsedOn: ptr("2026-09-21")}
+
+	w := do(newPetRouter(h.svc, "u1"), http.MethodGet, "/api/v1/pet/status", "")
+	if !strings.Contains(w.Body.String(), `"shields":0,"last_shield_used_on":"2026-09-21"`) {
+		t.Errorf("body = %s, want shields 0 and last_shield_used_on 2026-09-21", w.Body.String())
 	}
 }
 
