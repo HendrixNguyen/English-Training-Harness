@@ -57,6 +57,24 @@ func (f *fakeRepo) Ensure(_ context.Context, userID string) error {
 	return nil
 }
 
+func (f *fakeRepo) EnsureNamed(_ context.Context, userID, plantName string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.ensureErr != nil {
+		return f.ensureErr
+	}
+	f.ensured++
+	if _, ok := f.states[userID]; !ok {
+		f.states[userID] = defaultState(f.now())
+	}
+	if plantName != "" {
+		st := f.states[userID]
+		st.PlantName = plantName
+		f.states[userID] = st
+	}
+	return nil
+}
+
 func (f *fakeRepo) Get(_ context.Context, userID string) (State, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -46,6 +46,15 @@ func (s *Service) Ensure(ctx context.Context, userID string) (State, error) {
 	return s.repo.Get(ctx, userID)
 }
 
+// EnsureNamed is Ensure with the learner's chosen name (onboarding's create
+// path). An empty name is exactly Ensure. See Repo.EnsureNamed.
+func (s *Service) EnsureNamed(ctx context.Context, userID, plantName string) (State, error) {
+	if err := s.repo.EnsureNamed(ctx, userID, plantName); err != nil {
+		return State{}, err
+	}
+	return s.repo.Get(ctx, userID)
+}
+
 // OnTargetMet is §8's success logic for the user's local day localDate:
 // quests fires it when the day's total first reaches 1800s (backend spec
 // §6.2), and may fire it again after a failure on the same call or after a

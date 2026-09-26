@@ -35,6 +35,12 @@ type Candidate struct {
 type Repo interface {
 	// Ensure creates the 1:1 row idempotently: INSERT ... ON CONFLICT DO NOTHING.
 	Ensure(ctx context.Context, userID string) error
+	// EnsureNamed is Ensure plus a name: creates the row with plantName, or
+	// renames an existing row when plantName differs. An empty plantName is
+	// exactly Ensure — the row is created if missing and an existing name is
+	// never touched (onboarding's re-submit path). Length is the caller's
+	// rule; the column is VARCHAR(100).
+	EnsureNamed(ctx context.Context, userID, plantName string) error
 	Get(ctx context.Context, userID string) (State, error)
 	// Save writes every mutable column unconditionally except the two verdict
 	// dates, which only ever move forward. Revive uses it; the verdict
@@ -62,6 +68,12 @@ type Repo interface {
 
 const (
 	ensureSQL = `INSERT INTO pet_states (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`
+
+	// The WHERE makes an unchanged name a no-op write; UNIQUE(user_id) keeps it 1:1.
+	ensureNamedSQL = `
+INSERT INTO pet_states (user_id, plant_name) VALUES ($1, $2)
+ON CONFLICT (user_id) DO UPDATE SET plant_name = EXCLUDED.plant_name
+WHERE pet_states.plant_name IS DISTINCT FROM EXCLUDED.plant_name`
 
 	// Every pet_states column except user_id is nullable in §3.2 (DEFAULT
 	// without NOT NULL), so COALESCE to the DDL defaults. The two DATE
@@ -135,6 +147,16 @@ func NewPgRepo(pool *pgxpool.Pool) *PgRepo { return &PgRepo{Pool: pool} }
 func (r *PgRepo) Ensure(ctx context.Context, userID string) error {
 	if _, err := r.Pool.Exec(ctx, ensureSQL, userID); err != nil {
 		return fmt.Errorf("pet: ensuring pet_states row: %w", err)
+	}
+	return nil
+}
+
+func (r *PgRepo) EnsureNamed(ctx context.Context, userID, plantName string) error {
+	if plantName == "" {
+		return r.Ensure(ctx, userID)
+	}
+	if _, err := r.Pool.Exec(ctx, ensureNamedSQL, userID, plantName); err != nil {
+		return fmt.Errorf("pet: ensuring named pet_states row: %w", err)
 	}
 	return nil
 }
