@@ -17,7 +17,7 @@ func validRoadmapJSON(t *testing.T, mutate func(r *Roadmap)) string {
 		for d := 1; d <= DaysPerModule; d++ {
 			day := Day{Title: fmt.Sprintf("Day %d", (m-1)*DaysPerModule+d)}
 			for _, tt := range TaskTypes {
-				day.Tasks = append(day.Tasks, Task{Type: tt, Title: tt + " task", DurationMinutes: 10, Content: json.RawMessage(`{"items":[]}`)})
+				day.Tasks = append(day.Tasks, Task{Type: tt, Title: fmt.Sprintf("w%d-d%d-%s", m, d, tt), DurationMinutes: 10, Content: json.RawMessage(`{"items":[]}`)})
 			}
 			mod.Days = append(mod.Days, day)
 		}
@@ -177,8 +177,19 @@ func TestExercisesFlattensTo84RowsCarryingTitleAndDuration(t *testing.T) {
 	}
 	// day 8 is the first day of module 2 — and module 2 must be the one that
 	// declared week 2, otherwise stored roadmap_json and exercises disagree.
-	if r.Modules[1].Week != 2 || ex[21].DayNumber != (r.Modules[1].Week-1)*DaysPerModule+1 {
-		t.Errorf("exercise[21] day %d should come from the module declaring week 2 (got week %d)", ex[21].DayNumber, r.Modules[1].Week)
+	// Every fixture task title is now unique per module/day/type (see
+	// validRoadmapJSON), so this only holds if Exercises() actually read
+	// module[1].Days[0].Tasks[0] for exercise 21 — with the old fixed
+	// "<type> task" titles the same assertion would have passed even if
+	// Exercises() iterated modules in the wrong order.
+	var got21 struct {
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(ex[21].ContentJSON, &got21); err != nil {
+		t.Fatalf("exercise[21] content_json: %v", err)
+	}
+	if want := r.Modules[1].Days[0].Tasks[0].Title; got21.Title != want || ex[21].DayNumber != 8 {
+		t.Errorf("exercise[21] = day %d title %q, want day 8 title %q (the module declaring week 2)", ex[21].DayNumber, got21.Title, want)
 	}
 	seen := map[string]int{}
 	for _, e := range ex {
