@@ -18,9 +18,15 @@ Both deployables build into provider-neutral images — `backend/Dockerfile` and
 | `GEMINI_API_KEY` | optional | Google AI Studio | set if used; missing → its routes answer 503 | set if used |
 | `OPENAI_API_KEY` | optional | OpenAI dashboard | set if used; missing → its routes answer 503 | set if used |
 | `DEEPSEEK_API_KEY` | optional | DeepSeek dashboard | set if used; missing → its routes answer 503 | set if used |
+| `GEMINI_BASE_URL` | optional | provider base URL | set on the service if used | set in `deploy/.env` if used |
+| `OPENAI_BASE_URL` | optional | provider base URL (any OpenAI-compatible endpoint, e.g. OpenRouter) | set on the service if used | set in `deploy/.env` if used |
+| `DEEPSEEK_BASE_URL` | optional | provider base URL | set on the service if used | set in `deploy/.env` if used |
+| `GEMINI_MODEL` | optional | provider model | set on the service if used | set in `deploy/.env` if used |
+| `OPENAI_MODEL` | optional | provider model | set on the service if used | set in `deploy/.env` if used |
+| `DEEPSEEK_MODEL` | optional | provider model | set on the service if used | set in `deploy/.env` if used |
 | `VAPID_PUBLIC_KEY` | optional | `npx web-push generate-vapid-keys` | unset → reminder worker does not start | unset → reminder worker does not start |
 | `VAPID_PRIVATE_KEY` | optional | `npx web-push generate-vapid-keys` | unset → reminder worker does not start | unset → reminder worker does not start |
-| `VAPID_SUBJECT` | optional | a `mailto:`/`https:` contact | set if VAPID keys are set | set if VAPID keys are set |
+| `VAPID_SUBJECT` | optional | a `mailto:`/`https:` contact; the binary falls back to `config.DefaultVAPIDSubject` when unset — set a real contact in production | set if VAPID keys are set | set if VAPID keys are set |
 | `FRONTEND_ORIGIN` | yes | exact PWA origin(s), comma-separated, never `*` | the Cloudflare Pages domain | the web domain |
 | `NUXT_PUBLIC_API_BASE` | yes (build-time) | the API's public URL | the Railway domain | the api domain |
 | `NUXT_PUBLIC_GOOGLE_CLIENT_ID` | optional (build-time) | Google Cloud Console OAuth client | set if used | set if used |
@@ -86,7 +92,7 @@ Migrations run at API boot and are not reverted by any of this; a release whose 
 
 ## Target B — Dokploy later (deploy only; CD is parked)
 
-Install Dokploy on the server (`curl -sSL https://dokploy.com/install.sh | sh`, the official one-liner — Docker + Traefik). Create a **Compose** application from this repo with compose path `deploy/compose.yml` and paste the contents of `deploy/.env` as its environment. Public HTTPS via Traefik + Let's Encrypt on ports 80/443, or a Cloudflare Tunnel when the box is behind NAT (Google OAuth and Web Push refuse plain HTTP). A domain each for `web` (port 80) and `api` (port 8080). Enable Dokploy's scheduled Postgres backup to an S3-compatible bucket — the `postgres_data` volume is the only copy otherwise. `FRONTEND_ORIGIN` is the web domain; `NUXT_PUBLIC_API_BASE` is the api domain.
+Install Dokploy on the server (`curl -sSL https://dokploy.com/install.sh | sh`, the official one-liner — Docker + Traefik). Create a **Compose** application from this repo with compose path `deploy/compose.yml` and paste the contents of `deploy/.env` as its environment. Public HTTPS via Traefik + Let's Encrypt on ports 80/443, or a Cloudflare Tunnel when the box is behind NAT (Google OAuth and Web Push refuse plain HTTP). A domain each for `web` (port 80) and `api` (port 8080). Enable Dokploy's scheduled Postgres backup to an S3-compatible bucket — the `postgres_data` volume is the only copy otherwise. `FRONTEND_ORIGIN` is the web domain; `NUXT_PUBLIC_API_BASE` is the api domain. `deploy/.env` must carry the same `OPENAI_BASE_URL`/`OPENAI_MODEL` the Railway service has (the live deployment routes through OpenRouter, not OpenAI's own API).
 
 Continuous delivery to Dokploy (registry push + deploy webhook on a push to `production`, as a second job in `deploy.yml`) is parked in `harness/BACKLOG.md` until this target is live — until then, deploys here are manual.
 
