@@ -19,3 +19,6 @@ Two small quality gaps in `frontend/Dockerfile`:
 ## Evidence
 - Plan: `harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md` (branch origin/harness/2026-09-25-high-containerised-deploy-dockerfiles-production-compose-runbook- @ c46b1df); `frontend/Dockerfile` lines 7-11 and 23-28.
 - `docker exec aelp-rev-deploy-web id` gave `uid=0(root)`.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Dokploy-only hardening; the non-root port change ripples through compose, CI port mapping and the runbook — kept out of today's Dokploy plan (B5) to keep it 4-hour-sized. Next Dokploy slot.

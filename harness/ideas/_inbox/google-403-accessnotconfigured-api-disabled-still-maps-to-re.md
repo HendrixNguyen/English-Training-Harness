@@ -20,3 +20,6 @@ A 403 whose reason is known to be a project/configuration problem (at least `acc
 - `backend/internal/google/client.go` on branch `harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro`: `case resp.StatusCode == http.StatusForbidden && !throttleReasons[googleErrorReason(raw)]:` → `ErrReauthRequired`
 - Head idea's *Expected output*: `harness/ideas/_inbox/every-google-403-becomes-409-reauth-required-so-a-quota-erro.md`
 - Review: `harness/reviews/` entry for the plan above (2026-09-25)
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Real loop if the Calendar/Tasks API is disabled in the GCP project; the owner's project has them enabled (sync works live). Plan with the 409 test item as one `google` plan when a slot frees.

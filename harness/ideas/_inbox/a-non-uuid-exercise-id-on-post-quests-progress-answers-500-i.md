@@ -36,3 +36,6 @@ rejected as overtaken, and its body never mentioned the UUID case — so nothing
 - Reproduced on origin/main `3f4242d` against `postgres:16-alpine`:
   `SELECT 1 FROM e WHERE id='not-a-uuid'` on a `uuid` column →
   `ERROR: invalid input syntax for type uuid: "not-a-uuid"`.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Wrong status (500 vs 400) with no data write; `binding:"required,uuid"` + one handler row. Low impact — a client never sends a non-UUID. Next free bug slot.

@@ -26,3 +26,6 @@ one empty-text part.
 - `backend/internal/airouter/gemini.go` on branch `harness/2026-09-24-medium-geminiprovider-drops-every-response-part-after-the-first-so-` (@87ea60f): emptiness is checked on `len(Parts)`, never on the joined text.
 - `backend/internal/onboarding/service.go:113-131` (`routeJSON`): a malformed body is retried once and never falls back across providers; router errors do fall back.
 - Inferred from reading the code; no test exercises the shape.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Gemini unused in production; three-line fix + one test row — fold into the Gemini thinking plan tomorrow.

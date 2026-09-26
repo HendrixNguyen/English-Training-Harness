@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md
-status: draft
+status: approved
 priority: medium
 merged: false
 design: harness/designs/roadmap-tree.md

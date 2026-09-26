@@ -38,3 +38,5 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Achievable in one plan?* No, and it depends on an unbuilt foundation that *is* queued: `vocab_reviews` needs a stable `item_key` per vocabulary item, which only exists once task `content` has a schema — `2026-09-24-run-01/typed-task-content-with-answer-keys-…` (selected today, medium) defines `vocabulary → {words[{term, definition, example}]}`. After that it is still a table, SM-2 scheduling, two endpoint changes and a review UI — two plans.
 
 *Priority.* Low now; re-rank to medium once typed content has landed.
+
+_Evaluator, 2026-09-26 — **deferred** (not planned today)._ Depends on the typed content contract for a stable `item_key` per word; that branch merges tonight. Plan after it is on `main` and the learning room (retro plan 3) renders items — a review deck needs somewhere to be shown.

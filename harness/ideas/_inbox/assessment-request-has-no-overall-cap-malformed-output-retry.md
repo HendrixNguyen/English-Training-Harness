@@ -20,3 +20,6 @@ priority: low
 - `backend/internal/onboarding/service.go:131-165` on `c4c8873`: `routeJSON` loops `attempt < 2`, and each attempt calls `route()`, which does `context.WithTimeout(ctx, airouter.TaskTimeout(task))`.
 - `backend/cmd/api/server.go:26-31` (comment acknowledges "one malformed-body retry each").
 - `frontend/pages/onboarding.vue` waiting copy: "thường mất 1–2 phút".
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Needs a malformed first roadmap and a slow second one; the copy promise (1–2 min) is the user-visible part. Next free bug slot after the provider-timeout items, planned as one overall `Assess` deadline.

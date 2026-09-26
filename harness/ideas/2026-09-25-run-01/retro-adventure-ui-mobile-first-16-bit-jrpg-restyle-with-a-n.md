@@ -1,9 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: human
 run: 2026-09-25-run-01
 priority: high
+plan: harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md
 ---
 # Retro adventure UI: mobile-first 16-bit JRPG restyle with a new UI kit, night-dungeon palette and the plant as party companion
 
@@ -25,3 +26,14 @@ Design first (designer role, harness-design skill), then plans per screen:
 - Owner conversation 2026-09-25 (choices recorded above); frontend spec §6.1 "Modern Gamified Minimalist" is superseded for visual style by this decision — the spec's §7 flows and states still apply.
 - Current kit: `harness/UI-KIT.md` (tokens `growth/streak/alert/ink/paper/mute`, Fraunces display, 16/12 px radii), `frontend/tailwind.config.ts`, `frontend/components/*`.
 - Retention thesis: 1st-thinking §1 (30 min/day), §5.2 daily loop, backend spec §8 plant maths (unchanged).
+
+## Evaluation
+_Evaluator, 2026-09-26 — daily decide (two-cap rule: ≤5 bug plans + ≤5 feature plans; this is a feature verdict)._
+
+**Select — high. Planned today: plan 1 of 6 (the kit).**
+
+*Is the Why real?* Yes — owner decision after the first live session, and the design work is already done: `harness/UI-KIT.md` v2 and the six screen docs under `harness/designs/retro-*.md` were merged in PR #32. `harness/designs/retro-README.md` fixes the build order (kit → hub → learning room → onboarding → roadmap → revive/settings) and the dependencies.
+
+*Achievable in one plan?* Not as a whole (six screens); the kit alone is one plan of ~4 h: tokens in `frontend/tailwind.config.ts`, two self-hosted faces (VT323 + Nunito, Vietnamese subsets), the `components/retro/` set with the states the kit table lists, the companion sprite, restyled `StateBlock`/`CountdownTimer`, and the Vitest checks the README names. No page changes in plan 1, so nothing a learner sees changes until plan 2 — that is by design: the kit is what every later screen plan builds on and it can run in parallel with the typed-content bug's backend branch. *Dependencies:* none for the kit. Plan 3 (learning room) also needs the typed-content branch on `main`; it is written tomorrow.
+
+*Priority.* High — every retro screen and the 59-of-84 rendering fix's frontend half wait on it, and the owner asked for it explicitly. Auto-approved as a `priority: high` feature.
