@@ -12,8 +12,11 @@ cleanupOutdatedCaches()
 
 // §3 "User Progress & Pet Status: NetworkFirst" — synchronised state when
 // online, last-known state when not. Cache name must match utils/session.ts.
+// /roadmap is the same class of state (§3 "User Progress"): synchronised when
+// online, last known when not; utils/session.ts drops the whole cache on
+// sign-out, so it needs no separate clearing.
 registerRoute(
-  ({ url, request }) => request.method === 'GET' && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname),
+  ({ url, request }) => request.method === 'GET' && /\/api\/v1\/(quests\/daily|pet\/status|roadmap)$/.test(url.pathname),
   new NetworkFirst({ cacheName: 'api-state', networkTimeoutSeconds: 5 }),
 )
 

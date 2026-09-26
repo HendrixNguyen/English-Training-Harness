@@ -1,42 +1,59 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted } from 'vue'
+import { computed, nextTick, onMounted, reactive } from 'vue'
+import RoadmapModuleHeader from '~/components/roadmap/RoadmapModuleHeader.vue'
+import RoadmapNode from '~/components/roadmap/RoadmapNode.vue'
 import { usePetStore } from '~/stores/pet'
-import { useQuestStore } from '~/stores/quest'
+import { useRoadmapStore } from '~/stores/roadmap'
 import { roadmapNodes } from '~/utils/roadmap'
 
-const quest = useQuestStore()
+const roadmap = useRoadmapStore()
 const pet = usePetStore()
+
+const nodes = computed(() => (roadmap.outline ? roadmapNodes(roadmap.outline) : []))
+const expanded = reactive<Record<number, boolean>>({})
 
 onMounted(async () => {
   if (!pet.status) void pet.load()
-  if (!quest.daily && !quest.noRoadmap) await quest.load()
+  if (!roadmap.outline && !roadmap.noRoadmap) await roadmap.load()
+  if (roadmap.outline) expanded[roadmap.outline.day_number] = true
   await nextTick()
-  document.getElementById(`day-${quest.daily?.day_number ?? 0}`)?.scrollIntoView({ block: 'center' })
+  document.getElementById(`day-${roadmap.outline?.day_number ?? 0}`)?.scrollIntoView({ block: 'center' })
 })
-
-const nodes = computed(() => (quest.daily ? roadmapNodes(quest.daily.day_number) : []))
 </script>
 
 <template>
   <main class="mx-auto max-w-md px-4 pb-8">
     <AppHeader :streak="pet.status?.current_streak ?? null" />
-    <h1 class="mb-4 font-display text-2xl">
+
+    <template v-if="roadmap.outline">
+      <p class="text-xs font-semibold uppercase tracking-wider text-mute">
+        Lộ trình học 28 ngày
+      </p>
+      <h1 class="font-display line-clamp-2 text-[28px] leading-8">
+        {{ roadmap.outline.title }}
+      </h1>
+      <p class="text-mute">
+        Trình độ {{ roadmap.outline.cefr_level }} · Đã hoàn thành {{ roadmap.completedDays }}/28 ngày
+      </p>
+    </template>
+    <h1 v-else class="mb-4 font-display text-2xl">
       Lộ trình học 28 ngày
     </h1>
 
     <AppCard>
-      <StateBlock v-if="quest.loading && !quest.daily" state="loading" />
-      <StateBlock v-else-if="quest.noRoadmap" state="empty" message="Bạn chưa có lộ trình học." action="Tạo lộ trình 28 ngày" @action="navigateTo('/onboarding')" />
-      <StateBlock v-else-if="quest.error && !quest.daily" state="error" message="Không tải được lộ trình." action="Thử lại" @action="quest.load()" />
-      <ol v-else class="relative space-y-3">
-        <template v-for="(node, i) in nodes" :key="node.day">
-          <li v-if="i % 7 === 0" class="pt-2 text-xs font-semibold uppercase tracking-wider text-mute" aria-hidden="true">
-            Tuần {{ node.week }}
-          </li>
-          <li class="flex" :class="i % 2 === 0 ? 'justify-start pl-2' : 'justify-end pr-2'">
-            <RoadmapNode :node="node" />
-          </li>
-          <li v-if="i < nodes.length - 1 && (i + 1) % 7 !== 0" class="h-4 border-mute/30" :class="i % 2 === 0 ? 'ml-[40%] border-l' : 'mr-[40%] border-r'" aria-hidden="true" />
+      <StateBlock v-if="roadmap.loading && !roadmap.outline" state="loading" />
+      <StateBlock v-else-if="roadmap.noRoadmap" state="empty" message="Bạn chưa có lộ trình học." action="Tạo lộ trình 28 ngày" @action="navigateTo('/onboarding')" />
+      <StateBlock v-else-if="roadmap.error && !roadmap.outline" state="error" message="Không tải được lộ trình." action="Thử lại" @action="roadmap.load()" />
+      <ol v-else-if="roadmap.outline" class="relative ml-3 space-y-4 border-l-2 border-mute/30 pl-7">
+        <template v-for="module in roadmap.outline.modules" :key="module.week">
+          <RoadmapModuleHeader :module="module" :met="module.days.filter(d => d.is_target_met).length" />
+          <RoadmapNode
+            v-for="node in nodes.filter(n => n.week === module.week)"
+            :key="node.day"
+            :node="node"
+            :expanded="!!expanded[node.day]"
+            @update:expanded="v => (expanded[node.day] = v)"
+          />
         </template>
       </ol>
     </AppCard>
