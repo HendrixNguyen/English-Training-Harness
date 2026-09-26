@@ -16,6 +16,9 @@ const (
 	MissPenalty          = 30  // §8 inactivity logic: Health = Max(0, Health - 30)
 	ReviveHealth         = 50  // §6.3: "Resets health to 50% upon passing"
 	ReviveSeconds        = 900 // §7: "15-minute revival challenge"
+
+	MaxShields      = 2 // migration 0004 CHECK (shields BETWEEN 0 AND 2)
+	ShieldEveryDays = 7 // a shield per 7th consecutive met day
 )
 
 // Stages are the §3.2 pet_stage enum values. StageSeed is never produced —
@@ -44,6 +47,13 @@ type State struct {
 	// penalised: its miss was applied, it was spared, or a revival resolved it.
 	// nil for a pet the sweep has never seen.
 	JudgedThrough *string
+	// Shields is how many streak shields the pet holds (0..MaxShields,
+	// migration 0004). ApplyTargetMet awards one on every ShieldEveryDays-th
+	// consecutive met day; ApplyMiss spends one instead of the §8 penalty.
+	Shields int
+	// LastShieldUsedOn is the local YYYY-MM-DD a shield was last spent for;
+	// nil until the first spend. The client shows the spend for seven days.
+	LastShieldUsedOn *string
 }
 
 // StageFor derives the stage from health and streak. The spec gives no
@@ -67,10 +77,15 @@ func StageFor(health, streak int) string {
 
 // ApplyTargetMet is §8's success logic for localDate, applied once per local
 // day (Repo.SaveTargetMet enforces the once): +20 capped at 100, streak+1,
-// last_practiced_at = now, last_target_met_date = localDate.
+// last_practiced_at = now, last_target_met_date = localDate. Every
+// ShieldEveryDays-th consecutive met day also awards a streak shield, capped
+// at MaxShields (migration 0004, streak shield plan).
 func ApplyTargetMet(s State, now time.Time, localDate string) State {
 	s.HealthPoints = min(MaxHealth, s.HealthPoints+TargetMetHealthBonus)
 	s.CurrentStreak++
+	if s.CurrentStreak%ShieldEveryDays == 0 {
+		s.Shields = min(MaxShields, s.Shields+1)
+	}
 	s.Stage = StageFor(s.HealthPoints, s.CurrentStreak)
 	t := now
 	s.LastPracticedAt = &t
@@ -82,13 +97,21 @@ func ApplyTargetMet(s State, now time.Time, localDate string) State {
 // ApplyMiss is §8's inactivity logic for the local day judged, run by the
 // hourly sweep when that day stayed under 1800s: -30 floored at 0, wilted at
 // 0, streak reset (§8 is silent on the streak; a streak with a missed day in
-// it is not a streak), and judged_through advanced to judged. The real repo
-// performs this arithmetic in SQL (PgRepo.PenaliseMiss); this Go form is the
-// reference the fake repo and the integration test hold it to.
+// it is not a streak), and judged_through advanced to judged. When a streak
+// shield is held (migration 0004), it is spent instead: health, streak and
+// stage are untouched, and LastShieldUsedOn records the judged day. The real
+// repo performs this arithmetic in SQL (PgRepo.PenaliseMiss); this Go form is
+// the reference the fake repo and the integration test hold it to.
 func ApplyMiss(s State, now time.Time, judged string) State {
-	s.HealthPoints = max(0, s.HealthPoints-MissPenalty)
-	s.CurrentStreak = 0
-	s.Stage = StageFor(s.HealthPoints, s.CurrentStreak)
+	if s.Shields > 0 {
+		// The shield takes the hit: health, streak and stage are untouched.
+		s.Shields--
+		s.LastShieldUsedOn = &judged
+	} else {
+		s.HealthPoints = max(0, s.HealthPoints-MissPenalty)
+		s.CurrentStreak = 0
+		s.Stage = StageFor(s.HealthPoints, s.CurrentStreak)
+	}
 	s.JudgedThrough = laterDate(s.JudgedThrough, judged)
 	s.UpdatedAt = now
 	return s
@@ -98,7 +121,7 @@ func ApplyMiss(s State, now time.Time, judged string) State {
 // day it was passed on is resolved (judged_through = localDate), so that
 // night's sweep does not take the §8 penalty out of the 50 (plan decision 4).
 // It is not a success: last_practiced_at and last_target_met_date are untouched,
-// so reaching 1800s later the same day still earns the +20.
+// so reaching 1800s later the same day still earns the +20. Shields are untouched.
 func ApplyRevive(s State, now time.Time, localDate string) State {
 	s.HealthPoints = ReviveHealth
 	s.CurrentStreak = 0

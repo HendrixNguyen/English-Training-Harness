@@ -88,6 +88,46 @@ func TestApplyReviveResetsToFiftySproutZeroStreak(t *testing.T) {
 	if !s.UpdatedAt.Equal(now) {
 		t.Errorf("UpdatedAt = %v, want %v", s.UpdatedAt, now)
 	}
+	if r := ApplyRevive(State{HealthPoints: 0, Stage: StageWilted, Shields: 1}, now, "2026-09-22"); r.Shields != 1 {
+		t.Error("revive must not touch shields")
+	}
+}
+
+func TestApplyTargetMetAwardsAShieldEverySeventhDayCappedAtTwo(t *testing.T) {
+	for _, tt := range []struct{ streak, shields, wantShields int }{
+		{6, 0, 1},  // day 7
+		{7, 1, 1},  // day 8: nothing
+		{13, 1, 2}, // day 14
+		{20, 2, 2}, // day 21 with a full rack: capped
+		{13, 0, 1}, // day 14 after a spend
+	} {
+		got := ApplyTargetMet(State{HealthPoints: 100, CurrentStreak: tt.streak, Shields: tt.shields}, sept22, "2026-09-22")
+		if got.Shields != tt.wantShields || got.CurrentStreak != tt.streak+1 {
+			t.Errorf("streak %d, shields %d → shields %d (streak %d), want %d", tt.streak, tt.shields, got.Shields, got.CurrentStreak, tt.wantShields)
+		}
+		if got.LastShieldUsedOn != nil {
+			t.Error("a success must not touch LastShieldUsedOn")
+		}
+	}
+}
+
+func TestApplyMissSpendsAShieldBeforeThePenalty(t *testing.T) {
+	pre := State{HealthPoints: 100, CurrentStreak: 9, Stage: StageFlowering, Shields: 1}
+	got := ApplyMiss(pre, sept22, "2026-09-22")
+	if got.HealthPoints != 100 || got.CurrentStreak != 9 || got.Stage != StageFlowering {
+		t.Errorf("shielded miss changed the plant: %+v", got)
+	}
+	if got.Shields != 0 || got.LastShieldUsedOn == nil || *got.LastShieldUsedOn != "2026-09-22" {
+		t.Errorf("shields/last used = %d/%v, want 0/2026-09-22", got.Shields, got.LastShieldUsedOn)
+	}
+	if got.JudgedThrough == nil || *got.JudgedThrough != "2026-09-22" || !got.UpdatedAt.Equal(sept22) {
+		t.Errorf("a shielded miss must still resolve the day and stamp the clock: %+v", got)
+	}
+	// No shield left: the ordinary §8 penalty, and the spend date is kept.
+	again := ApplyMiss(got, sept22, "2026-09-23")
+	if again.HealthPoints != 70 || again.CurrentStreak != 0 || again.Stage != StageSprout || again.Shields != 0 || *again.LastShieldUsedOn != "2026-09-22" {
+		t.Errorf("unshielded miss = %+v, want 70/0/sprout, shields 0, last used kept", again)
+	}
 }
 
 func TestSpec8Constants(t *testing.T) {
