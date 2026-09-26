@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-25 22:00. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 10:31. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -18,6 +18,7 @@ _none_
 - `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
 - `harness/ideas/_inbox/caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Caddyfile serves index.html with a one-year immutable cache for missing /_nuxt assets [medium]
 - `harness/ideas/_inbox/deploy-compose-yml-drops-the-ai-provider-base-url-and-model-.md` — deploy/compose.yml drops the AI provider base-URL and model variables the live deployment depends on [medium]
+- `harness/ideas/_inbox/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` — Deploy smoke checks the PWA seconds after upload, when Pages' edge still serves hashed assets as no-store, so a good ship reports failure [high]
 - `harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md` — Every public table is readable and writable through Supabase's anon REST API because migrations never enable RLS [high]
 - `harness/ideas/_inbox/executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — Executor worktree nested under .claude/worktrees while plan frontmatter names .worktrees/<slug> [low]
 - `harness/ideas/_inbox/frontend-dist-symlink-left-by-nuxi-generate-is-not-gitignore.md` — frontend/dist symlink left by nuxi generate is not gitignored [low]
