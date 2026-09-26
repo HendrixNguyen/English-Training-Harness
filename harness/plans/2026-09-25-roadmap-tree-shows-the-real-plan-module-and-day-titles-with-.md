@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md
-status: approved
+status: executing
 priority: medium
 merged: false
 design: harness/designs/roadmap-tree.md
+branch: harness/2026-09-26-medium-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-
+worktree: .worktrees/roadmap-tree-shows-the-real-plan-module-and-day-titles-with-
 ---
 # Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan
 

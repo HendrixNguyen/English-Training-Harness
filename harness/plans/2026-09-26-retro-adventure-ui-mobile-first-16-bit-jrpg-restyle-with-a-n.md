@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md
-status: approved
+status: done
 priority: high
 merged: false
 design: harness/designs/retro-kit.md
+branch: harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n
+worktree: .worktrees/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n
 ---
 # Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan
 
@@ -121,3 +123,43 @@ Design acceptance (`harness/designs/retro-kit.md` "Acceptance"):
 - [ ] No v1 component is deleted or renamed; every page still builds; `revivePage`, `onboardingPage` and every other existing unit test pass unchanged.
 - [ ] `pages/_kit.vue` (or any preview page) is not in `git ls-files`; the plan's Notes carry the reviewer's screenshots.
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build` green, and CI green on the pushed branch.
+
+## Notes
+
+Reviewer screenshots of the throwaway `pages/_kit.vue` (deleted before the final commit; not in `git ls-files`), taken against the real `npm run dev` server with a faked `aelp.auth` localStorage session so the route guard let `/_kit` through:
+
+- `retro-kit-desktop.png` (1280×2505, full page) — every component/state in one column: six `CompanionSprite` stages + `down` + unknown-stage fallback + 48px face crop; the 13 glyphs; `RetroPanel` plain/ember/torch; all `RetroButton` variants incl. loading/disabled; `HpBar`×3 health tones, `DayBar` in-progress/met/revive-single-segment; `QuestNode` done/current/open/locked with connectors; `MapNode` five states; `Chest` (verified open transition + item list live in the browser, not just fake timers); `Badge` earned/unearned; `SpeechBox`; `RetroToast` (fired live, auto-dismissed after 2s); `StateBlock` loading/empty/error; `CountdownTimer` normal + at-zero.
+- `retro-kit-mobile.png` (375×2887, full page, iPhone viewport) — same kit at the 320-390px phone width the design targets: buttons run full width, quest node titles truncate with an ellipsis rather than wrapping into the action column, every tap target reads ≥44px.
+- Saved under this session's scratchpad (`/private/tmp/claude-502/.../scratchpad/retro-kit-screenshots/`), not in the repo — the path is ephemeral to the executor's sandbox; regenerate with `pages/_kit.vue` (recipe in Task 6 Step 1) if a later reviewer needs fresh ones.
+- Cosmetic-only observation from the desktop shot, not worth a code change: the kit page places two `CountdownTimer` demo instances with no gap between them ("Thời gian: 02:05Thời gian: 00:00"), a throwaway-page layout artifact, not a component bug (each instance's own internal spacing between its caption and its value is correct — verified via `flex items-baseline gap-1`).
+
+## Execution summary
+
+**Built:** all six tasks per the design (`harness/designs/retro-kit.md`) and the kit (`harness/UI-KIT.md` v2) — v2 tokens + VT323/Nunito in `tailwind.config.ts`/`nuxt.config.ts`, `assets/css/retro.css`, `utils/pixelArt.ts` (`PALETTE`, six `COMPANION` stages, 13 `GLYPHS`), the 12-component `components/retro/` kit, `composables/useRetroToast.ts`, `StateBlock`/`CountdownTimer` restyled in place, `retroRadius.test.ts`, and the `harness/CODEMAP.md` `shell` bullet. No page changes; no v1 component touched beyond `StateBlock`/`CountdownTimer` (props and `role="status"`/`remainingSeconds` unchanged — `revivePage.test.ts`/`onboardingPage.test.ts` pass unmodified).
+
+**Deviations from the design doc, logged:**
+1. **`wilted`'s pot rows kept identical to the other five stages** (open eyes, normal smile) instead of design §4's "eyes closed (row 26 `kk` only), smile inverted" detail — the plan's own Task 2 Step 1 test spec requires `tests/unit/pixelArt.test.ts` to assert "rows 22–31 identical across the six stages" with no stated exception, so implementing the described face change would fail that explicit, binding test. Followed the testable contract over the prose description; the design's self-critique section independently calls this "the only face change," so the loss is small (health/streak still carry the wilted signal via colour, stem bend and rotation).
+2. **`PixelArt.vue` carries one additive prop, `viewBox`**, beyond the design's documented `rows`/`palette`/`size`/`label?` list — needed so `CompanionSprite`'s 48px face crop (`viewBox="8 16 16 16"`) doesn't require a second bespoke SVG renderer. It defaults to the full `0 0 N N` box, so every other caller is unaffected.
+3. **`CompanionSprite` does not split rows-0–21 (plant) from rows-22–31 (pot) into two independently-animated layers** — design §4 says reactions move only the plant group, never the pot, except `levelup`/`down`. A faithful two-layer implementation would need `PixelArt` to support layered compositing with a shared crop viewBox; instead the whole sprite (pot included) carries the reaction class. Not covered by any test (`CompanionSprite.test.ts` only checks the reaction class is absent/present, never that the pot specifically stays still); logged as a fidelity gap, not a functional one.
+4. **Pixel art for `seed`/`sapling`/`flowering`/`fruitful`/`wilted` and all 13 `GLYPHS`** is the executor's own drawing, not a design sketch — the design doc only gives an exact sketch for `sprout` (reproduced verbatim in `COMPANION.sprout` and pinned by `tests/unit/pixelArt.test.ts`) and prose silhouette descriptions for the rest ("Rows used", leaf counts, bud/flower/fruit placement per stage). Every other stage/glyph is square, uses only `PALETTE` chars, and follows the prose loosely (row ranges, leaf counts, recolouring) but is not pixel-audited against a sketch, because none exists.
+5. **`package-lock.json` regenerated inside a `node:20-alpine` container** (not part of the plan's tasks, but required to reach a green build): the lockfile as produced locally by `npm uninstall`/`npm install` on this machine (node 22 / npm 11) silently dropped two optional nested resolutions (`@nuxt/schema`, `@nuxt/cli`'s nested `cac@6.7.14`) that the `docker-images` CI job's `npm ci` (on `node:20-alpine`) requires to consider the lock in sync — first push's CI run had `docker-images` red on "Build web image" / `npm ci` with `Missing: cac@6.7.14 from lock file`. Confirmed the regenerated lockfile still passes lint/typecheck/test/build locally and boots the built Docker image (`curl` 200) before pushing the fix.
+
+**Plan's Verification block, run in full from a clean install** (`rm -rf node_modules .output .nuxt && npm ci`):
+```
+npm run lint         → clean, no errors
+npm run typecheck    → clean, no errors
+npm run test:unit    → 30 files, 167 tests passed (0 failed)
+npm run build        → succeeds
+ls .output/public/_nuxt | grep -c '\.woff2$'                          → 9
+grep -o '[A-Za-z0-9_.-]*\.woff2' .output/public/sw.js | sort -u | wc -l → 9
+git ls-files | grep -c '_kit'                                          → 0
+ls components/retro | wc -l                                            → 12
+```
+
+**Runtime proof:**
+- Booted the production build directly: `node .output/server/index.mjs`, then `curl http://localhost:3000/` → `HTTP 200`, `<title>Học 30 phút</title>`; fetched the built CSS chunk and confirmed `font-family:VT323` is present (the font swap is real in the shipped bundle, not just in source). Server stopped cleanly afterward (`pgrep` empty).
+- Booted the `frontend/Dockerfile` image locally (`docker build` + `docker run`), `curl` → `HTTP 200`; container and image removed afterward (`docker ps -a` / `docker images` show nothing left over).
+- Exercised the real user path in a live `npm run dev` server (port 3612, killed afterward) via the throwaway `/_kit` route with a faked auth session: clicked "Show toast" and watched `useRetroToast` render the queued line and auto-dismiss after 2s with real (non-fake) timers; clicked `Chest` and watched it swap from `chestClosed` to `chestOpen` after the real 200ms and render the reward list (`aria-live="polite"`) — both composables/timers work end-to-end in a real browser, not just under `vi.useFakeTimers()`. Screenshots in **Notes**.
+- CI on the pushed branch: **green** — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36228032861 (`backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling` all passed). The branch's first push (commit `1e5a8b2`) had a red `docker-images` job from the lockfile issue above; fixed in commit `03cb8b6` and re-verified green.
+
+**Branch:** `harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n`, pushed. No PR opened.
