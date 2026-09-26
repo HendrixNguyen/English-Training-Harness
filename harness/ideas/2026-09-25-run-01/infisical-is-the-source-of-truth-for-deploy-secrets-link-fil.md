@@ -1,9 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: human
 run: 2026-09-25-run-01
 priority: medium
+plan: harness/plans/2026-09-26-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md
 ---
 # Infisical is the source of truth for deploy secrets: link file in the repo, runbook section, Railway sync
 
@@ -19,3 +20,10 @@ Until 2026-09-25 the production env existed only on the Railway service and in o
 ## Evidence
 - Infisical free plan and Railway secret sync: https://infisical.com/pricing , https://infisical.com/docs/integrations/secret-syncs/railway
 - CLI facts verified 2026-09-25: `infisical secrets set --file` exists; a blank value aborts the whole upload ("Secret key 'DEEPSEEK_API_KEY' has an empty value"); `infisical init` lists every product's projects by name only, so a Secret Manager project must exist first (org sample projects are of types agent-vault, kms, secret-scanning, cert-manager, pam plus one secret-manager).
+
+## Evaluation
+_Evaluator, 2026-09-26 — daily decide (feature queue; owner idea)._
+
+**Select — medium. Plan written today (draft — waits for `/approve`).**
+
+*Is the Why real?* Yes — the owner has already moved the 24 production keys into Infisical and works from `infisical export`; today the repo does not know that, so a second machine or person rebuilds the env from four dashboards. *Achievable in one plan?* Yes, ≈1.5 h and no code: commit `.infisical.json` (a project id, not a secret — the idea says so and `deploy/.env` stays gitignored), a runbook section, the owner checklist reordered, a smoke example. *Dependencies:* none (the deploy branch is on `main`). *Priority:* medium — developer-workflow, no learner impact; not auto-approved.

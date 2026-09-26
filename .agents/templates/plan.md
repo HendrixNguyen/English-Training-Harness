@@ -1,5 +1,6 @@
 # {title} — Plan
 
+**Design:** `harness/designs/<slug>.md` — required when any task touches `frontend/`; frontend tasks cite its sections and `## Verification` repeats its acceptance list. (Delete this line for backend-only plans.)
 **Idea:** `{idea}`
 **Goal:** <!-- one sentence -->
 

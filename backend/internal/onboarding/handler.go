@@ -49,6 +49,8 @@ func AssessmentHandler(svc *Service) gin.HandlerFunc {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ai_unavailable"})
 		case errors.Is(err, ErrBadAIOutput):
 			c.JSON(http.StatusBadGateway, gin.H{"error": "ai_bad_output"})
+		case errors.Is(err, ErrAITimeout):
+			c.JSON(http.StatusGatewayTimeout, gin.H{"error": "ai_timeout"})
 		case errors.Is(err, airouter.ErrAllProvidersFailed):
 			c.JSON(http.StatusBadGateway, gin.H{"error": "ai_upstream_failed"})
 		case err != nil:

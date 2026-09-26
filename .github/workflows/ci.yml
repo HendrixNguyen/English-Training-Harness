@@ -2,18 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main, 'harness/**']
+    # production: every commit on it must prove itself here before
+    # deploy.yml ships it (deploy.yml runs on this workflow's completion).
+    branches: [main, production, 'harness/**', 'release/**', 'hotfix/**']
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  # Branches: one group per ref, superseded runs cancelled. main: one group per
-  # commit, so back-to-back merges each finish their own run (a shared group
-  # would cancel the *pending* run when a third push arrives).
-  group: ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Branches: one group per ref, superseded runs cancelled. main and
+  # production: one group per commit, so back-to-back merges each finish their
+  # own run (a shared group would cancel the *pending* run when a third push
+  # arrives) — and a cancelled production run would never ship.
+  group: ci-${{ github.workflow }}-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/production' }}
 
 jobs:
   backend-unit:
@@ -152,3 +155,50 @@ jobs:
         run: npm run test:unit
       - name: Build
         run: npm run build
+
+  docker-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build API image
+        run: docker build --pull -t aelp-api:ci -f backend/Dockerfile backend
+      - name: API image runs (config.Load refuses to boot without env)
+        run: |
+          set +e
+          out=$(docker run --rm aelp-api:ci 2>&1); code=$?
+          set -e
+          echo "$out" | tail -3
+          if [ "$code" -eq 0 ] || ! echo "$out" | grep -q 'config: DATABASE_URL is required'; then
+            echo "::error::expected the API to exit non-zero with 'config: DATABASE_URL is required' (exit $code)"
+            exit 1
+          fi
+      - name: Build web image
+        run: |
+          docker build --pull -t aelp-web:ci -f frontend/Dockerfile \
+            --build-arg NUXT_PUBLIC_API_BASE=https://api.example.test frontend
+      - name: Web image serves the PWA with the right cache headers
+        run: |
+          docker run -d --rm --name web -p 18081:80 aelp-web:ci
+          for _ in $(seq 1 20); do curl -sf --max-time 2 http://127.0.0.1:18081/healthz >/dev/null && break; sleep 1; done
+          docker run --rm --entrypoint sh aelp-web:ci -c 'grep -rql "api.example.test" /srv' \
+            || { echo "::error::NUXT_PUBLIC_API_BASE build arg did not reach the generated site"; exit 1; }
+          deploy/smoke-web.sh http://127.0.0.1:18081
+          docker stop web
+      - name: Production compose file is valid
+        run: |
+          cat > "$RUNNER_TEMP/deploy.env" <<EOF2
+          POSTGRES_PASSWORD=ci-only
+          JWT_SECRET=$(openssl rand -base64 32)
+          ENCRYPTION_SECRET_KEY=$(openssl rand -hex 32)
+          GOOGLE_CLIENT_ID=ci-only
+          GOOGLE_CLIENT_SECRET=ci-only
+          FRONTEND_ORIGIN=https://app.example.test
+          NUXT_PUBLIC_API_BASE=https://api.example.test
+          EOF2
+          docker compose --env-file "$RUNNER_TEMP/deploy.env" -f deploy/compose.yml config -q
+          # And the guards hold: without the env file, config must fail.
+          if docker compose -f deploy/compose.yml config -q 2>/dev/null; then
+            echo "::error::compose config succeeded with no env — the :? guards are missing"
+            exit 1
+          fi
