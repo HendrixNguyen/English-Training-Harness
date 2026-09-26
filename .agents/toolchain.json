@@ -1,0 +1,103 @@
+{
+  "$comment": "Source of truth for what any coding agent needs to work in this repo. Tool configs (.mcp.json, .claude/settings.json, .codex/config.toml, .gemini/settings.json) are adapters of this file; `python3 tools/harness/cli.py doctor` checks a machine and the adapters against it. Change this file first, then the adapters.",
+  "version": 1,
+  "roles": {
+    "ideator":   {"role": ".agents/roles/ideator.md",   "skill": "harness-ideate"},
+    "evaluator": {"role": ".agents/roles/evaluator.md", "skill": "harness-evaluate"},
+    "designer":  {"role": ".agents/roles/designer.md",  "skill": "harness-design"},
+    "executor":  {"role": ".agents/roles/executor.md",  "skill": "harness-execute"},
+    "reviewer":  {"role": ".agents/roles/reviewer.md",  "skill": "harness-review"}
+  },
+  "project_skills": {
+    "path": ".agents/skills",
+    "names": ["harness-ideate", "harness-evaluate", "harness-design", "harness-execute", "harness-review", "harness-orchestrate"]
+  },
+  "skill_packs": [
+    {
+      "name": "superpowers",
+      "required": true,
+      "source": "https://github.com/obra/superpowers",
+      "claude_plugin": "superpowers@superpowers-marketplace",
+      "provides": ["brainstorming", "writing-plans", "executing-plans", "subagent-driven-development", "test-driven-development", "systematic-debugging", "verification-before-completion", "using-git-worktrees", "requesting-code-review"],
+      "used_by": ["evaluator", "executor", "reviewer"]
+    },
+    {
+      "name": "frontend-design",
+      "required": true,
+      "source": "https://github.com/anthropics/claude-plugins-official",
+      "claude_plugin": "frontend-design@claude-plugins-official",
+      "provides": ["frontend-design"],
+      "used_by": ["designer"]
+    },
+    {
+      "name": "code-review",
+      "required": true,
+      "source": "https://github.com/anthropics/claude-plugins-official",
+      "claude_plugin": "code-review@claude-plugins-official",
+      "provides": ["code-review"],
+      "used_by": ["reviewer"]
+    },
+    {
+      "name": "figma",
+      "required": false,
+      "source": "https://github.com/anthropics/claude-plugins-official",
+      "claude_plugin": "figma@claude-plugins-official",
+      "provides": ["figma-generate-design", "figma-design-to-code"],
+      "used_by": ["designer"],
+      "note": "Optional: the designer draws in Figma only when a connection exists; the markdown design doc is the contract."
+    }
+  ],
+  "mcp_servers": {
+    "context7": {
+      "required": true,
+      "purpose": "Current library docs (Nuxt, Vue, Pinia, Tailwind, Gin, pgx, go-redis) before writing or reviewing code.",
+      "command": "npx", "args": ["-y", "@upstash/context7-mcp"],
+      "used_by": ["evaluator", "executor", "reviewer"]
+    },
+    "playwright": {
+      "required": true,
+      "purpose": "Drive the running PWA for the executor's runtime proof, the designer's research and the reviewer's acceptance-list walk.",
+      "command": "npx", "args": ["-y", "@playwright/mcp@latest"],
+      "used_by": ["designer", "executor", "reviewer"]
+    },
+    "railway": {
+      "required": false,
+      "purpose": "Read deploy status and logs of the live API (project english-learning, service api). Read-only use; secrets are pushed with the CLI over stdin, never through a tool argument.",
+      "command": "railway", "args": ["mcp"],
+      "used_by": ["reviewer"],
+      "needs": "railway login"
+    },
+    "figma": {
+      "required": false,
+      "purpose": "Designer draws or reads a frame. Provided by the figma plugin on Claude Code; remote OAuth server elsewhere.",
+      "url": "https://mcp.figma.com/mcp",
+      "used_by": ["designer"],
+      "needs": "OAuth in the tool"
+    }
+  },
+  "clis": {
+    "required": {
+      "git": "every role",
+      "gh": "PRs, CI runs (gh auth login)",
+      "python3": "harness CLI (3.9+, stdlib only)",
+      "go": "backend build and tests",
+      "node": "frontend (20+)",
+      "npm": "frontend",
+      "docker": "backend integration tests and compose"
+    },
+    "optional": {
+      "railway": "API deploy status and env (railway login)",
+      "wrangler": "manual Pages upload; CD does it on production (wrangler login)",
+      "infisical": "deploy secrets: infisical export --env prod --format dotenv > deploy/.env",
+      "actionlint": "lint .github/workflows"
+    }
+  },
+  "hooks": {
+    "session_start": "python3 tools/harness/cli.py context --hook"
+  },
+  "adapters": {
+    "claude-code": [".mcp.json", ".claude/settings.json", ".claude/agents/", ".claude/commands/", ".claude/skills -> ../.agents/skills"],
+    "codex": [".codex/config.toml", ".codex/hooks.json", "AGENTS.md", ".agents/skills"],
+    "gemini-cli": [".gemini/settings.json", "AGENTS.md"]
+  }
+}
