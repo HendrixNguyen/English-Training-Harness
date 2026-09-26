@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-26 15:14. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 15:38. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -90,8 +90,7 @@ _none_
 
 ## Executing
 
-- `harness/plans/2026-09-25-growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub — Plan [medium]
-- `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium]
+_none_
 
 ## Done (last 10)
 
@@ -101,10 +100,10 @@ _none_
 - `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high] (unreviewed)
 - `harness/plans/2026-09-25-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md` — Ship on merge: a deploy workflow that builds the PWA and uploads it to Cloudflare Pages on every push to main, then smoke-checks both public URLs — Plan [high] (unreviewed)
+- `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md` — Roadmap tree shows the real plan: module and day titles with true per-day completion — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-25-pet-streak-shield-earned-by-target-days.md` — pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 
