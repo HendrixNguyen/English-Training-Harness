@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-26 11:09. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-26 11:21. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -83,7 +83,6 @@ _none_
 ## Approved
 
 - `harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — Level-true content: the roadmap prompt carries a CEFR descriptor and the goal's register, and a deterministic placement floor stops a 10/10 learner being graded A2 — Plan [high]
-- `harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md` — Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan [high]
 - `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high]
 - `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan [high]
 - `harness/plans/2026-09-25-growth-moment-after-every-task-health-gain-streak-and-target.md` — Growth moment after every task: health gain, streak and target-met celebration on the hub — Plan [medium]
@@ -98,6 +97,7 @@ _none_
 ## Done (last 10)
 
 - `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — airouter amend: `TestParseRoadmapRejects` proves the day-sum rule — rows only the day budget can reject, keyed by reason — Plan [high] (unreviewed)
+- `harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md` — Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` — Pages ship is honest: wait for the edge before the smoke check, no `404.html` on Pages so deep links answer 200, and the `/login` return-trip check — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-26-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — Roadmap regeneration: `POST /api/v1/roadmaps/regenerate` replaces the active roadmap (optionally one CEFR step up or down) so a roadmap stored before the typed-content contract can be re-made — Plan [high] (unreviewed)
@@ -106,7 +106,6 @@ _none_
 - `harness/plans/2026-09-25-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md` — Ship on merge: a deploy workflow that builds the PWA and uploads it to Cloudflare Pages on every push to main, then smoke-checks both public URLs — Plan [high] (unreviewed)
 - `harness/plans/2026-09-25-providertimeout-of-30-s-makes-roadmap-generation-impossible-.md` — Per-task AI deadlines (180 s roadmap / 30 s others), the graded level survives a failed roadmap step, Gemini default model off the retired name, one retry on 503, per-call provider logs — Plan [high] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-25-parseorigins-accepts-frontend-origin-entries-no-browser-send.md` — middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-25-nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect.md` — Nobody can sign in on Cloudflare Pages: /login is 308-redirected to /login/ and the auth middleware drops Google's code — Plan [high] (review: pass-with-bugs) (merged)
 
 ## Failed
 
