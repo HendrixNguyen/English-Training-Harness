@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md
-status: executing
+status: done
 priority: medium
 merged: false
 design: harness/designs/plant-name.md
@@ -383,3 +383,42 @@ Mutation checks (record the results): (a) change `utf8.RuneCountInString` to `le
 - **`GET /pet/status` example in §6.3** keeps "My Green Buddy": correct for a pet whose owner never onboarded.
 - **e2e:** `frontend/tests/e2e/login.spec.ts` stubs `PET` with "My Green Buddy" and asserts nothing about the name — untouched; Playwright is local-only (CODEMAP `frontend` job).
 - **Rename UI** is a follow-up on `/settings` (approved 2026-09-24), not this plan.
+
+## Execution summary
+
+**Built exactly as planned, all 8 tasks, one commit each, all green.** Branch `harness/2026-09-26-medium-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o`, worktree `.worktrees/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o`, cut from freshly-fetched `origin/main` (`67ad0c0`). No overlap with the growth-moment/streak-shield plans at Task 7 Step 0 — neither had landed on `origin/main` yet, so `speechLine`/`index.vue` were exactly the shape the plan assumed.
+
+**Deviations (none functional, all in the plan's own count predictions):**
+- Task 3's `handler_test.go` step reused the plan's literal snippets verbatim; no code deviation.
+- Task 6/7 grep-count expectations in the Verification section undercounted the baseline: `onboardingPage.test.ts` already had 9 cases before this plan (plan assumed 6), so the final count is 11, not "8". `pages/index.vue`'s `plant_name` grep count is 4, not 3, because the new caption line's `v-if` and interpolation both reference `pet.status.plant_name` on one line. `TestIntegration*` count is 14, not the plan's predicted 13 — the pre-plan baseline was already 13, not 12. None of these reflect a scope or correctness gap; the plan's own literal instructions produced them.
+- The plan's `grep -rn 'My Green Buddy' internal/onboarding/*.go` check ("expect: no output outside `_test.go` files") turns up one line: `service.go`'s `DefaultPlantName` doc comment, which quotes "My Green Buddy" to explain why the default is *not* that string — this is the exact comment the plan itself specified in Task 3 Step 3. Nothing outside a comment or a test file writes the DDL default from `onboarding`; the grep's own wording is stricter than the code it prescribes.
+- `harness/designs/plant-name.md` inherits `frontend-shell.md` (v1: `AppCard`/`AppButton`/`text-mute`/`text-alert`/Fraunces). `harness/UI-KIT.md` v2 (the retro JRPG restyle) supersedes v1 for visual style, but as of this branch's base no `frontend/components/retro/` or retro Tailwind tokens exist in the codebase (confirmed by grep before starting) — the v2 migration hasn't landed. Followed the v1-consistent design doc verbatim, matching every class name already live in `onboarding.vue`/`index.vue`/`revive.vue`; no departure from the binding design doc.
+
+**Plan's Verification section:** every command run, all outputs matched (see grep counts above for the three where the plan's predicted number was stale). `git diff --stat origin/main...HEAD -- harness/` touches only `harness/CODEMAP.md`. `python3 tools/harness/cli.py validate` → exit 0.
+
+**Mutation checks — all three flipped red as predicted, then reverted clean:**
+(a) `utf8.RuneCountInString` → `len`: `TestAssessNamesThePlant/thirty_runes` failed with `plant_name must be at most 30 characters` (60 bytes for 30 "ă" runes). Reverted; `git status` clean.
+(b) Dropped `WHERE … IS DISTINCT FROM` from `ensureNamedSQL`: `TestIntegrationEnsureNamedWritesOnceAndKeepsTheNameOnRepeat` failed `RowsAffected on an unchanged name = 1, want 0` against the real isolated Postgres. Reverted; `git status` clean.
+(c) Always-send `plant_name` in `onboarding.vue`: the exact-body `toEqual` case in `onboardingPage.test.ts` failed (unexpected `"plant_name": ""` key). Reverted; `git status` clean.
+
+**Test evidence:**
+- Backend: `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1 -race` (via `make check`) → 13 packages `ok`, `gofmt -l .` silent, `go vet ./...` silent.
+- Backend integration, against an isolated `docker compose` stack (`COMPOSE_PROJECT_NAME=name-plant`, Postgres 55616, Redis 56616): `go test ./internal/onboarding/ ./internal/pet/ ./cmd/... -count=1 -race -v` with `TEST_DATABASE_URL`/`TEST_REDIS_URL` exported → all `ok`, including the new `TestIntegrationEnsureNamedWritesOnceAndKeepsTheNameOnRepeat` (concurrent writers, rename, no-op repeat all proved against real Postgres).
+- Frontend: `npm run lint && npm run typecheck && npm run test:unit && npm run build` → all clean; 16 test files, 85 tests, 0 failures.
+
+**Runtime proof (Definition of done):**
+1. `go build ./...` and `npm run build` both succeed (see above).
+2. Full test suites run clean from a clean shell (env vars unset except the isolated `TEST_*` pair for integration), including every pre-existing package/test, not only what this plan added.
+3. Booted the real compiled `cmd/api` binary against the isolated Postgres/Redis stack (`GEMINI_BASE_URL` pointed at a local fake Gemini server returning valid placement/roadmap JSON, discriminated by system-prompt content, so the AI hop is real HTTP but deterministic). `GET /healthz` → 200.
+4. Exercised the real feature end to end over HTTP with a minted session (a throwaway `cmd/seedsmoke` helper inserted a user directly and signed a real JWT + Redis session, then deleted before commit — never part of the plan's file list, confirmed absent from `git status`):
+   - `GET /api/v1/onboarding/quiz` → real question bank.
+   - `POST /api/v1/onboarding/assessment` with `plant_name: "  Lá Xanh Smoke  "` → `201`, `pet_state.plant_name = "Lá Xanh Smoke"` (trimmed).
+   - `GET /api/v1/pet/status` on the same user → `plant_name = "Lá Xanh Smoke"`, proving persistence, not just an echoed response.
+   - `docker exec` a direct `psql` read of `pet_states` → same row, same name.
+   - Re-submit with a different `plant_name` while the roadmap is already active → `200`, name unchanged (`"Lá Xanh Smoke"`) — proves the re-submit path never renames.
+   - A 31-character `plant_name` → `400 {"error":"invalid_request"}`.
+5. Cleaned up: killed the smoke-test API process and the fake Gemini server (`pgrep` confirms none left), `make down` on the `name-plant` compose project (`docker ps` confirms no `name-plant-*` containers), removed the scratch `backend/.env` and the `cmd/seedsmoke` helper.
+
+**CI:** pushed `harness/2026-09-26-medium-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o`; run [36229005157](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36229005157) — **success**. All five jobs green: `backend-unit`, `backend-integration`, `frontend`, `harness-tooling`, `docker-images`.
+
+No PR opened (owner's daily-PR routine). No blockers for the owner.
