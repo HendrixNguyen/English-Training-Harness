@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/pet-streak-shield-earned-by-target-days.md
-status: draft
+status: approved
 priority: medium
 merged: false
 design: harness/designs/pet-streak-shield.md
