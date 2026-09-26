@@ -21,7 +21,11 @@ export default defineNuxtRouteMiddleware((to) => {
     return
   }
   if (!auth.isAuthenticated) {
+    // A stored-but-expired token gets one sentence on /login explaining why;
+    // no token at all (first visit, cleared storage) gets the plain screen.
+    const expired = auth.accessToken !== null
     void auth.signOut()
+    if (expired) return navigateTo({ path: '/login', query: { reason: 'expired' } }, { replace: true })
     return navigateTo('/login', { replace: true })
   }
 })

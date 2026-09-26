@@ -4,6 +4,7 @@ import { useApi } from '~/composables/useApi'
 import { useAuthStore, type SignInResponse } from '~/stores/auth'
 import { ApiError } from '~/utils/apiClient'
 import { googleAuthUrl, randomState } from '~/utils/googleAuth'
+import { loginNotice } from '~/utils/loginReason'
 
 const STATE_KEY = 'aelp.oauth_state'
 
@@ -14,6 +15,7 @@ const auth = useAuthStore()
 const busy = ref(false)
 const error = ref<string | null>(null)
 const redirectUri = computed(() => `${window.location.origin}/login`)
+const notice = computed(() => loginNotice(route.query.reason))
 
 function startSignIn() {
   error.value = null
@@ -66,6 +68,10 @@ onMounted(() => {
     <p class="text-mute">
       Học 30 phút mỗi ngày, nuôi một cái cây.
     </p>
+
+    <AppCard v-if="notice" data-testid="login-expired" class="text-left text-sm text-ink">
+      <span aria-hidden="true">⏳</span> {{ notice }}
+    </AppCard>
 
     <div v-if="busy" class="flex items-center gap-2 text-mute" role="status">
       <span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />

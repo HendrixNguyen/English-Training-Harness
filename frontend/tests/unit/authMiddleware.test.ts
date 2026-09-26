@@ -25,7 +25,7 @@ describe('middleware/auth.global — expired session (the daily sign-out path)',
     navigateTo.mockReset()
   })
 
-  it('drops the per-user api-state cache, keeps the assets cache, and redirects to /login', async () => {
+  it('drops the per-user api-state cache, keeps the assets cache, and redirects to /login?reason=expired', async () => {
     const caches = await installSeededCaches(API_STATE_CACHE)
     persistSession(Date.now() - 1) // expires_in elapsed since the last visit
 
@@ -34,6 +34,12 @@ describe('middleware/auth.global — expired session (the daily sign-out path)',
     await vi.waitFor(async () => expect(await caches.has(API_STATE_CACHE)).toBe(false))
     expect(await caches.has('assets')).toBe(true)
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+    expect(navigateTo).toHaveBeenCalledWith({ path: '/login', query: { reason: 'expired' } }, { replace: true })
+  })
+
+  it('redirects a missing session (never signed in) to /login without a reason', () => {
+    guard(to, to)
+
     expect(navigateTo).toHaveBeenCalledWith('/login', { replace: true })
   })
 

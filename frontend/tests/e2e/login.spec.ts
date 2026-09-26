@@ -53,6 +53,24 @@ test('a guarded route without a token redirects to /login', async ({ page }) => 
   await expect(page.getByRole('button', { name: 'Đăng nhập bằng Google' })).toBeVisible()
 })
 
+test('/login?reason=expired explains the 24-hour expiry before the Google button', async ({ page }) => {
+  await page.goto('/login?reason=expired')
+  const notice = page.getByTestId('login-expired')
+  await expect(notice).toBeVisible()
+  await expect(notice).toHaveText('⏳ Phiên đã hết hạn sau 24 giờ không hoạt động. Đăng nhập lại để tiếp tục.')
+  const positions = await page.evaluate(() => {
+    const notice = document.querySelector('[data-testid="login-expired"]')!
+    const button = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Đăng nhập bằng Google'))!
+    return { notice: notice.getBoundingClientRect().top, button: button.getBoundingClientRect().top }
+  })
+  expect(positions.notice).toBeLessThan(positions.button)
+})
+
+test('/login without a reason shows no notice', async ({ page }) => {
+  await page.goto('/login')
+  await expect(page.getByTestId('login-expired')).toHaveCount(0)
+})
+
 test('the Google callback exchanges the code (§6.1 shape) and lands on the dashboard', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('aelp.oauth_state', 'state-1'))
   await page.goto('/login?code=code-1&state=state-1')
