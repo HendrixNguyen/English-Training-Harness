@@ -26,6 +26,7 @@ export default defineNuxtConfig({
     '@fontsource/nunito/latin-ext-700.css',
     '@fontsource/nunito/vietnamese-700.css',
     '~/assets/css/main.css',
+    '~/assets/css/retro.css',
   ],
   app: {
     head: {

@@ -1,0 +1,84 @@
+/*
+ * Retro kit shared mechanics (design §3, harness/UI-KIT.md "Motion budget").
+ * Imported after main.css: the kit's stepped keyframes and the one
+ * reduced-motion block that turns every `retro-*` animation off. A "unit"
+ * is `--px` — the pixel scale (4px at the companion's 128px size) — so
+ * transforms stay on the pixel grid instead of an arbitrary px value.
+ */
+
+:root {
+  --px: 4;
+}
+
+.retro-pixel {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+
+@keyframes retro-breath {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(var(--px) * -1px)); }
+}
+
+@keyframes retro-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(var(--px) * -2px)); }
+}
+
+@keyframes retro-shake {
+  0%, 100% { transform: translateX(calc(var(--px) * -1px)); }
+  50% { transform: translateX(calc(var(--px) * 1px)); }
+}
+
+@keyframes retro-flash {
+  0% { filter: none; }
+  33% { filter: brightness(1.6) saturate(2); }
+  66% { filter: brightness(2.2) grayscale(0.4); }
+  100% { filter: none; }
+}
+
+@keyframes retro-dots {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@keyframes retro-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes retro-rise {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.retro-breath {
+  animation: retro-breath 1000ms steps(1) infinite;
+}
+.retro-hop {
+  animation: retro-hop 200ms steps(1);
+}
+.retro-shake {
+  animation: retro-shake 200ms steps(1);
+}
+.retro-flash {
+  animation: retro-flash 300ms steps(3);
+}
+.retro-dots {
+  animation: retro-dots 900ms steps(3) infinite;
+}
+.retro-blink {
+  animation: retro-blink 600ms steps(2) infinite;
+}
+.retro-rise {
+  animation: retro-rise 150ms steps(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class^='retro-'],
+  [class*=' retro-'],
+  .retro-anim {
+    animation: none !important;
+    transition: none !important;
+  }
+}
