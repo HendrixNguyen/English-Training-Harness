@@ -365,6 +365,7 @@ func NewRouter() (*Router, error) {
 
 *  users.google\_refresh\_token encrypted with AES-256-GCM via ENCRYPTION\_SECRET\_KEY (32-byte hex).  
 *  JWT access token validated against Redis key (sess:{user\_id}:token) with a 24-hour TTL.
+*  The 24-hour TTL is an idle window: auth.Require renews a token with less than 12 h left and returns the new one in X-Session-Token / X-Session-Expires-In; the Redis key always holds exactly one token, so DEL still revokes at once.
 
 |             |     |  Queues)    |     |  Tasks)      |     | Router     |
 
