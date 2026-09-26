@@ -95,12 +95,19 @@ func (f *fakeLimiter) Allow(context.Context, string) error {
 
 type fakePet struct {
 	ensured int
+	names   []string
 	state   PetState
 	err     error
 }
 
-func (f *fakePet) Ensure(context.Context, string) (PetState, error) {
+func (f *fakePet) Ensure(_ context.Context, _ string, plantName string) (PetState, error) {
 	f.ensured++
+	f.names = append(f.names, plantName)
+	if plantName != "" {
+		st := f.state
+		st.PlantName = plantName
+		return st, f.err
+	}
 	return f.state, f.err
 }
 

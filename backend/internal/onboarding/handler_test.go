@@ -32,7 +32,7 @@ func post(r *gin.Engine, body string) *httptest.ResponseRecorder {
 }
 
 // spec61Request is the backend spec §6.1 example body with the bank's ids.
-const spec61Request = `{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}`
+const spec61Request = `{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "plant_name": "Mầm Non", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}`
 
 func TestQuizReturnsTheBankWithoutAnswers(t *testing.T) {
 	h := newHarness(t)
@@ -56,7 +56,7 @@ func TestAssessmentReturns201WithTheSpec61Body(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d body = %s", w.Code, w.Body.String())
 	}
-	want := `{"status":"success","assessed_level":"B1","roadmap_id":"rm-new","pet_state":{"plant_name":"My Green Buddy","health_points":100,"stage":"sprout"}}`
+	want := `{"status":"success","assessed_level":"B1","roadmap_id":"rm-new","pet_state":{"plant_name":"Mầm Non","health_points":100,"stage":"sprout"}}`
 	if strings.TrimSpace(w.Body.String()) != want {
 		t.Errorf("body =\n%s\nwant\n%s", w.Body.String(), want)
 	}
@@ -89,6 +89,7 @@ func TestAssessmentErrorMapping(t *testing.T) {
 		{"bad output twice", func(h *harness) { h.ai.replies[airouter.TaskPlacementTest] = []string{"x", "y"} }, spec61Request, 502, "ai_bad_output"},
 		{"repo failure", func(h *harness) { h.repo.saveErr = errors.New("pg") }, spec61Request, 500, "internal_error"},
 		{"ai timed out", func(h *harness) { h.ai.timeout[airouter.TaskRoadmapGen] = true }, spec61Request, 504, "ai_timeout"},
+		{"plant name too long", nil, strings.Replace(spec61Request, `"Mầm Non"`, `"`+strings.Repeat("a", 31)+`"`, 1), 400, "invalid_request"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
