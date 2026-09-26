@@ -339,9 +339,49 @@ func TestIntegrationRoadmapOutlineJoinsDailyProgress(t *testing.T) {
 		t.Errorf("rows contains the out-of-range date 1999-01-01")
 	}
 
-	// TODO(Task 3): svc.Roadmap(ctx, userID) end-to-end assertions land here
-	// once Service.Roadmap exists.
-	_ = rdb
+	svc := NewService(NewRedisCounter(rdb), repo, repo, NopPet{}, func() time.Time { return time.Now().UTC() })
+	out, err := svc.Roadmap(ctx, userID)
+	if err != nil {
+		t.Fatalf("Roadmap: %v", err)
+	}
+	if out.DayNumber != 1 {
+		t.Errorf("DayNumber = %d, want 1", out.DayNumber)
+	}
+	if len(out.Modules) != 4 {
+		t.Fatalf("len(Modules) = %d, want 4", len(out.Modules))
+	}
+	for i, m := range out.Modules {
+		if len(m.Days) != 7 {
+			t.Errorf("Modules[%d] has %d days, want 7", i, len(m.Days))
+		}
+	}
+	day1 := out.Modules[0].Days[0]
+	if day1.Date != d1 || day1.MinutesSpent != 30 || !day1.IsTargetMet || day1.Title != "Day 1" {
+		t.Errorf("Modules[0].Days[0] = %+v, want date=%s minutes=30 met=true title=Day 1", day1, d1)
+	}
+	day2 := out.Modules[0].Days[1]
+	if day2.MinutesSpent != 12 || day2.IsTargetMet {
+		t.Errorf("Modules[0].Days[1] = %+v, want minutes=12 met=false", day2)
+	}
+	day3 := out.Modules[0].Days[2]
+	if day3.MinutesSpent != 0 || day3.IsTargetMet {
+		t.Errorf("Modules[0].Days[2] = %+v, want minutes=0 met=false", day3)
+	}
+	for _, m := range out.Modules {
+		for _, d := range m.Days {
+			if len(d.Tasks) != 3 {
+				t.Fatalf("day %d has %d tasks, want 3", d.DayNumber, len(d.Tasks))
+			}
+			for _, task := range d.Tasks {
+				if task.DurationMinutes != 10 {
+					t.Errorf("day %d task %+v duration = %d, want 10", d.DayNumber, task, task.DurationMinutes)
+				}
+				if !strings.HasPrefix(task.Title, "Day task: ") {
+					t.Errorf("day %d task %+v title does not start with 'Day task: '", d.DayNumber, task)
+				}
+			}
+		}
+	}
 }
 
 // integrationRoadmap is a valid 4x7x3 roadmap whose tasks carry the title and

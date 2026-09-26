@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 )
 
 // RoadmapDoc is the §3.2 roadmaps row with its roadmap_json: the
@@ -74,4 +76,131 @@ func (r *PgRepo) ProgressBetween(ctx context.Context, userID, fromDate, toDate s
 		out[date] = p
 	}
 	return out, rows.Err()
+}
+
+// RoadmapTask is one entry of a day's tasks in the GET /api/v1/roadmap body
+// (backend spec §6.2): the outline only — no content_json.
+type RoadmapTask struct {
+	TaskType        string `json:"task_type"`
+	Title           string `json:"title"`
+	DurationMinutes int    `json:"duration_minutes"`
+}
+
+// RoadmapDay is one of the 28 days: its plan and what daily_progress says
+// happened on its date.
+type RoadmapDay struct {
+	DayNumber    int           `json:"day_number"`
+	Date         string        `json:"date"` // YYYY-MM-DD in the user's timezone (DayDate)
+	Title        string        `json:"title"`
+	Tasks        []RoadmapTask `json:"tasks"`
+	MinutesSpent int           `json:"minutes_spent"`
+	IsTargetMet  bool          `json:"is_target_met"`
+}
+
+// RoadmapModule is one of the four weekly modules (§6.1).
+type RoadmapModule struct {
+	Week  int          `json:"week"`
+	Title string       `json:"title"`
+	Focus string       `json:"focus"`
+	Days  []RoadmapDay `json:"days"`
+}
+
+// RoadmapOutline is the GET /api/v1/roadmap 200 body — backend spec §6.2,
+// field for field.
+type RoadmapOutline struct {
+	RoadmapID string          `json:"roadmap_id"`
+	Title     string          `json:"title"`
+	CEFRLevel string          `json:"cefr_level"`
+	CreatedAt time.Time       `json:"created_at"`
+	DayNumber int             `json:"day_number"`
+	Modules   []RoadmapModule `json:"modules"`
+}
+
+// Roadmap resolves the active roadmap document, joins it with daily_progress
+// over its 28 days and reports the learner's real progress against it. Three
+// rules govern the join: dates are DayDate in the user's timezone (the same
+// rule DayNumber uses, so the tree and the daily suite can never disagree
+// about which date a day is); a day with no daily_progress row is
+// minutes_spent 0 / is_target_met false; and the flag is exactly what the pet
+// was told — a day past 30 minutes whose OnTargetMet hook failed still reads
+// 30/false until the next progress call retries it. The tree does not know
+// better than the pet.
+func (s *Service) Roadmap(ctx context.Context, userID string) (RoadmapOutline, error) {
+	profile, err := s.quests.Profile(ctx, userID)
+	if err != nil {
+		return RoadmapOutline{}, err
+	}
+	doc, err := s.quests.ActiveRoadmapDoc(ctx, userID)
+	if err != nil {
+		return RoadmapOutline{}, err
+	}
+
+	var parsed airouter.Roadmap
+	if err := json.Unmarshal(doc.JSON, &parsed); err != nil {
+		return RoadmapOutline{}, fmt.Errorf("quests: roadmap_json for roadmap %s: %w", doc.ID, err)
+	}
+	if len(parsed.Modules) != airouter.Modules {
+		return RoadmapOutline{}, fmt.Errorf("quests: roadmap %s has %d modules, want %d", doc.ID, len(parsed.Modules), airouter.Modules)
+	}
+	for mi, m := range parsed.Modules {
+		if len(m.Days) != airouter.DaysPerModule {
+			return RoadmapOutline{}, fmt.Errorf("quests: roadmap %s module %d has %d days, want %d", doc.ID, mi+1, len(m.Days), airouter.DaysPerModule)
+		}
+	}
+
+	loc := Location(profile.Timezone)
+	now := s.now()
+	day := DayNumber(doc.CreatedAt, now, loc)
+
+	rows, err := s.progress.ProgressBetween(ctx, userID, DayDate(doc.CreatedAt, 1, loc), DayDate(doc.CreatedAt, RoadmapDays, loc))
+	if err != nil {
+		return RoadmapOutline{}, err
+	}
+
+	modules := make([]RoadmapModule, 0, airouter.Modules)
+	for mi, m := range parsed.Modules {
+		days := make([]RoadmapDay, 0, airouter.DaysPerModule)
+		for di, d := range m.Days {
+			n := mi*airouter.DaysPerModule + di + 1
+			date := DayDate(doc.CreatedAt, n, loc)
+			p := rows[date]
+
+			tasks := make([]RoadmapTask, 0, len(d.Tasks))
+			for _, task := range d.Tasks {
+				duration := task.DurationMinutes
+				if duration <= 0 {
+					duration = DefaultTaskMinutes
+				}
+				tasks = append(tasks, RoadmapTask{
+					TaskType:        task.Type,
+					Title:           task.Title,
+					DurationMinutes: duration,
+				})
+			}
+
+			days = append(days, RoadmapDay{
+				DayNumber:    n,
+				Date:         date,
+				Title:        d.Title,
+				Tasks:        tasks,
+				MinutesSpent: p.MinutesSpent,
+				IsTargetMet:  p.IsTargetMet,
+			})
+		}
+		modules = append(modules, RoadmapModule{
+			Week:  m.Week,
+			Title: m.Title,
+			Focus: m.Focus,
+			Days:  days,
+		})
+	}
+
+	return RoadmapOutline{
+		RoadmapID: doc.ID,
+		Title:     parsed.Title,
+		CEFRLevel: parsed.CEFRLevel,
+		CreatedAt: doc.CreatedAt,
+		DayNumber: day,
+		Modules:   modules,
+	}, nil
 }
