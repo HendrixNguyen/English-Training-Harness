@@ -29,6 +29,13 @@ describe('plant helpers (design §3)', () => {
     expect(speechLine({ stage: 'wilted', health: 0, targetMet: false })).toBe('…')
   })
 
+  it('speaks the plant\'s name where "tớ" would be, and stays byte-identical without one', () => {
+    expect(speechLine({ stage: 'sapling', health: 10, targetMet: true, name: 'Mầm Non' })).toBe('Cảm ơn bạn, hôm nay Mầm Non đủ nước rồi 🌿')
+    expect(speechLine({ stage: 'sapling', health: 10, targetMet: false, name: 'Mầm Non' })).toBe('Mầm Non sắp héo mất! Học một chút nhé?')
+    expect(speechLine({ stage: 'sprout', health: 80, targetMet: false, name: 'Mầm Non' })).toBe('Tưới cho tớ 10 phút học đi!')
+    expect(speechLine({ stage: 'sapling', health: 10, targetMet: true, name: '  ' })).toBe('Cảm ơn bạn, hôm nay tớ đủ nước rồi 🌿')
+  })
+
   it('counts whole days since last practice, or null when unknown', () => {
     const now = new Date('2026-09-23T10:00:00Z')
     expect(daysSince('2026-09-21T20:15:00Z', now)).toBe(1)

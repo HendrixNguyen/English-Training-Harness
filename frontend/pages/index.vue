@@ -12,7 +12,7 @@ onMounted(() => {
 })
 
 const bubble = computed(() => pet.status
-  ? speechLine({ stage: pet.status.stage, health: pet.status.health_points, targetMet: quest.targetMet })
+  ? speechLine({ stage: pet.status.stage, health: pet.status.health_points, targetMet: quest.targetMet, name: pet.status.plant_name })
   : '')
 
 function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked' | 'open' {
@@ -31,7 +31,7 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
       to="/revive"
       class="mb-4 flex items-center justify-between rounded-card bg-alert px-4 py-3 font-semibold text-white"
     >
-      <span>⚠️ Cây xanh đang bị héo rũ!</span>
+      <span>⚠️ {{ pet.status?.plant_name || 'Cây xanh' }} đang bị héo rũ!</span>
       <span class="text-sm underline">Cứu cây ngay</span>
     </NuxtLink>
 
@@ -39,6 +39,9 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
       <StateBlock v-if="pet.loading && !pet.status" state="loading" />
       <StateBlock v-else-if="pet.error && !pet.status" state="error" message="Không tải được cây của bạn." action="Thử lại" @action="pet.load()" />
       <template v-else-if="pet.status">
+        <p v-if="pet.status.plant_name" class="text-center font-display text-lg">
+          {{ pet.status.plant_name }}
+        </p>
         <PlantSvg :stage="pet.status.stage" :health="pet.status.health_points" />
         <HealthBar class="mt-3" :health="pet.status.health_points" />
         <SpeechBubble v-if="bubble !== '…'" :line="bubble" />

@@ -63,6 +63,7 @@ describe('/revive (wireframe 7.5) when GET /pet/status fails', () => {
 
     expect(w.find('[data-stage="wilted"]').exists()).toBe(true)
     expect(w.find('[role="alert"]').text()).toContain('héo rũ')
+    expect(w.find('[role="alert"]').text()).toContain('My Green Buddy đang bị héo rũ')
     expect(w.text()).toContain('Cứu cây ngay')
   })
 

@@ -16,12 +16,15 @@ export function healthTone(health: number): Tone {
   return 'alert'
 }
 
-export function speechLine(o: { stage: string, health: number, targetMet: boolean }): string {
+/** `name` replaces "tớ" in the two lines that address the plant by name (design plant-name §2); blank keeps every line as before. */
+export function speechLine(o: { stage: string, health: number, targetMet: boolean, name?: string }): string {
+  const name = o.name?.trim() || 'tớ'
+  const Name = name === 'tớ' ? 'Tớ' : name
   if (o.stage === 'wilted' || o.health <= 0) return '…'
-  if (o.targetMet) return 'Cảm ơn bạn, hôm nay tớ đủ nước rồi 🌿'
+  if (o.targetMet) return `Cảm ơn bạn, hôm nay ${name} đủ nước rồi 🌿`
   if (o.health >= 60) return 'Tưới cho tớ 10 phút học đi!'
   if (o.health >= 30) return 'Tớ hơi khát rồi… 10 phút thôi?'
-  return 'Tớ sắp héo mất! Học một chút nhé?'
+  return `${Name} sắp héo mất! Học một chút nhé?`
 }
 
 /** Whole days between an ISO timestamp and now; null when absent or unparsable. */

@@ -72,7 +72,7 @@ async function revive() {
     <!-- Real data, and it says wilted: the only way into the alarm. -->
     <template v-else-if="pet.status">
       <div class="mt-4 rounded-card bg-alert px-4 py-3 text-center font-semibold uppercase tracking-wide text-white" role="alert">
-        ⚠️ Cây xanh đang bị héo rũ!
+        ⚠️ <span class="normal-case">{{ pet.status.plant_name || 'Cây xanh' }}</span> đang bị héo rũ!
       </div>
 
       <AppCard class="mt-4 text-center">
