@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -52,6 +53,7 @@ type fakeQuestRepo struct {
 	exercises       map[int][]Exercise // by day_number
 	completed       map[string]bool
 	markCompleteErr error
+	roadmapJSON     json.RawMessage // nil → ActiveRoadmapDoc mirrors ActiveRoadmap's roadmap but with no JSON
 }
 
 func newFakeQuestRepo(l *callLog) *fakeQuestRepo {
@@ -193,3 +195,27 @@ func demoExercises(day int) []Exercise {
 
 // fixedClock returns a clock pinned to t.
 func fixedClock(t time.Time) func() time.Time { return func() time.Time { return t } }
+
+func (f *fakeQuestRepo) ActiveRoadmapDoc(context.Context, string) (RoadmapDoc, error) {
+	if f.roadmap == nil {
+		return RoadmapDoc{}, ErrNoActiveRoadmap
+	}
+	return RoadmapDoc{ID: f.roadmap.ID, CreatedAt: f.roadmap.CreatedAt, JSON: f.roadmapJSON}, nil
+}
+
+// ProgressBetween mirrors progressBetweenSQL over the rows map: ISO dates
+// compare lexically, so the string range is the date range.
+func (f *fakeProgressRepo) ProgressBetween(_ context.Context, userID, fromDate, toDate string) (map[string]DayProgress, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := map[string]DayProgress{}
+	for key, row := range f.rows {
+		uid, date, ok := strings.Cut(key, "|")
+		if !ok || uid != userID || date < fromDate || date > toDate {
+			continue
+		}
+		out[date] = DayProgress{MinutesSpent: row.minutes, IsTargetMet: row.targetMet}
+	}
+	return out, nil
+}

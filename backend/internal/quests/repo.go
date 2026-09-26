@@ -60,6 +60,9 @@ type QuestRepo interface {
 	// MarkComplete sets is_completed and returns ErrExerciseNotFound when the
 	// exercise is not on roadmapID.
 	MarkComplete(ctx context.Context, roadmapID, exerciseID string) error
+	// ActiveRoadmapDoc is ActiveRoadmap plus roadmap_json — the outline
+	// GET /api/v1/roadmap renders. Same row, same ErrNoActiveRoadmap.
+	ActiveRoadmapDoc(ctx context.Context, userID string) (RoadmapDoc, error)
 }
 
 // ProgressRepo owns daily_progress. The row is monotonic: minutes_spent never
@@ -78,6 +81,10 @@ type ProgressRepo interface {
 	// row → false. GET /quests/daily reads it so both endpoints answer the
 	// same is_target_met for the same local day, counter or no counter.
 	TargetMet(ctx context.Context, userID, localDate string) (bool, error)
+	// ProgressBetween returns the user's daily_progress rows with
+	// fromDate <= date <= toDate (both YYYY-MM-DD, inclusive), keyed by
+	// YYYY-MM-DD. Days without a row are simply absent.
+	ProgressBetween(ctx context.Context, userID, fromDate, toDate string) (map[string]DayProgress, error)
 }
 
 const (

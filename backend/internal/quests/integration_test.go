@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -243,6 +244,104 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	if after.AccumulatedSeconds != 60 || !after.IsTargetMet {
 		t.Errorf("Daily after the counter was lost = accumulated %d, is_target_met %t; want 60 (the one post-loss report) and true (durable row)", after.AccumulatedSeconds, after.IsTargetMet)
 	}
+}
+
+// TestIntegrationRoadmapOutlineJoinsDailyProgress proves the storage reads
+// (ActiveRoadmapDoc, ProgressBetween) and Service.Roadmap against a real
+// Postgres, seeded the way production seeds it (onboarding.SaveAssessment).
+func TestIntegrationRoadmapOutlineJoinsDailyProgress(t *testing.T) {
+	dbURL, redisURL := os.Getenv("TEST_DATABASE_URL"), os.Getenv("TEST_REDIS_URL")
+	if dbURL == "" || redisURL == "" {
+		t.Skip("TEST_DATABASE_URL/TEST_REDIS_URL unset; run `make up` and export them to run integration tests")
+	}
+	ctx := context.Background()
+
+	pg, err := store.NewPostgres(ctx, dbURL)
+	if err != nil {
+		t.Fatalf("NewPostgres: %v", err)
+	}
+	t.Cleanup(pg.Close)
+	if _, err := store.Migrate(ctx, pg.Migrator(), store.MigrationsFS); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	rdb, err := store.NewRedis(ctx, redisURL)
+	if err != nil {
+		t.Fatalf("NewRedis: %v", err)
+	}
+	t.Cleanup(func() { _ = rdb.Close() })
+
+	const gid = "google-roadmap-integration"
+	var userID string
+	_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid)
+	if err := pg.Pool.QueryRow(ctx,
+		`INSERT INTO users (email, google_id, target_goal, timezone) VALUES ($1,$2,$3,$4) RETURNING id`,
+		"roadmap@example.com", gid, "", "UTC").Scan(&userID); err != nil {
+		t.Fatalf("inserting user: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id = $1`, gid) })
+
+	if _, err := onboarding.NewPgRepo(pg.Pool).SaveAssessment(ctx, userID, onboarding.Assessment{
+		CEFRLevel: "B1", TargetGoal: "integration", Timezone: "UTC", NotificationTime: "20:00:00",
+		Roadmap: integrationRoadmap(),
+	}); err != nil {
+		t.Fatalf("SaveAssessment: %v", err)
+	}
+
+	repo := NewPgRepo(pg.Pool)
+	doc, err := repo.ActiveRoadmapDoc(ctx, userID)
+	if err != nil {
+		t.Fatalf("ActiveRoadmapDoc: %v", err)
+	}
+	if doc.ID == "" {
+		t.Fatalf("doc.ID is empty")
+	}
+	if time.Since(doc.CreatedAt) > time.Minute {
+		t.Errorf("doc.CreatedAt = %v, want within the last minute", doc.CreatedAt)
+	}
+	if !json.Valid(doc.JSON) {
+		t.Fatalf("doc.JSON is not valid JSON: %s", doc.JSON)
+	}
+	if !strings.Contains(string(doc.JSON), `"modules"`) {
+		t.Errorf("doc.JSON does not contain modules: %s", doc.JSON)
+	}
+
+	loc := Location("UTC")
+	d1 := DayDate(doc.CreatedAt, 1, loc)
+	d2 := DayDate(doc.CreatedAt, 2, loc)
+
+	if _, err := repo.Upsert(ctx, userID, d1, 30); err != nil {
+		t.Fatalf("Upsert(d1): %v", err)
+	}
+	if err := repo.MarkTargetMet(ctx, userID, d1); err != nil {
+		t.Fatalf("MarkTargetMet(d1): %v", err)
+	}
+	if _, err := repo.Upsert(ctx, userID, d2, 12); err != nil {
+		t.Fatalf("Upsert(d2): %v", err)
+	}
+	if _, err := repo.Upsert(ctx, userID, "1999-01-01", 5); err != nil {
+		t.Fatalf("Upsert(out of range): %v", err)
+	}
+
+	rows, err := repo.ProgressBetween(ctx, userID, d1, DayDate(doc.CreatedAt, 28, loc))
+	if err != nil {
+		t.Fatalf("ProgressBetween: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("len(rows) = %d, want 2 (rows = %+v)", len(rows), rows)
+	}
+	if rows[d1] != (DayProgress{MinutesSpent: 30, IsTargetMet: true}) {
+		t.Errorf("rows[d1] = %+v", rows[d1])
+	}
+	if rows[d2] != (DayProgress{MinutesSpent: 12, IsTargetMet: false}) {
+		t.Errorf("rows[d2] = %+v", rows[d2])
+	}
+	if _, ok := rows["1999-01-01"]; ok {
+		t.Errorf("rows contains the out-of-range date 1999-01-01")
+	}
+
+	// TODO(Task 3): svc.Roadmap(ctx, userID) end-to-end assertions land here
+	// once Service.Roadmap exists.
+	_ = rdb
 }
 
 // integrationRoadmap is a valid 4x7x3 roadmap whose tasks carry the title and
