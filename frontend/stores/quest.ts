@@ -34,6 +34,9 @@ export interface ProgressResponse {
   streak_count: number
 }
 
+/** What `complete()` resolves: the §6.2 body plus whether this call newly met today's target (hub growth moment). */
+export type CompleteResult = ProgressResponse & { targetMetChanged: boolean }
+
 interface Timer {
   totalSeconds: number
   remainingSeconds: number
@@ -95,9 +98,10 @@ export const useQuestStore = defineStore('quest', {
       const t = this.timers[taskId]
       return t ? t.totalSeconds - t.remainingSeconds : 0
     },
-    async complete(exerciseId: string, durationSeconds: number, userAnswers?: Record<string, string>): Promise<ProgressResponse> {
+    async complete(exerciseId: string, durationSeconds: number, userAnswers?: Record<string, string>): Promise<CompleteResult> {
       const body: Record<string, unknown> = { exercise_id: exerciseId, duration_seconds: clampDuration(durationSeconds) }
       if (userAnswers && Object.keys(userAnswers).length > 0) body.user_answers = userAnswers
+      const wasMet = this.daily?.is_target_met ?? false
       const res = await useApi().post<ProgressResponse>('/api/v1/quests/progress', body)
       if (this.daily) {
         this.daily.accumulated_seconds = res.daily_seconds_spent
@@ -106,7 +110,7 @@ export const useQuestStore = defineStore('quest', {
         if (t) t.is_completed = true
       }
       Reflect.deleteProperty(this.timers, exerciseId)
-      return res
+      return { ...res, targetMetChanged: res.is_target_met && !wasMet }
     },
   },
 })
