@@ -14,6 +14,8 @@ export interface AssessmentRequest {
   target_goal: string
   notification_time: string
   timezone: string
+  /** Optional; trimmed 1–30 chars; omitted when blank → server default "Mầm Non". */
+  plant_name?: string
   answers: { question_id: string, selected_option: string }[]
 }
 /** §6.1 response — 201 on a new roadmap, 200 when one was already active. */
