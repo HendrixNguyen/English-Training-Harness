@@ -106,6 +106,39 @@ describe('useAuthStore', () => {
     expect(auth.isAuthenticated).toBe(true)
   })
 
+  it('renew updates accessToken, expiresAt and aelp.auth without touching the api-state cache', async () => {
+    const auth = useAuthStore()
+    await auth.signIn(spec61, 1_000_000) // its own cache clear happens here, before the cache below is seeded
+    const caches = await installSeededCaches(API_STATE_CACHE)
+
+    auth.renew('eyJ.renewed', 3600, 2_000_000)
+
+    expect(auth.accessToken).toBe('eyJ.renewed')
+    expect(auth.expiresAt).toBe(2_000_000 + 3600 * 1000)
+    expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toEqual({
+      accessToken: 'eyJ.renewed',
+      expiresAt: 2_000_000 + 3600 * 1000,
+      user: spec61.user,
+    })
+    expect(await caches.has(API_STATE_CACHE)).toBe(true)
+  })
+
+  it('renew ignores a non-positive expires_in and a missing user', () => {
+    const auth = useAuthStore()
+    auth.signIn(spec61, 1_000_000)
+
+    auth.renew('eyJ.bad-1', 0, 2_000_000)
+    auth.renew('eyJ.bad-2', -60, 2_000_000)
+    auth.renew('eyJ.bad-3', Number.NaN, 2_000_000)
+    expect(auth.accessToken).toBe('eyJ.test')
+    expect(auth.expiresAt).toBe(1_000_000 + 86400 * 1000)
+
+    auth.signOut()
+    auth.renew('eyJ.no-user', 3600, 2_000_000)
+    expect(auth.accessToken).toBeNull()
+    expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+  })
+
   it('leaves no caches stub behind for the next case (the file-level afterEach unstubs)', () => {
     // vi.stubGlobal('caches', undefined) defines the property; only an unstub
     // removes it. Without the afterEach, every case appended after the

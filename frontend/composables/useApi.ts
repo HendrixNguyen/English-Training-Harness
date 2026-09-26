@@ -16,6 +16,7 @@ export function useApi(): ApiClient {
       void auth.signOut()
       void navigateTo('/login')
     },
+    onRenew: (token, expiresIn) => auth.renew(token, expiresIn),
   })
   return client
 }

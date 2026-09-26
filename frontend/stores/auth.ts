@@ -72,6 +72,21 @@ export const useAuthStore = defineStore('auth', {
       storageOrNull()?.setItem(AUTH_STORAGE_KEY, JSON.stringify(p))
       return clearApiCache()
     },
+    /**
+     * Adopts a token Require renewed silently (design harness/designs/stay-signed-in.md
+     * §5): updates the session in place and rewrites storage, but never
+     * touches the api-state cache — a renewal must be invisible, not a
+     * fresh sign-in. Ignored when there is no signed-in user or expiresIn
+     * is not a positive, finite number.
+     */
+    renew(token: string, expiresIn: number, now: number = Date.now()): void {
+      if (!Number.isFinite(expiresIn) || expiresIn <= 0) return
+      if (this.user === null) return
+      this.accessToken = token
+      this.expiresAt = now + expiresIn * 1000
+      const p: Persisted = { accessToken: this.accessToken, expiresAt: this.expiresAt, user: this.user }
+      storageOrNull()?.setItem(AUTH_STORAGE_KEY, JSON.stringify(p))
+    },
     /** Drops the session, then the per-user service worker cache — every sign-out path goes through here. */
     signOut(): Promise<void> {
       this.accessToken = null

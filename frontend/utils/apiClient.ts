@@ -19,6 +19,13 @@ export interface ApiClientOptions {
   getToken: () => string | null
   /** Called once per 401 before the ApiError is thrown (sign out + redirect). */
   onUnauthorized: () => void
+  /**
+   * Called when a response carries a fresh X-Session-Token (Require's silent
+   * renewal, design harness/designs/stay-signed-in.md §5). Only on a 2xx, and
+   * only when the token actually changed — never on an error response or an
+   * unchanged token.
+   */
+  onRenew?: (token: string, expiresIn: number) => void
   fetch?: typeof globalThis.fetch
 }
 
@@ -39,10 +46,10 @@ async function errorCode(res: Response): Promise<string> {
 export function createApiClient(opts: ApiClientOptions): ApiClient {
   const doFetch = opts.fetch ?? globalThis.fetch
 
-  async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown, isRetry = false): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' }
-    const token = opts.getToken()
-    if (token) headers.Authorization = `Bearer ${token}`
+    const sent = opts.getToken()
+    if (sent) headers.Authorization = `Bearer ${sent}`
     if (body !== undefined) headers['Content-Type'] = 'application/json'
 
     const res = await doFetch(`${opts.baseURL}${path}`, {
@@ -51,7 +58,20 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       body: body === undefined ? undefined : JSON.stringify(body),
     })
 
+    if (res.ok) {
+      const renewed = res.headers.get('X-Session-Token')
+      if (renewed && renewed !== opts.getToken()) {
+        opts.onRenew?.(renewed, Number(res.headers.get('X-Session-Expires-In')))
+      }
+    }
+
     if (res.status === 401) {
+      // A renewal from another in-flight request can land between this
+      // request being sent and its 401 coming back; retry once with the
+      // newest token before giving up (design §5 "One retry").
+      if (!isRetry && opts.getToken() !== sent) {
+        return request<T>(method, path, body, true)
+      }
       opts.onUnauthorized()
       throw new ApiError(401, 'unauthorized')
     }

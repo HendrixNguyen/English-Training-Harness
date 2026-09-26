@@ -2,6 +2,7 @@
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies'
+import { stripSessionHeaders } from './apiStateCache'
 import { parsePushPayload } from './push'
 
 declare let self: ServiceWorkerGlobalScope
@@ -12,9 +13,16 @@ cleanupOutdatedCaches()
 
 // §3 "User Progress & Pet Status: NetworkFirst" — synchronised state when
 // online, last-known state when not. Cache name must match utils/session.ts.
+// cacheWillUpdate strips the sliding-session headers first (design
+// harness/designs/stay-signed-in.md §4 "Offline") so a cache hit served
+// while offline never carries a token newer than the one in the auth store.
 registerRoute(
   ({ url, request }) => request.method === 'GET' && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname),
-  new NetworkFirst({ cacheName: 'api-state', networkTimeoutSeconds: 5 }),
+  new NetworkFirst({
+    cacheName: 'api-state',
+    networkTimeoutSeconds: 5,
+    plugins: [{ cacheWillUpdate: ({ response }) => Promise.resolve(stripSessionHeaders(response)) }],
+  }),
 )
 
 // §3 "Static Assets & Exercises: StaleWhileRevalidate" for anything the
