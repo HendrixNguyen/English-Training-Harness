@@ -90,49 +90,74 @@ func TestParseRoadmapAcceptsTheDayBudgetEdges(t *testing.T) {
 }
 
 func TestParseRoadmapRejects(t *testing.T) {
-	cases := map[string]string{
-		"markdown fence":      "```json\n" + validRoadmapJSON(t, nil) + "\n```",
-		"preamble":            "Here is your roadmap: " + validRoadmapJSON(t, nil),
-		"trailing garbage":    validRoadmapJSON(t, nil) + " {}",
-		"empty":               "",
-		"not an object":       `[1,2,3]`,
-		"three modules":       validRoadmapJSON(t, func(r *Roadmap) { r.Modules = r.Modules[:3] }),
-		"five modules":        validRoadmapJSON(t, func(r *Roadmap) { r.Modules = append(r.Modules, r.Modules[0]) }),
-		"six days":            validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Days = r.Modules[1].Days[:6] }),
-		"two tasks":           validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[3].Tasks = r.Modules[2].Days[3].Tasks[:2] }),
-		"four tasks":          validRoadmapJSON(t, func(r *Roadmap) { d := &r.Modules[2].Days[3]; d.Tasks = append(d.Tasks, d.Tasks[0]) }),
-		"duplicate task type": validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[0].Tasks[1].Type = "vocabulary" }),
-		"unknown task type":   validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[0].Tasks[2].Type = "listening" }),
-		"empty task title":    validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].Title = "" }),
-		"absurd duration":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].DurationMinutes = 120 }),
-		"bad cefr":            validRoadmapJSON(t, func(r *Roadmap) { r.CEFRLevel = "B7" }),
-		"three thirty-minute tasks (90-minute day)": validRoadmapJSON(t, func(r *Roadmap) {
+	// want is a substring of the invalid(...) message this row must produce,
+	// keyed by content so a row can only pass for the reason it is named
+	// after. For "preamble" / "trailing garbage" / "empty" / "not an
+	// object": all four are rejected by the pre-decode guards (empty check,
+	// "{" prefix check, trailing-token check) with fixed wording, never by
+	// the generic "decoding: %v" wrapper, so each still gets a stable want.
+	cases := map[string]struct{ raw, want string }{
+		"markdown fence":      {"```json\n" + validRoadmapJSON(t, nil) + "\n```", "wrapped in a markdown fence"},
+		"preamble":            {"Here is your roadmap: " + validRoadmapJSON(t, nil), "does not start with a JSON object"},
+		"trailing garbage":    {validRoadmapJSON(t, nil) + " {}", "trailing content after the JSON object"},
+		"empty":               {"", "empty response"},
+		"not an object":       {`[1,2,3]`, "does not start with a JSON object"},
+		"three modules":       {validRoadmapJSON(t, func(r *Roadmap) { r.Modules = r.Modules[:3] }), "modules, want 4"},
+		"five modules":        {validRoadmapJSON(t, func(r *Roadmap) { r.Modules = append(r.Modules, r.Modules[0]) }), "modules, want 4"},
+		"six days":            {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Days = r.Modules[1].Days[:6] }), "has 6 days, want 7"},
+		"two tasks":           {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[3].Tasks = r.Modules[2].Days[3].Tasks[:2] }), "has 2 tasks, want 3"},
+		"four tasks":          {validRoadmapJSON(t, func(r *Roadmap) { d := &r.Modules[2].Days[3]; d.Tasks = append(d.Tasks, d.Tasks[0]) }), "has 4 tasks, want 3"},
+		"duplicate task type": {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[0].Tasks[1].Type = "vocabulary" }), "repeats task type"},
+		"unknown task type":   {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[0].Tasks[2].Type = "listening" }), "has type"},
+		"empty task title":    {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].Title = "" }), "module 4 day 7 task 1 has no title"},
+		"absurd duration":     {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[3].Days[6].Tasks[0].DurationMinutes = 120 }), "outside 5..15"},
+		"bad cefr":            {validRoadmapJSON(t, func(r *Roadmap) { r.CEFRLevel = "B7" }), "is not a CEFR level"},
+		// These two only ever exercised the per-task band check (each task
+		// is outside 5..15 by itself) — never the day-sum check, since a
+		// task rejection short-circuits before the day total is summed.
+		"thirty-minute task (task band)": {validRoadmapJSON(t, func(r *Roadmap) {
 			for i := range r.Modules[0].Days[0].Tasks {
 				r.Modules[0].Days[0].Tasks[i].DurationMinutes = 30
 			}
-		}),
-		"three three-minute tasks (9-minute day)": validRoadmapJSON(t, func(r *Roadmap) {
+		}), "outside 5..15"},
+		"three-minute task (task band)": {validRoadmapJSON(t, func(r *Roadmap) {
 			for i := range r.Modules[1].Days[2].Tasks {
 				r.Modules[1].Days[2].Tasks[i].DurationMinutes = 3
 			}
-		}),
-		"one 20-minute task in an otherwise normal day": validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[4].Tasks[1].DurationMinutes = 20 }),
-		"weeks reversed":      validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week, r.Modules[3].Week = 4, 1 }),
-		"duplicate week":      validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Week = 1 }),
-		"week counts from 0":  validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week = 0 }),
-		"empty roadmap title": validRoadmapJSON(t, func(r *Roadmap) { r.Title = "" }),
-		"blank roadmap title": validRoadmapJSON(t, func(r *Roadmap) { r.Title = "   " }),
-		"empty module title":  validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Title = "" }),
-		"empty day title":     validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[5].Title = "" }),
+		}), "outside 5..15"},
+		// These two are the rows only the day-sum check can reject: every
+		// task is inside 5..15 individually, but the day total falls
+		// outside 20..40.
+		"three five-minute tasks (15-minute day)": {validRoadmapJSON(t, func(r *Roadmap) {
+			for i := range r.Modules[0].Days[0].Tasks {
+				r.Modules[0].Days[0].Tasks[i].DurationMinutes = 5
+			}
+		}), "adds up to 15 minutes"},
+		"three fifteen-minute tasks (45-minute day)": {validRoadmapJSON(t, func(r *Roadmap) {
+			for i := range r.Modules[1].Days[2].Tasks {
+				r.Modules[1].Days[2].Tasks[i].DurationMinutes = 15
+			}
+		}), "adds up to 45 minutes"},
+		"one 20-minute task in an otherwise normal day": {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Days[4].Tasks[1].DurationMinutes = 20 }), "outside 5..15"},
+		"weeks reversed":      {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week, r.Modules[3].Week = 4, 1 }), "declares week 4, want 1"},
+		"duplicate week":      {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[1].Week = 1 }), "declares week 1, want 2"},
+		"week counts from 0":  {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Week = 0 }), "declares week 0, want 1"},
+		"empty roadmap title": {validRoadmapJSON(t, func(r *Roadmap) { r.Title = "" }), "roadmap has no title"},
+		"blank roadmap title": {validRoadmapJSON(t, func(r *Roadmap) { r.Title = "   " }), "roadmap has no title"},
+		"empty module title":  {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[2].Title = "" }), "module 3 has no title"},
+		"empty day title":     {validRoadmapJSON(t, func(r *Roadmap) { r.Modules[0].Days[5].Title = "" }), "module 1 day 6 has no title"},
 	}
-	for name, raw := range cases {
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := ParseRoadmap(raw)
+			_, err := ParseRoadmap(tc.raw)
 			if err == nil {
 				t.Fatal("ParseRoadmap accepted it")
 			}
 			if !errors.Is(err, ErrInvalidRoadmap) {
 				t.Errorf("err = %v, want it to wrap ErrInvalidRoadmap", err)
+			}
+			if tc.want != "" && !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("err = %q, want it to mention %q", err, tc.want)
 			}
 		})
 	}
