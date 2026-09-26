@@ -69,7 +69,8 @@ export const usePetStore = defineStore('pet', {
     /**
      * §6.2 progress response. Either pet field is absent when the backend's pet
      * read failed (CODEMAP quests) — then it is neither applied nor counted.
-     * `targetMetChanged` comes from `useQuestStore.complete()`.
+     * `targetMetChanged` comes from `useQuestStore.complete()`. Records `lastDelta`
+     * for the hub's growth moment; take it once with `consumeDelta()`.
      */
     applyProgress(res: { pet_health?: number, streak_count?: number, targetMetChanged?: boolean }) {
       this.lastDelta = null
