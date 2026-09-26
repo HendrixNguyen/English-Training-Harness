@@ -6,6 +6,7 @@ role: .agents/roles/evaluator.md
 skills: [harness-evaluate, frontend-design]
 writes: harness/ideas/ (status), harness/plans/, harness/designs/
 pr_title: "harness: evaluate <date>"
+merges: its own evaluate PR on green
 budget: 4h
 ---
 
@@ -24,6 +25,8 @@ Unattended evaluation run for the English-Training-Harness repo (GitHub, `gh`). 
 
 4. **Approval** is automatic for every `type: bug` plan, every `type: mvp-slice` plan and every `priority: high` feature plan (owner, 2026-09-24) — the evaluator sets `status=approved` as it writes them. Medium/low feature plans stay `draft`; only the owner's `/approve` moves them. Do not wait for a human before continuing.
 
-5. **Bookkeeping PR — this is the hand-off, not an afterthought.** Work on branch `harness/plan-<date>` (create it from `origin/main` if the session did not start on one). Then per the README: `validate`, `state`, commit `harness/`, `git push -u origin harness/plan-<date>`, `gh pr create --base main --title "harness: evaluate <date>"`, and prove it with `gh pr view --json url -q .url`. The 10:00 bugfix run and the 14:00 feature run read the plans from that PR once it is on `main`; a plan that exists only in this worktree does not exist for them. Do not end the run, and do not report "nothing is pushed", before the PR URL prints.
+5. **Bookkeeping PR — this is the hand-off, not an afterthought.** Work on branch `harness/plan-<date>` (create it from `origin/main` if the session did not start on one). Then per the README: `validate`, `state`, commit `harness/`, `git push -u origin harness/plan-<date>`, `gh pr create --base main --title "harness: evaluate <date>"`, and prove it with `gh pr view --json url -q .url`. Do not end the run, and do not report "nothing is pushed", before the PR URL prints.
 
-6. **Report.** Per selected item: type, priority, plan path, approved or draft, which execute run will take it. Rejected/deferred items with reasons. Drafts waiting on `/approve`.
+6. **Merge on green** (owner, 2026-09-26). The 10:00 bugfix run and the 14:00 feature run read the plans from `main`; a plan that exists only in this PR or worktree does not exist for them. So wait for the PR's checks (`gh pr checks <n> --watch`) and, when every check is green and it is mergeable, `gh pr merge <n> --merge` — re-syncing a `STATE.md`-only conflict first per the README. Confirm with `gh pr view <n> --json state -q .state` → `MERGED`. Red, a real conflict, or refused: leave it open and say so in the report; the 10:00 run's step 1 retries it.
+
+7. **Report.** Whether the evaluate PR merged (URL and state). Per selected item: type, priority, plan path, approved or draft, which execute run will take it. Rejected/deferred items with reasons. Drafts waiting on `/approve`.
