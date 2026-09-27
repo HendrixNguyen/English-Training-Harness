@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 13:39. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 14:05. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,7 +9,7 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-- `harness/ideas/_inbox/retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro v1 aliases re-hue growth, alert and mute, so white-on-growth buttons drop to 1.67:1 and text-mute to 3.4:1 on live v1 pages — blocks `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`
+_none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
@@ -80,7 +80,6 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high]
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]
@@ -93,6 +92,7 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high] (unreviewed)
 - `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high] (review: fail)
@@ -102,7 +102,6 @@ _none_
 - `harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — Level-true content: the roadmap prompt carries a CEFR descriptor and the goal's register, and a deterministic placement floor stops a 10/10 learner being graded A2 — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — Roadmap regeneration: `POST /api/v1/roadmaps/regenerate` replaces the active roadmap (optionally one CEFR step up or down) so a roadmap stored before the typed-content contract can be re-made — Plan [high] (unreviewed)
-- `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium] (unreviewed)
 
 ## Failed
 
