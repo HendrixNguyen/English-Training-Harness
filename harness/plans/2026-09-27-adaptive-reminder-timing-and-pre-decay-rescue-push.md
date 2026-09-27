@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/adaptive-reminder-timing-and-pre-decay-rescue-push.md
-status: draft
+status: approved
 priority: low
 merged: false
 ---

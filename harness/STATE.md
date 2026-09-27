@@ -66,7 +66,6 @@ _none_
 - `harness/plans/2026-09-27-install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — Install-and-remind nudge — the companion asks to call you tomorrow after your first met day — Plan [medium]
 - `harness/plans/2026-09-26-day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint (backend): `POST /api/v1/roadmaps/next` re-grades the level and replaces the roadmap; `GET /quests/daily` says `roadmap_complete` — Plan [medium]
 - `harness/plans/2026-09-26-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: `.infisical.json` in the repo, an "Env source of truth" runbook section, Railway sync by Infisical — Plan [medium]
-- `harness/plans/2026-09-27-adaptive-reminder-timing-and-pre-decay-rescue-push.md` — Pre-decay rescue push: one "your plant needs {n} more minutes" Web Push at local 22:00 on an unmet day — Plan [low]
 - `harness/plans/2026-09-27-spaced-repetition-vocabulary-review-in-the-daily-quest.md` — Spaced-repetition vocabulary review (backend): `vocab_reviews`, `reviews[]` on `GET /quests/daily`, `review_grades[]` on `POST /quests/progress` — Plan [low]
 
 ## Approved
@@ -78,6 +77,7 @@ _none_
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]
+- `harness/plans/2026-09-27-adaptive-reminder-timing-and-pre-decay-rescue-push.md` — Pre-decay rescue push: one "your plant needs {n} more minutes" Web Push at local 22:00 on an unmet day — Plan [low]
 - `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low]
 - `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low]
 
