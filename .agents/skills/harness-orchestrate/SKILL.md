@@ -46,7 +46,7 @@ gh pr create --base main --head $DAILY \
 ```
 Body: one section per included plan — idea title, what changed, the review verdict and the path to the review file — then the CI run URL, then `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. Record it on every included plan: `cli.py set <plan> pr=<url>`.
 
-The owner merges that PR. Afterwards, for each included plan: `cli.py set <plan> merged=true`, then `/harness prune`.
+Merging it: the unattended `daily-review` routine merges it itself when review and CI are both green (`.agents/routines/daily-review.md` step 4, owner 2026-09-26); otherwise the owner does. Afterwards, whoever merged: for each included plan `cli.py set <plan> merged=true`, then `/harness prune`.
 
 ## merge <plan>  (human-invoked only)
 Preconditions: plan `status=done`, latest review verdict `pass` or `pass-with-bugs`, `merged=false`, and `python3 tools/harness/cli.py blockers --plan <plan>` exits 0. Refuse otherwise — `cli.py set … merged=true` enforces the blocker check independently, so a merge that skips it cannot be recorded.

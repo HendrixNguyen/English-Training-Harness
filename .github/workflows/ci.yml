@@ -2,18 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main, 'harness/**']
+    # production: every commit on it must prove itself here before
+    # deploy.yml ships it (deploy.yml runs on this workflow's completion).
+    branches: [main, production, 'harness/**', 'release/**', 'hotfix/**']
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  # Branches: one group per ref, superseded runs cancelled. main: one group per
-  # commit, so back-to-back merges each finish their own run (a shared group
-  # would cancel the *pending* run when a third push arrives).
-  group: ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Branches: one group per ref, superseded runs cancelled. main and
+  # production: one group per commit, so back-to-back merges each finish their
+  # own run (a shared group would cancel the *pending* run when a third push
+  # arrives) — and a cancelled production run would never ship.
+  group: ci-${{ github.workflow }}-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/production' }}
 
 jobs:
   backend-unit:

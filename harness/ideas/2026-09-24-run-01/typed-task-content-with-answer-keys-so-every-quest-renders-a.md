@@ -3,7 +3,7 @@ type: feature
 status: planned
 source: ideator
 run: 2026-09-24-run-01
-priority: medium
+priority: high
 plan: harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md
 ---
 # Typed task content with answer keys so every quest renders and gives instant feedback

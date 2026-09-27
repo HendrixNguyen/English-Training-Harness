@@ -1,26 +1,43 @@
 name: Deploy
 
-# Delivery loop (AGENTS.md; deploy/README.md "Ship from production"): on a
-# push to the release branch `production` — which only ever receives
-# fast-forwards of main, by the nightly ship routine or the owner — build the
-# PWA and upload it to Cloudflare Pages, then smoke-check both public URLs.
-# The API is not touched here: Railway keeps auto-deploying it from `main` on
-# every push through its own GitHub connection (owner decision, 2026-09-25).
-# Never on main, never on harness/** branches, never on pull requests.
-# `production` commits have already passed CI on main; this workflow does not
-# re-run it.
+# Delivery loop (AGENTS.md; deploy/README.md "Ship from production"). The
+# release branch `production` is the only thing that ships. It moves only by
+# pull request — a nightly release PR (main merged onto production plus a
+# CHANGELOG.md section, `.agents/routines/daily-ship.md`) or an owner hotfix
+# PR — and CI runs on every push to it. This workflow starts when that CI run
+# finishes green on `production`, builds the PWA from exactly that commit,
+# uploads it to Cloudflare Pages, smoke-checks both public URLs and, on
+# success, tags the commit `v<version>` from CHANGELOG.md with a GitHub
+# Release. The API ships from the same push: Railway's GitHub connection
+# watches `production` with Wait for CI on and rebuilds the api service by
+# itself, so this workflow never calls Railway (owner decision, 2026-09-25).
+# Never on main, harness/** branches or pull requests.
+#
+# workflow_dispatch redeploys the PWA from any ref — a `v*` tag is the
+# rollback path — and never tags.
+#
+# GitHub runs a workflow_run workflow from its copy on the default branch
+# (main), whatever commit it deploys: a change to this file takes effect once
+# it is on main, not when it reaches production.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [production]
   workflow_dispatch:
     inputs:
+      ref:
+        description: Ref to deploy — a v* tag to roll back, or production
+        type: string
+        default: production
       dry_run:
         description: Build the PWA but skip both deploys and the smoke checks
         type: boolean
         default: false
 
 permissions:
-  contents: read
+  # write: the release tag and GitHub Release after a green ship.
+  contents: write
 
 # One ship at a time and never cancelled: a cancelled run can leave Pages and
 # Railway on different commits.
@@ -30,10 +47,17 @@ concurrency:
 
 jobs:
   ship:
+    # A push to production whose CI passed — never a pull request's CI run,
+    # never a red one.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+      SHIP_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
       PAGES_URL: ${{ vars.PAGES_URL }}
       API_URL: ${{ vars.API_URL }}
       # Public build-time values (Nuxt reads NUXT_PUBLIC_* while generating).
@@ -42,6 +66,9 @@ jobs:
       NUXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NUXT_PUBLIC_VAPID_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHIP_REF }}
+          fetch-depth: 0
 
       - name: Check configuration
         env:
@@ -61,7 +88,19 @@ jobs:
               exit 1
             fi
           fi
-          echo "dry_run=$DRY_RUN ref=$GITHUB_REF_NAME sha=$GITHUB_SHA"
+          echo "dry_run=$DRY_RUN ref=$SHIP_REF sha=$(git rev-parse HEAD)"
+
+      # The version this commit ships as: the first "## [x.y.z]" heading.
+      - name: Read the release version
+        id: version
+        run: |
+          version=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          if [ -z "$version" ]; then
+            echo "::error::CHANGELOG.md has no '## [x.y.z]' section — see deploy/README.md 'Versions and rollback'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version: v$version"
 
       - uses: actions/setup-node@v7
         with:
@@ -81,16 +120,26 @@ jobs:
           test -f .output/public/sw.js
           test -f .output/public/manifest.webmanifest
 
+      # `--branch main` names the Pages project's production slot (set when the
+      # project was created), not the git branch: any other value would land
+      # as a preview deployment. The commit fields make the dashboard show
+      # what actually shipped.
       - name: Upload the PWA to Cloudflare Pages
         if: env.DRY_RUN != 'true'
         working-directory: frontend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: >-
           npx --yes wrangler@4 pages deploy .output/public
           --project-name english-learning --branch main
+          --commit-hash "$(git rev-parse HEAD)"
+          --commit-message "v$VERSION ($SHIP_REF)"
 
+      # Railway rebuilds the API from this same push in parallel; /healthz
+      # does not report a commit yet, so a 200 here can still be the previous
+      # deploy answering while the new one builds.
       - name: Wait for the API
         if: env.DRY_RUN != 'true'
         run: |
@@ -114,3 +163,26 @@ jobs:
           # fixed; that one check warns instead of failing. Remove with the fix.
           SMOKE_WEB_SPA_WARN: '1'
         run: deploy/smoke-web.sh "$PAGES_URL"
+
+      # Only a green ship from production is a release; a manual redeploy or
+      # rollback reuses the tag it came from. An existing tag on another
+      # commit means the release PR forgot to bump the version.
+      - name: Tag the release
+        if: env.DRY_RUN != 'true' && github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          sha=$(git rev-parse HEAD)
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            if [ "$(git rev-list -n1 "$tag")" = "$sha" ]; then
+              echo "$tag already points at $sha"; exit 0
+            fi
+            echo "::error::$tag already exists on another commit — bump CHANGELOG.md"
+            exit 1
+          fi
+          awk -v h="## [$VERSION]" 'index($0,h)==1{on=1;next} on&&/^## \[/{exit} on' CHANGELOG.md > notes.md
+          git tag "$tag" "$sha"
+          git push origin "refs/tags/$tag"
+          gh release create "$tag" --title "$tag" --notes-file notes.md --verify-tag

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: human
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md
 ---
 # Pages ignores the _redirects SPA rewrite while 404.html exists, so deep links still answer 404
 
@@ -24,3 +25,6 @@ $ curl -sI https://english-learning-e6a.pages.dev/sw.js | grep -i cache-control
 cache-control: no-cache                                                                            # _headers applied
 ```
 Cloudflare docs on 404.html vs SPA mode: https://developers.cloudflare.com/pages/configuration/serving-pages/#single-page-application-spa-rendering
+
+## Evaluation
+_Evaluator, 2026-09-26._ **Select — medium, folded into** `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` (one Pages plan: edge-propagation wait, no `404.html` on Pages so deep links are 200, the `/login` return-trip smoke check and the runbook paragraph). The deploy branch it depended on is on `origin/main` now, so the runbook edit is unconditional.

@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-24-run-01
 priority: medium
+plan: harness/plans/2026-09-26-day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md
 ---
 # Day-28 checkpoint: CEFR re-assessment and the next roadmap
 
@@ -42,3 +43,5 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Is the Why real?* Yes and verifiable in code: `backend/internal/quests/day.go` clamps `day_number` at 28, `onboarding` returns the existing active roadmap with `200` and no AI call, and `users.cefr_current` is written once at placement. Every learner dead-ends after four weeks with the same three tasks. The first real user reaches day 28 about four weeks after launch — this must be planned before then, not today.
 
 *Achievable in one plan?* Backend and frontend together are a long day; plan it as one backend plan (`POST /api/v1/roadmaps/next` reusing `TaskPlacementTest`/`TaskRoadmapGen`, the parsers, the rate-limit slot and the single-transaction save; `GET /quests/daily` gains an additive `roadmap_complete`; spec §6/§7 and CODEMAP) and one frontend plan (checkpoint card, level-check reuse of the quiz UI, roadmap history; design note first). *Dependencies:* the concurrent double-submit race (`two-concurrent-assessment-submits-…`, selected medium) applies to any roadmap-replacing route — fix it in onboarding first or fold the same guard into the new endpoint.
+
+_Evaluator, 2026-09-26 — planned today (feature queue; backend plan, draft)._ Written on top of today's bug plan B2 (`harness/plans/2026-09-26-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md`), whose `Repo.ReplaceRoadmap` is the single-transaction replace this route needs; the plan says so and must not execute before B2 is on `main`. The frontend (checkpoint card, level-check reuse of the quiz UI, roadmap history) is a separate plan after the retro hub/roadmap screens.

@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-22-run-01
 priority: low
+plan: harness/plans/2026-09-27-spaced-repetition-vocabulary-review-in-the-daily-quest.md
 ---
 # Spaced Repetition Vocabulary Review in the Daily Quest
 
@@ -38,3 +39,7 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Achievable in one plan?* No, and it depends on an unbuilt foundation that *is* queued: `vocab_reviews` needs a stable `item_key` per vocabulary item, which only exists once task `content` has a schema — `2026-09-24-run-01/typed-task-content-with-answer-keys-…` (selected today, medium) defines `vocabulary → {words[{term, definition, example}]}`. After that it is still a table, SM-2 scheduling, two endpoint changes and a review UI — two plans.
 
 *Priority.* Low now; re-rank to medium once typed content has landed.
+
+_Evaluator, 2026-09-26 — **deferred** (not planned today)._ Depends on the typed content contract for a stable `item_key` per word; that branch merges tonight. Plan after it is on `main` and the learning room (retro plan 3) renders items — a review deck needs somewhere to be shown.
+
+_Evaluator, 2026-09-27 — daily decide (feature queue, aged selected idea, planned today as **F2** — backend half)._ Checked: the typed-content contract is `done` on `origin/harness/2026-09-25-medium-typed-task-content-with-answer-keys-so-every-quest-renders-a` (unmerged — the 2026-09-26 review run never ran): `airouter/content.go` defines `Word{Term, Definition, Example}` (`example` optional) inside `VocabularyContent{Words[], Questions[]}`, 5–8 words per vocabulary task, and `ParseRoadmap` enforces it, so a `vocabulary` exercise's `content_json.words[]` is a stable, validated list to seed from. `POST /quests/progress` on this checkout and on all three unmerged `quests` branches has **no `completed` flag** — every accepted progress call ends in `MarkComplete`, so "completion of a vocabulary exercise" = any accepted progress call whose exercise has `task_type = 'vocabulary'`; seeding is idempotent (`ON CONFLICT (user_id, item_key) DO NOTHING`), so a second call re-seeds nothing. **`item_key` = `<exercise_id>:<normalised term>`**, normalised = trimmed, lower-cased, inner whitespace collapsed to one space — the UUID makes it unique across roadmaps (a word re-taught by a later roadmap is a fresh card, accepted), the term makes it unique within an exercise, and it needs no new id from the model. Deviation from the idea's DDL: `term`, `definition`, `example` are copied into `vocab_reviews` at seed time so the due-list read is one query and outlives a roadmap swap (`exercises` rows are deactivated, not deleted, but the read should not depend on that). Scheduler is Anki-flavoured SM-2 (exact arithmetic in the plan): ease starts 2.50, floor 1.30; first intervals 1 → 6 days, then `interval × ease`; `again` resets reps and interval to 1. Dependency: the 2026-09-26 daily code PR (typed content + the three `quests` branches) must be on `origin/main` first — the plan gates on it. Migration number is "next free" (two unmerged branches already take `0004`), and the RLS convention from `0004_rls` applies. Frontend (the review deck inside the vocabulary task) is a separate plan after a design doc; this plan ships only the two additive wire changes. Stays `selected` / `low`; plan left `draft` for `/approve`.

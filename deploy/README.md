@@ -36,15 +36,27 @@ The three `NUXT_PUBLIC_*` values are baked into the static site at build time (N
 
 **Redis on Upstash** — free database, copy the **`rediss://`** URL (TLS) into `REDIS_URL`. Free tier is 500K commands/month; the reminder worker's poll is ≈86K/month.
 
-**PWA on Cloudflare Pages** — project `english-learning`, **direct upload, no Git connection**: the `Deploy` workflow uploads every push to `production` (see *Ship from `production`* below); nobody runs `wrangler pages deploy` by hand any more. The three `NUXT_PUBLIC_*` values are baked in at build time from the repository variables, not set in the Pages dashboard. `frontend/public/_redirects` and `_headers` ship with the build (SPA rewrite; `no-cache` on `sw.js` and the manifest). Known gap: Pages serves the generated `404.html` before the `_redirects` splat, so a deep link still answers 404 with the app shell until the inbox fix lands — the workflow warns on that check instead of failing.
+**PWA on Cloudflare Pages** — project `english-learning`, **direct upload, no Git connection**: the `Deploy` workflow uploads every `production` commit whose CI is green (see *Ship from `production`* below); nobody runs `wrangler pages deploy` by hand any more. The three `NUXT_PUBLIC_*` values are baked in at build time from the repository variables, not set in the Pages dashboard. `frontend/public/_redirects` and `_headers` ship with the build (SPA rewrite; `no-cache` on `sw.js` and the manifest). Known gap: Pages serves the generated `404.html` before the `_redirects` splat, so a deep link still answers 404 with the app shell until the inbox fix lands — the workflow warns on that check instead of failing.
 
 **Wiring** — set `FRONTEND_ORIGIN=https://<pages-domain>` on the Railway service; the Google OAuth client's Authorized JavaScript origin is the Pages origin and its Authorized redirect URI is `https://<pages-domain>/login` (`frontend/pages/login.vue` uses `window.location.origin + '/login'`).
 
 ## Ship from `production`
 
-The two deployables ship on two different triggers. The **API already ships on every merge to `main`** — Railway's GitHub auto-deploy rebuilds the `api` service from `main` as it does today; nothing here changes that. The **PWA ships from the long-lived release branch `production`**: it only ever moves by a **pure fast-forward of `origin/main`**, pushed by the nightly routine `.agents/routines/daily-ship.md` (22:00 local) when `main`'s latest CI run is green, or by the owner by hand at any time (`git fetch origin main production && git push origin origin/main:production`). Nothing deploys the PWA on a merge to `main` by itself; `main` is where the daily PR lands and CI proves it, `production` is what decides when the PWA goes live.
+Both deployables ship from the long-lived release branch **`production`**, never from `main`. The **API** ships through Railway's own GitHub connection, pointed at `production`; the **PWA** ships through the `Deploy` workflow below. Nothing deploys on a merge to `main`; `main` is where the daily PR lands and CI proves it, `production` is what decides when the API and the PWA go live.
 
-`.github/workflows/deploy.yml` runs on every push to `production` (and by hand from the Actions tab — `gh workflow run deploy.yml --ref production`; tick **dry_run** to build without deploying or smoke-checking). In order: a configuration check; `npm ci` + `npx nuxi generate` in `frontend/` on Node 20; `npx wrangler@4 pages deploy .output/public --project-name english-learning --branch main`; a wait of up to 2 minutes for `$API_URL/healthz` (the API is already live from Railway's own deploy by this point); `deploy/smoke-api.sh`; `deploy/smoke-web.sh` (with `SMOKE_WEB_SPA_WARN=1`). A failed deploy or smoke check fails the run — a red `Deploy` run means the PWA is stale or half-shipped; the failing step says which. One run at a time (`concurrency: deploy`), never cancelled. It never runs on `main`, `harness/**` or pull requests.
+`production` moves **only by pull request**, and CI runs on the PR and again on the push the merge makes:
+
+- **Release (nightly)** — `.agents/routines/daily-ship.md` (22:00 local), when `main` has something new and its CI is green, cuts `release/v<x.y.z>` from `production`, merges `main` into it, writes the `CHANGELOG.md` section, opens `Release v<x.y.z>` into `production` and merges it once its checks are green. It then opens (or reuses) a `Back-merge … into main` PR — **the owner merges that one**, so `main` gets the changelog and any hotfix back.
+- **Release (by hand)** — the same steps, any time: branch `release/v<x.y.z>` from `origin/production`, `git merge --no-ff origin/main`, add the `CHANGELOG.md` section, PR into `production`, merge on green.
+- **Hotfix** — for a fix that cannot wait for, or must not bring, the rest of `main`: branch `hotfix/<slug>` from `origin/production`, make the fix, add a **patch** section to `CHANGELOG.md`, PR into `production`, merge on green. Then open the back-merge PR `production → main` and merge it, or the next nightly release stops on the conflict.
+
+Every commit on `production` passes CI twice (its PR and its push) before anything ships.
+
+**Owner, one-time:**
+- **Railway** — `api` service → Settings → Source: set the connected branch to **`production`** and turn on **Wait for CI**, so Railway waits for the push's CI run before building. Until this is switched the API still deploys on every merge to `main`.
+- **GitHub branch protection** on `production` (Settings → Branches → Add rule, or a ruleset): require a pull request before merging (0 approvals, so the nightly run can merge its own release PR), require the status checks `backend-unit`, `backend-integration`, `frontend`, `docker-images` and `harness-tooling`, block force pushes and deletions. Do not tick "require branches to be up to date" — release branches are cut from `production` and are always current.
+
+`.github/workflows/deploy.yml` starts when **CI finishes green on a push to `production`** (never on a PR's CI run, never on a red one), and by hand from the Actions tab (`gh workflow run deploy.yml -f ref=<v-tag or production>`; tick **dry_run** to build without deploying or smoke-checking). It checks out exactly the commit CI proved. In order: a configuration check; the version from the first `## [x.y.z]` heading of `CHANGELOG.md` (no heading fails the run); `npm ci` + `npx nuxi generate` in `frontend/` on Node 20; `npx wrangler@4 pages deploy .output/public --project-name english-learning --branch main` — `main` is the Pages project's production slot, not the git branch, and the upload carries the commit hash and `v<x.y.z>` so the dashboard shows what shipped; a wait of up to 2 minutes for `$API_URL/healthz` (Railway rebuilds the API from the same push in parallel, and `/healthz` reports no commit yet, so this proves an API is up, not that it is the new one); `deploy/smoke-api.sh`; `deploy/smoke-web.sh` (with `SMOKE_WEB_SPA_WARN=1`); and, only for a CI-triggered run, the tag `v<x.y.z>` on that commit plus a GitHub Release whose notes are its `CHANGELOG.md` section (an existing tag on a different commit fails the run: the release forgot to bump). A failed deploy or smoke check fails the run before the tag — a red `Deploy` run means the PWA is stale or half-shipped; the failing step says which. The API's own rollout shows in the Railway dashboard, not in this run. One run at a time (`concurrency: deploy`), never cancelled. It never runs on `main`, `harness/**` or pull requests.
 
 Configuration lives in the GitHub repository (Settings → Secrets and variables → Actions, or `gh variable set` / `gh secret set`):
 
@@ -59,6 +71,18 @@ Configuration lives in the GitHub repository (Settings → Secrets and variables
 | secret | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → *Account details* |
 
 Variables are public values (they end up in the built site anyway); the two secrets are the only credentials and only the workflow holds them — agents never do. A run with any of the seven unset fails in its first step naming what is missing (a dry run only warns).
+
+## Versions and rollback
+
+Every ship is a version: `CHANGELOG.md` at the repo root holds one `## [x.y.z] - <date>` section per release (Added / Fixed / Changed), and the green `Deploy` run tags that commit `v<x.y.z>` with a GitHub Release (`gh release list`). **Minor** when a release carries a feature or MVP slice, **patch** for fixes, docs or tooling only, **major** only by owner decision. `0.1.0` is the untagged baseline; the first tag is the first release after it.
+
+To roll back:
+
+1. **PWA, now** — `gh workflow run deploy.yml -f ref=v<good>` rebuilds and re-uploads that tag's PWA and smoke-checks it. It never creates a tag.
+2. **API, now** — Railway dashboard → `api` service → Deployments → the deployment built from `v<good>`'s commit (its sha is on the tag, `git rev-list -n1 v<good>`) → **Redeploy**.
+3. **Make it stick** — both steps above are undone by the next ship. Fix it on `production` with a hotfix PR that `git revert`s the bad merge (`git revert -m 1 <merge sha>`) and adds a patch section to `CHANGELOG.md`, then back-merge into `main` so the next nightly release does not ship it again.
+
+Migrations run at API boot and are not reverted by any of this; a release whose migration must be undone needs a new down-migration shipped as a hotfix.
 
 ## Target B — Dokploy later (deploy only; CD is parked)
 
@@ -112,7 +136,8 @@ Run after every deploy:
 - [ ] Set `FRONTEND_ORIGIN` on Railway to the Pages origin and redeploy.
 - [ ] In Google Cloud Console, add the Pages origin as an authorized JavaScript origin and `https://<pages-domain>/login` as the redirect URI on the OAuth client; add Gemini/OpenAI/DeepSeek keys if any provider is used.
 - [ ] Create the Cloudflare API token (custom, **Account → Cloudflare Pages → Edit**) and set the five repository variables and two secrets from *Ship from `production`*.
-- [ ] Protect the `production` branch (Settings → Branches): block force pushes and deletion; **no** pull-request requirement — the nightly routine pushes fast-forwards directly.
-- [ ] First ship: Actions → **Deploy** → *Run workflow* on `production` with `dry_run` ticked (green, no `::warning::` in *Check configuration*), then `git push origin origin/main:production` and watch the run: the Pages step prints a deployment URL, both smoke steps are green (one `WARN spa fallback` line is expected until the deep-link bug is fixed).
+- [ ] Point the Railway `api` service's Source branch at `production` with **Wait for CI** on.
+- [ ] Protect the `production` branch as in *Ship from `production`*: pull request required (0 approvals), the five CI checks required, no force pushes or deletion.
+- [ ] First ship: Actions → **Deploy** → *Run workflow* with `ref` = `production` and `dry_run` ticked (green, no `::warning::` in *Check configuration*), then let the nightly routine release (or cut `release/v<x.y.z>` by hand) and watch production CI → Deploy: the Pages step prints a deployment URL, both smoke steps are green (one `WARN spa fallback` line is expected until the deep-link bug is fixed), and `gh release list` shows the new tag.
 - [ ] The Deploy run's smoke steps are green; sign in from a phone, install the PWA, and allow notifications.
 - [ ] When the Dokploy server exists: install Dokploy, complete *Target B* above, move DNS.

@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md
 ---
 # Week-2 provenance assertion in TestExercisesFlattens repeats the day-number check
 
@@ -16,3 +17,6 @@ Make the fixture's task titles (or content) unique per module/day, e.g. `fmt.Spr
 ## Evidence
 - Plan under review: `harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md` (Task 2).
 - `backend/internal/airouter/roadmap_test.go:20` (fixture task titles), `:150` (existing day-number check), `:155-157` (new assertion).
+
+## Evaluation
+_Evaluator, 2026-09-26._ **Select — low, folded into the blocker amend plan** `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` (Task 1b: unique fixture titles + a provenance assertion with a mutation check). Same branch, same test file, same review.
