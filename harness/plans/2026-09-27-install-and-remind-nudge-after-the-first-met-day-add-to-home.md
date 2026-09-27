@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-26-run-01/install-and-remind-nudge-after-the-first-met-day-add-to-home.md
-status: draft
+status: approved
 priority: medium
 merged: false
 order: 5
