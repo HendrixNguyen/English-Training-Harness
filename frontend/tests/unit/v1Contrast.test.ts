@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import AppHeader from '~/components/AppHeader.vue'
 import QuestRow from '~/components/quest/QuestRow.vue'
 import RoadmapNode from '~/components/roadmap/RoadmapNode.vue'
@@ -10,6 +10,11 @@ import AppButton from '~/components/ui/AppButton.vue'
 import SegmentedProgress from '~/components/ui/SegmentedProgress.vue'
 import type { QuestTask } from '~/stores/quest'
 import type { RoadmapNode as RoadmapNodeData } from '~/utils/roadmap'
+
+// utils/roadmap.ts imports TASK_ORDER from ~/stores/quest, which imports the
+// real useApi composable (Nuxt's #app alias, unavailable outside a Nuxt
+// runtime) — mock it the way every store test does.
+vi.mock('~/composables/useApi', () => ({ useApi: () => ({ get: vi.fn(), post: vi.fn() }) }))
 
 describe('v1 text on growth/alert fills is ground-0; v1 green text follows the scheme (design A9)', () => {
   it('AppButton primary is bg-growth text-ground-0, never text-white', () => {
@@ -54,11 +59,30 @@ describe('v1 text on growth/alert fills is ground-0; v1 green text follows the s
     expect(label.classes()).toContain('dark:text-growth')
   })
 
-  it('RoadmapNode today state is bg-growth text-ground-0', () => {
-    const node: RoadmapNodeData = { day: 9, week: 2, state: 'today' }
-    const w = mount(RoadmapNode, { props: { node }, global: { stubs: { NuxtLink: true } } })
-    expect(w.classes()).toContain('bg-growth')
-    expect(w.classes()).toContain('text-ground-0')
+  it('RoadmapNode today chip and Học ngay CTA are bg-growth text-ground-0, never text-white', () => {
+    const node: RoadmapNodeData = {
+      day: 9,
+      week: 2,
+      date: '2026-09-09',
+      title: 'Day 9',
+      state: 'today',
+      minutesSpent: 10,
+      isTargetMet: false,
+      tasks: [
+        { task_type: 'vocabulary', title: 'Vocab 9', duration_minutes: 10 },
+        { task_type: 'reading', title: 'Reading 9', duration_minutes: 10 },
+        { task_type: 'practice', title: 'Practice 9', duration_minutes: 10 },
+      ],
+    }
+    const w = mount(RoadmapNode, { props: { node, expanded: true }, global: { stubs: { NuxtLink: { template: '<a><slot /></a>' } } } })
+    const chip = w.find('span.bg-growth')
+    expect(chip.exists()).toBe(true)
+    expect(chip.classes()).toContain('text-ground-0')
+    expect(chip.classes()).not.toContain('text-white')
+    const cta = w.find('a.bg-growth')
+    expect(cta.exists()).toBe(true)
+    expect(cta.classes()).toContain('text-ground-0')
+    expect(cta.classes()).not.toContain('text-white')
   })
 
   it('SegmentedProgress met is text-growth-deep dark:text-growth', () => {

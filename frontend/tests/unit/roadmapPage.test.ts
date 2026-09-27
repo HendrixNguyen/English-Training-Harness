@@ -129,6 +129,17 @@ describe('/roadmap (design harness/designs/roadmap-tree.md)', () => {
     expect(today.text()).toContain('10 phút')
     expect(today.text()).toContain('Học ngay')
 
+    // Kit v2 (a0ec6ed): text on bg-growth is text-ground-0, never text-white
+    // (2.5:1 at #10B981, 1.7:1 at main's #3DE1B0 — both fail 4.5:1).
+    const chip = w.findAll('span').find(s => s.text() === 'HÔM NAY')
+    if (!chip) throw new Error('no HÔM NAY chip')
+    expect(chip.classes()).toContain('text-ground-0')
+    expect(chip.classes()).not.toContain('text-white')
+    const cta = w.findAll('a').find(a => a.text().includes('Học ngay'))
+    if (!cta) throw new Error('no Học ngay CTA')
+    expect(cta.classes()).toContain('text-ground-0')
+    expect(cta.classes()).not.toContain('text-white')
+
     const others = w.findAll('li[id^="day-"]').filter(li => li.attributes('id') !== 'day-9')
     for (const row of others) {
       expect(row.find('button').attributes('aria-expanded')).toBe('false')
