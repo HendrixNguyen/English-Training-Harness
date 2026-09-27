@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md
 ---
 # Integration gate tests only prove the skip and would pass if the gate always skipped
 
@@ -72,3 +73,8 @@ confirm the gate still lets a nominated run through.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low (was medium).** Test-only, but the gate is the thing that keeps `go test` from dropping a production database, so a positive-direction test is worth having. CI's `backend-integration` job now fails on any `--- SKIP`, which is the outer guard the reviewer wanted; the unit-level assertion is the remaining half. Batch with the 0003 migration plan (same package, same test files).
+
+## Evaluation
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Planned — low, auto-approved.** Confirmed: `store/integration_gate_test.go` only asserts the skip direction. Plan adds the two "proceeds" cases in that file alone (`NewPostgres` stays lazy on `main` and on today's migrate-lock branch) plus an uncommitted mutation check. The direct `reset`-refusal test is deferred: it needs a `testing.TB` seam in `integration_test.go`, which the unmerged RLS and streak-shield branches edit. Plan: `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md`.

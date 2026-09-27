@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-27-medium-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs
+worktree: .worktrees/migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs
 ---
 # Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan
 
@@ -124,3 +126,19 @@ git diff --stat origin/main..HEAD   # only postgres.go, migrations.go, migrate_l
 git push -u origin harness/2026-09-27-medium-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs
 ```
 (`english`/`english`/`english` are `backend/docker-compose.yml`'s defaults; the ports are the overrides set above.)
+
+## Execution summary
+
+Executed 2026-09-27 by the daily bugfix run on `harness/2026-09-27-medium-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs` (head `be70b39`, base `0392e5d`). CI: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36291533240 — success (all five jobs). The diff touches only `postgres.go`, `migrations.go`, `migrate_lock_test.go`, `migrate_fs_test.go` and `harness/CODEMAP.md`.
+
+- `3c3aafe` store: release the migration advisory lock even on a cancelled context (Tasks 1–3)
+- `50e5420` store: test Migrate over an in-memory FS and refuse malformed migration names (Task 4)
+- `be70b39` CODEMAP store paragraph
+
+**Reproduction.** With the old `Lock`/unlock body restored and the new tests kept, `TestIntegrationUnlockReleasesTheLockOnACancelledContext` failed (`pg_locks` still held the lock, count=1; a second Postgres could not acquire it within 3 s) and `TestIntegrationMigrateSucceedsWithPoolMaxConnsOne` failed with `store: ensuring version table: context deadline exceeded`. With the fix, all 7 store integration tests pass, plus the full `make test-integration` suite (16 tests).
+
+**Runtime proof.** `go build ./...`, `gofmt`, `go vet`, `make check` and the race unit suite are green. The binary was booted against a compose stack (`COMPOSE_PROJECT_NAME=migrate-lock`): migrations applied `[0001_init 0002_google_sync 0003_pet_verdict_dates]`, and `GET /healthz` returned 200 with postgres/redis ok. The stack was torn down afterwards.
+
+**Deviations.** Tasks 1–3 went into one commit because they are all in the same method. The optional `TestPgMigratorUsesThePinnedConnectionWhileLocked` was dropped as the plan allows; the integration test exercises `db()`'s pinned path.
+
+**Follow-ups.** Give `cmd/api/main.go`'s boot `store.Migrate` a bounded deadline, and drop the CODEMAP "deadline-free … until the leak is fixed" clause. This was deferred by the plan.

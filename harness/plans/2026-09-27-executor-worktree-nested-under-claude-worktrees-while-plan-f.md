@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/executor-worktree-nested-under-claude-worktrees-while-plan-f.md
-status: approved
+status: done
 priority: low
 merged: false
+branch: harness/2026-09-27-low-executor-worktree-nested-under-claude-worktrees-while-plan-f
+worktree: .worktrees/executor-worktree-nested-under-claude-worktrees-while-plan-f
 ---
 # `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan
 
@@ -108,3 +110,31 @@ grep -n 'covers' tools/harness/scan.py tools/harness/schema.py tools/harness/cli
 git diff --stat origin/main -- backend frontend deploy   # must be empty: tooling-only branch
 git push -u origin harness/2026-09-27-low-executor-worktree-nested-under-claude-worktrees-while-plan-f
 ```
+
+## Execution summary
+
+Built all three tasks task-by-task, TDD (failing test committed conceptually verified red before implementation, then green):
+
+- **Task 1** — `_git_worktree_list()`, `parse_worktree_list()`, `stale_worktrees()` added to `tools/harness/cli.py`; `cmd_stale_worktrees` now reads `git worktree list --porcelain` and falls back to the old `.worktrees/` glob only when git is unavailable. Reproduction: `test_stale_worktrees_finds_merged_branches_anywhere_git_lists_them`, `test_stale_worktrees_skips_the_main_worktree_and_the_current_checkout`, `test_stale_worktrees_falls_back_to_the_worktrees_dir_without_git` — all three failed with `AttributeError: ... does not have the attribute '_git_worktree_list'` before the change, all pass after. Ran the real command from the repo root against the actual worktree list; it printed the five nested/merged paths the idea described:
+  ```
+  /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.claude/worktrees/daily-task-evaluation-planning-971a45/.worktrees/every-google-403-becomes-409-reauth-required-so-a-quota-erro
+  /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.claude/worktrees/daily-task-evaluation-planning-971a45/.worktrees/geminiprovider-drops-every-response-part-after-the-first-so-
+  /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.claude/worktrees/harness-daily-execute-154026/.worktrees/nobody-can-sign-in-on-cloudflare-pages-login-is-308-redirect
+  /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.claude/worktrees/harness-daily-execute-154026/.worktrees/providertimeout-of-30-s-makes-roadmap-generation-impossible-
+  /Users/hendrixnguyen/Workspaces/self/Learning-English-Project/.worktrees/containerised-deploy-dockerfiles-production-compose-runbook-
+  ```
+  (printed, not removed — `prune` stays the orchestrator's job.)
+- **Task 2** — executor role/skill wording updated to record the git-reported worktree path when the sandbox can't create `.worktrees/<slug>`; harness-orchestrate's `prune` section now says paths are absolute, from `git worktree list`. `.claude/skills` is a tracked symlink to `.agents/skills` on this checkout, so both copies are always byte-identical by construction; `diff -q` confirmed silent for all three skill pairs (harness-execute, harness-review, harness-orchestrate).
+- **Task 3** — `schema.py` validates `covers` as a list when present; `scan.py` `reviews_for` now also matches `plan_rel in covers`; `cli.py new-review` gained `--covers`. Reproduction: `test_next_review_honours_a_parent_review_that_covers_the_amend`, `test_next_review_still_queues_an_amend_the_parent_review_does_not_cover`, `test_covered_amend_plan_is_not_flagged_unreviewed`, `test_covers_must_be_a_list` — all four failed before (missing `--covers` flag / `covers` not applied / assertion failed) and pass after.
+
+**Deviation:** the `_merged_plan` test helper takes `branch=None` to omit the `branch:` field for the one fallback-path test that needs a legacy (no-branch) merged plan; the plan's helper signature didn't spell out that case but the fallback test (Task 1 Step 1, third bullet) requires it.
+
+**Deviation (process, not code):** this plan's frontmatter/status bookkeeping could not be applied to the main checkout as harness-execute normally prescribes — the main checkout (`ROOT`) was on `harness/review-auto-merge` with unrelated uncommitted work and did not have this plan file at all (it only exists on `origin/main`), and the run's instructions explicitly forbade editing or staging anything there. This `## Execution summary` and the `status=done` below are therefore recorded only in this worktree's own (uncommitted, unpushed) copy of the plan file, per the branch's own rule that `harness/plans/*` is never committed on a plan branch. The orchestrator should apply `python3 tools/harness/cli.py set harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md status=done branch=harness/2026-09-27-low-executor-worktree-nested-under-claude-worktrees-while-plan-f worktree=.worktrees/executor-worktree-nested-under-claude-worktrees-while-plan-f` on whatever checkout is canonical.
+
+### Runtime proof
+- Build: N/A (pure Python stdlib tooling, no compiled artifact).
+- Full suite from a clean shell: `python3 -m unittest discover -s tools/harness/tests -v` → 50 tests, OK.
+- Boots and answers: `python3 tools/harness/cli.py context` and `python3 tools/harness/cli.py state` run clean; `stale-worktrees` and `next --stage review --all` exercised against the real repo state (see above).
+- Every documented command: `validate` (exit 0), `doctor` (0 problems), `stale-worktrees`, `next --stage review --all` (unchanged — no existing review carries `covers:` yet).
+- No process/container was started by this plan; nothing to clean up.
+- CI on `harness/2026-09-27-low-executor-worktree-nested-under-claude-worktrees-while-plan-f`: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36291400442 — conclusion `success` (frontend, backend-unit, harness-tooling, backend-integration, docker-images all green).
