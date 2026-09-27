@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md: Task 3 turns a blank Gemini/OpenAI answer into a provider error with test rows"
 ---
 # GeminiProvider returns an empty string as success when a STOP candidate has only empty-text parts
 
@@ -29,3 +30,5 @@ one empty-text part.
 
 ## Evaluation
 _Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Gemini unused in production; three-line fix + one test row — fold into the Gemini thinking plan tomorrow.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Folded into `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md`, Task 3.** Still true on `origin/main`: `backend/internal/airouter/gemini.go:108-112` joins the parts and returns the string with no emptiness check, so a STOP candidate with `[{"text":""}]` is a success. The plan adds `strings.TrimSpace` → `gemini: empty response` after the finishReason check (so `SAFETY` keeps its name), the test rows, and the same guard for an empty `choices[0].message.content` in `openai.go` since it is the identical shape.

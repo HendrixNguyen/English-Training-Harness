@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md: closed by its Task 2/3/4 on the same google branch"
 ---
 # No test pins a 409 from Calendar events.patch to 502 google_unavailable
 
@@ -21,3 +22,5 @@ A service- or handler-level test where `fakeCalendar` returns `ErrAlreadyExists`
 
 ## Evaluation
 _Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Test-only gap on a merged branch; fold into the `google` plan above.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Folded into `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` as Task 3.** Confirmed on `origin/main`: `backend/internal/google/handler_test.go:104-114` `TestSyncHandlerMapsAnUnconsumed409To502` drives only `fakeTasks.errs["InsertTaskList"]`; no test makes `fakeCalendar` 409 on `InsertEvent` and again on `PatchEvent` (`service.go:91-103`), and `calendar_test.go` has no PATCH 409 row. Task 3 adds the handler-level test (call log shows exactly one `calendar.InsertEvent` and one `calendar.PatchEvent`, no Tasks call, no `SaveSyncState`; 502 `google_unavailable`) and the client-level `PATCH …/events/taken` 409 → `ErrAlreadyExists` row. Status becomes `rejected` only as the harness's "closed by another plan" marker.
