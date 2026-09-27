@@ -1,10 +1,12 @@
 ---
 idea: harness/ideas/_inbox/restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md
-status: approved
+status: done
 priority: high
 merged: false
 amends: harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md
 design: harness/designs/retro-kit.md
+branch: harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n
+worktree: .worktrees/retro-amend
 ---
 # Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan
 
@@ -179,3 +181,54 @@ Original plan's acceptance items that this amend must not regress: items 1–3, 
 ## Notes
 - Design decision (A1): **the kit forces its own dark ground; there are no light variants.** The kit is dark-native (UI-KIT "Dark/light"). Light variants would need `dark:` or a second palette, which the kit forbids, and plan 6 deletes `paper` anyway. Until plans 2–6 land, a light-scheme learner sees a small dark dialogue box inside a white v1 card. That is readable, and accepted.
 - `useReducedMotion` is the one kit addition (A4). It supersedes §3's "reduced motion is CSS-only".
+
+## Execution summary
+
+Executed on the existing branch `harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n`, in a fresh worktree `.worktrees/retro-amend` (git-force-added alongside the recorded worktree, which belongs to another session and was left untouched, per the orchestrator's instruction). Head commit **`2e0125c`**.
+
+**Tasks (one commit each, tests-first):**
+1. `41b0699` — `PixelArt` palette fallback (A3): every `--px-*` is defined from `PALETTE` before a caller's override; deleted `hexPalette()` in `QuestNode`/`MapNode`/`Chest`/`StateBlock`; the locked `QuestNode` icon dims every non-`k` char to `ink-2`. New `tests/unit/pixelPalette.test.ts` (25 cases across every kit component/state).
+2. `196489b` — **Blocker fix** (A1/A2): `StateBlock`, `CountdownTimer`, `RetroPanel` (and by extension `RetroToast`, which stopped passing `band`) now paint their own `bg-ground-1`/`text-ink-*`/ring on their own root, so they read on the v1 white card / light-scheme `bg-paper`, not just the kit's own ground. New `tests/unit/StateBlock.test.ts`, `tests/unit/CountdownTimer.test.ts`; extended `RetroPanel.test.ts`, `RetroToast.test.ts`, `QuestNode.test.ts`.
+3. `1ea70b5` — Tiles (A2 MapNode, A5): `MapNode`'s `<button>` is now a 44×44 `group relative p-0.5` hit-area wrapping a 40×40 `[data-tile]`; both tiles carry the five torch focus-visible classes and a pressed inset bound to their actionable states; the partial band is `h-2` (was `h-1/2`, which painted over the digits). Extended `MapNode.test.ts`, `QuestNode.test.ts`.
+4. `2dffed4` — `useReducedMotion()` (A4): new module-level composable reading `matchMedia('(prefers-reduced-motion: reduce)')`; `HpBar`, `DayBar`, `SpeechBox`, `Chest`, `QuestNode`, `CompanionSprite` default `reduced` to the OS setting (`withDefaults({ reduced: undefined })` — the explicit `undefined` avoids Vue's absent-Boolean-prop-casts-to-`false` trap). New `tests/unit/useReducedMotion.test.ts`; extended `HpBar.test.ts`, `DayBar.test.ts`, `SpeechBox.test.ts`, `Chest.test.ts`, `QuestNode.test.ts` with `vi.doMock` + `vi.resetModules` per-test isolation.
+5. `fc74546` — `CompanionSprite` static reactions (A4 table): under reduced motion, `hit`/`miss`/`levelup` hold one static frame for 300 ms (`watch` on `[react, isReduced]` driving one `setTimeout`, cleared on every change and on unmount) and then emit `reacted`, mirroring the non-reduced `animationend` path. Extended `CompanionSprite.test.ts` with fake-timer cases (hit/levelup/miss, restart-on-change, unmount-mid-hold).
+6. `2e0125c` — Browser reproduction (A7) and `harness/CODEMAP.md` update (screenshots below).
+
+**Deviations from the plan, logged:**
+- None from the design's build contracts. One process deviation: per the amend plan's own note, the parent plan's recorded worktree "belongs to another session" and was still checked out (clean, on-branch) at `zen-burnell-b29ff5/.worktrees/retro-adventure-…`; rather than working inside a worktree another session might be using concurrently, I added a second worktree for the same branch with `git worktree add --force` at `.worktrees/retro-amend`, per this task's orchestrator instructions. Both worktrees now point at the same branch; the other session's worktree was not touched.
+- `origin/main` has moved ~23 commits ahead of this branch's base (`03cb8b6`). Per the git rule ("only ever merge `main`/`origin/main`"), I did not merge it in: nothing in the plan or its Verification requires this branch to be current with `main`, and CI (which runs the workflow file at the pushed commit) is green without it. Flagging so the reviewer/owner can decide whether the eventual `main` merge needs a rebase.
+
+**Runtime proof (step 8 of the executor role):**
+- **Builds:** `npm run build` — clean production build; PWA precache manifest generated; no errors.
+- **Whole suite, clean shell:** `npm run test:unit -- --run` → **34 files, 230 tests, all passing** (baseline before this plan: 30 files / 167 tests).
+- **Boots and answers a real path:** `npx nuxi dev --port 3355` (no backend, `NUXT_PUBLIC_API_BASE=http://127.0.0.1:19999`) served `/`, `/learn/x` and the throwaway `/_kit`; a Playwright script drove real page loads, real `matchMedia`/`prefers-reduced-motion`, keyboard `Tab` focus and click reactions (see below). Dev server killed afterward; `pgrep -fl "nuxi dev --port 3355"` empty, port free.
+- **Documented commands:** `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build` — all green, exactly as the plan's Verification lists them.
+- **Bounded:** dev server polled with a 30 s cap via `curl --max-time 2` per attempt; `gh run watch --exit-status` (self-bounded).
+
+**Plan's `## Verification` block, run and passing:**
+```
+npm ci && npm run lint && npm run typecheck && npm run test:unit && npm run build   # green (230 tests)
+npx vitest run tests/unit/pixelPalette.test.ts tests/unit/useReducedMotion.test.ts tests/unit/StateBlock.test.ts tests/unit/CountdownTimer.test.ts   # 34/34 pass
+npx vitest run tests/unit/revivePage.test.ts tests/unit/onboardingPage.test.ts   # 15/15 pass, files unchanged
+git diff 03cb8b6 -- tests/unit/revivePage.test.ts tests/unit/onboardingPage.test.ts pages/ tailwind.config.ts | wc -l   # 0
+grep -n 'bg-ground-2' components/ui/StateBlock.vue   # no hits
+grep -rn 'function hexPalette' components/   # no hits
+grep -rn 'dark:' components/retro/   # no hits
+grep -n "reduced: undefined" components/retro/{HpBar,DayBar,SpeechBox,Chest,QuestNode,CompanionSprite}.vue | wc -l   # 6
+git ls-files | grep -c '_kit'   # 0
+ls ../harness/reviews/retro-kit-screens/amend-*.png | wc -l   # 6 (copied into ROOT, not this worktree/branch)
+gh run list --branch harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n --limit 1   # completed success, run 36298745809
+```
+
+**Review reproduction, re-run (Playwright, `npm run dev`, no backend, 375×812, `aelp.auth` seeded in `localStorage` before navigation), before → after:**
+- Light-scheme hub `/` error text contrast: **1.05:1 → 15.97:1** (computed `rgb(244, 241, 255)` on `rgb(21, 20, 52)`, its own `ground-1`, not the v1 card's white). Same on `/learn/x`'s empty state and `/_kit`'s bare-`html` `CountdownTimer`. Dark scheme: identical ratio (the kit paints the same ground either way, design A1). Screenshots: `amend-hub-light-375.png`, `amend-hub-dark-375.png`, `amend-learn-light-375.png`, `amend-learn-dark-375.png`, `amend-kit-v1-light-375.png`, `amend-kit-v1-dark-375.png` — committed under `harness/reviews/retro-kit-screens/` **in ROOT** (per this task's routing; the branch only carries the `CODEMAP.md` update).
+- Loader cell colour: `bg-ground-2` (`rgb(31, 29, 74)`) → `bg-line-lit` **`rgb(201, 196, 244)`**.
+- `svg.retro-pixel rect` computed `fill: rgb(0, 0, 0)` (non-`k`): **48 → 0**.
+- Reduced motion `[data-fill]`/`[data-segment]` `transitionDuration`: **0.3s → 0s**. Sprite `hit` click: `[data-log]` was empty/stuck → now shows `hit` within 400 ms.
+- Keyboard focus `outline-color` on `QuestNode`/`MapNode`: → **`rgb(242, 168, 59)`** (torch), verified via real `Tab` key navigation (a programmatic `.focus()` does not trigger Chromium's `:focus-visible` after a prior mouse interaction — a script-methodology trap I hit and corrected). `box-shadow` at focus shows the v1 growth ring's colour channel present but its width/spread collapsed to `0px` by `ring-0`/`ring-offset-0` — no visible ring.
+- `MapNode.getBoundingClientRect()`: **40×40 → 44×44** (width and height both measured 44).
+
+**Design acceptance (amend), items 1–10:** all satisfied by the above (unit tests pin items 2–8 and 10; the browser run above pins items 1, 5's "zero non-outline black rects" and 9's focus/press/hit-area numbers).
+**Original plan's acceptance items 1–3, 5, 6, 8 (not regressed):** covered by the unchanged `tokens.test.ts`, `retroRadius.test.ts`, `HpBar.test.ts`, `fonts.test.ts` (9 woff2 confirmed in `.output/public/_nuxt` and the build's precache manifest) and `CompanionSprite.test.ts`'s six-stage cases, all still green.
+
+**CI:** green on the pushed branch — https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36298745809 (`backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling` all ✓), head sha `2e0125c`.
