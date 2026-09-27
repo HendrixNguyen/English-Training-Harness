@@ -4,13 +4,29 @@ export default defineNuxtConfig({
   // per-user, so there is nothing to render on a server (design §5).
   ssr: false,
   devtools: { enabled: false },
+  // Emit `login.html`, not `login/index.html`: a directory index makes
+  // Cloudflare Pages 308 `/login?code=…` to `/login/?code=…`, which broke every
+  // Google sign-in on the live host (2026-09-25). Pages serves `/login` from
+  // the flat file with no redirect; the Caddy image's try_files is unaffected.
+  nitro: { prerender: { autoSubfolderIndex: false } },
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss', '@nuxt/eslint', '@vite-pwa/nuxt'],
   components: [{ path: '~/components', pathPrefix: false }],
   css: [
-    '@fontsource-variable/fraunces/index.css',
-    '@fontsource/source-sans-3/400.css',
-    '@fontsource/source-sans-3/600.css',
+    // Retro kit faces (design §2): per-subset files only, so Vite emits
+    // exactly nine woff2 and the service-worker precache carries nothing
+    // else. `latin` covers A–Z, `vietnamese` the Vietnamese code points and
+    // tone marks — both are required for the app's copy.
+    '@fontsource/vt323/latin-400.css',
+    '@fontsource/vt323/latin-ext-400.css',
+    '@fontsource/vt323/vietnamese-400.css',
+    '@fontsource/nunito/latin-400.css',
+    '@fontsource/nunito/latin-ext-400.css',
+    '@fontsource/nunito/vietnamese-400.css',
+    '@fontsource/nunito/latin-700.css',
+    '@fontsource/nunito/latin-ext-700.css',
+    '@fontsource/nunito/vietnamese-700.css',
     '~/assets/css/main.css',
+    '~/assets/css/retro.css',
   ],
   app: {
     head: {

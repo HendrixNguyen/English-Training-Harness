@@ -1,0 +1,408 @@
+# Design: Retro kit — tokens, fonts, base components, companion sprite (plan 1 of 6)
+
+**Idea:** `harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`
+**Inherits:** `harness/designs/frontend-shell.md` §4 (the v1 component inventory this replaces), `harness/designs/retro-README.md` (build order; "The kit plan (1) in one paragraph").
+**Kit:** `harness/UI-KIT.md` v2 — the source for every token, type role, state and motion rule. This doc does not repeat the kit; it adds only what an executor needs to build `frontend/components/retro/*` without guessing and what the reviewer needs to check them.
+**Spec wireframe:** none — no page changes in plan 1. Screens come in plans 2–6 (`retro-hub.md` … `retro-settings.md`).
+
+## 0. Research
+- **Learner's job:** none yet — nothing a learner navigates changes in this plan. The kit's job is to make plans 2–6 pure page work: every later screen composes these components and adds no token.
+- **What the executor builds from:** the kit's component table (props, states) plus this doc's sizes, DOM contracts, sprite data format and tests. Anything not stated here or in the kit is the executor's call and is recorded in the plan's Notes.
+- **What today does wrong:** `components/ui/*` are v1 (16/12-px radii, spinner loaders, Fraunces); `PlantSvg` is vector art with easing sway; `QuestRow`/`RoadmapNode` use `NuxtLink` and emoji glyphs; `tailwind.config.ts` has seven v1 tokens. None of it is deleted here — v1 pages keep building until each screen plan swaps its components (README rule).
+- **Open questions, answered from the kit and the code:**
+  1. *Visible change in plan 1?* Yes, small and intended: `font-display`/`font-body` swap to VT323/Nunito on every page (v1 sizes 14–34 px all satisfy the VT323 rule), and `StateBlock`/`CountdownTimer` are restyled in place. The `html` ground, the global focus ring and the `paper` tokens stay v1 until plan 6 — flipping the ground now would put v1's white cards under `ink-0` text on light-scheme devices.
+  2. *Sprite technique?* Inline SVG `<rect>` grid from string rows (§4), not a PNG sheet: agents cannot author binaries, rects recolour through CSS variables (health tint, unknown-stage `ink-2`, the level-up flash), and Vitest can count pixels. Reactions are stepped transforms/palette swaps of one base drawing per stage — six drawings, not twenty.
+  3. *Navigation inside kit components?* None. `QuestNode`/`MapNode` emit `enter`/`select`; pages call `navigateTo`. Keeps the kit Nuxt-free so `@vue/test-utils` mounts it without stubs (v1 `QuestRow` embeds `NuxtLink` and is untested for that reason).
+  4. *Portrait 48 px on a 32-grid?* 48 = 16 units × 3: the portrait is a `viewBox` crop of the face region (§4). Every size the screen docs use is a whole multiple: full 32/64/128, face 48.
+
+## 1. Token migration (`frontend/tailwind.config.ts`)
+`tokens` stays a flat `Record<string, string>` (the contrast test iterates it). Hex is the kit's; roles are in the kit table.
+
+| Name | Hex | Fate |
+|---|---|---|
+| `ground-0` `ground-1` `ground-2` | `#0B0A1F` `#151434` `#1F1D4A` | new |
+| `line-lit` `line-dim` | `#C9C4F4` `#3B3A78` | new |
+| `ink-0` `ink-1` `ink-2` | `#F4F1FF` `#B7B3DC` `#8783B5` | new; flat keys — `text-ink-0`, not `ink.0` |
+| `growth` | `#3DE1B0` (was `#10B981`) | **kept, hex changes**; `growth-deep` `#178A69` new |
+| `torch` `torch-deep` | `#F2A83B` `#B8641E` | new |
+| `ember` `ember-deep` | `#FF5A4E` `#B3261E` | new |
+| `streak` `alert` `mute` | **superseded by A8:** pinned to their v1 hex `#F59E0B` `#EF4444` `#64748B` (were aliases of `torch`/`ember`/`ink-2`) | v1-only; no file under `components/retro/` references them; deleted in plan 6 |
+| `ink` `paper` `paper-dark` | `#1E293B` `#F8FAFC` `#0F172A` unchanged | v1-only; deleted in plan 6 with the `html` rule in `main.css` |
+| `borderRadius` | `card: 16px`, `btn: 12px` unchanged | v1-only, deleted in plan 6. Retro components use built-ins only: `rounded-none` (0) and `rounded-sm` (2 px). No new radius token. |
+| `fontFamily` | `display: ['VT323', 'monospace']` · `body: ['Nunito', 'system-ui', 'sans-serif']` | replaces Fraunces / Source Sans 3 |
+
+`darkMode: 'media'` stays; no `dark:` variant is written in `components/retro/`. `tests/unit/tokens.test.ts` is rewritten for v2 (§6).
+
+**Kit clarification (computed 2026-09-26, no token change):** `ink-2` on `ground-2` is **4.46:1** — below the floor. `ink-2` text sits only on `ground-0`/`ground-1` (5.0:1); on a `ground-2` surface (secondary button, selected option, HP track, fog) muted text uses `ink-1`. The `locked` `MapNode`/`QuestNode` keep `ink-2` because they are `aria-disabled` and carry the padlock glyph.
+
+## 2. Fonts
+- **Packages (fontsource v5; names by reasoning, verified by the executor with `ls node_modules/@fontsource/vt323` after `npm install` — this worktree has no `node_modules`):** `@fontsource/vt323` (400 only) and `@fontsource/nunito` (static; 400 and 700). Remove `@fontsource-variable/fraunces` and `@fontsource/source-sans-3` from `package.json`. Static Nunito over `@fontsource-variable/nunito`: two weights, smaller, no variable-axis rendering differences between engines.
+- **Imports in `nuxt.config.ts` `css:`** — per-subset files only, so Vite emits exactly nine `woff2` and the precache carries nothing else: `@fontsource/vt323/{latin,latin-ext,vietnamese}-400.css`, `@fontsource/nunito/{latin,latin-ext,vietnamese}-{400,700}.css`. The `vietnamese` subset covers only the Vietnamese code points (`U+1EA0–1EF9`, tone marks, `đ`); `latin` carries A–Z, so all three subsets are required. If a per-subset file is missing from the installed package, fall back to `400.css`/`700.css` (all subsets, `unicode-range` split) and note the larger precache in the plan.
+- **Precache:** unchanged mechanism — the per-subset CSS references its `files/*.woff2`, Vite emits them under `_nuxt/`, `injectManifest.globPatterns` already includes `woff2`, `precacheAndRoute(self.__WB_MANIFEST)` caches them at install. Verify after `npm run build`: nine `*vietnamese*|*latin*` `.woff2` under `.output/public/_nuxt/` and each listed in the generated `sw.js` manifest.
+- **Roles and sizes:** the kit Type table is binding. Tailwind classes to use: display title `font-display text-[34px] leading-9` · heading `text-[28px] leading-8` · name/button `text-[22px] leading-6` · counter `text-xl leading-6` (20/24) · eyebrow `text-base leading-5 uppercase tracking-[0.05em]`; body `font-body text-[17px] leading-[26px]` · passage `text-lg leading-[30px]` · caption `text-sm leading-5`. Counters and timers add `tabular-nums` (VT323 is monospaced; the class documents intent).
+
+## 3. Shared mechanics
+- **`assets/css/retro.css`** (new, imported after `main.css`): `.retro-pixel { image-rendering: pixelated; shape-rendering: crispEdges }`; the stepped keyframes `retro-breath` (translateY 0 → −1 unit, `steps(1)`, 1000 ms, infinite), `retro-hop` (0 → −2 units → 0, 200 ms), `retro-shake` (−1 → +1 unit, 200 ms), `retro-flash` (palette to `torch` → `ink-0` → base, 300 ms), `retro-dots` (loader cells, 900 ms, `steps(3)`), `retro-blink` (cursor, 600 ms, `steps(2)`), `retro-rise` (toast, translateY 8 px → 0, 150 ms, `steps(1)`); and one `@media (prefers-reduced-motion: reduce)` block that sets `animation: none` and `transition: none` on every `[class^="retro-"]` and `.retro-anim` element. Reduced motion is CSS-only — no JS media-query reads — so happy-dom tests exercise the static frame by mounting with the `reduced` prop described per component. Units: a "unit" is `var(--px)`, the scale in px (`--px: 4` at 128 px), so transforms stay on the pixel grid.
+- **Focus:** every focusable retro element sets `focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch` in its own template (the global `ring-growth` rule in `main.css` is v1 and stays until plan 6).
+- **Pressed within 100 ms:** no transitions on press. `RetroButton` uses `:active` classes; tiles use `:active` inset (border colour → `line-dim`, translateY 2 px).
+- **Glyph text:** `▶`, `★`, `○`, `✔`, `✖` are drawn as pixel glyphs (§4 `PixelArt`), never as font characters — VT323's coverage of U+25xx is not guaranteed and a fallback glyph breaks the pixel look. Emoji strings passed by pages (e.g. `Chest` items "🔥 x7") render as-is in `font-body`.
+
+## 4. Pixel art: `PixelArt` and the companion
+**`PixelArt.vue` (internal kit addition, reason: one renderer and one test for every sprite, icon and glyph).** Props `rows: string[]` (N strings of N chars), `palette: Record<char, cssColor>`, `size: number` (px; snapped down to a whole multiple of N), `label?` (sets `role="img"` + `aria-label`; without it `aria-hidden="true"`). Renders `<svg viewBox="0 0 N N" class="retro-pixel" shape-rendering="crispEdges">` with one `<rect height="1">` per horizontal run of the same char (run-length merged; `.` is transparent and emits nothing). Fill is `var(--px-<char>)`, the variables set on the `<svg>` from `palette`, so a parent recolours by overriding variables. Data lives in `utils/pixelArt.ts`: `COMPANION[stage]: string[]` (32 rows), `GLYPHS[name]: string[]` (16 rows: `book`, `scroll`, `sword`, `flame`, `shield`, `star`, `padlock`, `ring`, `chestClosed`, `chestOpen`, `check`, `cross`; 8 rows: `cursor`) and `PALETTE` (below). `tests/unit/pixelArt.test.ts` asserts every row set is square and uses only palette chars.
+
+**Palette chars** (the only ones allowed in any row): `.` none · `k` `ground-0` outline · `g` `growth` · `G` `growth-deep` · `i` `ink-0` highlight · `t` `torch` · `T` `torch-deep` · `e` `ember` · `E` `ember-deep` · `d` `line-dim` · `l` `line-lit`.
+
+**Companion anatomy (32×32, one silhouette).** Rows 22–31 are the pot and never change between stages: rim rows 22–24 (`t` light band on 23, cols 7–24), body rows 25–31 narrowing to cols 9–22, the **face on the pot**: eyes 2×2 `k` at cols 12–13 and 18–19 rows 26–27 with an `i` catchlight at (13,27) and (19,27), a smile `k` at (13,28) (18,28) and cols 14–17 row 29. Because the face lives on the pot, every stage has the same expression, the portrait crop is identical for all stages, and reactions read at 32 px. The plant grows in rows 3–21, stem always cols 15–16 (`g` left, `G` right, `k` outline at 14 and 17), leaves 1-px outlined with one `i` glint each.
+
+| Stage | Rows used | Silhouette |
+|---|---|---|
+| `seed` | 19–21 | no stem; a 6×3 dome of `G` with a `g` top row and `k` outline on the soil, cols 13–18, one `i` glint at (14,20) |
+| `sprout` | 9–21 | the sketch below: stem 7 rows, one left leaf (rows 11–16) and one higher right leaf (rows 9–15) |
+| `sapling` | 6–21 | stem 13 rows; four alternating leaves (right 8–12, left 10–14, right 13–16, left 15–18, each 6 wide); a 3-row `g` bud at the tip (rows 6–8, cols 14–17) |
+| `flowering` | 4–21 | sapling + three 3×3 flowers (`i` petals, `t` centre) at the tip (rows 4–6) and on the outer tip of the two upper leaves |
+| `fruitful` | 3–21 | flowering with leaves one px wider; flowers become 3×3 fruits (`t` with a `T` bottom row); a fourth fruit on the lower right leaf |
+| `wilted` | 9–21 | sapling's shape with `g→e`, `G→E`; the top six stem rows step one column right per row (bend), leaves mirrored to point down, no bud; eyes closed (row 26 `kk` only), smile inverted (`k` at cols 14–17 row 28, at (13,29) (18,29)) |
+
+Sprout at 1× (verified 32×32; `.` transparent):
+```
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+...................kkk..........
+..................kgggk.........
+........kkk......kggigk.........
+.......kgggk.....kgggGk.........
+......kgggigk....kgGGk..........
+......kggggGk.kgGGGk............
+.......kgggGGkkgGk..............
+.........kkkkkkgGk..............
+..............kgGk..............
+..............kgGk..............
+..............kgGk..............
+..............kgGk..............
+..............kgGk..............
+........kkkkkkkkkkkkkkkk........
+.......kttttttttttttttttk.......
+.......kTTTTTTTTTTTTTTTTk.......
+........kTTTTTTTTTTTTTTk........
+........kTTTkkTTTTkkTTTk........
+........kTTTkiTTTTkiTTTk........
+........kTTTTkTTTTkTTTTk........
+.........kTTTTkkkkTTTTk.........
+.........kTTTTTTTTTTTTk.........
+.........kkkkkkkkkkkkkk.........
+```
+
+**`CompanionSprite.vue`** wraps `PixelArt` with `rows = COMPANION[normalizeStage(stage).stage]` (unknown → sprout with `--px-g`/`--px-G` overridden to `ink-2`, as v1). Props: `stage: string`, `health: number`, `name?: string`, `size = 128`, `crop: 'full' | 'face' = 'full'` (face = `viewBox="8 16 16 16"`, so 48 px is ×3), `react: 'idle' | 'hit' | 'miss' | 'levelup' | 'down' = 'idle'`, `reduced = false`. Emits `reacted(react)` on `animationend` for `hit|miss|levelup`, then returns to idle. Health tint: `health < 30` sets `--px-g` to `ember`, `30–59` to `torch`, else `growth` (reuse `healthTone()`; map `streak→torch`, `alert→ember`). Reactions are applied to the plant `<g>` (rows 0–21), never the pot, except `levelup` (whole sprite) and `down`:
+
+| `react` | Frames | Implementation |
+|---|---|---|
+| `idle` | 2, 1000 ms loop | `retro-breath` on the plant group; off when `stage='wilted'` |
+| `hit` | 2, 200 ms once | `retro-hop` |
+| `miss` | 2, 200 ms once | `retro-shake` |
+| `levelup` | 3, 300 ms once | `retro-flash`: all `--px-*` except `k` → `torch`, then `ink-0`, then base |
+| `down` | 1, static | the `wilted` rows with `transform="rotate(90 16 16) translate(0 7)"` on the whole drawing (pot on the left, plant lying right, pot base on row 31); no idle. `aria-label` adds ", đã gục" |
+| `reduced` (prop or media query) | 1 | idle static; hit = plant raised 2 units for 300 ms then base; miss = base; levelup = torch palette for 300 ms then base — a frame swap, no keyframe |
+
+`aria-label`: `${name ? name + ', ' : ''}giai đoạn ${stage}, ${health} HP`; `data-stage`, `data-react` and `data-frame` attributes for tests.
+
+## 5. Components (`frontend/components/retro/`)
+Sizes are at 1× CSS px on the 8-px grid. States and colours are the kit table's; only what the kit leaves open is added here. Every component: `rounded-none`/`rounded-sm` only, no `dark:`, no `transition` except where a stepped one is named, `font-display`/`font-body` per the kit Type table.
+
+**`RetroPanel`** — `<section>`; `border-2 border-line-lit bg-ground-1 p-4` plus `box-shadow: 0 0 0 2px #0B0A1F, 0 0 0 4px <outer>`, `<outer>` = `line-dim` or the `tone` colour. Needs 4 px of outside room: pages stack panels with 16 px. `speaker` renders a tab `<h2>` (VT323 22, `bg-ground-1 text-ink-0 px-2`, `absolute -top-3 left-3`) and the section gets `mt-3` and `aria-labelledby`; `aria-live="polite"` when `speaker` is set. `portrait` slot: a 48-px box on the left with `gap-4`, content column grows. Props also accept `band?` (full-bleed, `p-2`, no outer line — revive) and `fog?` (a `ground-2`/60 % overlay child, `inert` content — roadmap) as booleans; both are one class each and cost nothing now.
+```
+ ╔══════════════════╗  line-dim  (4 px ring, recoloured by tone)
+ ║┌────────────────┐║  ground-0  (2 px gap)
+ ║│ line-lit 2 px   │║
+ ║│  ground-1, p-4  │║
+```
+
+**`RetroButton`** — `<button>` `h-12 min-w-[48px] px-5 rounded-sm font-display text-[22px] leading-6`; `block` → `w-full`. Depth `box-shadow: 0 4px 0 0 <deep>` (zero blur); `:active` → `translate-y-[2px]` and `0 2px 0 0`, no transition. Variants: primary `bg-growth text-ground-0` shadow `growth-deep`; secondary `bg-ground-2 text-ink-0 border-2 border-line-lit` shadow `line-dim`; danger `bg-ember text-ground-0` shadow `ember-deep`. v1 `ghost` maps to `secondary` when pages migrate. `loading`: label kept in the DOM at `opacity-0` (width kept), an absolutely centred `…` where dots light 1→2→3 with `retro-dots`; `aria-busy`; disabled while loading. `disabled`: `opacity-50`, `shadow-none`, `aria-disabled` and `disabled`. Props `type`, `variant`, `loading`, `disabled`, `block`; slot default.
+```
+ ┌──────────────────┐
+ │   VÀO NHIỆM VỤ   │  48 px, growth
+ └──────────────────┘
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀  4 px growth-deep (2 px when pressed)
+```
+
+**`HpBar`** — `role="meter"` with `aria-valuenow/min/max`, `aria-label` = `label`. Track `h-3` (12 px) `bg-ground-2 border-2 border-line-dim`, width fixed at `cells × 4 + 4` px (default `cells = 25` → 104 px; hub passes 40). Fill `<i data-fill>` `h-full` with inline `width: ${lit * 4}px`, `lit = Math.round(clamp(value/max) × cells)`; colour by `healthTone(value/max×100)`. Fill change: `transition: width 300ms steps(${|Δlit|})` (inline), none under reduced motion. Label left: VT323 20 `HP 80/100` (`label value/max`). Props `value`, `max = 100`, `label = 'HP'`, `cells = 25`, `reduced`.
+```
+ HP 80/100 [████████████████████░░░░░]   25 cells × 4 px; 20 lit
+```
+
+**`DayBar`** — three (`segments`) `HpBar`-style tracks in a row with `gap-1` (4 px), each `cells = 20` (84 px wide; 3 × 84 + 8 = 260 px, fits 320-px phones), no label, one `role="progressbar"` on the group (`aria-valuenow` seconds, max `segments × segmentSeconds`). Per-segment fill from `segmentFills()` (utils/progress). Right of the eyebrow: counter VT323 20 `20/30` (minutes, `minutesOf`); caption `font-body text-sm text-ink-1` = `${pct}%` or, when `met`, "Phòng hôm nay đã xong" in `text-growth`. Props `valueSeconds`, `segments = 3`, `segmentSeconds = 600`, `met = false`, `reduced`. Revive passes `segments=1 segmentSeconds=900 cells=40`.
+
+**`QuestNode`** — `<li>` containing a 56×56 tile `<button>` (`bg-ground-1 border-2`, icon `PixelArt GLYPHS[book|scroll|sword]` at 32 px, by `task.task_type` vocabulary/reading/practice) and beside it title `font-body text-[17px]` + `(10 phút)` `text-sm text-ink-1`, action word right in VT323 20. Left of the tile an 8-px column: the `▶` cursor glyph for `current` (`retro-blink`), and below the tile the connector: `w-1 h-4` cells `bg-growth` (`connector='lit'`), `bg-line-dim` (`'dim'`), none. States: `done` border `line-lit`, `star` glyph overlaid top-right at 16 px in `torch`, "Đã xong", `aria-disabled`; `current` border `growth`, "Vào", `aria-current="step"`; `open` border `line-lit`, "Vào"; `locked` everything `text-ink-2`, `padlock` overlay, "Khoá", `aria-disabled` (still in the DOM, no `enter`). Props `task`, `index`, `state`, `connector = 'none'`, `reduced`; emits `enter(task.id)`.
+
+**`MapNode`** — 40×40 `<button>` tile, day number VT323 20 centred; `cleared` `border-torch` + `star` 12 px top-right; `today` `border-growth bg-ground-2`, `aria-current="step"`, slot `sprite` above the tile (roadmap places `CompanionSprite size=32`); `partial` `growth` fill on the lower half; `missed` `border-ember` + `ring` glyph; `locked` `text-ink-2 border-line-dim` under a `ground-2`/60 % overlay, `aria-disabled`. Props `day`, `state`, `title` (→ `aria-label` "Ngày 9: {title}, {state word}"), `expanded?` (→ `aria-expanded`); emits `select(day)`.
+
+**`Chest`** — 64 px `PixelArt` (`chestClosed`/`chestOpen`, 16-grid ×4) centred; when `open` becomes true the open frame replaces the closed one after 200 ms (one `setTimeout`, cleared on unmount; at once when `reduced`) and the list appears: `<ul>` of `items` rows, VT323 22 `text-torch`, `icon` string then `label`. Emits `opened`. `aria-live="polite"` on the list. Props `items: {icon: string, label: string}[]`, `open`, `reduced`.
+
+**`Badge`** — inline `<span>`: 32-px `PixelArt` (`flame|shield|star` by `kind`) + optional count VT323 20 `x7`. `earned`: palette as drawn (`torch`); not earned: every non-`k` char → `line-dim`, `k` → transparent (outline only). `aria-label` "chuỗi 7 ngày" / "khiên" / "sao"; count also visible as text. Props `kind`, `count?`, `earned = true`.
+
+**`SpeechBox`** — composes `RetroPanel speaker=name` with `portrait` = `CompanionSprite crop=face size=48 stage health` and the `line` in `font-body text-[17px] text-ink-0`. Typing: a `visibleChars` counter advanced every 30 ms (`setInterval`, cleared on unmount, restarted when `line` changes); tap anywhere on the panel or `reduced` shows all. The full line is always in a visually-hidden `<span>` (`aria-live` announces it once); the typed copy is `aria-hidden`. Emits `settled`. Props `line`, `name`, `stage`, `health`, `reduced`.
+
+**`RetroToast`** + **`useRetroToast()`** (kit addition: `composables/useRetroToast.ts`, module-level queue — reason: "one at a time" needs one owner; pages call `show(line, tone?)`). The component renders the head of the queue as a one-line `RetroPanel tone` `fixed inset-x-4 bottom-[calc(80px+env(safe-area-inset-bottom))] max-w-md mx-auto`, `role="status"`, entering with `retro-rise`, auto-dismissed after 2000 ms, next item after. Props none; the composable exposes `queue`, `show`, `dismiss`. Pages mount `<RetroToast />` once (plan 2+).
+
+**`StateBlock`** (restyled in place, `components/ui/StateBlock.vue`; props and `role="status"` unchanged — `revivePage`/`onboardingPage` tests click `[role="status"] button`) — `loading`: three 8×8 `bg-ground-2` cells lighting `line-lit` in turn (`retro-dots`), `aria-busy`, `aria-label="Đang tải"`; `empty`/`error`: `<p>` `font-body text-[17px] text-ink-0` (error prefixed by the `cross` glyph 16 px in `ember` — the red wall is gone) + `RetroButton` (`secondary` for error, `primary` for empty). No `text-alert`.
+
+**`CountdownTimer`** (restyled in place, `components/learn/CountdownTimer.vue`; prop `remainingSeconds` unchanged — plan 3 changes the semantics) — `font-display text-xl tabular-nums text-ink-0`, `aria-live="off"`, the "Thời gian:" caption in `font-body text-sm text-ink-1`; `text-ember` at 0; no emoji.
+
+## 6. Verification without a demo page
+No committed preview. The reviewer verifies visually from a **throwaway route in the worktree**: `frontend/pages/_kit.vue` that mounts every component in every state on a `bg-ground-0` column (`npm run dev`, open `/_kit`), created by the executor, screenshotted for the plan's Notes, and **deleted before the final commit** (the acceptance list checks `git ls-files` has no `pages/_kit.vue`). Storybook is not added. Unit checks are Vitest with `@vue/test-utils` on happy-dom (existing convention), new files under `tests/unit/`:
+
+| Test file | Pins |
+|---|---|
+| `tokens.test.ts` (rewritten) | v2 hex for every name in §1; aliases equal their targets; the WCAG pairs: `ink-0/1/2`, `line-lit`, `growth`, `torch`, `ember` on `ground-1` ≥ 4.5:1, `ground-0` on `growth/torch/ember` ≥ 4.5:1, `ink-0` on `ember-deep` ≥ 4.5:1 (a 15-line luminance helper in the test) |
+| `fonts.test.ts` | `package.json` has `@fontsource/vt323` and `@fontsource/nunito`, not fraunces/source-sans; `nuxt.config.ts` text contains the three `vietnamese-*` css imports; `tailwind.config.ts` `fontFamily` names VT323/Nunito |
+| `pixelArt.test.ts` | every `COMPANION` and `GLYPHS` entry is square; only palette chars; run-length rects render (`sprout` → `rect` count > 40 and < 400) |
+| `CompanionSprite.test.ts` | each of the six stages sets `data-stage`; unknown stage → `sprout` + `ink-2` variable; `aria-label` has name, stage, HP; `react=down` rotates; `reduced` renders one frame (no `retro-*` animation class); `size=50` snaps to 32 |
+| `HpBar.test.ts` | width is a multiple of 4 for values 0, 1, 33, 50, 99, 100; tone thresholds at 29/30/59/60; `aria-valuenow` |
+| `DayBar.test.ts` | ports `SegmentedProgress.test.ts` (three segments, `20/30`, met caption, one 15-minute segment) |
+| `RetroButton.test.ts` | height class `h-12`; three variants; loading keeps the label node and sets `aria-busy`; disabled has `aria-disabled` and stays in the DOM |
+| `RetroPanel.test.ts` `QuestNode.test.ts` `MapNode.test.ts` `Chest.test.ts` `Badge.test.ts` `SpeechBox.test.ts` `RetroToast.test.ts` | one `it` per state in the kit table; emits (`enter`, `select`, `opened`, `settled`); locked nodes do not emit; typing reveals the full line on click; toast queue shows one at a time (fake timers) |
+| `retroRadius.test.ts` | reads `components/retro/*.vue` and fails on any `rounded-` class other than `rounded-none`/`rounded-sm`, any `blur`, `bg-gradient`, `scale-`, `ease-`, or `dark:` |
+| `StateBlock` / `CountdownTimer` | existing page tests keep passing unchanged |
+
+## 7. Copy
+Fixed strings owned by the kit components (Vietnamese, sentence case): `QuestNode` "Vào" · "Đã xong" · "Khoá" · "({n} phút)"; `DayBar` "Phòng hôm nay đã xong"; `HpBar` label "HP"; `StateBlock` `aria-label` "Đang tải"; `CompanionSprite` "giai đoạn {stage}, {n} HP", ", đã gục"; `Badge` "chuỗi {n} ngày" · "khiên" · "sao"; `MapNode` state words "đã xong" · "hôm nay" · "một phần" · "bỏ lỡ" · "khoá"; `CountdownTimer` "Thời gian:". Every other string is passed in by the page.
+
+## 8. Self-critique
+- Traded away: fluid bars. Fixed 4-px cells make `HpBar`/`DayBar` deterministic and testable but the day bar is 260 px on every phone rather than full-width; the hub eyebrow/counter row above it hides the gap. If a screen plan needs a wider bar, it passes `cells`, never a percentage.
+- The face-on-the-pot decision makes the portrait crop and reactions trivial but means the plant's growth carries no expression change; the wilted stage's closed eyes and inverted smile are the only face change. Acceptable — the kit's stage feedback is size and colour.
+- Plan 1 is visible after all (fonts, `StateBlock`, timer). The alternative — parallel `font-pixel` names and a second font payload — would cost ~150 KB of precache and a rename in plan 6; not worth it.
+- Executor traps: `tokens` must stay flat strings (`ink-0`, not `ink: {0: …}`), or the alias `mute: tokens['ink-2']` and the contrast test break; `growth` changes hex — `tokens.test.ts` will fail until rewritten; do not import `NuxtLink` or `navigateTo` in `components/retro/`; `PixelArt` rows are strings, keep them in a `.ts` module not `.json` (type-checked chars); the `box-shadow` ring needs outer room — don't put a panel flush against `overflow-hidden`; `setInterval`/`setTimeout` in `SpeechBox`, `Chest`, `RetroToast` must clear on unmount or the test run leaks timers; `pages/_kit.vue` must not be committed.
+- Review checks beyond the acceptance list: the sprout at 128 px matches the sketch pixel for pixel; the five other stages keep the pot rows identical (diff rows 22–31 of each `COMPANION` entry); `ls .output/public/_nuxt | grep -c woff2` is 9.
+
+## Acceptance
+- [ ] `tests/unit/tokens.test.ts` proves every text pair in §6 ≥ 4.5:1 with the v2 hex; `streak`/`alert`/`mute` hold their v1 hex (A8, supersedes "equal `torch`/`ember`/`ink-2`"); `paper`, `paper-dark`, `ink`, `card`, `btn` still exist.
+- [ ] No file under `components/retro/` uses a radius above 2 px, a blur, a gradient, a scale tween, an easing curve or a `dark:` variant (`retroRadius.test.ts`).
+- [ ] `HpBar` fill width is a multiple of 4 px for every value 0–100 and the tone changes at 30 and 60; `DayBar` renders three segments and the revive single segment.
+- [ ] Every `RetroButton` variant is 48 px tall and ≥ 48 px wide; `QuestNode` tiles are 56 px; `MapNode` tiles are 40 px with a ≥ 44 px hit area (`p-0.5` on the wrapper).
+- [ ] `package.json` lists `@fontsource/vt323` and `@fontsource/nunito` only; `nuxt.config.ts` imports the `vietnamese` (and `latin`, `latin-ext`) subsets for both; after `npm run build` the nine `woff2` files are in `.output/public/_nuxt/` and in the service-worker precache manifest.
+- [ ] `CompanionSprite` renders all six stages, `down`, and an unknown stage (sprout in `ink-2`); the portrait crop at 48 px is a whole ×3; `aria-label` carries name, stage and HP.
+- [ ] With `reduced` (and under `prefers-reduced-motion` in the browser) no `retro-*` animation runs and every reaction still shows its static frame; typing text, chest and toast appear at once.
+- [ ] No v1 component is deleted or renamed; every page still builds; `revivePage`, `onboardingPage` and every other existing unit test pass unchanged.
+- [ ] `pages/_kit.vue` (or any preview page) is not in `git ls-files`; the plan's Notes carry the reviewer's screenshots.
+- [ ] `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build` green, and CI green on the pushed branch.
+
+## Addendum 2026-09-27 — amend after review
+Scope: one amend plan on the kit branch (`amends:` plan 1) covering the blocker `restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` and the medium bugs `retro-kit-components-inherit-the-v1-page-text-colour-and-ret.md`, `questnode-icon-palettes-miss-chars-their-glyphs-use-so-book-.md`, `companionsprite-never-emits-reacted-when-animations-are-off-.md`, `os-prefers-reduced-motion-does-not-reach-hpbar-daybar-speech.md`, `questnode-and-mapnode-tiles-lack-the-torch-focus-ring-and-pr.md`. The four low bugs are not designed here. **No page changes** (§0 Q1 stands); no copy changes (§7 stands); no new token. Where this addendum and §3–§5 disagree, the addendum wins.
+
+### A1. Decision: the kit carries its own dark ground — no light variants
+**Every surface component sets its own ground and its own ink on its root; nothing inherits page colour or page ground.** Surface components are `RetroPanel` (all modes), `RetroToast`, the `QuestNode`/`MapNode` tiles, `RetroButton`, and the two restyled v1 components `StateBlock` and `CountdownTimer`. Inline components (`HpBar`, `DayBar`, `Badge`, `Chest`, `CompanionSprite`, the `QuestNode` text column) set an explicit `text-*` on every text node they render and are placed only on a kit ground (inside a `RetroPanel`, or on a migrated page whose `<main>` is `bg-ground-0 text-ink-0`, which is the screen plans' job). No component relies on `html`'s colour, and no `dark:` appears in `components/retro/` (the `retroRadius` guard stays as written).
+
+*Reason.* The kit is dark-native by owner decision (UI-KIT "Dark/light"): a daylight palette would be a new kit revision, not a fix, and scheme-aware classes would need `dark:` variants or a second palette, both of which the kit forbids. Light variants would also be throw-away: plan 6 flips `html` to `ground-0` and deletes `paper`, so anything written for the white card dies with it. A component that paints its own `ground-1` and `ink-0` is readable on any parent: v1 white card, v1 slate card, or the kit's `ground-0`. Its contrast becomes the kit's own pairs (ink-0 16.0:1, ink-1 8.9:1, ember 5.8:1 on `ground-1`), which `tokens.test.ts` already proves. The same markup then survives plan 6 unchanged. The cost is small and temporary: until plans 2–6, a light-scheme learner sees a small dark dialogue box inside a white v1 card. It is readable and in style, and it reads as the incoming look rather than a bug.
+
+### A2. Surfaces and ink (build contract)
+- **`StateBlock`** (props, `role="status"` on the root, and the button inside it unchanged, so the page tests' `[role="status"] button` still resolves):
+  - `loading`: root `inline-flex items-center gap-2 bg-ground-1 p-2`, keeping `aria-busy="true"` and `aria-label="Đang tải"`. Three `h-2 w-2 bg-line-lit` cells with `retro-dots` at 0/150/300 ms delay. The keyframe dims each cell to 0.35 and lights it to 1, so a lit cell *is* `line-lit`. There is no `bg-ground-2` cell. Under reduced motion all three sit at opacity 1 (the static `…` frame).
+  - `empty`/`error`: root `<div role="status">` wrapping a `RetroPanel`. Error uses `tone="ember"` and empty uses `tone="plain"`, per the kit table's "error uses `tone=ember`". The panel content stays `<p class="flex items-center gap-2 font-body text-[17px] text-ink-0">` + the `RetroButton`. The v1 `AppCard`'s `p-4` gives the panel ring its 4 px of room.
+- **`CountdownTimer`**: root `inline-flex items-baseline gap-1 border-2 border-line-dim bg-ground-1 px-2`. The caption stays `text-ink-1` and the digits stay `text-ink-0`, or `text-ember` at 0. `aria-live="off"` stays. It now reads on `bg-paper` and `bg-paper-dark` alike.
+- **`RetroPanel`**: the `<section>` always carries `border-2 border-line-lit bg-ground-1 text-ink-0` and the ring `box-shadow`. `band` only swaps `p-4` for `p-2 w-full`. *Clarification of §5:* the band keeps its fill, line and ring, because revive's alarm band is `tone=ember` (retro-revive.md) and its tone lives on the ring.
+- **`RetroToast`**: renders `<RetroPanel :tone>` **without** `band`, so it gets the fill, the 2+2 px ring and `text-ink-0` with no extra class.
+- **`QuestNode`** tile `<button>`: add `text-ink-0`, or `text-ink-2` when `locked` (the text column already sets its own ink).
+- **`MapNode`**: the visual tile (see A5) carries `bg-ground-1 text-ink-0`, or `text-ink-2` when `locked`. The day number is `relative z-10`. *Clarification of the kit's "partial half-filled":* the partial fill is a bottom band of two 4-px cells (`absolute inset-x-0 bottom-0 h-2 bg-growth`), not `h-1/2`. A half-height growth block under `ink-0` digits would be about 1.4:1. The executor confirms in the `/_kit` screenshot that the digits' ink box does not touch the band.
+
+### A3. `PixelArt` palette fallback
+`palette` becomes optional (`Partial<Record<PaletteChar, string>>`, default `{}`). `PixelArt` first sets `--px-<c>` for **every** char in `PALETTE`, resolved to the token hex, then overlays `palette`. Every `--px-*` a rect can reference is therefore always defined. Callers pass only overrides. Delete the per-component `hexPalette(...)` helpers in `QuestNode`, `MapNode`, `Chest` and `StateBlock`: they only restate `PALETTE`, and `CompanionSprite`/`Badge` already build from `PALETTE`. The only overrides that remain:
+- health tint and unknown-stage `ink-2` (`CompanionSprite`);
+- unearned (`Badge`);
+- the reduced level-up frame (A4);
+- the `StateBlock` cross, which is already drawn in `e` and so needs none;
+- **locked `QuestNode` icon**: every non-`k` char → `ink-2`, with `k` kept, so the icon dims with the rest of the tile. The padlock overlay stays as drawn.
+
+### A4. Reduced motion: `useReducedMotion()` and static frames
+- **`composables/useReducedMotion.ts`** (kit addition; reason: one owner for the media query, so pages never wire it). Module-level `ref<boolean>`, initialised on first call from `window.matchMedia('(prefers-reduced-motion: reduce)').matches`, with one `change` listener that updates the ref. It returns `Readonly<Ref<boolean>>`. `ssr: false` is set in `nuxt.config.ts`, so there is no hydration concern. If `matchMedia` is missing (old happy-dom), it returns `false`.
+- **Default for every `reduced` prop** (`CompanionSprite`, `HpBar`, `DayBar`, `QuestNode`, `Chest`, `SpeechBox`): declare `reduced?: boolean` with `withDefaults({ reduced: undefined })`. **Trap:** without the explicit `undefined` default, Vue casts an absent Boolean prop to `false` and the OS value is never read. Each component computes `const isReduced = computed(() => props.reduced ?? osReduced.value)` and uses only `isReduced`. An explicit `reduced=false` overrides the OS setting, which keeps tests deterministic. `SpeechBox` passes `:reduced="isReduced"` to its portrait sprite.
+- **Bars:** the fill `<i data-fill>` (HpBar) and `<i data-segment>` (DayBar) also get class `retro-anim`, so the existing CSS block wins over the inline transition even before JS runs. The inline `transition` is omitted when `isReduced`.
+- **`QuestNode` cursor:** always rendered for `current`. Only the `retro-blink` class is dropped when `isReduced`, which gives a static `▶` rather than no cursor.
+- **Supersedes §3's "Reduced motion is CSS-only — no JS media-query reads".** CSS still stops keyframes. JS timers (typing, chest, the sprite hold) and inline transitions read `isReduced`.
+- **`CompanionSprite` static reactions** (when `isReduced` and `react` becomes `hit|miss|levelup`; this replaces §4's `reduced` row):
+
+| `react` | Static frame, held 300 ms | `data-frame` during / after |
+|---|---|---|
+| `hit` | inline `transform: translateY(calc(var(--px) * -2px))` on the element that carries `retro-hop` today (plant raised 2 units) | `1` / `0` |
+| `levelup` | palette override: every non-`k` char → `tokens.torch` | `1` / `0` |
+| `miss` | base frame (per §4) | `0` / `0` |
+
+  One `setTimeout(300)` is started from a `watch` on `react`. On fire, the frame returns to base and the component emits `reacted(react)`, for all three kinds. The timer is cleared when `react` changes again and on unmount. Without `isReduced`, the `animationend` path is unchanged. The sprite does not reset `react` itself; the caller returns it to `idle` on `reacted`, as today. `idle` under reduced is the static base, and `down` is unchanged.
+
+### A5. Focus, pressed, hit area
+- **Torch focus**, on the `QuestNode` tile button and the `MapNode` button: `focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch focus-visible:ring-0 focus-visible:ring-offset-0`. The last two neutralise the v1 global `:focus-visible { ring-2 ring-growth ring-offset-2 }` from `main.css`, which otherwise draws a growth ring next to the torch outline.
+- **Pressed inset**, no transition, bound only when the tile can act (`open`/`current` for QuestNode, not `locked` for MapNode):
+  - QuestNode: `active:translate-y-[2px] active:border-line-dim` on the button.
+  - MapNode: `group-active:translate-y-[2px] group-active:border-line-dim` on the inner tile.
+- **MapNode hit wrapper**: the `<button>` becomes the wrapper `group relative p-0.5` and measures 44×44. It keeps `type`, `aria-*`, the `@click` and the focus classes. The visual tile moves into a child `<span data-tile class="relative flex h-10 w-10 items-center justify-center border-2 bg-ground-1 text-ink-0">`, which gets the state border classes. The number, glyphs, partial band, fog overlay and `sprite` slot move with it.
+
+### A6. Tests (Vitest, happy-dom)
+- **`useReducedMotion.test.ts`**: stub `matchMedia` with `matches: true` to get `true`; firing `change` flips the ref.
+- **Per-component reduced default**: with `vi.mock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))` and **no** `reduced` prop:
+  - `HpBar`/`DayBar` fills have no inline `transition` and carry `retro-anim`;
+  - `SpeechBox` shows the full line at mount;
+  - `Chest` shows `chestOpen` and emits `opened` synchronously;
+  - `QuestNode` `current` has the cursor without `retro-blink`;
+  - an explicit `reduced=false` restores the animated path.
+- **`CompanionSprite`** (fake timers, reduced):
+  - `hit`: `data-frame="1"` and the translate style; no emit at 299 ms; at 300 ms `reacted` is `['hit']` and `data-frame="0"`.
+  - `levelup`: `--px-g` equals `torch` during the hold.
+  - `miss`: emits at 300 ms.
+  - Unmounting during a hold emits nothing.
+- **`pixelPalette.test.ts`**: mount every component under `components/retro/` plus `StateBlock` in every state, including locked/unearned/`down`/unknown stage/reduced level-up hold. Every `rect[fill^="var(--px-"]` must have that variable present and non-empty in its `<svg>` inline style.
+- **Colour contracts**:
+  - `RetroPanel` (plain, tone, band) root has `bg-ground-1 text-ink-0 border-2`;
+  - the `RetroToast` panel has `bg-ground-1` and a ring `box-shadow`;
+  - the `MapNode` `[data-tile]` has `text-ink-0`, or `text-ink-2` when locked; the number has `z-10`; the partial band is `h-2`;
+  - the `QuestNode` tile has `text-ink-0`/`text-ink-2`, and the locked icon palette is `ink-2`.
+- **New `StateBlock.test.ts` / `CountdownTimer.test.ts`**:
+  - the StateBlock loading root has `bg-ground-1`, and each of its 3 cells has `bg-line-lit`;
+  - error/empty render a `RetroPanel` with tone `ember`/`plain` inside `[role="status"]`, with the button inside it;
+  - the CountdownTimer root has `bg-ground-1`, and the digits get `text-ember` at 0.
+- **Focus/hit classes**: both tiles carry the five focus classes; MapNode's button has `p-0.5` and `[data-tile]` has `h-10 w-10`; the `active:` classes are absent on locked/done tiles.
+
+### A7. Browser reproduction (reviewer's steps, rerun by executor and reviewer)
+Set up the throwaway `pages/_kit.vue` (§6, deleted before the final commit) and add a **"v1 surfaces"** section with **no** `bg-ground-0` wrapper:
+- `StateBlock` loading/empty/error inside an `AppCard`;
+- `CountdownTimer` at 125 s and at 0 on the bare `html` ground.
+
+Every reaction control writes the emitted events into a `<pre data-log>`. Then run Playwright against `npm run dev` at 375×812, with no backend:
+1. `emulateMedia({ colorScheme: 'light' })` and then `'dark'`. For each, screenshot `/`, `/learn/x` and `/_kit`. For every text node in `[role="status"]` and in the timer, read the computed `color` and the first non-transparent `background-color` up the ancestor chain, and compute the WCAG ratio.
+2. On `/_kit`, check that the loader cells' computed `background-color` is `rgb(201, 196, 244)`.
+3. Collect every `svg.retro-pixel rect` with a computed fill of `rgb(0, 0, 0)` that is not a `k` rect.
+4. With `reducedMotion: 'reduce'`, check that `[data-fill]` and `[data-segment]` report computed `transitionDuration` `0s`. Click the hit, levelup and miss reactions and wait 400 ms: `[data-log]` lists each one. A typed SpeechBox line is complete at once, and the chest is open at once.
+5. Tab onto a QuestNode and a MapNode: the computed `outline-color` is `rgb(242, 168, 59)` and no growth `box-shadow` is present. The MapNode button's `getBoundingClientRect()` is 44×44.
+
+## Acceptance (amend)
+1. Under `prefers-color-scheme: light` **and** `dark`, at 375 px with no backend, every `StateBlock` empty/error text on `/` and `/learn/:id` (inside the v1 `AppCard`) and the `CountdownTimer` digits and caption on `/_kit`'s bare v1 ground have a computed contrast ≥ 4.5:1 against their nearest painted background. Screenshots `hub-light-375.png`, `hub-dark-375.png`, `learn-light-375.png`, `learn-dark-375.png`, `kit-v1-light-375.png` and `kit-v1-dark-375.png` are in the plan's Notes.
+2. `StateBlock` loading renders three cells whose computed background is `line-lit` (`rgb(201, 196, 244)`) on a `ground-1` plate; no `bg-ground-2` cell remains.
+3. `StateBlock`, `CountdownTimer`, `RetroPanel` (plain, toned, band), `RetroToast`, and the `QuestNode`/`MapNode` tiles each set their own `bg-ground-1` (or state ground) and `text-ink-*` on their root. The toast has a `ground-1` fill, a 2 px `line-lit` border and the 2+2 px ring, and does not use `band`.
+4. `MapNode` digits are `ink-0` (`ink-2` when locked), `z-10`, and clear of the `h-2` partial band.
+5. No `<rect>` in any kit component or state references an undefined `--px-*` variable (`pixelPalette.test.ts`), and the browser shows zero non-outline `rgb(0, 0, 0)` rects. The locked `QuestNode` icon is drawn in `ink-2`.
+6. `useReducedMotion()` exists. With it mocked `true` and no `reduced` prop:
+   - `HpBar`/`DayBar` fills have no transition;
+   - `SpeechBox` shows the whole line;
+   - `Chest` opens at once;
+   - the `QuestNode` cursor is static;
+   - explicit `reduced=false` overrides it.
+7. Under emulated `reducedMotion: 'reduce'`, `[data-fill]`/`[data-segment]` computed `transitionDuration` is `0s`, and the SpeechBox and Chest appear at once.
+8. Under reduced motion, `CompanionSprite` holds the static frame for 300 ms and then emits `reacted`:
+   - `hit`: plant raised 2 units, `data-frame="1"`;
+   - `levelup`: torch palette;
+   - `miss`: base.
+   
+   This holds both in fake-timer tests and in the browser `[data-log]` after 400 ms. No emit follows an unmount mid-hold.
+9. The `QuestNode` and `MapNode` buttons show a 2 px `torch` outline with a 2 px offset on keyboard focus and no v1 growth ring. The actionable tiles drop 2 px with a `line-dim` border on `:active`, with no transition. The MapNode button measures 44×44 around a 40×40 tile.
+10. No page file, copy string or token changes (`git diff` of `pages/`, `tailwind.config.ts` and §7's strings is empty); `retroRadius.test.ts` still passes with no `dark:` in `components/retro/`. `pages/_kit.vue` is not in `git ls-files`. `npm run lint`, `typecheck`, `test:unit` and `build` are green, and CI is green on the pushed branch.
+
+## Addendum 2 2026-09-27 — amend 2 after re-review
+Scope: a second amend on the kit branch (`amends:` plan 1) for the blocker `retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md`, with the medium bug `retro-amend-tests-miss-live-reduced-motion-flips-and-the-sta.md` folded in (A11). Where this addendum disagrees with §1, §0 Q1 or amend acceptance 10 ("no page file changes"), this addendum wins, for the page lines listed in A9 only. No layout change, no copy change, no new token.
+
+### A8. Decision: v1 aliases pinned; v1 text on a filled colour is `ground-0`; v1 green text follows the scheme
+**Rule.** `streak`, `alert` and `mute` go back to their `main` hex, because they are v1-only names the kit never draws. `growth` keeps its v2 hex, because the kit draws with it. Every v1 text node that sat on a `growth` or `alert` fill in white switches to `text-ground-0`. v1 `text-growth` becomes `text-ink dark:text-growth` below 24 px and `text-growth-deep dark:text-growth` at 24 px and up, and on glyphs. The v1 focus ring follows the same light/dark split.
+
+*Floor chosen: no v1 pair worse than `main`, every pair that passes on `main` still passes, and every pair this amend touches reaches AA* (4.5:1, or 3:1 for text ≥ 24 px and for glyphs/rings). Full AA on every v1 pair in both schemes is **not reachable with one hex per token**. A colour needs relative luminance ≤ 0.183 to reach 4.5:1 on white and ≥ 0.273 to reach it on the v1 dark card `ink` #1E293B, and no hex does both. So the remaining pre-existing pairs (table below) would need scheme-aware tokens or `dark:` edits on about 20 page lines. Plans 2–6 delete those surfaces anyway: each screen moves to `ground-0`, where the kit pairs apply. Each screen plan's acceptance must show that its screen has none of them.
+
+Ratios (WCAG, computed 2026-09-27 from the hex in `tailwind.config.ts` @2e0125c):
+
+| v1 pair (fg on bg) | scheme | `main` | @2e0125c | after A8 | floor |
+|---|---|---|---|---|---|
+| white → **`ground-0`** on `growth` fill (AppButton primary, avatar, QuestRow "Học", RoadmapNode today) | both | 2.54 | 1.67 | **11.69** | 4.5 |
+| white → **`ground-0`** on `alert` fill (AppButton danger, hub banner, revive alert) | both | 3.76 | 3.08 | **5.18** | 4.5 |
+| `mute` on `paper` / white | light | 4.55 / 4.76 | 3.38 / 3.53 | **4.55 / 4.76** | 4.5 |
+| `mute` on `paper-dark` / `ink` | dark | 3.75 / 3.07 | 5.05 / 4.14 | 3.75 / 3.07 | = main (pre-existing) |
+| small `text-growth` → **`ink`** on white / `paper` | light | 2.54 / 2.42 | 1.67 / 1.59 | **14.63 / 13.98** | 4.5 |
+| large/glyph `text-growth` → **`growth-deep`** on white / `paper` | light | 2.54 / 2.42 | 1.67 / 1.59 | **4.31 / 4.12** | 3 |
+| `text-growth` on `paper-dark` / `ink` | dark | 7.04 / 5.77 | 10.71 / 8.77 | **10.71 / 8.77** | 4.5 |
+| focus ring `growth` → **`growth-deep`** on white / `paper` | light | 2.54 / 2.42 | 1.67 / 1.59 | **4.31 / 4.12** | 3 |
+| `text-streak` on white / `paper` | light | 2.15 / 2.05 | 2.01 / 1.92 | 2.15 / 2.05 | = main (pre-existing) |
+| `text-streak` on `paper-dark` / `ink` | dark | 8.31 / 6.81 | 8.87 / 7.27 | **8.31 / 6.81** | 4.5 |
+| `text-alert` on `paper-dark` (bare) | dark | 4.74 | 5.80 | **4.74** | 4.5 |
+| `text-alert` on `alert/10` over white · `paper` · `ink` · `paper-dark` | both | 3.29 · 3.17 · 3.56 · 4.35 | 2.74 · 2.64 · 4.25 · 5.20 | = main | = main (pre-existing) |
+
+- **Why pin rather than re-hue.** Pinning `alert` is the only choice that does not regress the light error text (`ember` on the `alert/10` tint is 2.74 < 3.29). Pinning `streak` keeps the light streak pill at `main`'s value (`torch` would give 2.01 < 2.15). Pinning `mute` restores light AA across its 19 uses. The dark `mute` value falls back from the branch's 5.05 to `main`'s 3.75, which is exactly `main`; that is a documented trade, not a regression.
+- **Why `ground-0` and not white on fills.** It is the kit's own pair (RetroButton primary is `bg-growth text-ground-0`). It passes on both hex values of `alert` and in both schemes, because a fill looks the same in either scheme. Hover `/90` stays above the floor over white (growth 12.19, alert 5.79) and over `ink` (growth 9.88). Danger hover over `ink` is 4.47, a hover-only state on revive's dark card; the white-text version on `main` measures 4.36 there, and 3.76 at rest.
+- **Why `ink` for small green text in light.** No kit token gives a green ≥ 4.5:1 on white (`growth-deep` is 4.31). The done state is still carried by the copy ("Xong", "✓ Đã hoàn thành") and by the `growth-deep` `[✓]` glyph beside it.
+- **Kit untouched.** `growth`, `growth-deep`, `ground-0`, `torch`, `ember` keep their hex, and every kit pair in §6 and A2 is unchanged. `components/retro/*` never uses `streak`/`alert`/`mute` classes (guard in A10). `CompanionSprite`/`HpBar` already map the tone *names* straight to `tokens.torch`/`tokens.ember`.
+- **Non-text graphics, accepted until their screen plan:** the v1 progress fills (`bg-growth` against the `mute/20` track: light 1.97 → 1.30, dark 4.67 → 7.10), the selected-option `border-growth` (light 2.54 → 1.67; ContentViewer, GoalCard, onboarding), and the `PlantSvg` `text-growth` fill. The bars carry numeric text, and plans 2–6 replace all three with `HpBar`/`DayBar`/`CompanionSprite`. The evaluator may file the selected-option border as a low bug.
+- **Pending branches** (growth moment, roadmap tree, name-your-plant, streak shield): whichever of each pair merges second applies A8 to its new lines. `text-streak`/`text-alert`/`text-mute` need nothing once the pins land. On roadmap-tree `components/roadmap/RoadmapNode.vue`, the `HÔM NAY` pill at :33 and the button at :45 become `text-ground-0`; the `statusClass` today branch at :12 becomes `text-ink dark:text-growth`, because it is 13 px; and the :22 ring becomes `focus-visible:ring-growth-deep dark:focus-visible:ring-growth`. On roadmap-tree, `components/roadmap/RoadmapMarker.vue:10` becomes `border-growth text-growth-deep dark:text-growth`, because it is a glyph. On growth-moment, `components/plant/GrowthChip.vue:9` becomes `bg-growth/15 text-ink dark:text-growth`: 13.38 light, and 6.21 on `ink` in dark.
+
+### A9. Build contract (line numbers @2e0125c)
+| File:line | Change |
+|---|---|
+| `frontend/tailwind.config.ts:37-42` | `streak: '#F59E0B'`, `alert: '#EF4444'`, `mute: '#64748B'` (move into `v1Only`); comment: "v1-only, pinned to v1 hex (design A8); the kit never uses them; deleted in plan 6" |
+| `frontend/assets/css/main.css:14-15` | `:focus-visible { @apply outline-none ring-2 ring-growth-deep ring-offset-2 }`; inside the existing dark `@media` block (:9) add `:focus-visible { @apply ring-growth }` |
+| `frontend/components/ui/AppButton.vue:16-17` | `primary: 'bg-growth text-ground-0 hover:bg-growth/90'` · `danger: 'bg-alert text-ground-0 hover:bg-alert/90'` |
+| `frontend/components/AppHeader.vue:21` | `text-white` → `text-ground-0` |
+| `frontend/components/quest/QuestRow.vue:13` | `'text-growth'` → `'text-growth-deep dark:text-growth'` (glyph) |
+| `frontend/components/quest/QuestRow.vue:18` | `text-white` → `text-ground-0` |
+| `frontend/components/quest/QuestRow.vue:21` | `'text-growth'` → `'text-ink dark:text-growth'` (14 px) |
+| `frontend/components/roadmap/RoadmapNode.vue:11` | `today: 'border-growth bg-growth text-ground-0 scale-105'` |
+| `frontend/components/ui/SegmentedProgress.vue:24` | `met ? 'text-growth-deep dark:text-growth' : ''` (24 px) |
+| `frontend/pages/index.vue:32` | `text-white` → `text-ground-0` (the inner "Cứu cây ngay" inherits) |
+| `frontend/pages/revive.vue:48` | `text-growth` → `text-growth-deep dark:text-growth` (24 px) |
+| `frontend/pages/revive.vue:74` | `text-white` → `text-ground-0` |
+| `frontend/pages/learn/[id].vue:90` | `text-growth` → `text-ink dark:text-growth` (16 px) |
+| `frontend/tests/unit/tokens.test.ts:41-45` | replace the alias `it` with the A10 v1 block |
+| `frontend/tests/unit/retroRadius.test.ts` | add an `it.each(files)` that fails on `/\b(text|bg|border|fill|ring|outline)-(streak|alert|mute)\b/` |
+
+### A10. `tokens.test.ts` v1 pairs (copy as written; `contrastRatio` is the existing helper)
+- `it('pins the v1-only aliases to their v1 hex (A8)')`: `alert` is `#EF4444`, `streak` is `#F59E0B`, `mute` is `#64748B`. Also `alert !== ember`, `streak !== torch`, `mute !== ink-2`.
+- `it('v1 text pairs meet the A8 floor')`, as a table of `[fg, bg, min, label]`:
+
+| fg | bg | min | scheme · use |
+|---|---|---|---|
+| `ground-0` | `growth` | 4.5 | both · text on the growth fill |
+| `ground-0` | `alert` | 4.5 | both · text on the alert fill |
+| `mute` | `paper` | 4.5 | light · caption on html |
+| `mute` | `#FFFFFF` | 4.5 | light · caption in AppCard |
+| `ink` | `#FFFFFF` | 4.5 | light · small done text |
+| `ink` | `paper` | 4.5 | light · small done text |
+| `growth-deep` | `#FFFFFF` | 3 | light · large green text, glyph, ring |
+| `growth-deep` | `paper` | 3 | light · large green text, glyph, ring |
+| `growth` | `paper-dark` | 4.5 | dark · green text |
+| `growth` | `ink` | 4.5 | dark · green text in AppCard |
+| `streak` | `paper-dark` | 4.5 | dark · streak text |
+| `streak` | `ink` | 4.5 | dark · streak text in AppCard |
+| `alert` | `paper-dark` | 4.5 | dark · bare error text |
+
+- `it('v1 pre-existing sub-AA pairs do not regress below main (A8)')`: `mute` is ≥ 3.7 on `paper-dark` and ≥ 3.0 on `ink`; `streak` is ≥ 2.0 on `#FFFFFF`; `alert` is ≥ 3.7 on `#FFFFFF`. White is a literal, since there is no `white` token.
+
+### A11. SpeechBox under a mid-line OS flip (folds the medium bug)
+- **Behaviour:** if `isReduced` turns `true` while a line is still typing, the whole line appears at once and `settled` fires exactly once. If the line had already settled, nothing happens (no second emit). If `isReduced` turns `false`, nothing happens: the shown line stays whole and the next `line` types normally.
+- **Build:** add `watch(isReduced, (r) => { if (r) revealAll() })` after `SpeechBox.vue:51`. `revealAll` already guards `settled`. Do **not** add `isReduced` to the `line` watch sources, because that would retype the line and emit again. `CompanionSprite`'s `[react, isReduced]` watch stays as it is.
+- **Tests:** follow the medium bug's expected output. The `useReducedMotion` mock returns a shared `ref(false)` that the test flips.
+  - Per consumer (Chest, DayBar, HpBar, QuestNode, SpeechBox, CompanionSprite): mount without `reduced`, flip the ref to `true`, `await nextTick()`, and assert the reduced render.
+  - SpeechBox specifically: flip after 2 characters; the full line shows and there is one `settled`. Flip after settle; still one emit.
+  - A `CompanionSprite` OS-default block: OS `true` gives the hold, then `reacted`. Explicit `reduced=false` gives the animation class.
+  - `StateBlock` error: the panel `style` contains `tokens.ember`, and the empty state's does not.
+
+### A12. Browser reproduction
+Run `nuxi dev` in the worktree with Playwright at 375×812, with no backend and `aelp.auth` seeded (as in the re-review). Stub with `page.route`:
+- `/api/v1/pet/status` → `{stage:'wilted', health_points:0, …}` for the hub banner and the revive alarm;
+- `/api/v1/quests/daily` → one `next` task, for QuestRow "Học";
+- everything else → abort.
+
+For each of `emulateMedia({colorScheme:'light'})` and `'dark'`, read the computed `color` and the first painted ancestor `background-color`, then compute the ratio:
+1. `/login` button: `rgb(11, 10, 31)` on `rgb(61, 225, 176)`, ≥ 11.6. Caption `p.text-mute`: `rgb(100, 116, 139)` on `rgb(248, 250, 252)`, 4.55 (light), or on `rgb(15, 23, 42)`, 3.75 (dark, = main).
+2. `/` avatar and QuestRow "Học": the same pair as 1. Hub banner: `rgb(11, 10, 31)` on `rgb(239, 68, 68)`, ≥ 5.1. AppCard `h2.text-mute` on `rgb(255, 255, 255)` is 4.76 (light), or on `rgb(30, 41, 59)` is 3.07 (dark, = main).
+3. `/revive`: the alarm band has the same pair as the hub banner; the danger AppButton `rgb(11, 10, 31)` on `rgb(239, 68, 68)`.
+4. `/learn/<stubbed id>`: "‹ Quay lại" is `rgb(100, 116, 139)` on `rgb(248, 250, 252)`.
+5. Tab onto the `/login` button. Computed `box-shadow` contains `rgb(23, 138, 105)` in light, and `rgb(61, 225, 176)` in dark.
+
+Screenshots `a2-{login,hub,revive}-{light,dark}-375.png` go in the plan's Notes. No computed `color` of `rgb(255, 255, 255)` may sit on a `growth` or `alert` fill.
+
+## Acceptance (amend 2)
+1. `tailwind.config.ts` has `streak #F59E0B`, `alert #EF4444`, `mute #64748B`; every v2 hex, including `growth #3DE1B0`, is unchanged, and all kit pairs in `tokens.test.ts` still pass.
+2. Every A10 pair passes in `tokens.test.ts`, and the non-regression block passes.
+3. No `text-white` remains on a `bg-growth`/`bg-alert` element under `components/` or `pages/` (`grep -rnE 'bg-(growth|alert)[^/].*text-white' frontend/components frontend/pages` prints nothing).
+4. Every A9 row is applied, and no other page line changes (`git diff --stat` touches only `pages/index.vue`, `pages/revive.vue` and `pages/learn/[id].vue` among pages, and only the listed lines). No copy or layout changes.
+5. `retroRadius.test.ts` also fails on any `streak`/`alert`/`mute` class under `components/retro/`, and passes.
+6. A12 steps 1–5 give the listed computed colours and ratios in both schemes, and the screenshots are in Notes.
+7. SpeechBox: a mid-line flip to reduced reveals the line and emits `settled` once, with no emit after settling (A11). Each of the six consumers has a live-flip test; `CompanionSprite` has the OS-default block; the `StateBlock` error test asserts `tokens.ember`.
+8. `npm run lint`, `typecheck`, `test:unit` and `build` are green, and CI is green on the pushed branch.

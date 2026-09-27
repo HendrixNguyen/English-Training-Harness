@@ -17,12 +17,13 @@ func TestOpenAICompatibleSendsTheSpec62RequestAndReturnsTheFirstChoice(t *testin
 		gotPath, gotAuth = r.URL.Path, r.Header.Get("Authorization")
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &gotBody)
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"{\"cefr_level\":\"B1\"}"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"{\"cefr_level\":\"B1\"}"}}],"usage":{"prompt_tokens":7,"completion_tokens":9,"total_tokens":16}}`))
 	}))
 	defer srv.Close()
 
+	logs := captureLog(t)
 	p := NewOpenAICompatibleProvider(srv.URL+"/v1/", "sk-1", "deepseek-chat", srv.Client())
-	out, err := p.GenerateContent(context.Background(), "SYS", "USR")
+	out, err := p.GenerateContent(withTask(context.Background(), TaskEssayGrading), "SYS", "USR")
 	if err != nil {
 		t.Fatalf("GenerateContent: %v", err)
 	}
@@ -46,6 +47,13 @@ func TestOpenAICompatibleSendsTheSpec62RequestAndReturnsTheFirstChoice(t *testin
 		msgs[1].(map[string]any)["role"] != "user" || msgs[1].(map[string]any)["content"] != "USR" {
 		t.Errorf("messages = %v", msgs)
 	}
+	got := logs.String()
+	if !strings.Contains(got, "openai-compat(deepseek-chat) task=essay_grading ok ") || !strings.Contains(got, "tokens prompt=7 completion=9") {
+		t.Errorf("log missing usage line:\n%s", got)
+	}
+	if strings.Contains(got, "sk-1") {
+		t.Errorf("the API key reached the log:\n%s", got)
+	}
 }
 
 func TestOpenAICompatibleRejectsNon2xxEmptyChoicesAndBadJSON(t *testing.T) {
@@ -57,6 +65,7 @@ func TestOpenAICompatibleRejectsNon2xxEmptyChoicesAndBadJSON(t *testing.T) {
 		"401":           {401, `{"error":{"message":"bad key"}}`, "status 401"},
 		"empty choices": {200, `{"choices":[]}`, "empty"},
 		"not json":      {200, `oops`, "decoding"},
+		"empty content": {200, `{"choices":[{"message":{"content":""}}]}`, "empty"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -76,7 +85,7 @@ func TestOpenAICompatibleRejectsNon2xxEmptyChoicesAndBadJSON(t *testing.T) {
 
 func TestOpenAICompatibleDefaults(t *testing.T) {
 	p := NewOpenAICompatibleProvider("", "k", "", nil)
-	if p.baseURL != DefaultOpenAIBaseURL || p.model != DefaultOpenAIModel || p.client.Timeout != ProviderTimeout {
+	if p.baseURL != DefaultOpenAIBaseURL || p.model != DefaultOpenAIModel || p.client.Timeout != 0 {
 		t.Errorf("defaults = %q %q %v", p.baseURL, p.model, p.client.Timeout)
 	}
 	if DefaultOpenAIBaseURL != "https://api.openai.com/v1" || DefaultDeepSeekBaseURL != "https://api.deepseek.com/v1" {

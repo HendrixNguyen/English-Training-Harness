@@ -19,7 +19,7 @@ Learn English for 30 minutes a day with an AI-built study plan, and keep a virtu
 | `backend/` | A single Go binary (Gin, pgx, go-redis). It serves `/api/v1` and runs the reminder and plant-decay cron in the same process |
 | Data | PostgreSQL is the source of truth; Redis holds sessions, daily counters, rate limits and the push queue |
 | AI | `airouter` sends each task type to the provider that handles it (Gemini, DeepSeek or OpenAI) |
-| Hosting | Railway: two deployables that share no code |
+| Hosting | Two images (`backend/Dockerfile`, `frontend/Dockerfile`), one env contract. Today: API on Railway Free, Postgres on Supabase, Redis on Upstash, PWA on Cloudflare Pages; later: the owner's Dokploy server running `deploy/compose.yml`. Runbook: `deploy/README.md` |
 
 The frontend and backend share no code; they talk only over REST.
 

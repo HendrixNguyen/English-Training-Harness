@@ -20,6 +20,7 @@ func TestKeyBuilders(t *testing.T) {
 		{"ratelimit", AIRateLimitKey(uid), "ratelimit:ai:3f0d1a7e-0000-4000-8000-000000000001"},
 		{"webpush", WebPushDelayQueueKey, "queue:webpush:delay"},
 		{"revive", PetReviveKey(uid), "pet:revive:3f0d1a7e-0000-4000-8000-000000000001"},
+		{"pushfail", PushFailKey("3f0d…0001"), "push:fail:3f0d…0001"},
 	}
 	for _, tt := range tests {
 		if tt.got != tt.want {
@@ -52,6 +53,7 @@ func TestTTLs(t *testing.T) {
 		{"DailyAccumulatedTTL", DailyAccumulatedTTL, 48 * time.Hour},
 		{"AIRateLimitTTL", AIRateLimitTTL, time.Minute},
 		{"PetReviveTTL", PetReviveTTL, 24 * time.Hour},
+		{"PushFailTTL", PushFailTTL, 7 * 24 * time.Hour},
 	}
 	for _, tt := range tests {
 		if tt.got != tt.want {

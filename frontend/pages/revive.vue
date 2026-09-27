@@ -45,7 +45,7 @@ async function revive() {
     <template v-if="passed">
       <AppCard class="mt-4 text-center">
         <PlantSvg :stage="pet.status?.stage ?? 'sprout'" :health="pet.status?.health_points ?? 50" />
-        <p class="mt-3 font-display text-2xl text-growth">
+        <p class="mt-3 font-display text-2xl text-growth-deep dark:text-growth">
           Cây đã hồi sinh!
         </p>
         <p class="text-mute">
@@ -71,8 +71,8 @@ async function revive() {
 
     <!-- Real data, and it says wilted: the only way into the alarm. -->
     <template v-else-if="pet.status">
-      <div class="mt-4 rounded-card bg-alert px-4 py-3 text-center font-semibold uppercase tracking-wide text-white" role="alert">
-        ⚠️ Cây xanh đang bị héo rũ!
+      <div class="mt-4 rounded-card bg-alert px-4 py-3 text-center font-semibold uppercase tracking-wide text-ground-0" role="alert">
+        ⚠️ <span class="normal-case">{{ pet.status.plant_name || 'Cây xanh' }}</span> đang bị héo rũ!
       </div>
 
       <AppCard class="mt-4 text-center">

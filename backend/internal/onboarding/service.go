@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
@@ -15,8 +16,30 @@ import (
 // ErrInvalidRequest wraps every validation failure (400).
 var ErrInvalidRequest = errors.New("onboarding: invalid request")
 
+// ErrAITimeout means an AI call did not finish inside airouter.TaskTimeout.
+// The handler maps it to 504 ai_timeout; a caller's own cancellation is
+// passed through untouched.
+var ErrAITimeout = errors.New("onboarding: AI call timed out")
+
+// ErrNoActiveRoadmap means Regenerate was called by a user who never
+// onboarded (no active roadmap to replace). The handler maps it to 404
+// no_active_roadmap.
+var ErrNoActiveRoadmap = errors.New("onboarding: no active roadmap")
+
+// cefrOrder is the CEFR scale, used by stepAllowed to bound Regenerate's
+// level change to one step either way.
+var cefrOrder = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
+
 // DailyMinutes is the study commitment the roadmap prompt is built for (§1).
 const DailyMinutes = 30
+
+// DefaultPlantName is the name a blank plant_name gets. Decided here, not by
+// the DDL default ('My Green Buddy', spec §3.2 — kept, since it must equal
+// 0001_init), because the product speaks Vietnamese.
+const DefaultPlantName = "Mầm Non"
+
+// MaxPlantNameRunes bounds plant_name after trimming (runes, not bytes).
+const MaxPlantNameRunes = 30
 
 // Service runs the §5.1 steps 4-5 flow. The request/response DTOs and the
 // Pet/Generator seams are in types.go.
@@ -39,7 +62,8 @@ func NewService(repo Repo, quiz QuizStore, limiter airouter.RateLimiter, ai Gene
 
 // Assess validates, short-circuits when a roadmap is already active, then
 // grades, generates and persists — both AI calls before any write, so a
-// failure writes nothing.
+// failure writes nothing. Each AI call runs under its own airouter.TaskTimeout
+// budget (180 s for the roadmap, 30 s otherwise); a budget hit is ErrAITimeout.
 func (s *Service) Assess(ctx context.Context, userID string, req AssessmentRequest) (AssessmentResult, error) {
 	if err := validate(req); err != nil {
 		return AssessmentResult{}, err
@@ -52,7 +76,9 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		if err != nil {
 			return AssessmentResult{}, err
 		}
-		pet, err := s.pet.Ensure(ctx, userID)
+		// Deliberately no rename: the active-roadmap path writes nothing (see
+		// the inbox bug on re-submits).
+		pet, err := s.pet.Ensure(ctx, userID, "")
 		if err != nil {
 			return AssessmentResult{}, err
 		}
@@ -65,17 +91,28 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		return AssessmentResult{}, err
 	}
 
-	if err := s.quiz.StageAnswers(ctx, userID, req.Answers, store.PlacementQuizTTL); err != nil {
+	// A re-submit with the same answers after a failed roadmap step reuses
+	// the level graded then (it sits in the quiz hash for the TTL).
+	level, err := s.quiz.StagedLevel(ctx, userID, req.Answers)
+	if err != nil {
 		return AssessmentResult{}, err
 	}
-
-	var level string
-	if err := s.routeJSON(ctx, airouter.TaskPlacementTest, PlacementSystemPrompt, PlacementUserPrompt(req.Answers), func(raw string) error {
-		lvl, err := ParsePlacement(raw)
-		level = lvl
-		return err
-	}); err != nil {
-		return AssessmentResult{}, err
+	if level == "" {
+		if err := s.quiz.StageAnswers(ctx, userID, req.Answers, store.PlacementQuizTTL); err != nil {
+			return AssessmentResult{}, err
+		}
+		if err := s.routeJSON(ctx, airouter.TaskPlacementTest, PlacementSystemPrompt, PlacementUserPrompt(req.Answers), func(raw string) error {
+			lvl, err := ParsePlacement(raw)
+			level = lvl
+			return err
+		}); err != nil {
+			return AssessmentResult{}, err
+		}
+		if err := s.quiz.StageLevel(ctx, userID, level, store.PlacementQuizTTL); err != nil {
+			log.Printf("onboarding: staging level for %s: %v", userID, err) // a retry grades again
+		}
+	} else {
+		log.Printf("onboarding: reusing the staged level %s for %s", level, userID)
 	}
 
 	var roadmap airouter.Roadmap
@@ -98,7 +135,7 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		return AssessmentResult{}, err
 	}
 
-	pet, err := s.pet.Ensure(ctx, userID)
+	pet, err := s.pet.Ensure(ctx, userID, plantNameOrDefault(req.PlantName))
 	if err != nil {
 		return AssessmentResult{}, err
 	}
@@ -108,13 +145,81 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 	return AssessmentResult{Status: "success", AssessedLevel: level, RoadmapID: roadmapID, PetState: pet, Created: true}, nil
 }
 
+// Regenerate replaces the caller's active roadmap with a fresh one — at the
+// current CEFR level, or one step up/down — using the same generation path
+// and limiter as Assess. It writes nothing until the roadmap has parsed
+// (ReplaceRoadmap is the only write, one transaction).
+func (s *Service) Regenerate(ctx context.Context, userID string, req RegenerateRequest) (RegenerateResult, error) {
+	if _, ok, err := s.repo.ActiveRoadmapID(ctx, userID); err != nil {
+		return RegenerateResult{}, err
+	} else if !ok {
+		return RegenerateResult{}, ErrNoActiveRoadmap
+	}
+
+	profile, err := s.repo.Profile(ctx, userID)
+	if err != nil {
+		return RegenerateResult{}, err
+	}
+
+	level := req.CEFRLevel
+	if level == "" {
+		level = profile.CEFRCurrent
+	}
+	if !cefrLevels[level] || !stepAllowed(profile.CEFRCurrent, level) {
+		return RegenerateResult{}, fmt.Errorf("%w: cefr_level must be within one step of %s", ErrInvalidRequest, profile.CEFRCurrent)
+	}
+
+	if err := s.limiter.Allow(ctx, userID); err != nil {
+		return RegenerateResult{}, err
+	}
+
+	var roadmap airouter.Roadmap
+	if err := s.routeJSON(ctx, airouter.TaskRoadmapGen, airouter.RoadmapSystemPrompt, airouter.RoadmapUserPrompt(level, profile.TargetGoal, DailyMinutes), func(raw string) error {
+		rm, err := airouter.ParseRoadmap(raw)
+		roadmap = rm
+		return err
+	}); err != nil {
+		return RegenerateResult{}, err
+	}
+
+	roadmapID, err := s.repo.ReplaceRoadmap(ctx, userID, level, roadmap)
+	if err != nil {
+		return RegenerateResult{}, err
+	}
+	log.Printf("onboarding: regenerated roadmap %s for %s at %s", roadmapID, userID, level)
+	return RegenerateResult{Status: "success", AssessedLevel: level, RoadmapID: roadmapID}, nil
+}
+
+// stepAllowed reports whether requested is current or one CEFR step away
+// (A1..C2). Both must be known levels; an unknown level is never allowed.
+func stepAllowed(current, requested string) bool {
+	ci, ri := indexOf(cefrOrder, current), indexOf(cefrOrder, requested)
+	if ci < 0 || ri < 0 {
+		return false
+	}
+	d := ci - ri
+	if d < 0 {
+		d = -d
+	}
+	return d <= 1
+}
+
+func indexOf(levels []string, level string) int {
+	for i, l := range levels {
+		if l == level {
+			return i
+		}
+	}
+	return -1
+}
+
 // routeJSON calls the router and parses; a malformed body is retried once,
 // then reported as ErrBadAIOutput. Provider/router errors are returned as-is
 // (the router has already fallen back across providers).
 func (s *Service) routeJSON(ctx context.Context, task airouter.TaskType, system, user string, parse func(string) error) error {
 	var last error
 	for attempt := 0; attempt < 2; attempt++ {
-		raw, err := s.ai.Route(ctx, task, system, user)
+		raw, err := s.route(ctx, task, system, user)
 		if err != nil {
 			return err
 		}
@@ -131,6 +236,22 @@ func (s *Service) routeJSON(ctx context.Context, task airouter.TaskType, system,
 	return fmt.Errorf("%w: %v", ErrBadAIOutput, last)
 }
 
+// route runs one Route call under the task's own budget (airouter.TaskTimeout:
+// 180 s for the roadmap, 30 s otherwise) and names a deadline of ours
+// ErrAITimeout. If the parent context is done the client is gone, and that
+// error is returned as is.
+func (s *Service) route(ctx context.Context, task airouter.TaskType, system, user string) (string, error) {
+	budget := airouter.TaskTimeout(task)
+	actx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	raw, err := s.ai.Route(actx, task, system, user)
+	if err != nil && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		log.Printf("onboarding: %s did not finish inside %s", task, budget)
+		return "", fmt.Errorf("%w: %s after %s", ErrAITimeout, task, budget)
+	}
+	return raw, err
+}
+
 func validate(req AssessmentRequest) error {
 	goal := strings.TrimSpace(req.TargetGoal)
 	if goal == "" || len(goal) > 255 {
@@ -144,6 +265,9 @@ func validate(req AssessmentRequest) error {
 	}
 	if _, err := time.Parse("15:04:05", req.NotificationTime); err != nil {
 		return fmt.Errorf("%w: notification_time must be HH:MM:SS", ErrInvalidRequest)
+	}
+	if n := utf8.RuneCountInString(strings.TrimSpace(req.PlantName)); n > MaxPlantNameRunes {
+		return fmt.Errorf("%w: plant_name must be at most %d characters", ErrInvalidRequest, MaxPlantNameRunes)
 	}
 	if len(req.Answers) == 0 {
 		return fmt.Errorf("%w: answers must not be empty", ErrInvalidRequest)
@@ -163,4 +287,13 @@ func validate(req AssessmentRequest) error {
 		seen[a.QuestionID] = true
 	}
 	return nil
+}
+
+// plantNameOrDefault trims raw and, if empty, answers DefaultPlantName —
+// the create path's "blank → Mầm Non" rule.
+func plantNameOrDefault(raw string) string {
+	if name := strings.TrimSpace(raw); name != "" {
+		return name
+	}
+	return DefaultPlantName
 }

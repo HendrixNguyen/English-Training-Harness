@@ -102,6 +102,43 @@ describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
     expect(JSON.parse(localStorage.getItem('aelp.settings')!).notificationTime).toBe('20:00')
   })
 
+  it('rejects a plant name that is too long or has symbols inline, and accepts a trimmed plain one', async () => {
+    const w = mountPage()
+    await flushPromises()
+    await click(w, 'IELTS 7.0')
+
+    const start = () => w.findAll('button').find(b => b.text().includes('Bắt đầu bài kiểm tra'))
+    const nameInput = w.find('input[name="plant_name"]')
+
+    await nameInput.setValue('a'.repeat(31))
+    expect(start()?.attributes('disabled')).toBeDefined()
+    expect(w.find('[role="note"]').text()).toContain('Tên cây')
+
+    await nameInput.setValue('Mầm Non!')
+    expect(start()?.attributes('disabled')).toBeDefined()
+    expect(w.find('[role="note"]').text()).toContain('Tên cây')
+
+    await nameInput.setValue('  Mầm Non ')
+    expect(start()?.attributes('disabled')).toBeUndefined()
+    expect(w.find('[role="note"]').exists()).toBe(false)
+
+    await nameInput.setValue('   ')
+    expect(start()?.attributes('disabled')).toBeUndefined()
+    expect(w.find('[role="note"]').exists()).toBe(false)
+  })
+
+  it('sends plant_name trimmed when the learner typed one', async () => {
+    api.post.mockResolvedValue(ASSESSED)
+    const w = mountPage()
+    await flushPromises()
+    await click(w, 'IELTS 7.0')
+    await w.find('input[name="plant_name"]').setValue('  Lá Xanh ')
+    await completeQuiz(w)
+
+    const [, body] = api.post.mock.calls[0] as [string, Record<string, unknown>]
+    expect(body).toMatchObject({ plant_name: 'Lá Xanh' })
+  })
+
   it('names a 429 rate_limited honestly and keeps the learner on the quiz with their answers', async () => {
     api.post.mockRejectedValue(new ApiError(429, 'rate_limited'))
     const w = mountPage()
@@ -157,5 +194,18 @@ describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
     expect(w.find('[role="alert"]').text()).toContain('Máy chủ AI đang bận')
     expect(w.text()).toContain('Câu 10 / 10')
     expect(w.text()).not.toContain('Trình độ của bạn')
+  })
+
+  it('says the grading and roadmap can take a minute or two while the POST is pending', async () => {
+    let finish!: (v: unknown) => void
+    api.post.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const w = mountPage()
+    await flushPromises()
+    await completeQuiz(w)
+    expect(w.text()).toContain('thường mất 1–2 phút')
+    finish(ASSESSED)
+    await flushPromises()
+    expect(w.text()).not.toContain('thường mất 1–2 phút')
+    expect(w.text()).toContain('C1')
   })
 })

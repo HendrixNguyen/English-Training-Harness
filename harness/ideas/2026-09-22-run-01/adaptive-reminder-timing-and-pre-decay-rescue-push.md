@@ -1,9 +1,10 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-22-run-01
 priority: low
+plan: harness/plans/2026-09-27-adaptive-reminder-timing-and-pre-decay-rescue-push.md
 ---
 # Adaptive Reminder Timing and Pre-Decay Rescue Push
 
@@ -39,3 +40,7 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Achievable in one plan?* No. The *Expected output* is two features (a learned reminder time with a nightly median job and a new `reminder_mode`, and an hourly rescue-push job with its own idempotence key), a `users` + `daily_progress` migration, and settings-endpoint changes — at least two plans. *Dependencies not yet built:* no browser has ever subscribed (`push_subscriptions` is empty until the settings screen — `2026-09-24-run-01/settings-screen-…`, selected medium — ships) and the worker only starts with VAPID keys set on Railway, so no user can receive a rescue push today.
 
 *Priority.* Low until the settings screen lands; then plan the rescue push first (it needs only the counter and the existing queue) and the learned time later, as separate plans.
+
+_Evaluator, 2026-09-26 — **deferred** (not planned today)._ The settings screen that creates the first `push_subscriptions` row (`2026-09-24-settings-screen-…`, done) is still not on `origin/main`, so no user can receive a rescue push yet; the slot went to the owner's two high ideas (retro kit, level-true content). Plan the rescue push first once the settings branch has merged.
+
+_Evaluator, 2026-09-27 — daily decide (feature queue, aged selected idea, planned today as **F1** — rescue push half only)._ Checked: `notify.Service.Tick` / `RunWorker` (30 s poll over the ZSET, re-slot-then-send, prune on 404/410/forbidden) and `pet.RunHourly` / `Service.Sweep` (`:00` UTC timer, every pet with `users.timezone` via `SweepCandidates`, the decision made per user in Go) — the rescue job takes pet's hourly shape and notify's send path; `store.DailyAccumulatedKey` + `notify.StudyCounter` (`quests.RedisCounter.Total`, keyed by local date) already give notify the day's seconds without touching quests' key; `push_subscriptions` (§3.2) is notify's own table, so "users with a subscription, by timezone" is one join in a new notify query. Diffed every unmerged `harness/2026-09-24..26-*` branch against `origin/main`: none edits `backend/internal/notify/` or `backend/internal/store/keys.go`; seven edit `cmd/api/main.go` and two add a `0004_*` migration. **Scope decision:** this plan is the rescue push only — a new hourly job in new files (`notify/rescue.go`, `rescue_test.go`) plus one appended key builder (`rescue:{user}:{date}`, SETNX, 48 h) — with the `main.go` wiring gated on the 2026-09-26 daily code PR being on `origin/main`; no migration, no `users.reminder_mode` / `learned_notification_time` / `daily_progress.first_activity_at` columns, no settings-endpoint change — the learned reminder time stays a separate, later plan. Pet health is **dropped from the copy**: notify has no existing interface to pet, and pet's only reader (`Service.Ensure`) also INSERTs the row — restoring `· sức khỏe {health}%` is a follow-up once pet exposes a read-only health method. The idea stays `selected` / `low`; the plan is `draft` for `/approve`.

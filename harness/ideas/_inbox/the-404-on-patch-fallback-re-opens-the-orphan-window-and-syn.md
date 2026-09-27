@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md
 ---
 # The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered
 
@@ -55,3 +56,8 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Fix, when planned.* Correct `Sync`'s doc comment and the CODEMAP bullet to name the residual window, and pin it with `failSaveAt` on a sync that goes through the fallback (asserting the documented outcome). Making the fallback idempotent (a second deterministic id with a persisted generation counter) is more than the branch is worth today.
 
 *Priority.* Low, below the reviewer's medium: the branch needs a manual delete on the user's calendar, Google releasing the reserved id, *and* a `SaveSyncState` failure on the same sync; the user-facing defect is a documentation overclaim first. Plan with the other google test/doc follow-ups (`fakecalendar-returns-the-same-nextid-…`, `practiceeventid-is-a-lossy-filter-…`).
+
+## Evaluation
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Planned — low, auto-approved.** Confirmed on `main`: `google/service.go` `Sync`'s 409 → PATCH 404 fallback inserts with a Google-assigned id before `SaveSyncState`, and both the function doc ("The Calendar half is covered by the deterministic id") and CODEMAP ("a failure never orphans a Google object") overclaim. Decision: document and pin with a test (the idempotent fallback needs a `google_sync` migration, which is out of proportion for a branch that needs a hand-deleted event, a released id and a failed Postgres write together). Touches `service.go` (comments), `service_test.go` and CODEMAP. Existing fakes suffice, so `fakes_test.go` (held by today's 403 branch) is untouched. Plan: `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md`.

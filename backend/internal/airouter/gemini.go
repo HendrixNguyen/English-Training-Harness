@@ -6,32 +6,71 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
-// ProviderTimeout is the §6.2 HTTP client timeout.
-const ProviderTimeout = 30 * time.Second
-
 // Gemini defaults. §6.2's "gemini.api.internal" was a placeholder; this is the
-// real Generative Language API. The model is configurable because names churn.
+// real Generative Language API. The model is configurable (GEMINI_MODEL)
+// because names churn: gemini-2.5-flash answers 404 "no longer available to
+// new users" since 2026-09; Google points at gemini-3.8-flash.
 const (
 	DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com"
-	DefaultGeminiModel   = "gemini-2.5-flash"
+	DefaultGeminiModel   = "gemini-3.8-flash"
+
+	// GeminiMaxOutputTokens sizes the answer for the largest thing we ask for:
+	// a 28-day roadmap, 84 tasks each carrying content (word lists, passages,
+	// questions). Without it the model's default budget truncates long
+	// roadmaps, which ParseRoadmap then rejects as malformed JSON. Current Flash
+	// models accept up to 65536; 32768 leaves headroom for typed content.
+	//
+	// On Flash-class models this budget is shared with thinking: thinking
+	// tokens count against maxOutputTokens, and Flash's default thinking
+	// budget is dynamic (up to ~24k), so without thinkingConfig the visible
+	// JSON answer could shrink to a fraction of 32768 — a truncated roadmap
+	// that ParseRoadmap rejects with no clue why. GeminiThinkingBudget (below)
+	// gives the whole budget to the answer by default.
+	GeminiMaxOutputTokens = 32768
+
+	// DefaultGeminiThinkingBudget is GEMINI_THINKING_BUDGET's default: 0, no
+	// thinking, so the whole GeminiMaxOutputTokens budget goes to the strict
+	// JSON answer this workload needs. -1 asks for Google's dynamic budget; a
+	// positive number is a fixed cap.
+	//
+	// Flash and Flash-Lite models accept thinkingBudget: 0; Pro-class models
+	// reject it with a 400 (they require some minimum, e.g. 128) — an operator
+	// pointing GEMINI_MODEL at a Pro model must also set GEMINI_THINKING_BUDGET
+	// to that model's minimum.
+	//
+	// Contract check (2026-09-27, Google's public Gemini API reference via
+	// context7): the classic generateContent endpoint this package calls
+	// still accepts generationConfig.thinkingConfig.thinkingBudget. Google's
+	// newer Interactions API (v1beta/interactions, gemini-3.x) has moved to a
+	// thinking_level enum (low/medium/high) instead, but its own docs say
+	// "thinking_budget is retained for backward compatibility" on the
+	// endpoints that accept it, and that thinkingBudget/thinkingLevel must
+	// not both be set on one request — so thinkingBudget is kept here rather
+	// than switched to thinkingLevel.
+	DefaultGeminiThinkingBudget = 0
 )
 
 // GeminiProvider calls models/{model}:generateContent in JSON mode.
 type GeminiProvider struct {
-	apiKey  string
-	baseURL string
-	model   string
-	client  *http.Client
+	apiKey         string
+	baseURL        string
+	model          string
+	thinkingBudget int
+	client         *http.Client
 }
 
 // NewGeminiProvider builds a provider. Empty baseURL/model/client take the
-// defaults; tests pass an httptest server URL.
-func NewGeminiProvider(apiKey, baseURL, model string, client *http.Client) *GeminiProvider {
+// defaults; tests pass an httptest server URL. thinkingBudget is sent as
+// generationConfig.thinkingConfig.thinkingBudget (GeminiThinkingBudget /
+// GEMINI_THINKING_BUDGET, config.go) — DefaultGeminiThinkingBudget when the
+// caller does not care.
+func NewGeminiProvider(apiKey, baseURL, model string, thinkingBudget int, client *http.Client) *GeminiProvider {
 	if baseURL == "" {
 		baseURL = DefaultGeminiBaseURL
 	}
@@ -39,9 +78,9 @@ func NewGeminiProvider(apiKey, baseURL, model string, client *http.Client) *Gemi
 		model = DefaultGeminiModel
 	}
 	if client == nil {
-		client = &http.Client{Timeout: ProviderTimeout}
+		client = &http.Client{} // no Timeout: the per-task deadline is in the context (timeouts.go)
 	}
-	return &GeminiProvider{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), model: model, client: client}
+	return &GeminiProvider{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), model: model, thinkingBudget: thinkingBudget, client: client}
 }
 
 func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
@@ -54,9 +93,13 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 		"generationConfig": map[string]any{
 			"response_mime_type": "application/json",
 			"temperature":        0.2,
+			"maxOutputTokens":    GeminiMaxOutputTokens,
+			"thinkingConfig":     map[string]any{"thinkingBudget": g.thinkingBudget},
 		},
 	}
-	body, err := postJSON(ctx, g.client, url, reqBody, map[string]string{"x-goog-api-key": g.apiKey})
+	label := fmt.Sprintf("gemini(%s)", g.model)
+	started := time.Now()
+	body, err := postJSON(ctx, g.client, label, url, reqBody, map[string]string{"x-goog-api-key": g.apiKey})
 	if err != nil {
 		return "", fmt.Errorf("gemini: %w", err)
 	}
@@ -68,27 +111,100 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 					Text string `json:"text"`
 				} `json:"parts"`
 			} `json:"content"`
+			FinishReason string `json:"finishReason"`
 		} `json:"candidates"`
+		UsageMetadata struct {
+			PromptTokenCount     int `json:"promptTokenCount"`
+			CandidatesTokenCount int `json:"candidatesTokenCount"`
+		} `json:"usageMetadata"`
+		PromptFeedback struct {
+			BlockReason string `json:"blockReason"`
+		} `json:"promptFeedback"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", fmt.Errorf("gemini: decoding response: %w", err)
 	}
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
+		if br := parsed.PromptFeedback.BlockReason; br != "" {
+			// The prompt itself was refused: the one fact an operator needs.
+			return "", fmt.Errorf("gemini: empty response: blockReason %s", br)
+		}
 		return "", fmt.Errorf("gemini: empty response")
 	}
-	return parsed.Candidates[0].Content.Parts[0].Text, nil
+	logCall(ctx, label, started, parsed.UsageMetadata.PromptTokenCount, parsed.UsageMetadata.CandidatesTokenCount)
+	// STOP (or absent, on older responses) is the only complete answer. Anything
+	// else — MAX_TOKENS, SAFETY, RECITATION, … — would otherwise surface downstream
+	// as "ParseRoadmap: unexpected end of JSON input" and burn a paid retry.
+	if fr := parsed.Candidates[0].FinishReason; fr != "" && fr != "STOP" {
+		return "", fmt.Errorf("gemini: finishReason %s (answer incomplete or refused)", fr)
+	}
+	var sb strings.Builder
+	for _, part := range parsed.Candidates[0].Content.Parts {
+		sb.WriteString(part.Text)
+	}
+	// A STOP (or absent-finishReason) candidate whose joined text is blank is
+	// not a successful answer — handing "" to ParseRoadmap/ParsePlacement
+	// would surface as an opaque JSON-decode error instead of naming the
+	// provider as the cause, and Route would treat it as success and never
+	// fall back. Checked after the finishReason branch above so a non-STOP
+	// reason (e.g. SAFETY) keeps naming that reason instead.
+	if strings.TrimSpace(sb.String()) == "" {
+		return "", fmt.Errorf("gemini: empty response (finishReason %q)", parsed.Candidates[0].FinishReason)
+	}
+	return sb.String(), nil
+}
+
+// errorBodyChars bounds how much of an upstream error body reaches errors
+// and logs: enough for Google's "model retired" sentence, never a flood.
+const errorBodyChars = 200
+
+// retryBackoff is the pause before the single retry of a 429/502/503/504
+// answer ("Spikes in demand are usually temporary"). A var so tests need not wait.
+var retryBackoff = 2 * time.Second
+
+func retryable(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
 // postJSON is shared by both providers: marshal, POST, require 2xx, return the
-// body. Error bodies are truncated so a verbose upstream cannot flood logs.
-func postJSON(ctx context.Context, client *http.Client, url string, reqBody any, headers map[string]string) ([]byte, error) {
+// body. A retryable status is tried once more after retryBackoff, still under
+// ctx; any other failure is returned with the status and a truncated body.
+// label names the provider and model in log lines and never includes the key.
+func postJSON(ctx context.Context, client *http.Client, label, url string, reqBody any, headers map[string]string) ([]byte, error) {
 	raw, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal: %w", err)
 	}
+	for attempt := 0; ; attempt++ {
+		body, status, err := doJSON(ctx, client, url, raw, headers)
+		if err != nil {
+			return nil, err
+		}
+		if status >= 200 && status <= 299 {
+			return body, nil
+		}
+		upstream := fmt.Errorf("status %d: %s", status, truncate(body, errorBodyChars))
+		if attempt > 0 || !retryable(status) {
+			return nil, upstream
+		}
+		log.Printf("airouter: %s: %v; retrying once in %s", label, upstream, retryBackoff)
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("%w while waiting to retry: %v", ctx.Err(), upstream)
+		case <-time.After(retryBackoff):
+		}
+	}
+}
+
+// doJSON is one POST: transport errors are returned, any status is reported.
+func doJSON(ctx context.Context, client *http.Client, url string, raw []byte, headers map[string]string) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
+		return nil, 0, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	for k, v := range headers {
@@ -96,17 +212,19 @@ func postJSON(ctx context.Context, client *http.Client, url string, reqBody any,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http: %w", err)
+		return nil, 0, fmt.Errorf("http: %w", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, 0, fmt.Errorf("read body: %w", err)
 	}
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, truncate(body, 512))
-	}
-	return body, nil
+	return body, resp.StatusCode, nil
+}
+
+// logCall is the one line an operator reads per successful call.
+func logCall(ctx context.Context, label string, started time.Time, promptTokens, completionTokens int) {
+	log.Printf("airouter: %s task=%s ok %.1fs tokens prompt=%d completion=%d", label, taskFrom(ctx), time.Since(started).Seconds(), promptTokens, completionTokens)
 }
 
 func truncate(b []byte, n int) string {

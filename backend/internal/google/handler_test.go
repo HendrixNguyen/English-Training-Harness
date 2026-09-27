@@ -1,11 +1,15 @@
 package google
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -94,5 +98,117 @@ func TestSyncHandlerMapsADeadlineTo502(t *testing.T) {
 	w := post(t, router(h.svc, "u1"))
 	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
 		t.Fatalf("status %d body %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSyncHandlerMapsAnUnconsumed409To502(t *testing.T) {
+	h := newHarness()
+	// A 409 from tasklists.insert is not the Calendar insert's "ours already";
+	// nothing consumes it, so it must read as "Google is being difficult, retry".
+	h.tasks.errs = map[string]error{"InsertTaskList": fmt.Errorf("%w: tasks returned 409", ErrAlreadyExists)}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
+		t.Fatalf("status %d body %s, want 502 google_unavailable (CODEMAP: other Google failures → 502)", w.Code, w.Body.String())
+	}
+}
+
+// TestSyncHandlerMapsA409OnThePatchAfterA409InsertTo502 pins service.go:91-103
+// + handler.go:44 against a refactor: a concurrent sync already owns this
+// user's practice event (our own insert 409s, and the follow-up patch of our
+// own id also 409s — Google is mid-write on the same event), so the insert
+// path must not fall back to a second Google-assigned insert, and the
+// handler must answer 502, not 409 or 500. This passes today.
+func TestSyncHandlerMapsA409OnThePatchAfterA409InsertTo502(t *testing.T) {
+	h := newHarness()
+	conflict := fmt.Errorf("%w: calendar returned 409", ErrAlreadyExists)
+	h.cal.errs = map[string]error{"InsertEvent": conflict, "PatchEvent": conflict}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
+		t.Fatalf("status %d body %s, want 502 google_unavailable", w.Code, w.Body.String())
+	}
+	inserts, patches := 0, 0
+	var patchCall string
+	for _, call := range h.log.calls {
+		switch {
+		case strings.HasPrefix(call, "calendar.InsertEvent("):
+			inserts++
+		case strings.HasPrefix(call, "calendar.PatchEvent("):
+			patches++
+			patchCall = call
+		case strings.HasPrefix(call, "tasks."):
+			t.Fatalf("no Tasks call must happen once the Calendar half fails: %q", call)
+		case strings.HasPrefix(call, "repo.SaveSyncState("):
+			t.Fatalf("no SaveSyncState must happen once the Calendar half fails: %q", call)
+		}
+	}
+	if inserts != 1 || patches != 1 {
+		t.Fatalf("calls = %v, want exactly one InsertEvent and one PatchEvent", h.log.calls)
+	}
+	if !strings.HasSuffix(patchCall, ","+PracticeEventID("u1")+")") {
+		t.Fatalf("patch call = %q, want it to target PracticeEventID(u1) = %q", patchCall, PracticeEventID("u1"))
+	}
+}
+
+// captureLog routes the stdlib logger into a buffer for one test.
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	return &buf
+}
+
+func TestSyncHandlerLogsTheFailureServerSideOnly(t *testing.T) {
+	buf := captureLog(t)
+	h := newHarness()
+	h.oauth.err = &UpstreamError{Service: "oauth", Status: 503, Body: `{"error":"backend_error"}`}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
+		t.Fatalf("client body must stay opaque: %d %s", w.Code, w.Body)
+	}
+	got := buf.String()
+	for _, want := range []string{"google: sync", "user=u1", "oauth", "503", "backend_error"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("log %q missing %q", got, want)
+		}
+	}
+	// The refresh token the harness hands out and the derived access token
+	// must never be written — they are never in an error value; keep it so.
+	for _, secret := range []string{"1//refresh", "access-for-"} {
+		if strings.Contains(got, secret) {
+			t.Errorf("log leaks a token: %q", got)
+		}
+	}
+}
+
+func TestSyncHandlerLogsA500WithTheCauseAndTruncatesLongBodies(t *testing.T) {
+	buf := captureLog(t)
+	h := newHarness()
+	h.oauth.err = &UpstreamError{Service: "oauth", Status: 502, Body: strings.Repeat("x", 5000)}
+	post(t, router(h.svc, "u1"))
+	if n := strings.Count(buf.String(), "x"); n > 600 {
+		t.Errorf("log carries %d bytes of upstream body, want it truncated to ~512", n)
+	}
+
+	buf.Reset()
+	h = newHarness()
+	h.repo.errs = map[string]error{"Profile": errors.New("pg: connection reset")}
+	post(t, router(h.svc, "u1"))
+	if !strings.Contains(buf.String(), "connection reset") || !strings.Contains(buf.String(), "user=u1") {
+		t.Errorf("500 path must log the cause: %q", buf.String())
+	}
+}
+
+func TestSyncHandlerLogsSuccessWithoutTokens(t *testing.T) {
+	buf := captureLog(t)
+	h := newHarness()
+	post(t, router(h.svc, "u1"))
+	got := buf.String()
+	if !strings.Contains(got, "user=u1") || !strings.Contains(got, "tasks=28") {
+		t.Errorf("success line missing user/tasks: %q", got)
+	}
+	if strings.Contains(got, "1//refresh") || strings.Contains(got, "access-for-") {
+		t.Errorf("success line leaks a token: %q", got)
 	}
 }

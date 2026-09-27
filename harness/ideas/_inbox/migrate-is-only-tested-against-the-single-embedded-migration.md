@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md: Task 4 tests Migrate over an fstest.MapFS in a new migrate_fs_test.go"
 ---
 # Migrate is only tested against the single embedded migration
 
@@ -52,3 +53,7 @@ minimum:
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low (was medium).** Half overtaken: migration `0002` now exists, so ordering and the skip-applied branch run in the integration suite on every CI push. What remains is unit coverage of the error paths via `fstest.MapFS`. Batch with the 0003 migration plan, which touches `migrations_test.go` anyway.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._
+
+**Folded into `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md`, Task 4.** Checked on `origin/main`: `Migrate(ctx, m Migrator, fsys fs.FS)` already takes an interface and an `fs.FS`, so no seam is needed — the tests run over an `fstest.MapFS` with a package-local recording fake in a **new** `backend/internal/store/migrate_fs_test.go` (never `migrations_test.go`, which two unmerged 2026-09-26 branches rewrite). Coverage carried: filename ordering across three versions, applied-vs-pending, `EnsureVersionTable`/`AppliedVersions` errors applying nothing, a `ReadFile` failure mid-loop returning the partial `applied` slice, the 0001 down file dropping types after tables, plus one small guard the idea implies — a file whose name lacks the `NNNN_` prefix is refused as `store: malformed migration name` instead of being applied under a garbage version.
