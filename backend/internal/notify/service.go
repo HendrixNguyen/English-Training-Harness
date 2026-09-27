@@ -10,6 +10,11 @@ import (
 // ErrInvalidRequest means the settings body failed validation; nothing was written.
 var ErrInvalidRequest = errors.New("notify: invalid request")
 
+// MaxConsecutiveFailures bounds how many consecutive non-gone send failures
+// a subscription may accrue before Tick prunes it. One attempt per day, so 3
+// is three days broken; a success resets the count to 0.
+const MaxConsecutiveFailures = 3
+
 // StudyCounter is notify's read-only view of the §4 daily:accumulated
 // counter, keyed by the user's LOCAL date. *quests.RedisCounter satisfies it
 // (cmd/api/main.go registers it), so notify never touches quests' key.
@@ -32,7 +37,9 @@ type SettingsResult struct {
 	NextReminderAt   string `json:"next_reminder_at"`
 }
 
-// TickStats is one worker pass, for logs and tests.
+// TickStats is one worker pass, for logs and tests. Pruned counts rows
+// deleted because they are gone (404/410), forbidden (SSRF guard), or failed
+// MaxConsecutiveFailures times in a row.
 type TickStats struct {
 	Due, Sent, Skipped, Pruned, Failed int
 }
@@ -103,9 +110,9 @@ func (s *Service) UpdateSettings(ctx context.Context, userID string, req Setting
 // Tick is one worker pass at now: pop due users, re-slot each for tomorrow
 // FIRST (a crash mid-send then costs one reminder, not one every 30 s), skip
 // those who already met today's target, send to every subscription, prune
-// 404/410 and forbidden-endpoint ones, and drop users with nothing to send
-// to. Per-user failures are collected and returned joined; the pass never
-// stops early.
+// 404/410, forbidden-endpoint, and 3x-consecutively-failed ones, and drop
+// users with nothing to send to. Per-user failures are collected and
+// returned joined; the pass never stops early.
 func (s *Service) Tick(ctx context.Context, now time.Time) (TickStats, error) {
 	var stats TickStats
 	due, err := s.queue.Due(ctx, now, DueBatchSize)
@@ -171,10 +178,24 @@ func (s *Service) Tick(ctx context.Context, now time.Time) (TickStats, error) {
 				errs = append(errs, fmt.Errorf("user %s: %w", userID, err))
 				errs = appendIf(errs, s.repo.DeleteSubscription(ctx, sub.ID))
 			case err != nil:
-				stats.Failed++
-				errs = append(errs, fmt.Errorf("user %s: %w", userID, err))
+				n, cerr := s.queue.RecordFailure(ctx, sub.ID)
+				if cerr != nil {
+					stats.Failed++
+					errs = append(errs, fmt.Errorf("user %s: %w", userID, err), fmt.Errorf("user %s: %w", userID, cerr))
+					continue
+				}
+				if n >= MaxConsecutiveFailures {
+					stats.Pruned++
+					errs = append(errs, fmt.Errorf("user %s: subscription %s pruned after %d consecutive failures: %w", userID, sub.ID, n, err))
+					errs = appendIf(errs, s.repo.DeleteSubscription(ctx, sub.ID))
+					errs = appendIf(errs, s.queue.ClearFailures(ctx, sub.ID))
+				} else {
+					stats.Failed++
+					errs = append(errs, fmt.Errorf("user %s: %w", userID, err))
+				}
 			default:
 				stats.Sent++
+				errs = appendIf(errs, s.queue.ClearFailures(ctx, sub.ID))
 			}
 		}
 	}

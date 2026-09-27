@@ -189,6 +189,33 @@ func TestIntegrationScheduleAndSubscriptionRoundTrip(t *testing.T) {
 	if due, _ = q.Due(ctx, now.Add(3*time.Hour), 100); contains(due, a) {
 		t.Errorf("after Remove a is still there: %v", due)
 	}
+
+	// --- the push:fail failure counter ---
+	const subID = "notify-integration-sub"
+	t.Cleanup(func() { _ = q.ClearFailures(ctx, subID) })
+	for i := int64(1); i <= 3; i++ {
+		got, err := q.RecordFailure(ctx, subID)
+		if err != nil {
+			t.Fatalf("RecordFailure #%d: %v", i, err)
+		}
+		if got != i {
+			t.Errorf("RecordFailure #%d = %d, want %d", i, got, i)
+		}
+	}
+	ttl, err := rdb.Client.TTL(ctx, store.PushFailKey(subID)).Result()
+	if err != nil {
+		t.Fatalf("TTL: %v", err)
+	}
+	if ttl <= 0 || ttl > store.PushFailTTL {
+		t.Errorf("TTL(%s) = %v, want (0, %v]", store.PushFailKey(subID), ttl, store.PushFailTTL)
+	}
+	if err := q.ClearFailures(ctx, subID); err != nil {
+		t.Fatalf("ClearFailures: %v", err)
+	}
+	if got, err := q.RecordFailure(ctx, subID); err != nil || got != 1 {
+		t.Errorf("RecordFailure after clear = %d, %v; want 1, nil", got, err)
+	}
+	_ = q.ClearFailures(ctx, subID)
 }
 
 func contains(ss []string, s string) bool {

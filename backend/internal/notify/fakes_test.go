@@ -87,11 +87,15 @@ func (f *fakeRepo) DeleteSubscription(_ context.Context, id string) error {
 }
 
 type fakeQueue struct {
-	log    *callLog
-	scores map[string]int64 // member → unix score
+	log      *callLog
+	scores   map[string]int64 // member → unix score
+	failures map[string]int64 // subscription id → consecutive failure count
+	failErr  error            // when set, RecordFailure/ClearFailures both fail
 }
 
-func newFakeQueue(log *callLog) *fakeQueue { return &fakeQueue{log: log, scores: map[string]int64{}} }
+func newFakeQueue(log *callLog) *fakeQueue {
+	return &fakeQueue{log: log, scores: map[string]int64{}, failures: map[string]int64{}}
+}
 
 func (f *fakeQueue) Schedule(_ context.Context, userID string, at time.Time) error {
 	f.log.add("queue.Schedule(%s,%s)", userID, at.UTC().Format(time.RFC3339))
@@ -117,6 +121,24 @@ func (f *fakeQueue) Due(_ context.Context, now time.Time, limit int64) ([]string
 func (f *fakeQueue) Remove(_ context.Context, userID string) error {
 	f.log.add("queue.Remove(%s)", userID)
 	delete(f.scores, userID)
+	return nil
+}
+
+func (f *fakeQueue) RecordFailure(_ context.Context, subscriptionID string) (int64, error) {
+	f.log.add("queue.RecordFailure(%s)", subscriptionID)
+	if f.failErr != nil {
+		return 0, f.failErr
+	}
+	f.failures[subscriptionID]++
+	return f.failures[subscriptionID], nil
+}
+
+func (f *fakeQueue) ClearFailures(_ context.Context, subscriptionID string) error {
+	f.log.add("queue.ClearFailures(%s)", subscriptionID)
+	if f.failErr != nil {
+		return f.failErr
+	}
+	delete(f.failures, subscriptionID)
 	return nil
 }
 

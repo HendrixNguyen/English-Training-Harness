@@ -15,8 +15,8 @@ import (
 // bigger backlog simply drains over several ticks.
 const DueBatchSize = 100
 
-// Queue is the §4 queue:webpush:delay ZSET: member = user id, score = the
-// UNIX time of the next reminder. It is persistent (no TTL).
+// Queue is notify's Redis side: the §4 ZSET plus the per-subscription
+// failure counter, so NewService needs no extra wiring.
 type Queue interface {
 	// Schedule sets the user's next send time (ZADD; overwrites the score, so
 	// a user is never in the set twice).
@@ -25,6 +25,13 @@ type Queue interface {
 	Due(ctx context.Context, now time.Time, limit int64) ([]string, error)
 	// Remove drops the user from the set (no subscriptions left, or no user).
 	Remove(ctx context.Context, userID string) error
+	// RecordFailure increments the subscription's consecutive-failure
+	// counter (store.PushFailKey), refreshes its TTL, and returns the new
+	// count.
+	RecordFailure(ctx context.Context, subscriptionID string) (int64, error)
+	// ClearFailures resets the subscription's counter (a successful send, or
+	// the row being pruned).
+	ClearFailures(ctx context.Context, subscriptionID string) error
 }
 
 // RedisQueue is the real Queue.
@@ -55,6 +62,24 @@ func (q *RedisQueue) Due(ctx context.Context, now time.Time, limit int64) ([]str
 func (q *RedisQueue) Remove(ctx context.Context, userID string) error {
 	if err := q.Client.ZRem(ctx, store.WebPushDelayQueueKey, userID).Err(); err != nil {
 		return fmt.Errorf("notify: removing reminder: %w", err)
+	}
+	return nil
+}
+
+func (q *RedisQueue) RecordFailure(ctx context.Context, subscriptionID string) (int64, error) {
+	key := store.PushFailKey(subscriptionID)
+	incr := q.Client.TxPipeline()
+	res := incr.Incr(ctx, key)
+	incr.Expire(ctx, key, store.PushFailTTL)
+	if _, err := incr.Exec(ctx); err != nil {
+		return 0, fmt.Errorf("notify: recording send failure: %w", err)
+	}
+	return res.Val(), nil
+}
+
+func (q *RedisQueue) ClearFailures(ctx context.Context, subscriptionID string) error {
+	if err := q.Client.Del(ctx, store.PushFailKey(subscriptionID)).Err(); err != nil {
+		return fmt.Errorf("notify: clearing send failures: %w", err)
 	}
 	return nil
 }

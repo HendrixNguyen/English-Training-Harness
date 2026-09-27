@@ -259,6 +259,97 @@ func TestTickReportsSendFailuresButContinues(t *testing.T) {
 	}
 }
 
+func TestTickPrunesASubscriptionAfterThreeConsecutiveFailures(t *testing.T) {
+	h := dueHarness()
+	h.sender.fail["https://push.example/ep1"] = true
+
+	for day := 0; day < 2; day++ {
+		stats, err := h.svc.Tick(context.Background(), h.now)
+		if err == nil {
+			t.Fatalf("day %d: expected the failure to be reported", day)
+		}
+		if stats.Failed != 1 || stats.Pruned != 0 {
+			t.Errorf("day %d: stats = %+v, want Failed 1 Pruned 0", day, stats)
+		}
+		if len(h.repo.subs["u1"]) != 2 {
+			t.Errorf("day %d: subs = %+v, want both kept", day, h.repo.subs["u1"])
+		}
+		if got, want := h.queue.failures["s1"], int64(day+1); got != want {
+			t.Errorf("day %d: failures[s1] = %d, want %d", day, got, want)
+		}
+		h.now = h.now.Add(24 * time.Hour)
+	}
+
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if err == nil {
+		t.Fatal("expected the prune to be reported")
+	}
+	if stats.Pruned != 1 || stats.Failed != 0 {
+		t.Errorf("stats = %+v, want Pruned 1 Failed 0", stats)
+	}
+	if subs := h.repo.subs["u1"]; len(subs) != 1 || subs[0].ID != "s2" {
+		t.Errorf("subs after prune = %+v, want only s2", subs)
+	}
+	if _, ok := h.queue.failures["s1"]; ok {
+		t.Error("failures[s1] must be cleared once the row is pruned")
+	}
+}
+
+func TestTickResetsTheFailureCountOnSuccess(t *testing.T) {
+	h := dueHarness()
+	h.sender.fail["https://push.example/ep1"] = true
+	if _, err := h.svc.Tick(context.Background(), h.now); err == nil {
+		t.Fatal("expected a reported failure")
+	}
+	h.now = h.now.Add(24 * time.Hour)
+	if _, err := h.svc.Tick(context.Background(), h.now); err == nil {
+		t.Fatal("expected a reported failure")
+	}
+	if h.queue.failures["s1"] != 2 {
+		t.Fatalf("failures[s1] = %d, want 2", h.queue.failures["s1"])
+	}
+
+	h.now = h.now.Add(24 * time.Hour)
+	delete(h.sender.fail, "https://push.example/ep1")
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if err != nil {
+		t.Fatalf("success tick: %v", err)
+	}
+	if stats.Sent != 2 {
+		t.Errorf("stats = %+v, want both subscriptions sent", stats)
+	}
+	if _, ok := h.queue.failures["s1"]; ok {
+		t.Error("a success must clear the failure counter")
+	}
+
+	// Two more failures after the reset must not prune yet (count restarts at 1).
+	h.now = h.now.Add(24 * time.Hour)
+	h.sender.fail["https://push.example/ep1"] = true
+	h.svc.Tick(context.Background(), h.now)
+	h.now = h.now.Add(24 * time.Hour)
+	stats, _ = h.svc.Tick(context.Background(), h.now)
+	if stats.Pruned != 0 || len(h.repo.subs["u1"]) != 2 {
+		t.Errorf("two failures after a reset must not prune yet: stats = %+v, subs = %+v", stats, h.repo.subs["u1"])
+	}
+}
+
+func TestTickKeepsTheRowWhenTheCounterIsUnavailable(t *testing.T) {
+	h := dueHarness()
+	h.sender.fail["https://push.example/ep1"] = true
+	h.queue.failErr = errors.New("redis down")
+
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if err == nil {
+		t.Fatal("expected the counter error to be reported")
+	}
+	if stats.Failed != 1 || stats.Pruned != 0 {
+		t.Errorf("stats = %+v, want Failed 1 Pruned 0", stats)
+	}
+	if len(h.repo.subs["u1"]) != 2 {
+		t.Error("a counter error must not prune the row")
+	}
+}
+
 func TestTickDropsUsersWithNoSubscriptionsOrNoRow(t *testing.T) {
 	h := dueHarness()
 	h.repo.subs["u1"] = nil
