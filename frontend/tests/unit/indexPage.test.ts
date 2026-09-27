@@ -20,7 +20,7 @@ vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
 
 const { default: IndexPage } = await import('~/pages/index.vue')
 
-const STATUS_BEFORE = { plant_name: 'My Green Buddy', health_points: 80, stage: 'sprout', current_streak: 5, last_practiced_at: '2026-09-24T20:00:00Z' }
+const STATUS_BEFORE = { plant_name: 'My Green Buddy', health_points: 80, stage: 'sprout', current_streak: 5, last_practiced_at: '2026-09-24T20:00:00Z', shields: 0, last_shield_used_on: null }
 const STATUS_AFTER = { ...STATUS_BEFORE, health_points: 100, stage: 'sapling', current_streak: 6 }
 const DAILY_MET = {
   date: '2026-09-25',
