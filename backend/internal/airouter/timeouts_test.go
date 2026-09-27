@@ -56,7 +56,12 @@ func TestTaskTimeoutsMatchTheMeasuredProviders(t *testing.T) {
 	if TaskTimeout(TaskRoadmapGen) < 120*time.Second || TaskTimeout(TaskRoadmapGen) != RoadmapTimeout {
 		t.Errorf("TaskTimeout(roadmap) = %s, want RoadmapTimeout ≥ 120 s", TaskTimeout(TaskRoadmapGen))
 	}
-	for _, task := range []TaskType{TaskPlacementTest, TaskExerciseGen, TaskEssayGrading, TaskType("something_new")} {
+	// TaskExerciseGen is one exercise's typed content (≤ ~1.5k output tokens,
+	// see TestExerciseAnswerFitsTheBudget): 60 s, not the 30 s default.
+	if TaskTimeout(TaskExerciseGen) != 60*time.Second || TaskTimeout(TaskExerciseGen) != ExerciseTimeout {
+		t.Errorf("TaskTimeout(exercise) = %s, want ExerciseTimeout = 60 s", TaskTimeout(TaskExerciseGen))
+	}
+	for _, task := range []TaskType{TaskPlacementTest, TaskEssayGrading, TaskType("something_new")} {
 		if TaskTimeout(task) != 30*time.Second || TaskTimeout(task) != DefaultTaskTimeout {
 			t.Errorf("TaskTimeout(%s) = %s, want 30 s (§6.2)", task, TaskTimeout(task))
 		}
