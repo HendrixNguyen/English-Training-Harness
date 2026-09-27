@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 10:13. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 10:48. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -75,11 +75,7 @@ _none_
 
 ## Approved
 
-- `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
-- `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
-- `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]
-- `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low]
-- `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low]
+_none_
 
 ## Executing
 
@@ -87,16 +83,16 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (unreviewed)
+- `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (unreviewed)
+- `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low] (unreviewed)
 - `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — airouter amend: `TestParseRoadmapRejects` proves the day-sum rule — rows only the day budget can reject, keyed by reason — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md` — Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` — Pages ship is honest: wait for the edge before the smoke check, no `404.html` on Pages so deep links answer 200, and the `/login` return-trip check — Plan [high] (unreviewed)
-- `harness/plans/2026-09-26-caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md` — Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md` — Level-true content: the roadmap prompt carries a CEFR descriptor and the goal's register, and a deterministic placement floor stops a 10/10 learner being graded A2 — Plan [high] (unreviewed)
-- `harness/plans/2026-09-26-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md` — Roadmap regeneration: `POST /api/v1/roadmaps/regenerate` replaces the active roadmap (optionally one CEFR step up or down) so a roadmap stored before the typed-content contract can be re-made — Plan [high] (unreviewed)
-- `harness/plans/2026-09-25-the-documented-set-a-env-export-also-exports-test-database-u.md` — Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-25-task-timer-keeps-counting-through-reloads-and-background-tab.md` — Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan [high] (unreviewed)
 
 ## Failed
 
