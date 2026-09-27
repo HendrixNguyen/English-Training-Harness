@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
@@ -22,6 +23,14 @@ var ErrAITimeout = errors.New("onboarding: AI call timed out")
 
 // DailyMinutes is the study commitment the roadmap prompt is built for (§1).
 const DailyMinutes = 30
+
+// DefaultPlantName is the name a blank plant_name gets. Decided here, not by
+// the DDL default ('My Green Buddy', spec §3.2 — kept, since it must equal
+// 0001_init), because the product speaks Vietnamese.
+const DefaultPlantName = "Mầm Non"
+
+// MaxPlantNameRunes bounds plant_name after trimming (runes, not bytes).
+const MaxPlantNameRunes = 30
 
 // Service runs the §5.1 steps 4-5 flow. The request/response DTOs and the
 // Pet/Generator seams are in types.go.
@@ -58,7 +67,9 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		if err != nil {
 			return AssessmentResult{}, err
 		}
-		pet, err := s.pet.Ensure(ctx, userID)
+		// Deliberately no rename: the active-roadmap path writes nothing (see
+		// the inbox bug on re-submits).
+		pet, err := s.pet.Ensure(ctx, userID, "")
 		if err != nil {
 			return AssessmentResult{}, err
 		}
@@ -115,7 +126,7 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		return AssessmentResult{}, err
 	}
 
-	pet, err := s.pet.Ensure(ctx, userID)
+	pet, err := s.pet.Ensure(ctx, userID, plantNameOrDefault(req.PlantName))
 	if err != nil {
 		return AssessmentResult{}, err
 	}
@@ -178,6 +189,9 @@ func validate(req AssessmentRequest) error {
 	if _, err := time.Parse("15:04:05", req.NotificationTime); err != nil {
 		return fmt.Errorf("%w: notification_time must be HH:MM:SS", ErrInvalidRequest)
 	}
+	if n := utf8.RuneCountInString(strings.TrimSpace(req.PlantName)); n > MaxPlantNameRunes {
+		return fmt.Errorf("%w: plant_name must be at most %d characters", ErrInvalidRequest, MaxPlantNameRunes)
+	}
 	if len(req.Answers) == 0 {
 		return fmt.Errorf("%w: answers must not be empty", ErrInvalidRequest)
 	}
@@ -196,4 +210,13 @@ func validate(req AssessmentRequest) error {
 		seen[a.QuestionID] = true
 	}
 	return nil
+}
+
+// plantNameOrDefault trims raw and, if empty, answers DefaultPlantName —
+// the create path's "blank → Mầm Non" rule.
+func plantNameOrDefault(raw string) string {
+	if name := strings.TrimSpace(raw); name != "" {
+		return name
+	}
+	return DefaultPlantName
 }

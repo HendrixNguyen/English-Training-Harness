@@ -39,9 +39,11 @@ export interface SpeechInput {
   streak?: number
   lastPracticedAt?: string | null
   now?: Date
+  /** Replaces "tớ" in the two lines that address the plant by name (design plant-name §2); blank keeps every line as before. */
+  name?: string
 }
 
-const MET_LINE = 'Cảm ơn bạn, hôm nay tớ đủ nước rồi 🌿'
+const metLine = (name: string) => `Cảm ơn bạn, hôm nay ${name} đủ nước rồi 🌿`
 
 /** Whole days between an ISO timestamp and now; null when absent or unparsable. */
 export function daysSince(iso: string | null | undefined, now: Date = new Date()): number | null {
@@ -53,10 +55,12 @@ export function daysSince(iso: string | null | undefined, now: Date = new Date()
 
 /** One line, first match wins — design growth-moment §4. */
 export function speechLine(o: SpeechInput): string {
+  const name = o.name?.trim() || 'tớ'
+  const Name = name === 'tớ' ? 'Tớ' : name
   if (o.stage === 'wilted' || o.health <= 0) return '…'
   if (o.targetMet) {
     const milestone = o.streak !== undefined && (STREAK_MILESTONES as readonly number[]).includes(o.streak)
-    return milestone ? `${o.streak} ngày liên tiếp! ${MET_LINE}` : MET_LINE
+    return milestone ? `${o.streak} ngày liên tiếp! ${metLine(name)}` : metLine(name)
   }
   const accumulated = o.accumulatedSeconds ?? 0
   if (accumulated > 0) return `Còn ${Math.max(1, Math.ceil((DAILY_TARGET_SECONDS - accumulated) / 60))} phút nữa thôi!`
@@ -67,5 +71,5 @@ export function speechLine(o: SpeechInput): string {
   if (missed !== null && missed >= 1) return 'Hôm qua tớ nhớ bạn… Tưới 10 phút nhé?'
   if (o.health >= 60) return 'Tưới cho tớ 10 phút học đi!'
   if (o.health >= 30) return 'Tớ hơi khát rồi… 10 phút thôi?'
-  return 'Tớ sắp héo mất! Học một chút nhé?'
+  return `${Name} sắp héo mất! Học một chút nhé?`
 }

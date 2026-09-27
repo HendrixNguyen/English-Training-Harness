@@ -28,6 +28,7 @@ const bubble = computed(() => pet.status
       accumulatedSeconds: quest.accumulatedSeconds,
       streak: pet.status.current_streak,
       lastPracticedAt: pet.status.last_practiced_at,
+      name: pet.status.plant_name,
     })
   : '')
 
@@ -47,7 +48,7 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
       to="/revive"
       class="mb-4 flex items-center justify-between rounded-card bg-alert px-4 py-3 font-semibold text-ground-0"
     >
-      <span>⚠️ Cây xanh đang bị héo rũ!</span>
+      <span>⚠️ {{ pet.status?.plant_name || 'Cây xanh' }} đang bị héo rũ!</span>
       <span class="text-sm underline">Cứu cây ngay</span>
     </NuxtLink>
 
@@ -55,6 +56,9 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
       <StateBlock v-if="pet.loading && !pet.status" state="loading" />
       <StateBlock v-else-if="pet.error && !pet.status" state="error" message="Không tải được cây của bạn." action="Thử lại" @action="pet.load()" />
       <template v-else-if="pet.status">
+        <p v-if="pet.status.plant_name" class="text-center font-display text-lg">
+          {{ pet.status.plant_name }}
+        </p>
         <TransitionGroup name="chip" tag="div" class="absolute right-4 top-4 flex flex-col items-end gap-1.5" aria-live="polite">
           <GrowthChip v-for="c in chips" :key="c.tone" :text="c.text" :tone="c.tone" />
         </TransitionGroup>

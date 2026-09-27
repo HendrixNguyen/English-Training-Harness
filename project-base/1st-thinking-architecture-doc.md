@@ -671,7 +671,7 @@ return parsedResp.Choices\[0\].Message.Content, nil
 
 \* \*\*POST /api/v1/auth/google\*\*: OAuth code token swap & JWT issuance.
 
-\* \*\*POST /api/v1/onboarding/assessment\*\*: Submits placement quiz answers, grades level, triggers AI roadmap generation.
+\* \*\*POST /api/v1/onboarding/assessment\*\*: Submits placement quiz answers and an optional plant\_name, grades level, triggers AI roadmap generation.
 
 \* \*\*GET /api/v1/quests/daily\*\*: Fetches current day's 30-minute exercise suite (3x 10-min tasks).
 
