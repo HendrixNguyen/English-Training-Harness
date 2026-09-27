@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 14:05. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 14:16. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,7 +13,8 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/retro-amend-2-test-gaps-dark-focus-ring-cascade-unguarded-sp.md` — Retro amend 2 test gaps: dark focus-ring cascade unguarded, SpeechBox flip-back case asserts no emit count [low]
+- `harness/ideas/_inbox/v1contrast-source-guard-only-scans-class-attributes-so-scrip.md` — v1Contrast source guard only scans class attributes, so script-level class maps can put text-white on a growth fill unnoticed [low]
 
 ## Proposed
 
