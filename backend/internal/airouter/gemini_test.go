@@ -142,12 +142,15 @@ func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 		body   string
 		want   string
 	}{
-		"500":              {500, `{"error":"boom"}`, "status 500"},
-		"429":              {429, `rate`, "status 429"},
-		"empty candidates": {200, `{"candidates":[]}`, "empty"},
-		"empty parts":      {200, `{"candidates":[{"content":{"parts":[]}}]}`, "empty"},
-		"not json":         {200, `<html>`, "decoding"},
-		"prompt blocked":   {200, `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]},"candidates":[]}`, "blockReason SAFETY"},
+		"500":                         {500, `{"error":"boom"}`, "status 500"},
+		"429":                         {429, `rate`, "status 429"},
+		"empty candidates":            {200, `{"candidates":[]}`, "empty"},
+		"empty parts":                 {200, `{"candidates":[{"content":{"parts":[]}}]}`, "empty"},
+		"not json":                    {200, `<html>`, "decoding"},
+		"prompt blocked":              {200, `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]},"candidates":[]}`, "blockReason SAFETY"},
+		"STOP with empty text":        {200, `{"candidates":[{"content":{"parts":[{"text":""}]},"finishReason":"STOP"}]}`, "empty"},
+		"STOP with whitespace only":   {200, `{"candidates":[{"content":{"parts":[{"text":" \n"}]},"finishReason":"STOP"}]}`, "empty"},
+		"no finishReason, empty text": {200, `{"candidates":[{"content":{"parts":[{"text":""}]}}]}`, "empty"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

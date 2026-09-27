@@ -142,6 +142,15 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 	for _, part := range parsed.Candidates[0].Content.Parts {
 		sb.WriteString(part.Text)
 	}
+	// A STOP (or absent-finishReason) candidate whose joined text is blank is
+	// not a successful answer — handing "" to ParseRoadmap/ParsePlacement
+	// would surface as an opaque JSON-decode error instead of naming the
+	// provider as the cause, and Route would treat it as success and never
+	// fall back. Checked after the finishReason branch above so a non-STOP
+	// reason (e.g. SAFETY) keeps naming that reason instead.
+	if strings.TrimSpace(sb.String()) == "" {
+		return "", fmt.Errorf("gemini: empty response (finishReason %q)", parsed.Candidates[0].FinishReason)
+	}
 	return sb.String(), nil
 }
 
