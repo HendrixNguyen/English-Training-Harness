@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -20,12 +21,33 @@ func TestConfigFromEnvReadsTheSpec9VariablesAndDefaults(t *testing.T) {
 		"GEMINI_MODEL":      "gemini-2.5-pro",
 	}))
 	want := Config{
-		GeminiAPIKey: "g", GeminiBaseURL: DefaultGeminiBaseURL, GeminiModel: "gemini-2.5-pro",
+		GeminiAPIKey: "g", GeminiBaseURL: DefaultGeminiBaseURL, GeminiModel: "gemini-2.5-pro", GeminiThinkingBudget: 0,
 		OpenAIAPIKey: "o", OpenAIBaseURL: DefaultOpenAIBaseURL, OpenAIModel: DefaultOpenAIModel,
 		DeepSeekAPIKey: "d", DeepSeekBaseURL: "http://ds.local/v1", DeepSeekModel: DefaultDeepSeekModel,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("ConfigFromEnv =\n%+v\nwant\n%+v", cfg, want)
+	}
+}
+
+func TestConfigFromEnvReadsTheGeminiThinkingBudget(t *testing.T) {
+	cases := []struct {
+		env  string
+		want int
+	}{
+		{"1024", 1024},
+		{"-1", -1},
+		{"abc", 0}, // unparsable falls back to the default and logs
+	}
+	for _, tc := range cases {
+		logs := captureLog(t)
+		cfg := ConfigFromEnv(lookup(map[string]string{"GEMINI_THINKING_BUDGET": tc.env}))
+		if cfg.GeminiThinkingBudget != tc.want {
+			t.Errorf("GEMINI_THINKING_BUDGET=%q → GeminiThinkingBudget = %d, want %d", tc.env, cfg.GeminiThinkingBudget, tc.want)
+		}
+		if tc.env == "abc" && !strings.Contains(logs.String(), "GEMINI_THINKING_BUDGET") {
+			t.Errorf("expected a log line naming GEMINI_THINKING_BUDGET on a parse error, got:\n%s", logs.String())
+		}
 	}
 }
 

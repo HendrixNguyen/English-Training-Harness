@@ -99,7 +99,7 @@ func TestProvidersObeyTheContextDeadlineNotAClientTimeout(t *testing.T) {
 	defer srv.Close()
 	// nil client → the production default, which must carry no Timeout.
 	providers := map[string]LLMProvider{
-		"gemini": NewGeminiProvider("k", srv.URL, "m", nil),
+		"gemini": NewGeminiProvider("k", srv.URL, "m", DefaultGeminiThinkingBudget, nil),
 		"openai": NewOpenAICompatibleProvider(srv.URL, "k", "m", nil),
 	}
 	for name, p := range providers {
