@@ -145,6 +145,8 @@ def cmd_new_review(a):
         path = pathlib.Path("harness/reviews") / f"{today()}-{slug}-{n}.md"
         n += 1
     fm = {"plan": a.plan, "verdict": a.verdict, "bugs": a.bugs or []}
+    if a.covers:
+        fm["covers"] = a.covers
     body = template("review", title=title, plan=a.plan, branch=pfm.get("branch") or "-", worktree=pfm.get("worktree") or "-")
     code = write(path, fm, body)
     if code == 0:
@@ -419,6 +421,7 @@ def main(argv=None):
     p = sub.add_parser("new-plan"); p.add_argument("--idea", required=True); p.set_defaults(fn=cmd_new_plan)
     p = sub.add_parser("new-review"); p.add_argument("--plan", required=True)
     p.add_argument("--verdict", required=True, choices=["pass", "pass-with-bugs", "fail"]); p.add_argument("--bugs", nargs="*")
+    p.add_argument("--covers", nargs="*")
     p.set_defaults(fn=cmd_new_review)
     p = sub.add_parser("set"); p.add_argument("file"); p.add_argument("pairs", nargs="+"); p.set_defaults(fn=cmd_set)
     p = sub.add_parser("next"); p.add_argument("--stage", required=True, choices=["evaluate", "execute", "review"])

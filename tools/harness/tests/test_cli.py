@@ -296,6 +296,44 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(out, "")
 
+    def test_next_review_honours_a_parent_review_that_covers_the_amend(self):
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Parent", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, parent = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", parent, f"status={st}")
+        _, bug = self.run_cli("new-idea", "--run", run, "--title", "Amend fix", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        self.run_cli("set", bug, "status=selected")
+        _, amend = self.run_cli("new-plan", "--idea", bug)
+        self.run_cli("set", amend, f"amends={parent}")
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", amend, f"status={st}")
+        _, out = self.run_cli("next", "--stage", "review", "--all")
+        self.assertEqual(set(out.splitlines()), {parent, amend})
+        code, rev = self.run_cli("new-review", "--plan", parent, "--verdict", "pass", "--covers", amend)
+        self.assertEqual(code, 0)
+        self.assertEqual(read_fm(rev)["covers"], [amend])
+        _, out = self.run_cli("next", "--stage", "review", "--all")
+        self.assertEqual(out, "")
+
+    def test_next_review_still_queues_an_amend_the_parent_review_does_not_cover(self):
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Parent", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, parent = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", parent, f"status={st}")
+        _, bug = self.run_cli("new-idea", "--run", run, "--title", "Amend fix", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        self.run_cli("set", bug, "status=selected")
+        _, amend = self.run_cli("new-plan", "--idea", bug)
+        self.run_cli("set", amend, f"amends={parent}")
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", amend, f"status={st}")
+        self.run_cli("new-review", "--plan", parent, "--verdict", "pass")
+        _, out = self.run_cli("next", "--stage", "review", "--all")
+        self.assertEqual(out, amend)
+
     def test_stale_worktrees_falls_back_to_the_worktrees_dir_without_git(self):
         self._merged_plan("X", None, ".worktrees/x")
         pathlib.Path(".worktrees/x").mkdir(parents=True)
