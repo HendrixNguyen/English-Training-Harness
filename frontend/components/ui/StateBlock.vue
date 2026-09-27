@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { tokens } from '~/tailwind.config'
 import RetroButton from '~/components/retro/RetroButton.vue'
 import PixelArt from '~/components/retro/PixelArt.vue'
-import { GLYPHS, PALETTE } from '~/utils/pixelArt'
+import { GLYPHS } from '~/utils/pixelArt'
 
 /** Every async region's three states (design §5, kept: props/role="status"
  * unchanged — `revivePage`/`onboardingPage` click `[role="status"] button`). */
@@ -12,12 +11,6 @@ defineProps<{
   action?: string
 }>()
 defineEmits<{ action: [] }>()
-
-function hexPalette(...chars: string[]): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const c of chars) out[c] = (tokens as Record<string, string>)[PALETTE[c]]
-  return out
-}
 </script>
 
 <template>
@@ -31,7 +24,7 @@ function hexPalette(...chars: string[]): Record<string, string> {
   </div>
   <div v-else class="flex flex-col items-start gap-3" role="status">
     <p class="flex items-center gap-2 font-body text-[17px] text-ink-0">
-      <PixelArt v-if="state === 'error'" :rows="GLYPHS.cross" :palette="hexPalette('e')" :size="16" />
+      <PixelArt v-if="state === 'error'" :rows="GLYPHS.cross" :size="16" />
       {{ message }}
     </p>
     <RetroButton v-if="action" :variant="state === 'error' ? 'secondary' : 'primary'" @click="$emit('action')">

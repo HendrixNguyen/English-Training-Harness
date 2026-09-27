@@ -1,23 +1,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { tokens } from '~/tailwind.config'
+import { PALETTE } from '~/utils/pixelArt'
 
 /**
  * One renderer, one test, for every sprite/icon/glyph in the kit (design
- * §4). `rows` are N strings of N chars from `utils/pixelArt.ts`; `.` is
- * transparent and emits no `<rect>`. Fill colours come from CSS variables
- * (`--px-<char>`) set on the `<svg>` from `palette`, so a parent recolours
- * by overriding a variable (see `CompanionSprite`'s health tint).
+ * §4, amend A3). `rows` are N strings of N chars from `utils/pixelArt.ts`;
+ * `.` is transparent and emits no `<rect>`. Fill colours come from CSS
+ * variables (`--px-<char>`) set on the `<svg>`: every char in `PALETTE` is
+ * defined first from its token role, then `palette` overlays any
+ * overrides, so a `<rect>` can never reference an undefined `--px-*`
+ * variable even when a caller passes no palette at all.
  */
 const props = withDefaults(defineProps<{
   rows: string[]
-  palette: Record<string, string>
+  palette?: Partial<Record<string, string>>
   size: number
   label?: string
   /** Internal, additive to the design's documented prop list: lets
    * `CompanionSprite` crop to the 16×16 face region without PixelArt
    * knowing about companions. Defaults to the full `0 0 N N` box. */
   viewBox?: string
-}>(), { label: undefined, viewBox: undefined })
+}>(), { label: undefined, viewBox: undefined, palette: () => ({}) })
 
 const gridSize = computed(() => props.rows.length)
 const snappedSize = computed(() => {
@@ -28,7 +32,8 @@ const box = computed(() => props.viewBox ?? `0 0 ${gridSize.value} ${gridSize.va
 
 const cssVars = computed(() => {
   const out: Record<string, string> = {}
-  for (const [char, color] of Object.entries(props.palette)) out[`--px-${char}`] = color
+  for (const [char, role] of Object.entries(PALETTE)) out[`--px-${char}`] = (tokens as Record<string, string>)[role]
+  for (const [char, color] of Object.entries(props.palette)) if (color) out[`--px-${char}`] = color
   return out
 })
 

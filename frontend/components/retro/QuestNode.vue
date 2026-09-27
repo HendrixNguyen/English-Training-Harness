@@ -20,11 +20,13 @@ const emit = defineEmits<{ enter: [id: string] }>()
 const TASK_GLYPH: Record<string, keyof typeof GLYPHS> = { vocabulary: 'book', reading: 'scroll', practice: 'sword' }
 const taskGlyph = computed(() => TASK_GLYPH[props.task.task_type] ?? 'book')
 
-function hexPalette(...chars: string[]): Record<string, string> {
+/** design A3: locked dims every non-`k` char to `ink-2`, so the icon dims
+ * with the rest of the tile; `k` (the outline) is unchanged. */
+const lockedIconPalette = computed(() => {
   const out: Record<string, string> = {}
-  for (const c of chars) out[c] = (tokens as Record<string, string>)[PALETTE[c]]
+  for (const c of Object.keys(PALETTE)) if (c !== 'k') out[c] = tokens['ink-2']
   return out
-}
+})
 
 const border = computed(() => ({
   done: 'border-line-lit',
@@ -45,7 +47,7 @@ function onClick() {
   <li class="flex flex-col items-center">
     <div class="flex w-full items-center gap-3">
       <span class="w-2 shrink-0" aria-hidden="true">
-        <PixelArt v-if="state === 'current' && !reduced" :rows="GLYPHS.cursor" :palette="hexPalette('l')" :size="16" class="retro-blink" />
+        <PixelArt v-if="state === 'current' && !reduced" :rows="GLYPHS.cursor" :size="16" class="retro-blink" />
       </span>
       <button
         type="button"
@@ -55,12 +57,12 @@ function onClick() {
         :aria-disabled="disabled ? 'true' : undefined"
         @click="onClick"
       >
-        <PixelArt :rows="GLYPHS[taskGlyph]" :palette="hexPalette('k', 'l')" :size="32" />
+        <PixelArt :rows="GLYPHS[taskGlyph]" :palette="state === 'locked' ? lockedIconPalette : undefined" :size="32" />
         <span v-if="state === 'done'" data-glyph="star" class="absolute -right-1 -top-1">
-          <PixelArt :rows="GLYPHS.star" :palette="hexPalette('t', 'T')" :size="16" />
+          <PixelArt :rows="GLYPHS.star" :size="16" />
         </span>
         <span v-if="state === 'locked'" data-glyph="padlock" class="absolute -right-1 -top-1">
-          <PixelArt :rows="GLYPHS.padlock" :palette="hexPalette('k', 'd')" :size="16" />
+          <PixelArt :rows="GLYPHS.padlock" :size="16" />
         </span>
       </button>
       <div class="min-w-0 flex-1">

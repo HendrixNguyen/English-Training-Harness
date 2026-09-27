@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { tokens } from '~/tailwind.config'
-import { GLYPHS, PALETTE } from '~/utils/pixelArt'
+import { GLYPHS } from '~/utils/pixelArt'
 import PixelArt from './PixelArt.vue'
 
 /** World-map tile (design §5). */
@@ -13,12 +12,6 @@ const props = withDefaults(defineProps<{
 }>(), { expanded: undefined })
 
 const emit = defineEmits<{ select: [day: number] }>()
-
-function hexPalette(...chars: string[]): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const c of chars) out[c] = (tokens as Record<string, string>)[PALETTE[c]]
-  return out
-}
 
 const WORD: Record<typeof props.state, string> = {
   cleared: 'đã xong',
@@ -58,11 +51,11 @@ function onClick() {
     <span class="font-display text-xl leading-6">{{ day }}</span>
 
     <span v-if="state === 'cleared'" data-glyph="star" class="absolute -right-1 -top-1">
-      <PixelArt :rows="GLYPHS.star" :palette="hexPalette('t', 'T')" :size="12" />
+      <PixelArt :rows="GLYPHS.star" :size="12" />
     </span>
 
     <span v-if="state === 'missed'" data-glyph="ring" class="absolute -right-1 -top-1">
-      <PixelArt :rows="GLYPHS.ring" :palette="hexPalette('d')" :size="12" />
+      <PixelArt :rows="GLYPHS.ring" :size="12" />
     </span>
 
     <span v-if="state === 'partial'" data-partial-fill class="absolute inset-x-0 bottom-0 h-1/2 bg-growth" aria-hidden="true" />

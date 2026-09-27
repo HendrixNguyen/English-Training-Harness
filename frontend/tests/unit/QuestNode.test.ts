@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import QuestNode from '~/components/retro/QuestNode.vue'
+import { tokens } from '~/tailwind.config'
 import type { QuestTask } from '~/stores/quest'
 
 const task: QuestTask = { id: 't1', task_type: 'vocabulary', title: 'Từ vựng', duration_minutes: 10, is_completed: false, content_json: null }
@@ -35,6 +36,16 @@ describe('QuestNode (design §5)', () => {
     expect(w.find('[data-glyph="padlock"]').exists()).toBe(true)
     expect(w.text()).toContain('Khoá')
     expect(w.find('button').attributes('aria-disabled')).toBe('true')
+  })
+
+  it('locked icon dims every non-k char to ink-2 (design A3); k stays ground-0', () => {
+    const w = mount(QuestNode, { props: { task, index: 0, state: 'locked' } })
+    const style = w.find('button svg').attributes('style') ?? ''
+    expect(style).toContain(`--px-l: ${tokens['ink-2']}`)
+    expect(style).toContain(`--px-i: ${tokens['ink-2']}`)
+    expect(style).toContain(`--px-d: ${tokens['ink-2']}`)
+    expect(style).toContain(`--px-T: ${tokens['ink-2']}`)
+    expect(style).toContain(`--px-k: ${tokens['ground-0']}`)
   })
 
   it('emits enter with the task id for open/current, never for locked/done', async () => {

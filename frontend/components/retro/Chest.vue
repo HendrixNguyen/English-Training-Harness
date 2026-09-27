@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { tokens } from '~/tailwind.config'
-import { GLYPHS, PALETTE } from '~/utils/pixelArt'
+import { GLYPHS } from '~/utils/pixelArt'
 import PixelArt from './PixelArt.vue'
 
 /** Reward reveal (design §5): the closed chest swaps to open (one 200ms
@@ -37,12 +36,6 @@ watch(() => props.open, (open) => {
 }, { immediate: true })
 
 onBeforeUnmount(clearTimer)
-
-function hexPalette(...chars: string[]): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const c of chars) out[c] = (tokens as Record<string, string>)[PALETTE[c]]
-  return out
-}
 </script>
 
 <template>
@@ -51,14 +44,12 @@ function hexPalette(...chars: string[]): Record<string, string> {
       v-if="!revealed"
       data-glyph="chestClosed"
       :rows="GLYPHS.chestClosed"
-      :palette="hexPalette('T', 't', 'k')"
       :size="64"
     />
     <PixelArt
       v-else
       data-glyph="chestOpen"
       :rows="GLYPHS.chestOpen"
-      :palette="hexPalette('T', 't', 'k', 'i')"
       :size="64"
     />
     <ul v-if="revealed" aria-live="polite" class="space-y-1">
