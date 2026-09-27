@@ -12,6 +12,20 @@
     }
   }
   :focus-visible {
-    @apply outline-none ring-2 ring-growth ring-offset-2;
+    @apply outline-none ring-2 ring-growth-deep ring-offset-2;
+  }
+  /*
+   * Cascade note (design A9 deviation): this override must come AFTER the
+   * base `:focus-visible` rule above, not inside the html-only dark block at
+   * :9 — both selectors are plain `:focus-visible` with equal specificity,
+   * so whichever is later in source wins once the media query is active.
+   * Nesting it in the earlier block would make the base `ring-growth-deep`
+   * always win, even in dark mode (verified with `npx tailwindcss` output).
+   * A12/Acceptance item 6 requires the dark ring to compute as `growth`.
+   */
+  @media (prefers-color-scheme: dark) {
+    :focus-visible {
+      @apply ring-growth;
+    }
   }
 }

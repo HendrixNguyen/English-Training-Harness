@@ -13,7 +13,18 @@ const (
 	DaysPerModule      = 7
 	TasksPerDay        = 3
 	DefaultTaskMinutes = 10
-	maxTaskMinutes     = 30
+)
+
+// §6.1 constraint 4: "Each Daily Quest MUST be calculated to take
+// approximately 30 minutes to complete, split into 3 distinct tasks (10 mins
+// each)". "Approximately" is read as ±10 minutes on the day and ±5 on a task;
+// quests hard-codes total_minutes_required: 30 and the pet needs 1800 s, so
+// a day outside this band is a promise the learner cannot keep.
+const (
+	minTaskMinutes = 5
+	maxTaskMinutes = 15
+	minDayMinutes  = 20
+	maxDayMinutes  = 40
 )
 
 // TaskTypes are the §3.2 task_category values in the §6.1 order
@@ -65,10 +76,12 @@ func invalid(format string, args ...any) error {
 
 // ParseRoadmap decodes a model response strictly: no markdown fences or
 // preamble (§6.1 constraint 1), no trailing tokens, exactly 4 modules × 7 days
-// × 3 tasks with the three task types each present once, non-empty task
-// titles, durations within (0, 30] (a missing duration becomes 10), and a
-// valid cefr_level. Unknown extra fields are tolerated. Nothing is stripped or
-// repaired — a non-conforming answer is the caller's cue to retry.
+// × 3 tasks with the three task types each present once, module i declaring
+// week i, non-empty roadmap/module/day/task titles, task durations within
+// 5..15 and each day summing to 20..40 minutes (a missing duration becomes 10
+// before the sum), and a valid cefr_level. Unknown extra fields are
+// tolerated. Nothing is stripped or repaired — a non-conforming answer is the
+// caller's cue to retry.
 func ParseRoadmap(raw string) (Roadmap, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -90,6 +103,9 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 		return Roadmap{}, invalid("trailing content after the JSON object")
 	}
 
+	if strings.TrimSpace(r.Title) == "" {
+		return Roadmap{}, invalid("roadmap has no title")
+	}
 	if !cefrLevels[r.CEFRLevel] {
 		return Roadmap{}, invalid("cefr_level %q is not a CEFR level", r.CEFRLevel)
 	}
@@ -98,15 +114,29 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 	}
 	for mi := range r.Modules {
 		m := &r.Modules[mi]
+		if m.Week != mi+1 {
+			// Exercises() derives day_number from position; a module that says
+			// otherwise would store JSON the frontend renders as one week while
+			// exercises serve another. Reject — the retry gives the model a
+			// checkable instruction; sorting would hide the disagreement.
+			return Roadmap{}, invalid("module %d declares week %d, want %d", mi+1, m.Week, mi+1)
+		}
+		if strings.TrimSpace(m.Title) == "" {
+			return Roadmap{}, invalid("module %d has no title", mi+1)
+		}
 		if len(m.Days) != DaysPerModule {
 			return Roadmap{}, invalid("module %d has %d days, want %d", mi+1, len(m.Days), DaysPerModule)
 		}
 		for di := range m.Days {
 			d := &m.Days[di]
+			if strings.TrimSpace(d.Title) == "" {
+				return Roadmap{}, invalid("module %d day %d has no title", mi+1, di+1)
+			}
 			if len(d.Tasks) != TasksPerDay {
 				return Roadmap{}, invalid("module %d day %d has %d tasks, want %d", mi+1, di+1, len(d.Tasks), TasksPerDay)
 			}
 			seen := map[string]bool{}
+			dayMinutes := 0
 			for ti := range d.Tasks {
 				task := &d.Tasks[ti]
 				if !isTaskType(task.Type) {
@@ -122,9 +152,13 @@ func ParseRoadmap(raw string) (Roadmap, error) {
 				if task.DurationMinutes == 0 {
 					task.DurationMinutes = DefaultTaskMinutes
 				}
-				if task.DurationMinutes < 1 || task.DurationMinutes > maxTaskMinutes {
-					return Roadmap{}, invalid("module %d day %d task %d duration %d is outside 1..%d", mi+1, di+1, ti+1, task.DurationMinutes, maxTaskMinutes)
+				if task.DurationMinutes < minTaskMinutes || task.DurationMinutes > maxTaskMinutes {
+					return Roadmap{}, invalid("module %d day %d task %d duration %d is outside %d..%d", mi+1, di+1, ti+1, task.DurationMinutes, minTaskMinutes, maxTaskMinutes)
 				}
+				dayMinutes += task.DurationMinutes
+			}
+			if dayMinutes < minDayMinutes || dayMinutes > maxDayMinutes {
+				return Roadmap{}, invalid("module %d day %d adds up to %d minutes, want %d..%d (§6.1: approximately 30)", mi+1, di+1, dayMinutes, minDayMinutes, maxDayMinutes)
 			}
 		}
 	}

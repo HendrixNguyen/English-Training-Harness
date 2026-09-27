@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Overtaken: Route applies TaskTimeout (30 s / 180 s roadmap) via ensureDeadline when the caller sets no deadline and the drivers have no client timeout, so one call is bounded by the task budget, not 3 x 30 s"
 ---
 # Route has no overall deadline so one call can take 90 seconds
 
@@ -53,3 +54,5 @@ fakes that never answer, a `Route` on `context.Background()`, and an elapsed tim
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low.** Real: onboarding's handler sets no deadline (`grep -n WithTimeout internal/onboarding/*.go` → none), so a slow-then-failing provider chain can hold the assessment request for 90 s per `Route` call. Failure-path only. A `Router.Timeout` default is a few lines; take it in the same `airouter` plan as the 4xx classification.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Overtaken — rejected.** The merged providertimeout work delivers the Expected output's first option: `router.go:67` wraps every `Route` call in `ensureDeadline` (`timeouts.go:32-37`), which applies `TaskTimeout(task)` — 30 s, 180 s for `roadmap_generation` — whenever the caller passed no deadline, and the drivers' `http.Client` no longer carries a timeout of its own (`gemini.go:49`, `openai.go:40`), so the whole fallback chain is bounded by the task budget, not `3 × 30 s`. `TestRouteGivesTheRoadmapMoreThan30SecondsAndOtherTasksExactly30` pins the bound on a `context.Background()` call; `Route`'s doc comment, `harness/CODEMAP.md` and `CLAUDE.md` state it; `onboarding.route()` additionally sets the budget itself. Nothing remains. (The complementary problem — one hanging provider spending that whole bound — is today's B1.)

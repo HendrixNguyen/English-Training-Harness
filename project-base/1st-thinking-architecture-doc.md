@@ -671,7 +671,9 @@ return parsedResp.Choices\[0\].Message.Content, nil
 
 \* \*\*POST /api/v1/auth/google\*\*: OAuth code token swap & JWT issuance.
 
-\* \*\*POST /api/v1/onboarding/assessment\*\*: Submits placement quiz answers, grades level, triggers AI roadmap generation.
+\* \*\*POST /api/v1/onboarding/assessment\*\*: Submits placement quiz answers and an optional plant\_name, grades level, triggers AI roadmap generation.
+
+\* \*\*POST /api/v1/roadmaps/regenerate\*\* (added 2026-09-26): Replaces the active roadmap with a freshly generated one, at the current CEFR level or one step up/down, in one transaction; the previous roadmap is kept for history.
 
 \* \*\*GET /api/v1/quests/daily\*\*: Fetches current day's 30-minute exercise suite (3x 10-min tasks).
 

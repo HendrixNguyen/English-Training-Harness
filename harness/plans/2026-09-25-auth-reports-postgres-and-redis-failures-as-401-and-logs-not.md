@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/auth-reports-postgres-and-redis-failures-as-401-and-logs-not.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-25-medium-auth-reports-postgres-and-redis-failures-as-401-and-logs-not
 worktree: .worktrees/auth-reports-postgres-and-redis-failures-as-401-and-logs-not
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # auth: a Google rejection is 401, an outage is 5xx, and every failure is logged — Plan
 

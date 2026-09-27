@@ -41,6 +41,15 @@ class ScanTests(unittest.TestCase):
         s = render_state(scan(self.root))
         self.assertIn("beta.md", s)
         self.assertIn("(unreviewed)", s)
+
+    def test_covered_amend_plan_is_not_flagged_unreviewed(self):
+        w(self.root, "harness/plans/2026-09-23-amend.md", PLAN.format(slug="amend", status="done", prio="high", extra="amends: harness/plans/2026-09-22-beta.md\n"))
+        w(self.root, "harness/reviews/2026-09-24-beta.md",
+          "---\nplan: harness/plans/2026-09-22-beta.md\nverdict: pass\nbugs: []\ncovers: [harness/plans/2026-09-23-amend.md]\n---\n# Review\n")
+        s = render_state(scan(self.root))
+        amend_line = next(l for l in s.splitlines() if "amend.md" in l)
+        self.assertNotIn("(unreviewed)", amend_line)
+        self.assertIn("(review: pass)", amend_line)
     def test_render_context_keeps_actionable_sections_and_collapses_history(self):
         codemap = "# CODEMAP\n\n## Backend\n\n- **store** — Postgres + Redis.\n- plain bullet\n"
         s = render_context(scan(self.root), codemap, "Branch: main")

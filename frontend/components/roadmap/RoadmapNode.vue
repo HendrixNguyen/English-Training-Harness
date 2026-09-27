@@ -30,7 +30,7 @@ const statusClass = computed(() => {
         <span class="block text-base font-semibold" :class="titleClass">{{ node.title }}</span>
         <span class="block text-[13px] leading-[18px]" :class="statusClass">{{ statusText(node) }}</span>
       </span>
-      <span v-if="node.state === 'today'" class="shrink-0 rounded-full bg-growth px-2 text-xs text-white">HÔM NAY</span>
+      <span v-if="node.state === 'today'" class="shrink-0 rounded-full bg-growth px-2 text-xs text-ground-0">HÔM NAY</span>
     </button>
     <AppCard v-show="expanded" class="ml-9">
       <ul :aria-label="`Nhiệm vụ ngày ${node.day}`" class="space-y-2">
@@ -42,7 +42,7 @@ const statusClass = computed(() => {
       <NuxtLink
         v-if="node.state === 'today'"
         to="/"
-        class="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn bg-growth px-5 font-semibold text-white hover:bg-growth/90"
+        class="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-btn bg-growth px-5 font-semibold text-ground-0 hover:bg-growth/90"
       >
         Học ngay →
       </NuxtLink>

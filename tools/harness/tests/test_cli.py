@@ -1,5 +1,6 @@
 # tools/harness/tests/test_cli.py
 import os, io, sys, shutil, tempfile, unittest, pathlib, contextlib, time
+from unittest import mock
 from tools.harness import cli
 from tools.harness.frontmatter import split_document, parse
 
@@ -234,6 +235,112 @@ class CliTests(unittest.TestCase):
     def test_state_writes_file(self):
         self.run_cli("state")
         self.assertIn("# Harness state", pathlib.Path("harness/STATE.md").read_text())
+
+    def _merged_plan(self, title, branch, worktree):
+        """A done, merged plan recording `worktree` and, unless branch is None, `branch`."""
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", title, "--type", "bug", "--source", "reviewer")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, plan = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", plan, f"status={st}")
+        pairs = ([f"branch={branch}"] if branch is not None else []) + [f"worktree={worktree}", "merged=true"]
+        self.run_cli("set", plan, *pairs)
+        return plan
+
+    def test_stale_worktrees_finds_merged_branches_anywhere_git_lists_them(self):
+        self._merged_plan("X", "harness/2026-09-20-high-x", ".worktrees/x")
+        fixture = (
+            "worktree /repo\n"
+            "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+            "branch refs/heads/main\n"
+            "\n"
+            "worktree /repo/.claude/worktrees/s1/.worktrees/x\n"
+            "HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+            "branch refs/heads/harness/2026-09-20-high-x\n"
+            "\n"
+            "worktree /repo/.worktrees/y\n"
+            "HEAD cccccccccccccccccccccccccccccccccccccccc\n"
+            "branch refs/heads/harness/2026-09-21-high-y\n"
+            "\n"
+            "worktree /repo/.worktrees/x\n"
+            "HEAD dddddddddddddddddddddddddddddddddddddddd\n"
+            "branch refs/heads/harness/2026-09-26-high-x-again\n"
+            "\n"
+            "worktree /repo/.worktrees/z\n"
+            "HEAD eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\n"
+            "detached\n"
+            "\n"
+        )
+        with mock.patch.object(cli, "_git_worktree_list", return_value=fixture):
+            code, out = self.run_cli("stale-worktrees")
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "/repo/.claude/worktrees/s1/.worktrees/x")
+
+    def test_stale_worktrees_skips_the_main_worktree_and_the_current_checkout(self):
+        branch = "harness/2026-09-20-high-x"
+        self._merged_plan("X", branch, ".worktrees/x")
+        cwd = pathlib.Path.cwd().resolve().as_posix()
+        fixture = (
+            "worktree /repo\n"
+            "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+            f"branch refs/heads/{branch}\n"
+            "\n"
+            f"worktree {cwd}\n"
+            "HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+            f"branch refs/heads/{branch}\n"
+            "\n"
+        )
+        with mock.patch.object(cli, "_git_worktree_list", return_value=fixture):
+            code, out = self.run_cli("stale-worktrees")
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_next_review_honours_a_parent_review_that_covers_the_amend(self):
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Parent", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, parent = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", parent, f"status={st}")
+        _, bug = self.run_cli("new-idea", "--run", run, "--title", "Amend fix", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        self.run_cli("set", bug, "status=selected")
+        _, amend = self.run_cli("new-plan", "--idea", bug)
+        self.run_cli("set", amend, f"amends={parent}")
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", amend, f"status={st}")
+        _, out = self.run_cli("next", "--stage", "review", "--all")
+        self.assertEqual(set(out.splitlines()), {parent, amend})
+        code, rev = self.run_cli("new-review", "--plan", parent, "--verdict", "pass", "--covers", amend)
+        self.assertEqual(code, 0)
+        self.assertEqual(read_fm(rev)["covers"], [amend])
+        _, out = self.run_cli("next", "--stage", "review", "--all")
+        self.assertEqual(out, "")
+
+    def test_next_review_still_queues_an_amend_the_parent_review_does_not_cover(self):
+        _, run = self.run_cli("new-run")
+        _, idea = self.run_cli("new-idea", "--run", run, "--title", "Parent", "--type", "feature", "--source", "ideator")
+        self.run_cli("set", idea, "status=selected", "priority=high")
+        _, parent = self.run_cli("new-plan", "--idea", idea)
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", parent, f"status={st}")
+        _, bug = self.run_cli("new-idea", "--run", run, "--title", "Amend fix", "--type", "bug", "--source", "reviewer", "--priority", "high")
+        self.run_cli("set", bug, "status=selected")
+        _, amend = self.run_cli("new-plan", "--idea", bug)
+        self.run_cli("set", amend, f"amends={parent}")
+        for st in ["approved", "executing", "done"]:
+            self.run_cli("set", amend, f"status={st}")
+        self.run_cli("new-review", "--plan", parent, "--verdict", "pass")
+        _, out = self.run_cli("next", "--stage", "review", "--all")
+        self.assertEqual(out, amend)
+
+    def test_stale_worktrees_falls_back_to_the_worktrees_dir_without_git(self):
+        self._merged_plan("X", None, ".worktrees/x")
+        pathlib.Path(".worktrees/x").mkdir(parents=True)
+        with mock.patch.object(cli, "_git_worktree_list", return_value=None):
+            code, out = self.run_cli("stale-worktrees")
+        self.assertEqual(code, 0)
+        self.assertEqual(out, ".worktrees/x")
 
 if __name__ == "__main__":
     unittest.main()
