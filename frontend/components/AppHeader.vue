@@ -18,7 +18,7 @@ async function signOut() {
     <div class="relative flex items-center gap-3">
       <button
         type="button"
-        class="flex size-10 items-center justify-center rounded-full bg-growth font-semibold text-white"
+        class="flex size-10 items-center justify-center rounded-full bg-growth font-semibold text-ground-0"
         aria-haspopup="menu"
         :aria-expanded="menuOpen"
         aria-label="Tài khoản"

@@ -13,8 +13,8 @@ const classes = computed(() => [
   'inline-flex h-12 items-center justify-center gap-2 rounded-btn px-5 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
   props.block ? 'w-full' : '',
   {
-    primary: 'bg-growth text-white hover:bg-growth/90',
-    danger: 'bg-alert text-white hover:bg-alert/90',
+    primary: 'bg-growth text-ground-0 hover:bg-growth/90',
+    danger: 'bg-alert text-ground-0 hover:bg-alert/90',
     ghost: 'bg-transparent text-ink hover:bg-ink/5 dark:text-paper dark:hover:bg-paper/10',
   }[props.variant],
 ])

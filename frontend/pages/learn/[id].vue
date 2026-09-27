@@ -87,7 +87,7 @@ async function complete() {
           <h2 class="font-display text-2xl">
             {{ task.title }}
           </h2>
-          <p v-if="task.is_completed" class="text-growth">
+          <p v-if="task.is_completed" class="text-ink dark:text-growth">
             ✓ Đã hoàn thành
           </p>
           <p v-else class="text-mute">
