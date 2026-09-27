@@ -38,10 +38,41 @@ describe('design tokens v2 (design §1)', () => {
     expect(tokens['ember-deep']).toBe('#B3261E')
   })
 
-  it('keeps the v1 aliases pointing at their v2 targets', () => {
-    expect(tokens.streak).toBe(tokens.torch)
-    expect(tokens.alert).toBe(tokens.ember)
-    expect(tokens.mute).toBe(tokens['ink-2'])
+  it('pins the v1-only aliases to their v1 hex (A8)', () => {
+    expect(tokens.alert).toBe('#EF4444')
+    expect(tokens.streak).toBe('#F59E0B')
+    expect(tokens.mute).toBe('#64748B')
+    expect(tokens.alert).not.toBe(tokens.ember)
+    expect(tokens.streak).not.toBe(tokens.torch)
+    expect(tokens.mute).not.toBe(tokens['ink-2'])
+  })
+
+  it('v1 text pairs meet the A8 floor', () => {
+    const pairs: [string, string, number, string][] = [
+      [tokens['ground-0'], tokens.growth, 4.5, 'both · text on the growth fill'],
+      [tokens['ground-0'], tokens.alert, 4.5, 'both · text on the alert fill'],
+      [tokens.mute, tokens.paper, 4.5, 'light · caption on html'],
+      [tokens.mute, '#FFFFFF', 4.5, 'light · caption in AppCard'],
+      [tokens.ink, '#FFFFFF', 4.5, 'light · small done text'],
+      [tokens.ink, tokens.paper, 4.5, 'light · small done text'],
+      [tokens['growth-deep'], '#FFFFFF', 3, 'light · large green text, glyph, ring'],
+      [tokens['growth-deep'], tokens.paper, 3, 'light · large green text, glyph, ring'],
+      [tokens.growth, tokens['paper-dark'], 4.5, 'dark · green text'],
+      [tokens.growth, tokens.ink, 4.5, 'dark · green text in AppCard'],
+      [tokens.streak, tokens['paper-dark'], 4.5, 'dark · streak text'],
+      [tokens.streak, tokens.ink, 4.5, 'dark · streak text in AppCard'],
+      [tokens.alert, tokens['paper-dark'], 4.5, 'dark · bare error text'],
+    ]
+    for (const [fg, bg, min, label] of pairs) {
+      expect(contrastRatio(fg, bg), label).toBeGreaterThanOrEqual(min)
+    }
+  })
+
+  it('v1 pre-existing sub-AA pairs do not regress below main (A8)', () => {
+    expect(contrastRatio(tokens.mute, tokens['paper-dark'])).toBeGreaterThanOrEqual(3.7)
+    expect(contrastRatio(tokens.mute, tokens.ink)).toBeGreaterThanOrEqual(3.0)
+    expect(contrastRatio(tokens.streak, '#FFFFFF')).toBeGreaterThanOrEqual(2.0)
+    expect(contrastRatio(tokens.alert, '#FFFFFF')).toBeGreaterThanOrEqual(3.7)
   })
 
   it('keeps the v1-only tokens until plan 6 removes them', () => {

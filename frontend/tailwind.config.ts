@@ -29,17 +29,15 @@ const v1Only = {
   ink: '#1E293B',
   paper: '#F8FAFC',
   'paper-dark': '#0F172A',
+  // v1-only, pinned to v1 hex (design A8); the kit never uses them; deleted in plan 6.
+  streak: '#F59E0B',
+  alert: '#EF4444',
+  mute: '#64748B',
 } as const
 
 export const tokens = {
   ...v2,
   ...v1Only,
-  // v1 aliases (design §1): kept until the last screen migrates, then
-  // deleted in plan 6. Same hex as their v2 target so v1 components pick up
-  // the new hue without a rename.
-  streak: v2.torch,
-  alert: v2.ember,
-  mute: v2['ink-2'],
 } as const
 
 export default {
