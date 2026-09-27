@@ -31,6 +31,26 @@ func (b *budgeted) GenerateContent(ctx context.Context, _, _ string) (string, er
 	return b.out, nil
 }
 
+func TestAttemptBudgetSplitsWhatIsLeftOverTheProvidersLeft(t *testing.T) {
+	cases := []struct {
+		remaining     time.Duration
+		providersLeft int
+		want          time.Duration
+	}{
+		{180 * time.Second, 3, 60 * time.Second},
+		{180 * time.Second, 2, 90 * time.Second},
+		{180 * time.Second, 1, 180 * time.Second},
+		{30 * time.Second, 3, 10 * time.Second},
+		{0, 3, 0},
+		{5 * time.Second, 0, 5 * time.Second},
+	}
+	for _, tc := range cases {
+		if got := attemptBudget(tc.remaining, tc.providersLeft); got != tc.want {
+			t.Errorf("attemptBudget(%s, %d) = %s, want %s", tc.remaining, tc.providersLeft, got, tc.want)
+		}
+	}
+}
+
 func TestTaskTimeoutsMatchTheMeasuredProviders(t *testing.T) {
 	// 2026-09-25 measurements of the §6.1 roadmap: gpt-4o-mini 53 s, deepseek-chat 78 s.
 	if TaskTimeout(TaskRoadmapGen) < 120*time.Second || TaskTimeout(TaskRoadmapGen) != RoadmapTimeout {
