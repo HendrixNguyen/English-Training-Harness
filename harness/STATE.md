@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 10:48. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 12:11. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -34,15 +34,12 @@ _none_
 - `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
 - `harness/ideas/_inbox/a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` — A rejected CacheStorage delete now fails sign-in for a user who is already signed in [low]
 - `harness/ideas/_inbox/a-user-deleted-tasks-list-is-never-rebuilt-and-sync-keeps-an.md` — A user-deleted Tasks list is never rebuilt and sync keeps answering synced with a stale count [low]
-- `harness/ideas/_inbox/a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md` — A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line [medium]
 - `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
-- `harness/ideas/_inbox/codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs [low]
 - `harness/ideas/_inbox/config-gin-mode-validation-is-unreachable-in-the-binary-beca.md` — config GIN_MODE validation is unreachable in the binary because gin init panics first, and its comments claim otherwise [low]
 - `harness/ideas/_inbox/config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` — config.go still says JWT_SECRET is not in the 1st-thinking env list, and boot refusals print config: config: [low]
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/durable-flag-and-live-row-success-tests-leave-updated-at-and.md` — Durable-flag and live-row success tests leave updated_at and the Daily error path unasserted [low]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
-- `harness/ideas/_inbox/integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped [low]
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
 - `harness/ideas/_inbox/no-test-pins-that-login-awaits-signin-s-cache-clear-before-n.md` — No test pins that login awaits signIn's cache clear before navigating to the hub [low]
 - `harness/ideas/_inbox/onboarding-s-invalid-request-copy-asks-the-learner-to-fix-fi.md` — Onboarding's invalid_request copy asks the learner to fix fields the quiz step no longer shows [low]
@@ -54,7 +51,6 @@ _none_
 - `harness/ideas/_inbox/spec-3-2-leaves-user-id-nullable-on-three-child-tables.md` — spec 3.2 leaves user_id nullable on three child tables [low]
 - `harness/ideas/_inbox/store-reset-hard-codes-the-down-migration-list-so-migration-.md` — store reset hard-codes the down-migration list so migration 0003 will silently not roll back [low]
 - `harness/ideas/_inbox/synctimeout-gives-thirty-sequential-google-calls-a-two-secon.md` — SyncTimeout gives thirty sequential Google calls a two-second mean budget and no resumption [low]
-- `harness/ideas/_inbox/the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered [low]
 - `harness/ideas/_inbox/the-api-state-cache-still-has-no-expiry-bound-so-a-stale-res.md` — The api-state cache still has no expiry bound so a stale response can be served indefinitely [low]
 - `harness/ideas/_inbox/the-hourly-sweep-loads-every-pet-in-a-zone-into-memory-and-r.md` — The hourly sweep loads every pet in a zone into memory and reparses tzdata per user [low]
 - `harness/ideas/_inbox/the-sealed-refresh-token-is-not-bound-to-its-users-row-so-a-.md` — The sealed refresh token is not bound to its users row, so a ciphertext can be moved to another account [low]
@@ -75,7 +71,10 @@ _none_
 
 ## Approved
 
-_none_
+- `harness/plans/2026-09-27-a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md` — A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line — Plan [medium]
+- `harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs — Plan [low]
+- `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped — Plan [low]
+- `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low]
 
 ## Executing
 
