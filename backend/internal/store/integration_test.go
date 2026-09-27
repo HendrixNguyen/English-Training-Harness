@@ -48,10 +48,10 @@ func reset(t *testing.T, pg *Postgres) {
 		t.Fatal("reset called without TEST_DATABASE_URL; refusing to drop tables")
 	}
 	ctx := context.Background()
-	// 0003_pet_verdict_dates.up.sql and 0004_pet_shields.up.sql only add
+	// 0003_pet_verdict_dates.up.sql and 0005_pet_shields.up.sql only add
 	// columns to pet_states, so 0001_init's DROP TABLE (which the loop below
 	// still runs) removes them too — unlike 0001/0002's statements, 0003's
-	// and 0004's ALTER TABLE have no "IF EXISTS" on the table itself, so
+	// and 0005's ALTER TABLE have no "IF EXISTS" on the table itself, so
 	// running them here would fail whenever reset() is called against an
 	// already-empty database (its first use in a test binary, or right after
 	// a sibling test's own cleanup).
@@ -80,7 +80,7 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 	if err != nil {
 		t.Fatalf("first Migrate: %v", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_pet_shields"}; !reflect.DeepEqual(first, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls", "0005_pet_shields"}; !reflect.DeepEqual(first, want) {
 		t.Fatalf("first run applied %v, want %v", first, want)
 	}
 
@@ -102,6 +102,61 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 		if !exists {
 			t.Errorf("table %s was not created", table)
 		}
+	}
+}
+
+// TestIntegrationMigrateLeavesNoTableWithoutRLS is the live-database half of
+// the RLS convention: after Migrate, every table in public has RLS enabled
+// (Supabase exposes the whole schema through PostgREST with full
+// anon/authenticated grants, so a table without RLS is world-readable and
+// world-writable through the anon key). It also proves 0004_rls's down file
+// is the exact inverse of its up file.
+func TestIntegrationMigrateLeavesNoTableWithoutRLS(t *testing.T) {
+	pg := requirePostgres(t)
+	reset(t, pg)
+	t.Cleanup(func() { reset(t, pg) })
+
+	ctx := context.Background()
+	if _, err := Migrate(ctx, pg.Migrator(), MigrationsFS); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	withoutRLS := func(t *testing.T) []string {
+		t.Helper()
+		rows, err := pg.Pool.Query(ctx,
+			`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND NOT rowsecurity ORDER BY 1`)
+		if err != nil {
+			t.Fatalf("querying pg_tables: %v", err)
+		}
+		defer rows.Close()
+		var tables []string
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				t.Fatalf("scanning pg_tables row: %v", err)
+			}
+			tables = append(tables, name)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("iterating pg_tables: %v", err)
+		}
+		return tables
+	}
+
+	if got := withoutRLS(t); len(got) != 0 {
+		t.Fatalf("tables without RLS after Migrate: %v, want none", got)
+	}
+
+	// Prove the down file is the exact inverse: run it directly, then every
+	// one of the eight tables it names must show up as RLS-disabled.
+	down := readMigration(t, "0004_rls.down.sql")
+	if _, err := pg.Pool.Exec(ctx, down); err != nil {
+		t.Fatalf("running 0004_rls.down.sql: %v", err)
+	}
+	got := withoutRLS(t)
+	want := []string{"daily_progress", "exercises", "google_sync", "pet_states", "push_subscriptions", "roadmaps", "schema_migrations", "users"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("tables without RLS after running 0004_rls.down.sql: %v, want %v", got, want)
 	}
 }
 
@@ -148,7 +203,7 @@ func TestIntegrationConcurrentMigrateDoesNotRace(t *testing.T) {
 		}
 		total += len(<-applied)
 	}
-	const versions = 4 // 0001_init, 0002_google_sync, 0003_pet_verdict_dates, 0004_pet_shields
+	const versions = 5 // 0001_init, 0002_google_sync, 0003_pet_verdict_dates, 0004_rls, 0005_pet_shields
 	if total != versions {
 		t.Errorf("migrations were applied %d times across %d concurrent callers, want exactly %d", total, n, versions)
 	}

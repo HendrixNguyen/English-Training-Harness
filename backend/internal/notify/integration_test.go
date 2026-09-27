@@ -3,6 +3,7 @@ package notify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -97,6 +98,52 @@ func TestIntegrationScheduleAndSubscriptionRoundTrip(t *testing.T) {
 		t.Errorf("after delete: %d subscriptions, want 0", len(subsB))
 	}
 
+	// --- cap: an 11th distinct endpoint evicts the oldest, keeping 10 ---
+	for i := 1; i <= 11; i++ {
+		s := Subscription{
+			Endpoint: fmt.Sprintf("https://push.example.test/notify-integration/cap-ep%d", i),
+			P256dh:   "BNc5T",
+			Auth:     "aX8v",
+		}
+		if err := repo.SaveSubscription(ctx, a, s); err != nil {
+			t.Fatalf("SaveSubscription cap-ep%d: %v", i, err)
+		}
+	}
+	capSubs, err := repo.Subscriptions(ctx, a)
+	if err != nil {
+		t.Fatalf("Subscriptions(a) after cap: %v", err)
+	}
+	if len(capSubs) != MaxSubscriptionsPerUser {
+		t.Fatalf("len(capSubs) = %d, want %d", len(capSubs), MaxSubscriptionsPerUser)
+	}
+	var sawEp1, sawEp11 bool
+	for _, s := range capSubs {
+		if s.Endpoint == "https://push.example.test/notify-integration/cap-ep1" {
+			sawEp1 = true
+		}
+		if s.Endpoint == "https://push.example.test/notify-integration/cap-ep11" {
+			sawEp11 = true
+		}
+	}
+	if sawEp1 {
+		t.Error("cap-ep1 (oldest) should have been evicted")
+	}
+	if !sawEp11 {
+		t.Error("cap-ep11 (newest) should be present")
+	}
+	// Re-saving an endpoint already held is still a no-op: still 10 rows.
+	if err := repo.SaveSubscription(ctx, a, Subscription{
+		Endpoint: "https://push.example.test/notify-integration/cap-ep11", P256dh: "BNc5T", Auth: "aX8v",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if capSubs, _ = repo.Subscriptions(ctx, a); len(capSubs) != MaxSubscriptionsPerUser {
+		t.Errorf("re-saving cap-ep11: len = %d, want %d", len(capSubs), MaxSubscriptionsPerUser)
+	}
+	for _, s := range capSubs {
+		_ = repo.DeleteSubscription(ctx, s.ID)
+	}
+
 	// --- the ZSET ---
 	q := NewRedisQueue(rdb)
 	t.Cleanup(func() { _ = q.Remove(ctx, a); _ = q.Remove(ctx, b) })
@@ -142,6 +189,33 @@ func TestIntegrationScheduleAndSubscriptionRoundTrip(t *testing.T) {
 	if due, _ = q.Due(ctx, now.Add(3*time.Hour), 100); contains(due, a) {
 		t.Errorf("after Remove a is still there: %v", due)
 	}
+
+	// --- the push:fail failure counter ---
+	const subID = "notify-integration-sub"
+	t.Cleanup(func() { _ = q.ClearFailures(ctx, subID) })
+	for i := int64(1); i <= 3; i++ {
+		got, err := q.RecordFailure(ctx, subID)
+		if err != nil {
+			t.Fatalf("RecordFailure #%d: %v", i, err)
+		}
+		if got != i {
+			t.Errorf("RecordFailure #%d = %d, want %d", i, got, i)
+		}
+	}
+	ttl, err := rdb.Client.TTL(ctx, store.PushFailKey(subID)).Result()
+	if err != nil {
+		t.Fatalf("TTL: %v", err)
+	}
+	if ttl <= 0 || ttl > store.PushFailTTL {
+		t.Errorf("TTL(%s) = %v, want (0, %v]", store.PushFailKey(subID), ttl, store.PushFailTTL)
+	}
+	if err := q.ClearFailures(ctx, subID); err != nil {
+		t.Fatalf("ClearFailures: %v", err)
+	}
+	if got, err := q.RecordFailure(ctx, subID); err != nil || got != 1 {
+		t.Errorf("RecordFailure after clear = %d, %v; want 1, nil", got, err)
+	}
+	_ = q.ClearFailures(ctx, subID)
 }
 
 func contains(ss []string, s string) bool {

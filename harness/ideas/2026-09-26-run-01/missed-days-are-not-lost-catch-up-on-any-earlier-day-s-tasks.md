@@ -1,9 +1,11 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 4
+priority: medium
+plan: harness/plans/2026-09-27-missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md
 ---
 
 ## Why
@@ -27,3 +29,8 @@ Technical (backend `quests`, frontend roadmap + hub):
 - Code: `backend/internal/quests/repo.go:57` ("day_number, or the call is rejected with ErrExerciseNotFound"); `service.go:94,227` (`DayNumber` computed once for both endpoints); CODEMAP `quests` (calendar-day `day_number`, clamp 1..28).
 - Harness context: `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-…` (adds `GET /api/v1/roadmap` with per-day `minutes_spent`/`is_target_met` — the read this idea's entry point uses); `harness/designs/retro-roadmap.md` (world map of 28 nodes); `harness/plans/2026-09-25-task-timer-…` (timers keyed by task id).
 - Research: Duolingo's recovery mechanics (streak repair quiz, "complete three lessons to restore") and their A/B result — D7 retention +14% for a recovery offer — https://making.duolingo.com/how-streaks-keep-duolingo-learners-committed-to-their-language-goals and https://www.digia.tech/post/duolingo-habit-forming-reminders-retention-architecture/
+
+## Evaluation
+_Evaluator, 2026-09-27 — daily decide (feature queue)._ **Select — medium, not planned today.** *Is the Why real?* Yes: `quests/repo.go` rejects any exercise whose `day_number` is not today, so a skipped day's lessons are gone; the recovery mechanic is well evidenced. *One plan?* Yes (backend `?day=N` + relaxed `CheckExercise`, frontend catch-up view), but it needs a design doc on the retro roadmap world map. *Dependencies:* its entry point is the roadmap-tree plan (`GET /api/v1/roadmap`, done, unmerged) and it edits `quests/repo.go`/`service.go` and `stores/quest.ts`, all in flight on unmerged branches. Plan after the 2026-09-26 daily PR merges, designer first.
+
+_Evaluator, 2026-09-27 — 14:00 feature run:_ plan written — `harness/plans/2026-09-27-missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` (draft, medium). Design `harness/designs/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md`; the plan adds the design's `completed_tasks` field to `GET /api/v1/roadmap`. Execution is gated on the 2026-09-26 daily PR and the listed branches being on `origin/main` (the plan's **Depends on** block).

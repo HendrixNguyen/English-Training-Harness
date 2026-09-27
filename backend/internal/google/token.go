@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
+	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/secrets"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -13,6 +15,9 @@ import (
 // pre-encryption plaintext row, a tampered value, another key). Service maps
 // it to ErrReauthRequired: the PWA sends the user back through consent and
 // auth stores a fresh sealed token — the cutover needs no data migration.
+// An unopenable value is logged server-side with the user ID, and the error
+// also wraps the secrets sentinel (ErrNotSealed / ErrOpen) so callers can
+// tell a legacy row or a wrong ENCRYPTION_SECRET_KEY from plain re-consent.
 var ErrNoRefreshToken = errors.New("google: no refresh token on file")
 
 // Opener decrypts what auth sealed (backend spec §7). *secrets.Box satisfies it.
@@ -45,17 +50,24 @@ func (s *PgRefreshTokenSource) RefreshToken(ctx context.Context, userID string) 
 	if err := s.Pool.QueryRow(ctx, refreshTokenSQL, userID).Scan(&stored); err != nil {
 		return "", fmt.Errorf("google: reading refresh token: %w", err)
 	}
-	return openStored(s.opener, stored)
+	return openStored(s.opener, userID, stored)
 }
 
 // openStored maps the raw column to a usable token or ErrNoRefreshToken.
-func openStored(opener Opener, stored string) (string, error) {
+func openStored(opener Opener, userID, stored string) (string, error) {
 	if stored == "" {
 		return "", ErrNoRefreshToken
 	}
 	plain, err := opener.Open(stored)
 	if err != nil {
-		return "", fmt.Errorf("%w: stored value unusable (%v)", ErrNoRefreshToken, err)
+		// secrets' errors are fixed sentinels that never carry the input, so
+		// logging err never logs the stored value.
+		if errors.Is(err, secrets.ErrNotSealed) {
+			log.Printf("google: refresh token for user=%s is a legacy unsealed value; reauth required (%v)", userID, err)
+		} else {
+			log.Printf("google: refresh token for user=%s did not decrypt — check ENCRYPTION_SECRET_KEY if this repeats across users (%v)", userID, err)
+		}
+		return "", fmt.Errorf("%w: stored value unusable: %w", ErrNoRefreshToken, err)
 	}
 	return plain, nil
 }

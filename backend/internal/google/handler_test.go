@@ -112,6 +112,43 @@ func TestSyncHandlerMapsAnUnconsumed409To502(t *testing.T) {
 	}
 }
 
+// TestSyncHandlerMapsA409OnThePatchAfterA409InsertTo502 pins service.go:91-103
+// + handler.go:44 against a refactor: a concurrent sync already owns this
+// user's practice event (our own insert 409s, and the follow-up patch of our
+// own id also 409s — Google is mid-write on the same event), so the insert
+// path must not fall back to a second Google-assigned insert, and the
+// handler must answer 502, not 409 or 500. This passes today.
+func TestSyncHandlerMapsA409OnThePatchAfterA409InsertTo502(t *testing.T) {
+	h := newHarness()
+	conflict := fmt.Errorf("%w: calendar returned 409", ErrAlreadyExists)
+	h.cal.errs = map[string]error{"InsertEvent": conflict, "PatchEvent": conflict}
+	w := post(t, router(h.svc, "u1"))
+	if w.Code != http.StatusBadGateway || w.Body.String() != `{"error":"google_unavailable"}` {
+		t.Fatalf("status %d body %s, want 502 google_unavailable", w.Code, w.Body.String())
+	}
+	inserts, patches := 0, 0
+	var patchCall string
+	for _, call := range h.log.calls {
+		switch {
+		case strings.HasPrefix(call, "calendar.InsertEvent("):
+			inserts++
+		case strings.HasPrefix(call, "calendar.PatchEvent("):
+			patches++
+			patchCall = call
+		case strings.HasPrefix(call, "tasks."):
+			t.Fatalf("no Tasks call must happen once the Calendar half fails: %q", call)
+		case strings.HasPrefix(call, "repo.SaveSyncState("):
+			t.Fatalf("no SaveSyncState must happen once the Calendar half fails: %q", call)
+		}
+	}
+	if inserts != 1 || patches != 1 {
+		t.Fatalf("calls = %v, want exactly one InsertEvent and one PatchEvent", h.log.calls)
+	}
+	if !strings.HasSuffix(patchCall, ","+PracticeEventID("u1")+")") {
+		t.Fatalf("patch call = %q, want it to target PracticeEventID(u1) = %q", patchCall, PracticeEventID("u1"))
+	}
+}
+
 // captureLog routes the stdlib logger into a buffer for one test.
 func captureLog(t *testing.T) *bytes.Buffer {
 	t.Helper()

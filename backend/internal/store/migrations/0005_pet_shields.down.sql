@@ -1,4 +1,4 @@
--- Reverse of 0004_pet_shields.up.sql.
+-- Reverse of 0005_pet_shields.up.sql.
 
 ALTER TABLE pet_states
     DROP COLUMN IF EXISTS shields,

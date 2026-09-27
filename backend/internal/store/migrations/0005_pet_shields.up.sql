@@ -1,4 +1,4 @@
--- Migration 0004 — the streak shield (pet streak shield plan).
+-- Migration 0005 — the streak shield (pet streak shield plan).
 -- shields: how many shields the pet holds, 0..2. saveTargetMetSQL awards one on
 --   every 7th consecutive met day (LEAST(2, …)); penaliseMissSQL spends one in
 --   place of the -30 / streak reset when a judged day was missed.

@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-24-medium-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut
 worktree: .worktrees/parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # ParseRoadmap enforces the 30-minute day, non-empty titles at every level, and `week` = position — Plan
 

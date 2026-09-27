@@ -8,10 +8,12 @@ import (
 
 // AssessmentRequest is the backend spec §6.1 POST /onboarding/assessment body.
 type AssessmentRequest struct {
-	TargetGoal       string   `json:"target_goal"`
-	NotificationTime string   `json:"notification_time"`
-	Timezone         string   `json:"timezone"`
-	Answers          []Answer `json:"answers"`
+	TargetGoal       string `json:"target_goal"`
+	NotificationTime string `json:"notification_time"`
+	Timezone         string `json:"timezone"`
+	// PlantName is optional; trimmed, 1..MaxPlantNameRunes runes, blank → DefaultPlantName.
+	PlantName string   `json:"plant_name"`
+	Answers   []Answer `json:"answers"`
 }
 
 // PetState is the §6.1 pet_state object. onboarding defines its own type and
@@ -22,10 +24,12 @@ type PetState struct {
 	Stage        string `json:"stage"`
 }
 
-// Pet creates the pet_states row idempotently and reports it. Satisfied in
-// cmd/api/main.go by an adapter over *pet.Service.Ensure.
+// Pet creates the pet_states row idempotently and reports it. plantName is
+// the name to create the row with (or rename it to); "" creates the row if
+// missing and never touches an existing name — the re-submit path passes "".
+// Satisfied in cmd/api/main.go by an adapter over *pet.Service.EnsureNamed.
 type Pet interface {
-	Ensure(ctx context.Context, userID string) (PetState, error)
+	Ensure(ctx context.Context, userID, plantName string) (PetState, error)
 }
 
 // Generator is the one airouter method onboarding needs; *airouter.Router
@@ -42,4 +46,18 @@ type AssessmentResult struct {
 	RoadmapID     string   `json:"roadmap_id"`
 	PetState      PetState `json:"pet_state"`
 	Created       bool     `json:"-"`
+}
+
+// RegenerateRequest is the POST /api/v1/roadmaps/regenerate body (backend
+// spec §6.1.3, added by this plan). CEFRLevel is optional; omitted means the
+// current level.
+type RegenerateRequest struct {
+	CEFRLevel string `json:"cefr_level"`
+}
+
+// RegenerateResult is the §6.1.3 response.
+type RegenerateResult struct {
+	Status        string `json:"status"`
+	AssessedLevel string `json:"assessed_level"`
+	RoadmapID     string `json:"roadmap_id"`
 }

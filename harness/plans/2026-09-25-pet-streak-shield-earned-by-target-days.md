@@ -1,9 +1,11 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/pet-streak-shield-earned-by-target-days.md
-status: approved
+status: done
 priority: medium
 merged: false
 design: harness/designs/pet-streak-shield.md
+branch: harness/2026-09-26-medium-pet-streak-shield-earned-by-target-days
+worktree: .worktrees/pet-streak-shield-earned-by-target-days
 ---
 # pet: a streak shield, earned every 7th met day, is spent in place of the miss penalty — Plan
 
@@ -576,3 +578,53 @@ Mutation checks (record the results): (a) in `penaliseMissSQL` change `CASE WHEN
 - **Day 21 with a full rack** shows the earn line although no shield was added (cap). The copy was chosen to be true there ("you hold a shield"); a status field saying "awarded today" would fix the ambiguity properly — an ideator candidate, not this plan.
 - **Sweep leniency and shields.** A day spared by the marker or the Redis counter is still `MarkJudged`, never a spend; a shield is spent only on a genuine miss. Unchanged behaviour, stated for the reviewer.
 - **The seed of a full 7-day cycle** is `current_streak`, which `ApplyMiss` resets on an unshielded miss — so after a real miss the next shield is seven met days away, by design (the idea's "earned only by hitting the target on 7 consecutive days").
+
+## Execution summary
+
+Built on branch `harness/2026-09-26-medium-pet-streak-shield-earned-by-target-days` (worktree `.worktrees/pet-streak-shield-earned-by-target-days`, cut from freshly fetched `origin/main` at `67ad0c0`). All six tasks implemented as specified: migration `0004_pet_shields`, the Go engine (`ApplyTargetMet`/`ApplyMiss`), repo SQL (`saveTargetMetSQL` award, `penaliseMissSQL` spend + `RETURNING`, `PenaliseMiss` tri-return), `Sweep`'s shielded-miss exclusion, the `GET /pet/status` wire fields, the frontend store/helpers/`ShieldRow` component, hub wiring, and `harness/CODEMAP.md`.
+
+**Deviations from the plan (all additive, none changing the design):**
+1. **`backend/internal/store/migrations_test.go` was edited but not named in the plan's File structure table.** `TestMigrateAppliesPendingVersions` hardcodes the applied-version list and went red the moment `0004_pet_shields` existed on disk (a plain fake-migrator unit test, unrelated to the integration test the plan names). Updated its `want` list to include `0004_pet_shields` and added `TestMigration0004AddsPetShields`, mirroring the existing `TestMigration0003AddsPetVerdictDates` pattern exactly. Required for `go test ./...` to pass; not a scope change.
+2. **Migration-number collision risk (flagged per the orchestrator's heads-up).** `harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md` also claims migration `0004`, but it is **not** on `origin/main` (confirmed: `git fetch origin main` shows the highest migration there is `0003_pet_verdict_dates`; that bug plan's `0004` exists only in the orchestrator's local worktree/checkout). This plan's branch was cut from `origin/main` and is safe against that base. If the Supabase-RLS bug plan is executed and pushed before this branch reaches the daily integration branch, the reviewer/orchestrator will need to renumber one of the two `0004_*` migrations (e.g. to `0005`) when merging both into `harness/daily-2026-09-26` — this is a merge-time conflict to resolve by hand, not a defect in either branch individually.
+3. **The plan's `grep -c 'shield' harness/CODEMAP.md` check (expected ≥ 6) cannot be met as literally written.** `harness/CODEMAP.md` puts one entire bullet paragraph per physical line (confirmed: `wc -l` = 46 for the whole file, with the `pet`/`store`/`shell` paragraphs each thousands of characters on a single line), so `grep -c` counts *matching lines*, not occurrences, and is structurally capped at 3 (the `pet`, `store`, `shell` lines) no matter how many times "shield" appears within each. All three Task 6 edits were made exactly as the plan specifies (pet paragraph sentence + field list, store paragraph sentence, shell paragraph's two clauses); the check itself assumes a multi-line-per-bullet format that this file doesn't use. Verified: `grep -c 'shield' harness/CODEMAP.md` → 3 (up from 1, as the plan's own baseline states).
+
+**Verification (from the plan's Verification section, all run from the worktree):**
+```
+env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./internal/pet/ -count=1 -race -v | grep -c '^--- PASS'
+→ 48
+env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./internal/store/ ./internal/pet/ -count=1 -race
+→ ok store, ok pet
+make check (backend)
+→ fmt-check silent, vet silent, ok for every package (cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store) under -race
+grep -c 'RETURNING COALESCE(last_shield_used_on' internal/pet/repo.go → 1
+grep -c 'shields' internal/pet/repo.go → 10
+find internal/store/migrations -name '0004_pet_shields.*.sql' | wc -l → 2
+grep -c '0004_pet_shields' internal/store/integration_test.go → 3
+grep -c 'Added by migration' backend spec → 3
+diff spec-DDL vs migration 0004 → no output (identical)
+grep -c '"shields": 1, "last_shield_used_on": null' backend spec → 1
+frontend: npm run lint && npm run typecheck && npm run test:unit → all clean; 91 tests passed (17 files) — ShieldRow.test.ts 6/6, plant.test.ts 7/7 (incl. 2 new), petStore.test.ts 7/7 (incl. 1 new)
+npm run build → succeeds
+grep -c 'ShieldRow' pages/index.vue → 1
+grep -c 'motion-reduce' components/plant/ShieldRow.vue → 1
+grep -c 'shield' harness/CODEMAP.md → 3 (see deviation 3 above; plan expected ≥6)
+git diff --stat origin/main...HEAD -- harness/ | grep -v CODEMAP → no output
+python3 tools/harness/cli.py validate → exit 0
+```
+Mutation checks: (a) `penaliseMissSQL`/`ApplyMiss` shield-guard mutated (`shields > 0` → `shields > 1`) → `TestApplyMissSpendsAShieldBeforeThePenalty` and `TestSweepSpendsAShieldInsteadOfPenalising` both went red as predicted; reverted, confirmed green again. (b) `speechLine`'s `(o.shields ?? 0) > 0` clause dropped → the `streak: 7, shields: 0` case went red as predicted; reverted, confirmed green again.
+
+**Runtime proof (backend Definition of done, step 8):**
+- Built `go build ./...` (clean) and `go build -o /tmp/streak-shield-api ./cmd/api` (clean).
+- Full test suite from a clean shell, **including integration tests actually executing** (not skipped): started an isolated `docker compose` stack (`COMPOSE_PROJECT_NAME=streak-shield`, Postgres on host port 55614, Redis on 56614, `--wait --wait-timeout 120`), then ran `TEST_DATABASE_URL=postgres://english:english@localhost:55614/english?sslmode=disable TEST_REDIS_URL=redis://localhost:56614/0 env -u DATABASE_URL -u REDIS_URL go test ./... -count=1 -race -p 1` → all 13 packages `ok`, including `internal/store` and `internal/pet` with their integration tests running for real (confirmed with `-run Integration -v -p 1`: `TestIntegrationEnsureCreatesExactlyOnePetRow`, `TestIntegrationVerdictWritesAreConditional` — which contains the plan's new §6 shield-award/spend/cap/fallthrough assertions against a live Postgres — `TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent`, `TestIntegrationConcurrentMigrateDoesNotRace`, `TestIntegrationPetStatesRejectsASecondRowForTheSameUser`, `TestIntegrationRedisRoundTrip` all PASS). `-p 1` is required here per `harness/CODEMAP.md`'s store paragraph (two packages' integration tests share one `TEST_DATABASE_URL`); confirmed the documented race by first running without it (`relation "pet_states" does not exist` from a concurrent `reset()`), then re-ran correctly with `-p 1`.
+- Booted the real API binary against that same live stack on port 8614 (`PORT=8614`, dummy `JWT_SECRET`/`ENCRYPTION_SECRET_KEY`/`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` — Google OAuth itself is out of scope for this plan and never exercised). Boot log confirmed `migrations applied: [0001_init 0002_google_sync 0003_pet_verdict_dates 0004_pet_shields]`.
+- **Exercised one real user path end to end**: inserted a user row directly in the live Postgres, minted a real session JWT via `auth.TokenIssuer.Issue` (a scratch, uncommitted `cmd/` program used only for this proof and deleted afterward) and set the matching `sess:{user_id}:token` key in the live Redis, then:
+  1. `curl -H "Authorization: Bearer <token>" http://localhost:8614/api/v1/pet/status` → `200` with the fresh-pet defaults, `"shields":0,"last_shield_used_on":null}` — the wire contract live end to end.
+  2. Seeded `current_streak=6` directly, then called the real `pet.PgRepo.SaveTargetMet` (production code, not a copy) via another scratch program against the live DB for day 7 → `applied=true streak=7 shields=1 health=100 stage=flowering`; re-curled `/pet/status` → `"current_streak":7,"shields":1,"last_shield_used_on":null` — the award surfaced through the live HTTP endpoint.
+  3. Called the real `pet.PgRepo.PenaliseMiss` for the next day → `applied=true shielded=true streak=7 shields=0 health=100 stage=flowering` (plant untouched, shield spent); re-curled `/pet/status` → `"shields":0,"last_shield_used_on":"2026-09-26"` — the spend surfaced through the live HTTP endpoint too.
+- **Cleanup verified**: killed the API process (`pgrep -fl streak-shield-api` empty afterward), removed the three scratch `cmd/` programs and all temp files (`git status --short` clean before this commit), `make down` for the `streak-shield` compose project (containers removed), and explicitly removed the named volume `streak-shield_postgres_data` since this was a one-off isolated stack (`docker ps -a` / `docker volume ls` both clean of anything `streak-shield`-named afterward).
+
+**Frontend runtime proof:** `npm run build` succeeded (Nuxt client + server + service worker, PWA precache 50 entries); the design's acceptance list (two always-drawn slots, `held`/`spent`/`empty` states, spend caption 0–7 days inclusive, full-rack caption still shown, earn line in the bubble, `motion-reduce` guard, `role="img"` single-sentence `aria-label`) is covered by `ShieldRow.test.ts`'s 6 cases (all pass) and cross-checked against `harness/designs/pet-streak-shield.md` §4.1/§4.2 line by line during implementation; no frontend dev-server boot was needed beyond the build since the feature is a pure Vue component with no new API call (it consumes the already-verified `/pet/status` fields).
+
+**Note for the reviewer:** the UI kit at `harness/UI-KIT.md` is now "v2" (the retro/JRPG restyle), but confirmed via `grep` that the actual frontend code (`tailwind.config.ts`, `HealthBar.vue`, etc.) still uses the v1 tokens (`streak`, `mute`, `growth`, `alert`, `paper`) that `harness/designs/pet-streak-shield.md` was written against — the retro kit is "proposed" pending its own migration plan (UI-KIT.md: "Values become real only through the kit plan that changes `frontend/tailwind.config.ts`"). `ShieldRow.vue` was built against the live v1 tokens to match the current codebase; no design departure.
+
+**CI:** pushed `harness/2026-09-26-medium-pet-streak-shield-earned-by-target-days`; run [36227762960](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36227762960) — **success**, all five jobs green (`backend-unit`, `backend-integration`, `frontend`, `docker-images`, `harness-tooling`).

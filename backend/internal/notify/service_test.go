@@ -2,16 +2,25 @@ package notify
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 )
 
-var validSub = &Subscription{Endpoint: "https://push.example/ep1", P256dh: "BNc5T", Auth: "aX8v"}
+// validSubscription is a subscription with real, decodable key material —
+// what a browser actually sends. Endpoint stays fixed per call site.
+func validSubscription(t *testing.T) *Subscription {
+	t.Helper()
+	p256dh, auth := validKeys(t)
+	return &Subscription{Endpoint: "https://push.example/ep1", P256dh: p256dh, Auth: auth}
+}
 
 func TestUpdateSettingsStoresSubscriptionPreferencesAndSchedulesTonight(t *testing.T) {
 	h := newHarness()
+	validSub := validSubscription(t)
 	res, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
 		NotificationTime: "20:00", Timezone: "Asia/Ho_Chi_Minh", Subscription: validSub,
 	})
@@ -57,12 +66,20 @@ func TestUpdateSettingsWithoutASubscriptionOnlyMovesTheTime(t *testing.T) {
 }
 
 func TestUpdateSettingsRejectsBadInputBeforeWriting(t *testing.T) {
+	validP256dh, validAuth := validKeys(t)
+	rawAuth, err := base64.RawURLEncoding.DecodeString(validAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth15 := base64.RawURLEncoding.EncodeToString(rawAuth[:15])
 	cases := map[string]SettingsRequest{
 		"bad clock":                {NotificationTime: "25:00"},
 		"missing clock":            {NotificationTime: ""},
 		"bad timezone":             {NotificationTime: "20:00", Timezone: "Mars/Olympus"},
 		"subscription no endpoint": {NotificationTime: "20:00", Subscription: &Subscription{P256dh: "x", Auth: "y"}},
 		"subscription no keys":     {NotificationTime: "20:00", Subscription: &Subscription{Endpoint: "https://e"}},
+		"subscription bad p256dh":  {NotificationTime: "20:00", Subscription: &Subscription{Endpoint: "https://push.example/ep-bad-p256dh", P256dh: "BNc5T", Auth: validAuth}},
+		"subscription bad auth":    {NotificationTime: "20:00", Subscription: &Subscription{Endpoint: "https://push.example/ep-bad-auth", P256dh: validP256dh, Auth: auth15}},
 	}
 	for name, req := range cases {
 		h := newHarness()
@@ -81,6 +98,45 @@ func TestUpdateSettingsForAMissingUser(t *testing.T) {
 	_, err := h.svc.UpdateSettings(context.Background(), "ghost", SettingsRequest{NotificationTime: "20:00"})
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("err = %v, want ErrUserNotFound", err)
+	}
+}
+
+func TestUpdateSettingsKeepsAtMostTenSubscriptionsPerUser(t *testing.T) {
+	h := newHarness()
+	p256dh, auth := validKeys(t)
+	for i := 1; i <= 11; i++ {
+		sub := &Subscription{
+			Endpoint: fmt.Sprintf("https://push.example/ep%d", i),
+			P256dh:   p256dh,
+			Auth:     auth,
+		}
+		if _, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
+			NotificationTime: "20:00", Subscription: sub,
+		}); err != nil {
+			t.Fatalf("ep%d: %v", i, err)
+		}
+	}
+	subs := h.repo.subs["u1"]
+	if len(subs) != MaxSubscriptionsPerUser {
+		t.Fatalf("len(subs) = %d, want %d", len(subs), MaxSubscriptionsPerUser)
+	}
+	if subs[0].Endpoint != "https://push.example/ep2" {
+		t.Errorf("oldest kept = %s, want ep2 (ep1 evicted)", subs[0].Endpoint)
+	}
+	if subs[len(subs)-1].Endpoint != "https://push.example/ep11" {
+		t.Errorf("newest = %s, want ep11", subs[len(subs)-1].Endpoint)
+	}
+
+	// Re-saving an endpoint already held is still a no-op: still 10, unchanged.
+	if _, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
+		NotificationTime: "20:00",
+		Subscription:     &Subscription{Endpoint: "https://push.example/ep11", P256dh: p256dh, Auth: auth},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	subs = h.repo.subs["u1"]
+	if len(subs) != MaxSubscriptionsPerUser || subs[0].Endpoint != "https://push.example/ep2" {
+		t.Errorf("re-saving ep11 changed the set: %+v", subs)
 	}
 }
 
@@ -200,6 +256,97 @@ func TestTickReportsSendFailuresButContinues(t *testing.T) {
 	}
 	if len(h.repo.subs["u1"]) != 2 {
 		t.Error("a transient failure must not delete the subscription")
+	}
+}
+
+func TestTickPrunesASubscriptionAfterThreeConsecutiveFailures(t *testing.T) {
+	h := dueHarness()
+	h.sender.fail["https://push.example/ep1"] = true
+
+	for day := 0; day < 2; day++ {
+		stats, err := h.svc.Tick(context.Background(), h.now)
+		if err == nil {
+			t.Fatalf("day %d: expected the failure to be reported", day)
+		}
+		if stats.Failed != 1 || stats.Pruned != 0 {
+			t.Errorf("day %d: stats = %+v, want Failed 1 Pruned 0", day, stats)
+		}
+		if len(h.repo.subs["u1"]) != 2 {
+			t.Errorf("day %d: subs = %+v, want both kept", day, h.repo.subs["u1"])
+		}
+		if got, want := h.queue.failures["s1"], int64(day+1); got != want {
+			t.Errorf("day %d: failures[s1] = %d, want %d", day, got, want)
+		}
+		h.now = h.now.Add(24 * time.Hour)
+	}
+
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if err == nil {
+		t.Fatal("expected the prune to be reported")
+	}
+	if stats.Pruned != 1 || stats.Failed != 0 {
+		t.Errorf("stats = %+v, want Pruned 1 Failed 0", stats)
+	}
+	if subs := h.repo.subs["u1"]; len(subs) != 1 || subs[0].ID != "s2" {
+		t.Errorf("subs after prune = %+v, want only s2", subs)
+	}
+	if _, ok := h.queue.failures["s1"]; ok {
+		t.Error("failures[s1] must be cleared once the row is pruned")
+	}
+}
+
+func TestTickResetsTheFailureCountOnSuccess(t *testing.T) {
+	h := dueHarness()
+	h.sender.fail["https://push.example/ep1"] = true
+	if _, err := h.svc.Tick(context.Background(), h.now); err == nil {
+		t.Fatal("expected a reported failure")
+	}
+	h.now = h.now.Add(24 * time.Hour)
+	if _, err := h.svc.Tick(context.Background(), h.now); err == nil {
+		t.Fatal("expected a reported failure")
+	}
+	if h.queue.failures["s1"] != 2 {
+		t.Fatalf("failures[s1] = %d, want 2", h.queue.failures["s1"])
+	}
+
+	h.now = h.now.Add(24 * time.Hour)
+	delete(h.sender.fail, "https://push.example/ep1")
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if err != nil {
+		t.Fatalf("success tick: %v", err)
+	}
+	if stats.Sent != 2 {
+		t.Errorf("stats = %+v, want both subscriptions sent", stats)
+	}
+	if _, ok := h.queue.failures["s1"]; ok {
+		t.Error("a success must clear the failure counter")
+	}
+
+	// Two more failures after the reset must not prune yet (count restarts at 1).
+	h.now = h.now.Add(24 * time.Hour)
+	h.sender.fail["https://push.example/ep1"] = true
+	h.svc.Tick(context.Background(), h.now)
+	h.now = h.now.Add(24 * time.Hour)
+	stats, _ = h.svc.Tick(context.Background(), h.now)
+	if stats.Pruned != 0 || len(h.repo.subs["u1"]) != 2 {
+		t.Errorf("two failures after a reset must not prune yet: stats = %+v, subs = %+v", stats, h.repo.subs["u1"])
+	}
+}
+
+func TestTickKeepsTheRowWhenTheCounterIsUnavailable(t *testing.T) {
+	h := dueHarness()
+	h.sender.fail["https://push.example/ep1"] = true
+	h.queue.failErr = errors.New("redis down")
+
+	stats, err := h.svc.Tick(context.Background(), h.now)
+	if err == nil {
+		t.Fatal("expected the counter error to be reported")
+	}
+	if stats.Failed != 1 || stats.Pruned != 0 {
+		t.Errorf("stats = %+v, want Failed 1 Pruned 0", stats)
+	}
+	if len(h.repo.subs["u1"]) != 2 {
+		t.Error("a counter error must not prune the row")
 	}
 }
 

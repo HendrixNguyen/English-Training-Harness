@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/a-session-a-learner-wants-to-finish-level-true-content-do-to.md
-status: approved
+status: done
 priority: high
 merged: false
+branch: harness/2026-09-26-high-a-session-a-learner-wants-to-finish-level-true-content-do-to
+worktree: .worktrees/a-session-a-learner-wants-to-finish-level-true-content-do-to
 ---
 # Level-true content: the roadmap prompt carries a CEFR descriptor and the goal's register, and a deterministic placement floor stops a 10/10 learner being graded A2 — Plan
 
@@ -77,3 +79,50 @@ go test ./internal/onboarding -run 'TestGradeFloor|TestAssessRaisesTheAILevelToT
 git push -u origin harness/2026-09-26-high-a-session-a-learner-wants-to-finish-level-true-content-do-to
 ```
 Live proof (owner, after the ship, via the regenerate route from plan B2): `POST /api/v1/roadmaps/regenerate {"cefr_level":"B1"}` → day-1 tasks are workplace English (record the three day-1 titles in the Execution summary follow-up).
+
+## Execution summary
+
+Built exactly to plan: Task 1 (`airouter/level.go` — `LevelGuidance`, all six CEFR descriptors; `prompt.go`'s `RoadmapUserPrompt` gains the level/goal-register sentences, schema kept last, `RoadmapSystemPrompt` untouched), Task 2 (`onboarding/grade.go` — `GradeFloor` walks `A1..C1` requiring both bank items of a level correct to advance past it, so a wrong A1 item caps the floor at A1 regardless of later answers; `maxLevel`/`cefrIndex`; `service.go`'s `Assess` applies `level = max(ai, floor)` right after grading, logged when it raises), Task 3 (CODEMAP `airouter`/`onboarding` bullets).
+
+**Deviation (anticipated by the plan's own Review Focus #4):** the fixed fake-provider fixture `validRequest()` in `fakes_test.go` answers every bank item correctly (10/10), so `GradeFloor` is `C1` for it — higher than the harness's scripted `B1` grade. Updated the tests that exercise the full grading path and assert on the resulting level to expect the raised `C1` instead of `B1`: `TestAssessHappyPathGradesGeneratesAndPersistsOnce` and `TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry`. Added `TestAssessRaisesTheAILevelToTheFloor` (AI grades A2, 10/10 answers → C1) and `TestAssessKeepsAHigherAILevel` (AI grades B2, only the A1 pair right → floor stays A1, B2 kept) per the plan's Step 1. All other existing tests are unchanged and still pass — they either don't reach the grading branch (idempotent/validation/rate-limit/no-provider paths) or don't assert on the resulting level.
+
+### Verification output
+
+```
+$ cd backend && go build ./... && gofmt -l . && go vet ./... && go test -timeout 120s ./... -count=1 -race
+ok  	.../backend/cmd/api	2.776s
+ok  	.../backend/internal/airouter	2.351s
+ok  	.../backend/internal/auth	4.079s
+ok  	.../backend/internal/config	1.956s
+ok  	.../backend/internal/google	3.047s
+ok  	.../backend/internal/health	3.542s
+ok  	.../backend/internal/middleware	4.403s
+ok  	.../backend/internal/notify	5.088s
+ok  	.../backend/internal/onboarding	5.491s
+ok  	.../backend/internal/pet	6.027s
+ok  	.../backend/internal/quests	5.113s
+ok  	.../backend/internal/secrets	5.090s
+ok  	.../backend/internal/store	5.155s
+(gofmt -l and go vet: no output — clean)
+
+$ go test ./internal/airouter -run TestRoadmapUserPromptCarriesLevelAndGoalGuidance -v
+--- PASS: TestRoadmapUserPromptCarriesLevelAndGoalGuidance
+
+$ go test ./internal/onboarding -run 'TestGradeFloor|TestAssessRaisesTheAILevelToTheFloor' -v
+--- PASS: TestGradeFloor (+ 6 subtests)
+--- PASS: TestAssessRaisesTheAILevelToTheFloor
+```
+
+### Runtime proof
+
+Booted the real compiled `cmd/api` binary against a fresh, isolated dev stack (`COMPOSE_PROJECT_NAME=level-true`, Postgres `55611`, Redis `56611`, API `8611`) plus a small local stub standing in for the Gemini endpoint (`GEMINI_BASE_URL` pointed at `127.0.0.1:45123`, no real provider keys available in this unattended run) — this exercises the actual HTTP path (Gin routing, Postgres, Redis session store, JWT auth, `airouter.Router`, `onboarding.Service`), not a unit-test fake.
+
+- `GET /healthz` → `200 {"postgres":"ok","redis":"ok","status":"ok"}`.
+- Minted a real session (inserted a `users` row, signed a JWT with `JWT_SECRET`, wrote `sess:{user_id}:token` to Redis) and called `GET /api/v1/onboarding/quiz` with it → `200`, ten questions, real DB/Redis/JWT round trip.
+- `POST /api/v1/onboarding/assessment` with `target_goal: "Business English"` and every bank item answered correctly → `201 {"status":"success","assessed_level":"C1", ...}`. The stub always grades placement `B1`; the response's `C1` is the placement floor raising it, observed through the real API, not a test double.
+- The stub's request log confirms the roadmap-generation prompt actually sent by the running `airouter.Router` carried `Current CEFR level: C1`, `Write every task for a C1 learner.`, and `Every task must use the language of the learner's goal ("Business English"): its situations, vocabulary and register.` — `LevelGuidance("C1")` and the goal-register rule, live.
+- Cleaned up: killed the API process and the stub, `docker compose -p level-true down` (containers, network and volume all removed — verified with `docker ps`), removed the scratch `.env` and the scratch `cmd/tmpmint` helper (never committed).
+
+Actual AI-generated day-1 titles are not available from this proof (no live Gemini/OpenAI/DeepSeek key in this unattended run) — the plan's own "Live proof" line already defers that check to the owner post-ship via the regenerate route.
+
+**CI:** branch `harness/2026-09-26-high-a-session-a-learner-wants-to-finish-level-true-content-do-to`, run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36226444437 — all five jobs (`frontend`, `backend-unit`, `backend-integration`, `docker-images`, `harness-tooling`) green.

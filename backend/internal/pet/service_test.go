@@ -49,6 +49,28 @@ func TestEnsureCreatesTheRowOnceAndReturnsTheDefaults(t *testing.T) {
 	}
 }
 
+func TestEnsureNamedSetsTheNameAndAnEmptyNameKeepsIt(t *testing.T) {
+	h := newHarness(sept22)
+
+	st, err := h.svc.EnsureNamed(ctx, "u1", "Mầm Non")
+	if err != nil || st.PlantName != "Mầm Non" || st.HealthPoints != 100 {
+		t.Fatalf("EnsureNamed = %+v, %v; want a fresh row named Mầm Non", st, err)
+	}
+	// "" is onboarding's re-submit path: create if missing, never rename.
+	if st, err = h.svc.EnsureNamed(ctx, "u1", ""); err != nil || st.PlantName != "Mầm Non" {
+		t.Errorf("EnsureNamed(\"\") = %+v, %v; want the name kept", st, err)
+	}
+	if st, err = h.svc.EnsureNamed(ctx, "u1", "Lá Xanh"); err != nil || st.PlantName != "Lá Xanh" {
+		t.Errorf("EnsureNamed(Lá Xanh) = %+v, %v; want the name replaced", st, err)
+	}
+	if len(h.repo.states) != 1 {
+		t.Errorf("rows = %d, want 1 (still 1:1)", len(h.repo.states))
+	}
+	if _, err := h.svc.EnsureNamed(ctx, "u2", ""); err != nil || h.repo.states["u2"].PlantName != "My Green Buddy" {
+		t.Errorf("EnsureNamed(\"\") on a missing row must create it with the DDL default; got %+v, %v", h.repo.states["u2"], err)
+	}
+}
+
 func TestOnTargetMetAppliesSpec8SuccessOnceAndPersists(t *testing.T) {
 	h := newHarness(sept22)
 	h.repo.states["u1"] = State{PlantName: "Fern", HealthPoints: 80, CurrentStreak: 4, Stage: StageSapling}
