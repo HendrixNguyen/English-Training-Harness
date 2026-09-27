@@ -13,11 +13,25 @@ import (
 // not, and the drivers' http.Client carries no Timeout of its own.
 const (
 	// RoadmapTimeout bounds one Route call for TaskRoadmapGen, fallbacks
-	// included: room for one fast-failing provider plus one slow success.
+	// included: Route splits what is left of it evenly over the configured
+	// providers not yet tried (attemptBudget), so room for the fallback is
+	// enforced per attempt rather than assumed.
 	RoadmapTimeout = 180 * time.Second
 	// DefaultTaskTimeout is §6.2's 30 s for every other task.
 	DefaultTaskTimeout = 30 * time.Second
 )
+
+// attemptBudget is one provider's share of what is left of the Route budget:
+// remaining split evenly over the configured providers not yet tried (this
+// one included), so a preferred provider that hangs cannot spend the
+// fallbacks' time. With one provider left it is everything, so a
+// single-provider router behaves exactly as before.
+func attemptBudget(remaining time.Duration, providersLeft int) time.Duration {
+	if providersLeft <= 1 {
+		return remaining
+	}
+	return remaining / time.Duration(providersLeft)
+}
 
 // TaskTimeout is the budget for one Route call of task.
 func TaskTimeout(task TaskType) time.Duration {
