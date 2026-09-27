@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -121,7 +122,7 @@ func TestMigrateAppliesPendingVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Migrate() = %v, want nil error", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("applied = %v, want %v", got, want)
 	}
 	if m.ensured != 1 {
@@ -258,6 +259,92 @@ func TestMigration0003AddsPetVerdictDates(t *testing.T) {
 	for _, w := range []string{"DROP COLUMN IF EXISTS last_target_met_date", "DROP COLUMN IF EXISTS judged_through"} {
 		if !strings.Contains(down, w) {
 			t.Errorf("0003_pet_verdict_dates.down.sql is missing %q", w)
+		}
+	}
+}
+
+// rlsTables is every table any migration creates, plus schema_migrations
+// (created by the migrator itself, not a migration file) — the full set that
+// TestMigration0004EnablesRLSOnEveryTable and the down file must cover.
+var rlsTables = []string{
+	"users", "push_subscriptions", "pet_states", "daily_progress",
+	"roadmaps", "exercises", "google_sync", "schema_migrations",
+}
+
+func TestMigration0004EnablesRLSOnEveryTable(t *testing.T) {
+	up := readMigration(t, "0004_rls.up.sql")
+	for _, table := range rlsTables {
+		want := "ALTER TABLE " + table + " ENABLE ROW LEVEL SECURITY"
+		if !strings.Contains(up, want) {
+			t.Errorf("0004_rls.up.sql is missing %q", want)
+		}
+	}
+	for _, w := range []string{"pg_roles", "'anon'", "'authenticated'", "REVOKE ALL"} {
+		if !strings.Contains(up, w) {
+			t.Errorf("0004_rls.up.sql is missing %q (the guarded Supabase grant revoke)", w)
+		}
+	}
+
+	down := readMigration(t, "0004_rls.down.sql")
+	for _, table := range rlsTables {
+		want := "ALTER TABLE " + table + " DISABLE ROW LEVEL SECURITY"
+		if !strings.Contains(down, want) {
+			t.Errorf("0004_rls.down.sql is missing %q", want)
+		}
+	}
+	if strings.Contains(down, "GRANT") {
+		t.Error("0004_rls.down.sql must not re-grant: the Supabase anon/authenticated grants were Supabase's own defaults, not ours to recreate")
+	}
+}
+
+var (
+	sqlLineCommentRe = regexp.MustCompile(`(?m)--.*$`)
+	createTableRe    = regexp.MustCompile(`(?i)CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)`)
+	enableRLSRe      = regexp.MustCompile(`(?i)ALTER TABLE\s+(\w+)\s+ENABLE ROW LEVEL SECURITY`)
+)
+
+// stripSQLComments removes `-- ...` line comments so a migration's own
+// prose (e.g. 0004_rls.up.sql's convention comment, which says the words
+// "CREATE TABLE" and "ENABLE ROW LEVEL SECURITY" in English) can never be
+// mistaken for a statement by the regexes above.
+func stripSQLComments(sql string) string {
+	return sqlLineCommentRe.ReplaceAllString(sql, "")
+}
+
+// TestEveryTableCreatedByAMigrationHasRLS is the convention test: every table
+// any *.up.sql CREATEs must have a matching ENABLE ROW LEVEL SECURITY in some
+// *.up.sql (the same one or a later one). Supabase exposes the whole public
+// schema through PostgREST with full anon/authenticated grants, so a table
+// left without RLS is readable and writable by anyone with the project's
+// public anon key. schema_migrations is created by the migrator (not a
+// migration file) but is just as exposed, so it is required too.
+func TestEveryTableCreatedByAMigrationHasRLS(t *testing.T) {
+	names, err := fs.Glob(MigrationsFS, "migrations/*.up.sql")
+	if err != nil {
+		t.Fatalf("listing migrations: %v", err)
+	}
+
+	created := map[string]bool{"schema_migrations": true}
+	enabled := map[string]bool{}
+	for _, name := range names {
+		body, err := fs.ReadFile(MigrationsFS, name)
+		if err != nil {
+			t.Fatalf("reading %s: %v", name, err)
+		}
+		text := stripSQLComments(string(body))
+		for _, m := range createTableRe.FindAllStringSubmatch(text, -1) {
+			created[m[1]] = true
+		}
+		for _, m := range enableRLSRe.FindAllStringSubmatch(text, -1) {
+			enabled[m[1]] = true
+		}
+	}
+
+	for table := range created {
+		if !enabled[table] {
+			t.Errorf("table %q is created by a migration but no *.up.sql has ALTER TABLE %s ENABLE ROW LEVEL SECURITY — "+
+				"every CREATE TABLE in a migration needs ENABLE ROW LEVEL SECURITY in the same or a later up-migration — "+
+				"Supabase exposes public through PostgREST", table, table)
 		}
 	}
 }

@@ -13,6 +13,7 @@ const id = computed(() => String(route.params.id))
 const task = computed(() => quest.taskById(id.value))
 const content = computed(() => classifyContent(task.value?.content_json))
 const timer = computed(() => quest.timers[id.value])
+const remaining = computed(() => quest.remainingSeconds(id.value))
 const answers = ref<Record<string, string>>({})
 const finished = ref(false)
 const posting = ref(false)
@@ -21,18 +22,28 @@ const online = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
 
 let interval: ReturnType<typeof setInterval> | null = null
 
+function sync() {
+  quest.tick()
+}
+
 onMounted(async () => {
   if (!quest.daily && !quest.noRoadmap) await quest.load()
   if (task.value && !task.value.is_completed) {
     quest.startTimer(task.value.id, task.value.duration_minutes || 10)
-    interval = setInterval(() => quest.tick(task.value!.id), 1000)
+    quest.tick()
+    interval = setInterval(() => quest.tick(), 1000)
   }
+  // a resumed tab or PWA snaps to the wall clock immediately instead of waiting for the next (throttled) tick
+  document.addEventListener('visibilitychange', sync)
+  window.addEventListener('focus', sync)
   window.addEventListener('online', setOnline)
   window.addEventListener('offline', setOnline)
 })
 
 onBeforeUnmount(() => {
-  if (interval) clearInterval(interval) // the store keeps remainingSeconds, so re-entry resumes
+  if (interval) clearInterval(interval) // the store keeps the wall-clock anchor (and aelp.timers keeps it across reloads), so re-entry resumes
+  document.removeEventListener('visibilitychange', sync)
+  window.removeEventListener('focus', sync)
   window.removeEventListener('online', setOnline)
   window.removeEventListener('offline', setOnline)
 })
@@ -43,7 +54,7 @@ function setOnline() {
 
 const buttonLabel = computed(() => {
   if (task.value?.is_completed) return 'Đã hoàn thành'
-  if (timer.value?.remainingSeconds === 0) return 'Hết giờ — Hoàn thành'
+  if (timer.value && remaining.value === 0) return 'Hết giờ — Hoàn thành'
   return 'Hoàn thành'
 })
 
@@ -52,7 +63,7 @@ async function complete() {
   posting.value = true
   error.value = null
   try {
-    const res = await quest.complete(task.value.id, quest.elapsedSeconds(task.value.id), answers.value)
+    const res = await quest.complete(task.value.id, quest.elapsedSeconds(task.value.id, Date.now()), answers.value)
     pet.applyProgress(res)
     await navigateTo('/', { replace: true })
   } catch (e) {
@@ -69,7 +80,7 @@ async function complete() {
   <main class="mx-auto flex min-h-screen max-w-md flex-col px-4 pb-8">
     <div class="flex items-center justify-between py-3 text-sm">
       <NuxtLink to="/" class="text-mute hover:underline">‹ Quay lại</NuxtLink>
-      <CountdownTimer v-if="timer" :remaining-seconds="timer.remainingSeconds" />
+      <CountdownTimer v-if="timer" :remaining-seconds="remaining" />
     </div>
 
     <AppCard class="flex-1">
@@ -109,7 +120,7 @@ async function complete() {
       class="mt-4"
       block
       :loading="posting"
-      :disabled="task.is_completed || !online || (!finished && timer?.remainingSeconds !== 0)"
+      :disabled="task.is_completed || !online || (!finished && (!timer || remaining !== 0))"
       @click="complete"
     >
       {{ buttonLabel }}

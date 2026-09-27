@@ -65,6 +65,7 @@ func TestOpenAICompatibleRejectsNon2xxEmptyChoicesAndBadJSON(t *testing.T) {
 		"401":           {401, `{"error":{"message":"bad key"}}`, "status 401"},
 		"empty choices": {200, `{"choices":[]}`, "empty"},
 		"not json":      {200, `oops`, "decoding"},
+		"empty content": {200, `{"choices":[{"message":{"content":""}}]}`, "empty"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -89,5 +90,55 @@ func TestIntegrationUpsertCreatesThenPreservesTheLearnerState(t *testing.T) {
 	}
 	if plain, err := box.Open(refresh); err != nil || plain != "rt-1" {
 		t.Errorf("Open(stored) = %q, %v; want rt-1 — the stored token kept when Google sends none", plain, err)
+	}
+}
+
+func TestIntegrationUpsertRejectsAnEmailOwnedByAnotherGoogleAccount(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("TEST_DATABASE_URL is unset; run `make up` and export it to run integration tests")
+	}
+	ctx := context.Background()
+
+	pg, err := store.NewPostgres(ctx, url)
+	if err != nil {
+		t.Fatalf("NewPostgres: %v", err)
+	}
+	t.Cleanup(pg.Close)
+	if _, err := store.Migrate(ctx, pg.Migrator(), store.MigrationsFS); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	box, err := secrets.New(bytes.Repeat([]byte{7}, secrets.KeyBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewPgUserRepo(pg.Pool, box)
+	const gidA, gidB = "google-collision-a", "google-collision-b"
+	const email = "shared-collision@example.com"
+	cleanup := func() {
+		_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id IN ($1, $2)`, gidA, gidB)
+	}
+	t.Cleanup(cleanup)
+	cleanup()
+
+	if _, err := repo.UpsertByGoogleID(ctx, gidA, email, "A Person", "rt-a"); err != nil {
+		t.Fatalf("first upsert (google-a): %v", err)
+	}
+
+	_, err = repo.UpsertByGoogleID(ctx, gidB, email, "B Person", "rt-b")
+	if err == nil {
+		t.Fatal("expected an error upserting google-b with google-a's email")
+	}
+	if !errors.Is(err, ErrEmailTaken) {
+		t.Errorf("err = %v, want it to wrap ErrEmailTaken", err)
+	}
+	if !strings.Contains(err.Error(), gidB) {
+		t.Errorf("err = %q, want it to name the rejected google_id %q", err.Error(), gidB)
+	}
+
+	// The collision changed nothing: google-a can still upsert.
+	if _, err := repo.UpsertByGoogleID(ctx, gidA, email, "A Person Again", "rt-a2"); err != nil {
+		t.Errorf("third upsert (google-a again): %v", err)
 	}
 }

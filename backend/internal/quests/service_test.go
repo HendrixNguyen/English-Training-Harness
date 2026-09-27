@@ -35,6 +35,19 @@ func newHarness(t *testing.T, now time.Time) *harness {
 	return h
 }
 
+// petOf derefs out's pointer pet fields, standing in -1 for a nil (omitted)
+// field so assertions can compare against plain ints.
+func petOf(out ProgressResult) (int, int) {
+	health, streak := -1, -1
+	if out.PetHealth != nil {
+		health = *out.PetHealth
+	}
+	if out.StreakCount != nil {
+		streak = *out.StreakCount
+	}
+	return health, streak
+}
+
 func TestRecordProgressIncrementsRedisBeforeWritingPostgres(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
@@ -67,8 +80,8 @@ func TestProgressBelowTheTargetStillReportsThePetState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RecordProgress() = %v", err)
 	}
-	if out.PetHealth != 80 || out.StreakCount != 4 {
-		t.Errorf("pet = (%d, %d), want the unbumped (80, 4)", out.PetHealth, out.StreakCount)
+	if h, s := petOf(out); h != 80 || s != 4 {
+		t.Errorf("pet = (%d, %d), want the unbumped (80, 4)", h, s)
 	}
 	if h.pet.fired != 0 {
 		t.Errorf("hook fired %d times below the target, want 0", h.pet.fired)
@@ -104,8 +117,8 @@ func TestCrossingExactly1800SecondsMeetsTheTargetAndFiresOnce(t *testing.T) {
 		t.Errorf("hook fired %d times, want 1", h.pet.fired)
 	}
 	// State is read AFTER the hook: 80+20 = 100, 4+1 = 5 (§8 success logic).
-	if out.PetHealth != 100 || out.StreakCount != 5 {
-		t.Errorf("pet = (%d, %d), want the post-hook (100, 5)", out.PetHealth, out.StreakCount)
+	if h, s := petOf(out); h != 100 || s != 5 {
+		t.Errorf("pet = (%d, %d), want the post-hook (100, 5)", h, s)
 	}
 	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 30 || !row.targetMet {
 		t.Errorf("daily_progress row = %+v, want minutes=30 target=true", row)
@@ -134,8 +147,8 @@ func TestFurtherProgressTheSameDayDoesNotRefire(t *testing.T) {
 	if h.pet.fired != 1 {
 		t.Errorf("hook fired %d times, want 1", h.pet.fired)
 	}
-	if out.PetHealth != 100 || out.StreakCount != 5 {
-		t.Errorf("pet = (%d, %d), want (100, 5) — no second bump", out.PetHealth, out.StreakCount)
+	if h, s := petOf(out); h != 100 || s != 5 {
+		t.Errorf("pet = (%d, %d), want (100, 5) — no second bump", h, s)
 	}
 	if row := h.progress.rows["u1|2026-09-22"]; row.minutes != 40 {
 		t.Errorf("minutes_spent = %d, want 40 (2400s / 60)", row.minutes)
@@ -303,8 +316,7 @@ func TestAPetHookFailureDoesNotFailTheRequest(t *testing.T) {
 }
 
 func TestAPetStateFailureDoesNotFailTheRequest(t *testing.T) {
-	// The write is already committed; a 500 here would make the client retry
-	// and double-count. Pet fields fall back to zero and are logged.
+	// Pet fields are omitted, never fabricated: 0 means a dead plant (spec §8).
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
 	h.pet.stateErr = errors.New("pet_states unreachable")
@@ -313,8 +325,8 @@ func TestAPetStateFailureDoesNotFailTheRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RecordProgress() = %v, want nil", err)
 	}
-	if out.DailySecondsSpent != 600 || out.PetHealth != 0 || out.StreakCount != 0 {
-		t.Errorf("out = %+v, want the progress recorded and zero pet fields", out)
+	if out.DailySecondsSpent != 600 || out.PetHealth != nil || out.StreakCount != nil {
+		t.Errorf("out = %+v, want the progress recorded and omitted (nil) pet fields", out)
 	}
 }
 

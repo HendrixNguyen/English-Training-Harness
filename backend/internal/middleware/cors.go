@@ -15,7 +15,7 @@ import (
 
 // ErrBadOrigin is ParseOrigins' error for an entry that is not a bare
 // scheme://host[:port] origin, or for an empty list.
-var ErrBadOrigin = errors.New("middleware: FRONTEND_ORIGIN entries must be http(s)://host[:port] with no path, query, fragment or userinfo")
+var ErrBadOrigin = errors.New("middleware: FRONTEND_ORIGIN entries must be http(s)://host[:port] with no path, query, fragment, userinfo, default port, wildcard or trailing dot")
 
 // ParseOrigins turns the FRONTEND_ORIGIN value into the exact-match allow-list:
 // comma-separated, whitespace trimmed, one trailing slash dropped, scheme and
@@ -30,16 +30,39 @@ func ParseOrigins(raw string) ([]string, error) {
 			continue
 		}
 		u, err := url.Parse(p)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https" && strings.ToLower(u.Scheme) != "http" && strings.ToLower(u.Scheme) != "https") ||
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
 			u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil || u.Opaque != "" {
 			return nil, fmt.Errorf("%w: %q", ErrBadOrigin, strings.TrimSpace(part))
 		}
-		out = append(out, strings.ToLower(u.Scheme)+"://"+strings.ToLower(u.Host))
+		// The three shapes url.Parse accepts that no browser ever puts in an
+		// Origin header. Refuse them rather than normalise: boot must say what
+		// the operator typed and why it can never match.
+		if reason := neverSentByABrowser(u); reason != "" {
+			return nil, fmt.Errorf("%w: %q (%s)", ErrBadOrigin, strings.TrimSpace(part), reason)
+		}
+		out = append(out, u.Scheme+"://"+strings.ToLower(u.Host))
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%w: no origins in %q", ErrBadOrigin, raw)
 	}
 	return out, nil
+}
+
+// neverSentByABrowser names why a parsed origin can never equal a browser's
+// Origin header, or "" when it can. Browsers omit the scheme's default port
+// (RFC 6454 §6.1 serialises host:port only when the port is not the default),
+// never send a wildcard, and strip a trailing dot.
+func neverSentByABrowser(u *url.URL) string {
+	host, port := u.Hostname(), u.Port()
+	switch {
+	case strings.Contains(host, "*"):
+		return "wildcard hosts are not supported: list each preview origin explicitly"
+	case strings.HasSuffix(host, "."):
+		return "trailing dot: browsers send the host without it"
+	case (u.Scheme == "https" && port == "443") || (u.Scheme == "http" && port == "80"):
+		return "default port: browsers omit :" + port + " from Origin, so this entry would never match"
+	}
+	return ""
 }
 
 // CORS answers cross-origin browser requests from the allow-listed origins
