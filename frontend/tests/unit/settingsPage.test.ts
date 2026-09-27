@@ -110,6 +110,17 @@ describe('/settings', () => {
     expect(w.text()).toContain('Không lưu được. Thử lại.')
   })
 
+  it('a failed save while on keeps the switch on with the error line underneath', async () => {
+    reminders.state.value = 'on'
+    const w = mountPage()
+    await flushPromises()
+    expect(w.find('[role=switch]').exists()).toBe(true)
+    reminders.problem.value = 'error'
+    await flushPromises()
+    expect(w.find('[role=switch]').attributes('aria-checked')).toBe('true')
+    expect(w.text()).toContain('Không lưu được. Thử lại.')
+  })
+
   it('Google sync success shows the task count and switches the button to Đồng bộ lại', async () => {
     api.post.mockResolvedValue({ status: 'synced', calendar_event_id: 'evt', tasks_created_count: 28 })
     const w = mountPage()

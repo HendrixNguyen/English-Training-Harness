@@ -20,7 +20,7 @@ interface Deps {
 export function useReminders(deps?: Deps): {
   state: Ref<ReminderState>
   problem: Ref<SaveProblem>
-  init(): void
+  init(): Promise<void>
   enable(time: string): Promise<void>
   disable(): Promise<void>
   saveTime(time: string): Promise<void>
@@ -43,7 +43,7 @@ export function useReminders(deps?: Deps): {
     return sub && flat ? { sub, flat } : null
   }
 
-  function init() {
+  async function init() {
     const support = pushSupport(vapid, win)
     if (support !== 'ok') {
       state.value = support
@@ -53,7 +53,11 @@ export function useReminders(deps?: Deps): {
       state.value = 'denied'
       return
     }
-    state.value = store.remindersOn ? 'on' : 'off'
+    // Trust localStorage's remindersOn only as far as the browser still agrees:
+    // confirm a real subscription before showing `on`.
+    const cur = store.remindersOn ? await currentSubscription() : null
+    if (store.remindersOn && !cur) store.setRemindersOn(false)
+    state.value = cur ? 'on' : 'off'
   }
 
   async function enable(time: string) {
@@ -105,6 +109,13 @@ export function useReminders(deps?: Deps): {
 
   async function saveTime(time: string) {
     const cur = store.remindersOn ? await currentSubscription() : null
+    if (store.remindersOn && !cur) {
+      // The browser dropped the subscription since we last checked: this is a
+      // fact about the device, not about the save, so it's the one place
+      // saveTime writes `state`.
+      store.setRemindersOn(false)
+      state.value = 'off'
+    }
     const ok = await store.saveReminder(time, cur?.flat ?? null)
     problem.value = ok ? null : (store.saveError === 'invalid' ? 'invalid' : 'error')
   }

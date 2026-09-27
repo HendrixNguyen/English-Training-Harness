@@ -190,4 +190,40 @@ describe('useReminders', () => {
     expect(r.problem.value).toBe(null)
   })
 
+  // Task 2 — the switch follows the real subscription, not the last save result.
+  it('a failed save while on leaves the switch on with an error problem underneath', async () => {
+    const { win } = fakeBrowser({ existing: true })
+    useSettingsStore().setRemindersOn(true)
+    const r = useReminders({ vapidPublicKey: VAPID, win })
+    await r.init()
+    expect(r.state.value).toBe('on')
+    api.post.mockRejectedValue(new ApiError(500, 'internal_error'))
+    await r.saveTime('08:00')
+    expect(r.state.value).toBe('on')
+    expect(r.problem.value).toBe('error')
+    expect(useSettingsStore().remindersOn).toBe(true)
+  })
+
+  it('init does not trust a stale remindersOn flag when the browser holds no subscription', async () => {
+    const { win } = fakeBrowser({ existing: false })
+    useSettingsStore().setRemindersOn(true)
+    const r = useReminders({ vapidPublicKey: VAPID, win })
+    await r.init()
+    expect(r.state.value).toBe('off')
+    expect(useSettingsStore().remindersOn).toBe(false)
+  })
+
+  it('saveTime while on but the subscription is gone posts without it and turns the switch off', async () => {
+    api.post.mockResolvedValue({ status: 'updated', notification_time: '08:00:00' })
+    const { win, getSubscription } = fakeBrowser({ existing: true })
+    useSettingsStore().setRemindersOn(true)
+    const r = useReminders({ vapidPublicKey: VAPID, win })
+    await r.init()
+    expect(r.state.value).toBe('on')
+    getSubscription.mockResolvedValue(null)
+    await r.saveTime('08:00')
+    expect(api.post.mock.calls[0][1]).not.toHaveProperty('push_subscription')
+    expect(r.state.value).toBe('off')
+    expect(useSettingsStore().remindersOn).toBe(false)
+  })
 })
