@@ -61,7 +61,6 @@ _none_
 ## Planned (awaiting approval)
 
 - `harness/plans/2026-09-27-kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md` — Khó quá / Dễ quá — swap one task for a level-fitted replacement — Plan [medium]
-- `harness/plans/2026-09-27-hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — Hear it — read-aloud for passages, questions and flashcards (`useSpeech`, `SpeakButton`) on `/learn/:id` — Plan [medium]
 - `harness/plans/2026-09-27-google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` — Google Tasks tick themselves when the day's target is met, and the calendar event opens the app — Plan [medium]
 - `harness/plans/2026-09-27-missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` — Missed days are not lost — "Học bù" on any earlier day, minutes count toward today — Plan [medium]
 - `harness/plans/2026-09-27-install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — Install-and-remind nudge — the companion asks to call you tomorrow after your first met day — Plan [medium]
@@ -75,6 +74,7 @@ _none_
 
 - `harness/plans/2026-09-27-tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md` — The reading passage finally renders — with tap-a-word Vietnamese glosses — Plan [high]
 - `harness/plans/2026-09-27-level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — Level result in 30 seconds: grade first, write the roadmap in the background (`202 generating`, `roadmap:gen:{user_id}`, `404 roadmap_generating`, the onboarding result step and the hub drawing state) — Plan [medium]
+- `harness/plans/2026-09-27-hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — Hear it — read-aloud for passages, questions and flashcards (`useSpeech`, `SpeakButton`) on `/learn/:id` — Plan [medium]
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]
