@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/executor-worktree-nested-under-claude-worktrees-while-plan-f.md
 status: done
 priority: low
-merged: false
+merged: true
 branch: harness/2026-09-27-low-executor-worktree-nested-under-claude-worktrees-while-plan-f
 worktree: .worktrees/executor-worktree-nested-under-claude-worktrees-while-plan-f
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan
 

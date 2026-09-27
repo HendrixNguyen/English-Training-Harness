@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-27-medium-a-wrong-or-rotated-encryption-secret-key-silently-turns-ever
 worktree: .worktrees/a-wrong-or-rotated-encryption-secret-key-silently-turns-ever
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line — Plan
 

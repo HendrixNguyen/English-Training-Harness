@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/every-public-table-is-readable-and-writable-through-supabase.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-26-high-every-public-table-is-readable-and-writable-through-supabase
 worktree: .worktrees/every-public-table-is-readable-and-writable-through-supabase
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan
 

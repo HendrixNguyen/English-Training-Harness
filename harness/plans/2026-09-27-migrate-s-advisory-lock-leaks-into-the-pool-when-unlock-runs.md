@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-27-medium-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs
 worktree: .worktrees/migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan
 

@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-27-medium-no-per-user-subscription-cap-and-no-length-bound-on-endpoint
 worktree: .worktrees/no-per-user-subscription-cap-and-no-length-bound-on-endpoint
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan
 

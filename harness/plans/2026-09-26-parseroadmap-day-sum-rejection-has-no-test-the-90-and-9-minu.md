@@ -2,8 +2,9 @@
 idea: harness/ideas/_inbox/parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-24-parseroadmap-accepts-a-90-minute-daily-quest-so-the-30-minut.md
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # airouter amend: `TestParseRoadmapRejects` proves the day-sum rule — rows only the day budget can reject, keyed by reason — Plan
 

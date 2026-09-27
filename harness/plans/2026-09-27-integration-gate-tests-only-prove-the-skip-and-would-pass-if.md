@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/integration-gate-tests-only-prove-the-skip-and-would-pass-if.md
 status: done
 priority: low
-merged: false
+merged: true
 branch: harness/2026-09-27-low-integration-gate-tests-only-prove-the-skip-and-would-pass-if
 worktree: .worktrees/integration-gate-tests-only-prove-the-skip-and-would-pass-if
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Integration gate tests only prove the skip and would pass if the gate always skipped — Plan
 

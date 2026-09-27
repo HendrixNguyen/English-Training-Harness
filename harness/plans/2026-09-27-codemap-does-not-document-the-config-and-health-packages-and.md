@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/codemap-does-not-document-the-config-and-health-packages-and.md
 status: done
 priority: low
-merged: false
+merged: true
 branch: harness/2026-09-27-low-codemap-does-not-document-the-config-and-health-packages-and
 worktree: .worktrees/codemap-does-not-document-the-config-and-health-packages-and
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # CODEMAP does not document the config and health packages and still says three CI jobs — Plan
 

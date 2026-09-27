@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/google-403-accessnotconfigured-api-disabled-still-maps-to-re.md
 status: done
 priority: low
-merged: false
+merged: true
 branch: harness/2026-09-27-low-google-403-accessnotconfigured-api-disabled-still-maps-to-re
 worktree: .worktrees/google-403-accessnotconfigured-api-disabled-still-maps-to-re
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan
 
