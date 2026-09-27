@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-26-run-01/level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md
-status: draft
+status: approved
 priority: medium
 merged: false
 order: 1
