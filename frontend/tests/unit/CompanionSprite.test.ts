@@ -22,9 +22,10 @@ describe('CompanionSprite (design §4)', () => {
     expect(w.attributes('aria-label')).toBe('Mầm, giai đoạn sprout, 80 HP')
   })
 
-  it('rotates for react=down', () => {
+  it('down puts the rotation on the drawing, not the wrapper (folded bug)', () => {
     const w = mount(CompanionSprite, { props: { stage: 'wilted', health: 0, react: 'down' } })
-    expect(w.attributes('style')).toContain('rotate(90')
+    expect(w.find('g').attributes('transform')).toBe('rotate(90 16 16) translate(0 7)')
+    expect(w.attributes('style') ?? '').not.toContain('rotate(')
   })
 
   it('runs no retro-* animation class when reduced', () => {
@@ -57,6 +58,53 @@ describe('CompanionSprite (design §4)', () => {
     const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'hit' } })
     w.trigger('animationend')
     expect(w.emitted('reacted')).toEqual([['hit']])
+  })
+})
+
+describe('CompanionSprite --px unit (folded bug companionsprite-motion-is-off-the-pixel-grid)', () => {
+  it.each([
+    [128, 'full', '4'],
+    [64, 'full', '2'],
+    [32, 'full', '1'],
+  ] as const)('size=%i crop=%s sets --px to %s', (size, crop, px) => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, size, crop } })
+    expect(w.attributes('style')).toContain(`--px: ${px}`)
+  })
+
+  it('size=48 crop=face sets --px to 3 (a whole ×3 of the 16-grid)', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, size: 48, crop: 'face' } })
+    expect(w.attributes('style')).toContain('--px: 3')
+  })
+})
+
+describe('CompanionSprite levelup palette swap, non-reduced (folded bug)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('steps torch -> ink-0 -> base over 300ms, emits reacted once, never uses retro-flash', async () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'levelup' } })
+    expect(w.find('svg').attributes('style')).toContain(`--px-g: ${tokens.torch}`)
+
+    vi.advanceTimersByTime(100)
+    await w.vm.$nextTick()
+    expect(w.find('svg').attributes('style')).toContain(`--px-g: ${tokens['ink-0']}`)
+
+    vi.advanceTimersByTime(100)
+    await w.vm.$nextTick()
+    expect(w.find('svg').attributes('style')).toContain(`--px-g: ${tokens.growth}`)
+    expect(w.emitted('reacted')).toBeUndefined()
+
+    vi.advanceTimersByTime(100)
+    await w.vm.$nextTick()
+    expect(w.emitted('reacted')).toEqual([['levelup']])
+
+    expect(w.html()).not.toMatch(/\bretro-flash\b/)
+  })
+
+  it('unmounting mid-sequence leaves no pending timer', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'levelup' } })
+    w.unmount()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
 

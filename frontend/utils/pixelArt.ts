@@ -57,6 +57,24 @@ function withPot(top21: string[]): string[] {
   return [...top21, ...POT]
 }
 
+/**
+ * The wilted face (design retro-kit.md §4 wilted row; folded bug
+ * companionsprite-motion-is-off-the-pixel-grid — a KO screen with the open,
+ * happy face read wrong). Only rows 28-29 of the shared `POT` differ: the
+ * open face's mouth-line (row29, cols 14-17) and its corners (row28, cols
+ * 13/18) swap rows, moving the line up and the corners down — an inverted
+ * (frown) smile. Row 26's closed-eye pixels are already the same shape as
+ * the open face's (a flat `kk` pair per eye), so it needs no override; rows
+ * 22-25, 27 and 30-31 are untouched.
+ */
+function withWiltedPot(top21: string[]): string[] {
+  if (top21.length !== 22) throw new Error(`companion top must be 22 rows, got ${top21.length}`)
+  const pot = [...POT]
+  pot[6] = '........kTTTTTkkkkTTTTTk........' // 28 mouth line moves up (cols 14-17)
+  pot[7] = '.........kTTTkTTTTkTTTk.........' // 29 mouth corners move down (13, 18)
+  return [...top21, ...pot]
+}
+
 // --- seed: no stem; a 6x3 dome on the soil (rows 19-21) -------------------
 const seedTop = [
   ...blankRows(19, W),
@@ -181,7 +199,7 @@ export const COMPANION: Record<(typeof PLANT_STAGE_ORDER)[number], string[]> = {
   sapling: withPot(saplingTop),
   flowering: withPot(floweringTop),
   fruitful: withPot(fruitfulTop),
-  wilted: withPot(wiltedTop),
+  wilted: withWiltedPot(wiltedTop),
 }
 
 // --- glyphs: 16x16 icons (13-row `cursor` is 8x8) -------------------------

@@ -71,11 +71,38 @@ describe('pixel art data (design §4)', () => {
     expect(COMPANION.sprout).toEqual(SPROUT)
   })
 
-  it('rows 22-31 (the pot) are identical across all six stages', () => {
+  it('rows 22-25 and 30-31 (the pot rim and base) are identical across all six stages', () => {
     const stages = Object.keys(COMPANION) as (keyof typeof COMPANION)[]
-    const potOf = (rows: string[]) => rows.slice(22, 32)
-    const reference = potOf(COMPANION[stages[0]])
-    for (const stage of stages) expect(potOf(COMPANION[stage])).toEqual(reference)
+    const rimOf = (rows: string[]) => [...rows.slice(22, 26), ...rows.slice(30, 32)]
+    const reference = rimOf(COMPANION[stages[0]])
+    for (const stage of stages) expect(rimOf(COMPANION[stage])).toEqual(reference)
+  })
+
+  it('rows 26-29 (the face) are identical across the five non-wilted stages', () => {
+    const nonWilted = (Object.keys(COMPANION) as (keyof typeof COMPANION)[]).filter(s => s !== 'wilted')
+    const faceOf = (rows: string[]) => rows.slice(26, 30)
+    const reference = faceOf(COMPANION[nonWilted[0]])
+    for (const stage of nonWilted) expect(faceOf(COMPANION[stage])).toEqual(reference)
+  })
+
+  it('wilted (folded bug): eyes closed on row 26 (k only at the two eye columns)', () => {
+    const row = COMPANION.wilted[26]
+    // Interior (excluding the pot's own left/right rim k's): k appears only
+    // at the two eye-column pairs, same columns as the open face — a closed
+    // eyelid is drawn with one row, not the open face's row26+row27 pair.
+    expect(row.slice(9, 23)).toBe('TTTkkTTTTkkTTT')
+  })
+
+  it('wilted (folded bug): the mouth line moves up to row 28, cols 14-17', () => {
+    expect(COMPANION.wilted[28].slice(14, 18)).toBe('kkkk')
+    expect(COMPANION.wilted[28][13]).toBe('T')
+    expect(COMPANION.wilted[28][18]).toBe('T')
+  })
+
+  it('wilted (folded bug): the mouth corners move down to row 29, cols 13 and 18 (inverted smile)', () => {
+    expect(COMPANION.wilted[29][13]).toBe('k')
+    expect(COMPANION.wilted[29][18]).toBe('k')
+    expect(COMPANION.wilted[29].slice(14, 18)).toBe('TTTT')
   })
 
   it('PixelArt renders a plausible rect count for sprout and skips "." entirely', () => {

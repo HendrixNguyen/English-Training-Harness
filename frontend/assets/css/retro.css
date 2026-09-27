@@ -30,13 +30,6 @@
   50% { transform: translateX(calc(var(--px) * 1px)); }
 }
 
-@keyframes retro-flash {
-  0% { filter: none; }
-  33% { filter: brightness(1.6) saturate(2); }
-  66% { filter: brightness(2.2) grayscale(0.4); }
-  100% { filter: none; }
-}
-
 @keyframes retro-dots {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }
@@ -60,9 +53,6 @@
 }
 .retro-shake {
   animation: retro-shake 200ms steps(1);
-}
-.retro-flash {
-  animation: retro-flash 300ms steps(3);
 }
 .retro-dots {
   animation: retro-dots 900ms steps(3) infinite;

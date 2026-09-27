@@ -21,7 +21,12 @@ const props = withDefaults(defineProps<{
    * `CompanionSprite` crop to the 16×16 face region without PixelArt
    * knowing about companions. Defaults to the full `0 0 N N` box. */
   viewBox?: string
-}>(), { label: undefined, viewBox: undefined, palette: () => ({}) })
+  /** Internal, additive: an SVG transform applied to a `<g>` wrapping every
+   * `<rect>`, so a caller can rotate/translate the drawing itself (the
+   * `down` reaction, folded bug companionsprite-motion-is-off-the-pixel-grid)
+   * without rotating the wrapper element PixelArt is mounted in. */
+  transform?: string
+}>(), { label: undefined, viewBox: undefined, palette: () => ({}), transform: undefined })
 
 const gridSize = computed(() => props.rows.length)
 const snappedSize = computed(() => {
@@ -68,6 +73,11 @@ const rects = computed(() => {
     :aria-hidden="label ? undefined : 'true'"
     :style="cssVars"
   >
-    <rect v-for="(r, i) in rects" :key="i" :x="r.x" :y="r.y" :width="r.width" height="1" :fill="r.fill" />
+    <g v-if="transform" :transform="transform">
+      <rect v-for="(r, i) in rects" :key="i" :x="r.x" :y="r.y" :width="r.width" height="1" :fill="r.fill" />
+    </g>
+    <template v-else>
+      <rect v-for="(r, i) in rects" :key="i" :x="r.x" :y="r.y" :width="r.width" height="1" :fill="r.fill" />
+    </template>
   </svg>
 </template>
