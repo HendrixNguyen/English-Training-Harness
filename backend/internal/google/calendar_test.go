@@ -164,6 +164,7 @@ func TestCalendarMapsStatusesToSentinelErrors(t *testing.T) {
 		"PATCH /calendars/primary/events/unknownreason":   {403, `{"error":{"code":403,"errors":[{"reason":"domainPolicy"}]}}`},
 		"PATCH /calendars/primary/events/scopedetail":     {403, `{"error":{"code":403,"message":"Request had insufficient authentication scopes.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT","domain":"googleapis.com"}]}}`},
 		"PATCH /calendars/primary/events/forbiddenreason": {403, `{"error":{"code":403,"errors":[{"domain":"global","reason":"forbidden","message":"Forbidden"}]}}`},
+		"PATCH /calendars/primary/events/taken":           {409, `{"error":{"code":409,"message":"The requested identifier already exists.","errors":[{"reason":"duplicate"}]}}`},
 	})
 	c := NewHTTPCalendarClient()
 	c.BaseURL = srv.URL
@@ -192,5 +193,8 @@ func TestCalendarMapsStatusesToSentinelErrors(t *testing.T) {
 	}
 	if err := c.PatchEvent(ctx, "t", "apioff", sampleEvent()); !errors.As(err, &up) || !strings.Contains(up.Body, "accessNotConfigured") {
 		t.Errorf("apioff: err = %v, want *UpstreamError with body containing accessNotConfigured", err)
+	}
+	if err := c.PatchEvent(ctx, "t", "taken", sampleEvent()); !errors.Is(err, ErrAlreadyExists) {
+		t.Errorf("taken: err = %v, want ErrAlreadyExists", err)
 	}
 }
