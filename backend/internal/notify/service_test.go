@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -97,6 +98,45 @@ func TestUpdateSettingsForAMissingUser(t *testing.T) {
 	_, err := h.svc.UpdateSettings(context.Background(), "ghost", SettingsRequest{NotificationTime: "20:00"})
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("err = %v, want ErrUserNotFound", err)
+	}
+}
+
+func TestUpdateSettingsKeepsAtMostTenSubscriptionsPerUser(t *testing.T) {
+	h := newHarness()
+	p256dh, auth := validKeys(t)
+	for i := 1; i <= 11; i++ {
+		sub := &Subscription{
+			Endpoint: fmt.Sprintf("https://push.example/ep%d", i),
+			P256dh:   p256dh,
+			Auth:     auth,
+		}
+		if _, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
+			NotificationTime: "20:00", Subscription: sub,
+		}); err != nil {
+			t.Fatalf("ep%d: %v", i, err)
+		}
+	}
+	subs := h.repo.subs["u1"]
+	if len(subs) != MaxSubscriptionsPerUser {
+		t.Fatalf("len(subs) = %d, want %d", len(subs), MaxSubscriptionsPerUser)
+	}
+	if subs[0].Endpoint != "https://push.example/ep2" {
+		t.Errorf("oldest kept = %s, want ep2 (ep1 evicted)", subs[0].Endpoint)
+	}
+	if subs[len(subs)-1].Endpoint != "https://push.example/ep11" {
+		t.Errorf("newest = %s, want ep11", subs[len(subs)-1].Endpoint)
+	}
+
+	// Re-saving an endpoint already held is still a no-op: still 10, unchanged.
+	if _, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
+		NotificationTime: "20:00",
+		Subscription:     &Subscription{Endpoint: "https://push.example/ep11", P256dh: p256dh, Auth: auth},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	subs = h.repo.subs["u1"]
+	if len(subs) != MaxSubscriptionsPerUser || subs[0].Endpoint != "https://push.example/ep2" {
+		t.Errorf("re-saving ep11 changed the set: %+v", subs)
 	}
 }
 

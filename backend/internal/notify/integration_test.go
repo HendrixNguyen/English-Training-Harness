@@ -3,6 +3,7 @@ package notify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -95,6 +96,52 @@ func TestIntegrationScheduleAndSubscriptionRoundTrip(t *testing.T) {
 	}
 	if subsB, _ = repo.Subscriptions(ctx, b); len(subsB) != 0 {
 		t.Errorf("after delete: %d subscriptions, want 0", len(subsB))
+	}
+
+	// --- cap: an 11th distinct endpoint evicts the oldest, keeping 10 ---
+	for i := 1; i <= 11; i++ {
+		s := Subscription{
+			Endpoint: fmt.Sprintf("https://push.example.test/notify-integration/cap-ep%d", i),
+			P256dh:   "BNc5T",
+			Auth:     "aX8v",
+		}
+		if err := repo.SaveSubscription(ctx, a, s); err != nil {
+			t.Fatalf("SaveSubscription cap-ep%d: %v", i, err)
+		}
+	}
+	capSubs, err := repo.Subscriptions(ctx, a)
+	if err != nil {
+		t.Fatalf("Subscriptions(a) after cap: %v", err)
+	}
+	if len(capSubs) != MaxSubscriptionsPerUser {
+		t.Fatalf("len(capSubs) = %d, want %d", len(capSubs), MaxSubscriptionsPerUser)
+	}
+	var sawEp1, sawEp11 bool
+	for _, s := range capSubs {
+		if s.Endpoint == "https://push.example.test/notify-integration/cap-ep1" {
+			sawEp1 = true
+		}
+		if s.Endpoint == "https://push.example.test/notify-integration/cap-ep11" {
+			sawEp11 = true
+		}
+	}
+	if sawEp1 {
+		t.Error("cap-ep1 (oldest) should have been evicted")
+	}
+	if !sawEp11 {
+		t.Error("cap-ep11 (newest) should be present")
+	}
+	// Re-saving an endpoint already held is still a no-op: still 10 rows.
+	if err := repo.SaveSubscription(ctx, a, Subscription{
+		Endpoint: "https://push.example.test/notify-integration/cap-ep11", P256dh: "BNc5T", Auth: "aX8v",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if capSubs, _ = repo.Subscriptions(ctx, a); len(capSubs) != MaxSubscriptionsPerUser {
+		t.Errorf("re-saving cap-ep11: len = %d, want %d", len(capSubs), MaxSubscriptionsPerUser)
+	}
+	for _, s := range capSubs {
+		_ = repo.DeleteSubscription(ctx, s.ID)
 	}
 
 	// --- the ZSET ---

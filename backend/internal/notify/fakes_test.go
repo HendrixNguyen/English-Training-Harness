@@ -57,7 +57,13 @@ func (f *fakeRepo) SaveSubscription(_ context.Context, userID string, s Subscrip
 	}
 	f.seq++
 	s.ID = fmt.Sprintf("sub-%d", f.seq)
-	f.subs[userID] = append(f.subs[userID], s)
+	list := append(f.subs[userID], s)
+	// Mirror PgRepo's trim: keep at most MaxSubscriptionsPerUser rows,
+	// evicting the oldest. Rows are appended in save order, oldest first.
+	if len(list) > MaxSubscriptionsPerUser {
+		list = list[len(list)-MaxSubscriptionsPerUser:]
+	}
+	f.subs[userID] = list
 	return nil
 }
 
