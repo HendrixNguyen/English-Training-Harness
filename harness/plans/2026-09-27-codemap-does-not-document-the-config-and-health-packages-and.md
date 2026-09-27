@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/codemap-does-not-document-the-config-and-health-packages-and.md
-status: approved
+status: done
 priority: low
 merged: false
+branch: harness/2026-09-27-low-codemap-does-not-document-the-config-and-health-packages-and
+worktree: .worktrees/codemap-does-not-document-the-config-and-health-packages-and
 ---
 # CODEMAP does not document the config and health packages and still says three CI jobs — Plan
 
@@ -42,3 +44,23 @@ python3 tools/harness/cli.py validate
 - Every `os.Getenv("X")` in `config.go` appears in the config bullet. Every default and validation the bullet claims can be pointed to in `config.go`.
 - The CI section's number matches the jobs in `ci.yml`.
 - `git diff --name-only origin/main` for this task lists only `harness/CODEMAP.md`.
+
+## Execution summary
+
+Branch `harness/2026-09-27-low-codemap-does-not-document-the-config-and-health-packages-and` (worktree `.worktrees/codemap-does-not-document-the-config-and-health-packages-and`, from origin/main `0392e5d`), head `995ad0e`. Docs-only; `git diff --name-only origin/main` → `harness/CODEMAP.md`.
+
+**Built**
+- `27369c3` Task 1: `**config**` bullet before `**health**`, written from `config.go`: required (`DATABASE_URL`, `REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `JWT_SECRET` ≥ 32 bytes, `ENCRYPTION_SECRET_KEY` via `secrets.ParseHexKey`), defaulted (`PORT`→8080, `VAPID_SUBJECT`, `GIN_MODE`→release + debug/release/test check, `FRONTEND_ORIGIN` passed through to `middleware.ParseOrigins`), VAPID keys read but unvalidated (`cmd/api/main.go:149` gates the worker on both), AI vars read by `airouter.ConfigFromEnv(os.Getenv)` (`main.go:89`), test file `config_test.go`.
+- `568f3c8` Task 2: "Three" → "Five" parallel jobs (ci.yml: backend-unit, backend-integration, harness-tooling, frontend, docker-images).
+
+**Deviations**
+- `995ad0e` (extra commit): the same CI sentence said every job is capped at `timeout-minutes: 10`, but `docker-images` is 15 (ci.yml:161). Corrected in place, since the plan's goal is an accurate CI section.
+- The plan's wording "optional as a pair" for VAPID: `config` does not enforce pairing; the bullet says what the code does (read, not validated; `cmd/api` needs both).
+
+**Reproduction (before → after)**
+- `grep -n '^- \*\*config\*\*' harness/CODEMAP.md`: no match → line 11. `cli.py context` index now lists `config`.
+- `grep -n 'parallel GitHub Actions jobs'`: `37:Three parallel…` → `38:Five parallel…`; `grep -nE '^  [a-z-]+:$' ci.yml` = 5 jobs (+ `push:`).
+- `grep -c Getenv config.go` = 12; a loop over every `Getenv("X")` found all 12 names in the bullet.
+- `cli.py validate` exit 0; `python3 -m unittest discover -s tools/harness/tests` → 43 tests OK.
+
+**Runtime proof**: no code changed, so build/boot is n/a locally; CI run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36296611935 on `995ad0e`: success (backend-unit, backend-integration, harness-tooling, frontend, docker-images all green). No processes or containers started.

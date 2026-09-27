@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/integration-gate-tests-only-prove-the-skip-and-would-pass-if.md
-status: approved
+status: done
 priority: low
 merged: false
+branch: harness/2026-09-27-low-integration-gate-tests-only-prove-the-skip-and-would-pass-if
+worktree: .worktrees/integration-gate-tests-only-prove-the-skip-and-would-pass-if
 ---
 # Integration gate tests only prove the skip and would pass if the gate always skipped — Plan
 
@@ -45,3 +47,33 @@ git diff --name-only origin/main -- internal/store   # only integration_gate_tes
 ```
 - Both mutants from Task 2 make at least one gate test fail (evidence recorded).
 - CI `backend-unit` and `backend-integration` are green on the pushed branch. The new tests are not named `TestIntegration*`, so the integration job's PASS-count gate is unchanged.
+
+## Execution summary
+
+**Built:** two tests appended to `backend/internal/store/integration_gate_test.go` — `TestRequirePostgresProceedsWithTestDatabaseURL` (asserts no skip and `pg != nil && pg.Pool != nil`; never pings) and `TestRequireRedisURLProceedsWithTestRedisURL` (asserts no skip and the returned URL equals the one set). One clause added to the `store` paragraph of `harness/CODEMAP.md`. Commit `4ccdf4d` on `harness/2026-09-27-low-integration-gate-tests-only-prove-the-skip-and-would-pass-if`.
+
+**Deviations:** none from the tasks. Runtime proof: this change is test-only (no production code touched), so the "real path" is the `go test` invocation itself; the API was not booted and no compose stack was started (nothing to clean up — `docker ps`/`pgrep` untouched). The plan file is recorded in the worktree's uncommitted copy, per the orchestrator's instruction, not in ROOT.
+
+**Reproduction (mutation check, Task 2, not committed):**
+- `requirePostgres` body → `t.Helper(); t.Skip("mutant"); return nil`: `--- FAIL: TestRequirePostgresProceedsWithTestDatabaseURL` — `integration_gate_test.go:55: requirePostgres must not skip when TEST_DATABASE_URL is set`.
+- `requireRedisURL` body → `t.Helper(); t.Skip("mutant"); return ""`: `--- FAIL: TestRequireRedisURLProceedsWithTestRedisURL` — `integration_gate_test.go:74: requireRedisURL must not skip when TEST_REDIS_URL is set`.
+- After `git checkout`: `git diff origin/main -- internal/store/integration_test.go` → 0 lines.
+
+**Verification output:**
+```
+go test ./internal/store/ -count=1 -v -run 'RequirePostgres|RequireRedisURL'
+--- PASS: TestRequirePostgresSkipsWithoutTestDatabaseURL
+--- PASS: TestRequireRedisURLSkipsWithoutTestRedisURL
+--- PASS: TestRequirePostgresProceedsWithTestDatabaseURL
+--- PASS: TestRequireRedisURLProceedsWithTestRedisURL
+ok  .../backend/internal/store
+# same 4 top-level PASS with TEST_DATABASE_URL/TEST_REDIS_URL exported (t.Setenv overrides)
+go build ./...                      -> ok
+env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL go test ./... -count=1
+                                    -> ok for all 13 packages
+gofmt -l .                          -> empty
+go vet ./...                        -> ok
+git diff --name-only origin/main -- internal/store -> backend/internal/store/integration_gate_test.go
+```
+
+**CI:** https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36296624644 — success (backend-unit, backend-integration, frontend, docker-images, harness-tooling all green) on `4ccdf4d`.

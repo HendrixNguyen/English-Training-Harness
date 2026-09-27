@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md
-status: approved
+status: done
 priority: low
 merged: false
+branch: harness/2026-09-27-low-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn
+worktree: .worktrees/2026-09-27-low-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn
 ---
 # The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan
 
@@ -50,3 +52,27 @@ grep -n 'Google-assigned' internal/google/service.go ../harness/CODEMAP.md
 - No sentence in `service.go` or CODEMAP still claims the Calendar half is unconditionally covered (`grep -n 'Calendar half is covered' internal/google/service.go` shows only the qualified sentence).
 - `git diff origin/main -- internal/google/fakes_test.go` is empty.
 - CI is green on the pushed branch.
+
+## Execution summary
+
+Branch `harness/2026-09-27-low-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn`, head `44df75a` (commits `347b6d0` test, `6658d6e` service.go docs, `44df75a` CODEMAP). All three tasks done as written; no behaviour change.
+
+- **Task 1:** `TestAFailedSaveAfterTheGoneIDFallbackOrphansTheEventAndIsDocumented` added after `TestAReservedButGoneIDFallsBackToAGoogleAssignedInsert`. It passes on current code (it pins existing behaviour; stated in the commit body). Mutation check: changing the fallback's `ev.ID = ""` to a deterministic id makes it FAIL (`after first sync: inserted=[{… ID:aelpu1x}]`); reverted.
+- **Task 2:** `Sync` doc now says the Calendar half is covered by the deterministic id *except after the 410 fallback*; the fallback inline comment points to Sync's doc and the new test.
+- **Task 3:** CODEMAP google bullet names both documented orphan windows.
+
+Verification (real output, abridged):
+```
+--- PASS: TestAFailedSaveAfterTheEventInsertDoesNotCreateASecondEvent
+--- PASS: TestAReservedButGoneIDFallsBackToAGoogleAssignedInsert
+--- PASS: TestAFailedSaveAfterTheGoneIDFallbackOrphansTheEventAndIsDocumented
+--- PASS: TestAFailedSaveAfterTheListInsertOrphansTheListAndIsDocumented
+go test ./... -count=1   -> ok for all 14 packages
+gofmt -l .               -> (empty);  go vet ./... -> ok;  go build ./... -> ok
+grep 'Google-assigned'   -> service.go:45, service.go:99, CODEMAP.md:18
+grep 'Calendar half'     -> only service.go:42, the qualified sentence
+git diff origin/main -- internal/google/fakes_test.go -> empty
+```
+CI: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36296809833 — success (backend-unit, backend-integration, frontend, docker-images, harness-tooling).
+
+Deviations: none in code. The app was not booted with compose: the change is comments plus one unit test, so no runtime path changed. The build and the CI docker-images/backend-integration jobs cover it. Nothing was left running. Only `origin/main` was used as base; `fakes_test.go` and `token*.go` untouched.
