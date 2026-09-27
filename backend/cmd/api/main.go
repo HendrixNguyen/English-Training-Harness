@@ -137,7 +137,7 @@ func main() {
 		time.Now,
 	)
 
-	questRepo := quests.NewPgRepo(pg.Pool) // satisfies both QuestRepo and ProgressRepo
+	questRepo := quests.NewPgRepo(pg.Pool) // satisfies QuestRepo, ProgressRepo and ContentRepo
 	questSvc := quests.NewService(
 		studyCounter,
 		questRepo,
@@ -145,6 +145,7 @@ func main() {
 		pet.NewQuestHook(petSvc),
 		time.Now,
 	)
+	contentSvc := quests.NewContentService(questRepo, aiRouter, airouter.NewRedisRateLimiter(rdb), time.Now)
 
 	var workers sync.WaitGroup
 	// Spec §8 hourly cron, in-process (§2.1). Sweeps at every :00 UTC.
@@ -181,6 +182,7 @@ func main() {
 	guarded := v1.Group("", auth.Require(tokens, sessions))
 	guarded.GET("/quests/daily", quests.DailyHandler(questSvc))
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
+	guarded.GET("/quests/exercises/:id", quests.ExerciseHandler(contentSvc))
 	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
 	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
 	guarded.POST("/settings/notifications", notify.SettingsHandler(notifySvc))
