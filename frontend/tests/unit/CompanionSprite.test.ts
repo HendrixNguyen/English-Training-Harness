@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CompanionSprite from '~/components/retro/CompanionSprite.vue'
 import { PLANT_STAGES } from '~/utils/plant'
@@ -105,5 +106,55 @@ describe('CompanionSprite static reactions under reduced motion (design amend A4
     expect(vi.getTimerCount()).toBe(0)
     vi.advanceTimersByTime(1000)
     expect(w.emitted('reacted')).toBeUndefined()
+  })
+})
+
+describe('CompanionSprite reduced default (design amend A4)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('with no reduced prop, falls back to the OS setting: holds the static frame, then emits reacted', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: CompanionSpriteMocked } = await import('~/components/retro/CompanionSprite.vue')
+    const w = mount(CompanionSpriteMocked, { props: { stage: 'sprout', health: 80, react: 'hit' } })
+    expect(w.attributes('data-frame')).toBe('1')
+    vi.advanceTimersByTime(300)
+    expect(w.emitted('reacted')).toEqual([['hit']])
+  })
+
+  it('an explicit reduced=false overrides the OS setting: the animation class is applied', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: CompanionSpriteMocked } = await import('~/components/retro/CompanionSprite.vue')
+    const w = mount(CompanionSpriteMocked, { props: { stage: 'sprout', health: 80, react: 'hit', reduced: false } })
+    expect(w.classes()).toContain('retro-hop')
+  })
+})
+
+describe('CompanionSprite live OS flip (design A11)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('mounted without reduced, the OS flipping to reduced mid-session holds the frame and then emits reacted', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: CompanionSpriteMocked } = await import('~/components/retro/CompanionSprite.vue')
+    const w = mount(CompanionSpriteMocked, { props: { stage: 'sprout', health: 80, react: 'hit' } })
+    expect(w.classes()).toContain('retro-hop')
+    osReduced.value = true
+    await w.vm.$nextTick()
+    expect(w.attributes('data-frame')).toBe('1')
+    vi.advanceTimersByTime(300)
+    await w.vm.$nextTick()
+    expect(w.emitted('reacted')).toEqual([['hit']])
   })
 })

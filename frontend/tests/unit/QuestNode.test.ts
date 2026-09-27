@@ -127,3 +127,21 @@ describe('QuestNode cursor reduced default (design amend A4)', () => {
     expect(w.find('svg').classes()).toContain('retro-blink')
   })
 })
+
+describe('QuestNode cursor live OS flip (design A11)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('mounted without reduced, the OS flipping to reduced mid-session drops retro-blink', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: QuestNodeMocked } = await import('~/components/retro/QuestNode.vue')
+    const w = mount(QuestNodeMocked, { props: { task, index: 0, state: 'current' } })
+    expect(w.find('svg').classes()).toContain('retro-blink')
+    osReduced.value = true
+    await w.vm.$nextTick()
+    expect(w.find('svg').classes()).not.toContain('retro-blink')
+  })
+})

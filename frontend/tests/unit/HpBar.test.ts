@@ -70,3 +70,21 @@ describe('HpBar reduced default (design amend A4)', () => {
     expect(w.find('[data-fill]').attributes('style') ?? '').toContain('transition')
   })
 })
+
+describe('HpBar live OS flip (design A11)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('mounted without reduced, the OS flipping to reduced mid-session drops the transition', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: HpBarMocked } = await import('~/components/retro/HpBar.vue')
+    const w = mount(HpBarMocked, { props: { value: 50 } })
+    expect(w.find('[data-fill]').attributes('style') ?? '').toContain('transition')
+    osReduced.value = true
+    await w.vm.$nextTick()
+    expect(w.find('[data-fill]').attributes('style') ?? '').not.toContain('transition')
+  })
+})

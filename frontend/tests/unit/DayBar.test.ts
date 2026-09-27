@@ -54,3 +54,23 @@ describe('DayBar reduced default (design amend A4)', () => {
     expect(w.find('[data-segment]').attributes('style') ?? '').toContain('transition')
   })
 })
+
+describe('DayBar live OS flip (design A11)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('mounted without reduced, the OS flipping to reduced mid-session drops the transition', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: DayBarMocked } = await import('~/components/retro/DayBar.vue')
+    const w = mount(DayBarMocked, { props: { valueSeconds: 1200 } })
+    expect(w.find('[data-segment]').attributes('style') ?? '').toContain('transition')
+    osReduced.value = true
+    await w.vm.$nextTick()
+    for (const seg of w.findAll('[data-segment]')) {
+      expect(seg.attributes('style') ?? '').not.toContain('transition')
+    }
+  })
+})

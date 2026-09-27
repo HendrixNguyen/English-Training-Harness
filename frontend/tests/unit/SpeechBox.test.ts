@@ -73,3 +73,61 @@ describe('SpeechBox reduced default (design amend A4)', () => {
     expect(w.find('[data-typed]').text()).toBe('')
   })
 })
+
+describe('SpeechBox live OS flip (design A11)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('flipping the OS setting mid-line reveals the whole line and emits settled exactly once', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: SpeechBoxMocked } = await import('~/components/retro/SpeechBox.vue')
+    const w = mount(SpeechBoxMocked, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80 } })
+    vi.advanceTimersByTime(30 * 2)
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('Tớ')
+    osReduced.value = true
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('Tớ khát rồi')
+    expect(w.emitted('settled')).toHaveLength(1)
+  })
+
+  it('flipping the OS setting after the line has already settled does not emit settled again', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: SpeechBoxMocked } = await import('~/components/retro/SpeechBox.vue')
+    const w = mount(SpeechBoxMocked, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80 } })
+    vi.advanceTimersByTime(30 * 'Tớ khát rồi'.length)
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('Tớ khát rồi')
+    expect(w.emitted('settled')).toHaveLength(1)
+    osReduced.value = true
+    await w.vm.$nextTick()
+    expect(w.emitted('settled')).toHaveLength(1)
+  })
+
+  it('flipping the OS setting true then false after the reveal does not retype; a new line types normally', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: SpeechBoxMocked } = await import('~/components/retro/SpeechBox.vue')
+    const w = mount(SpeechBoxMocked, { props: { line: 'Aaa', name: 'Mầm', stage: 'sprout', health: 80 } })
+    vi.advanceTimersByTime(30)
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('A')
+    osReduced.value = true
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('Aaa')
+    osReduced.value = false
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('Aaa')
+    await w.setProps({ line: 'Bbb' })
+    expect(w.find('[data-typed]').text()).toBe('')
+    vi.advanceTimersByTime(30 * 3)
+    await w.vm.$nextTick()
+    expect(w.find('[data-typed]').text()).toBe('Bbb')
+  })
+})

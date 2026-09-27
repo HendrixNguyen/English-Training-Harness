@@ -75,3 +75,24 @@ describe('Chest reduced default (design amend A4)', () => {
     expect(w.find('[data-glyph="chestOpen"]').exists()).toBe(true)
   })
 })
+
+describe('Chest live OS flip (design A11)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('mounted without reduced, the OS flipping to reduced mid-session opens at once on the next open', async () => {
+    const osReduced = ref(false)
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => osReduced }))
+    const { default: ChestMocked } = await import('~/components/retro/Chest.vue')
+    const w = mount(ChestMocked, { props: { items, open: false } })
+    osReduced.value = true
+    await w.vm.$nextTick()
+    await w.setProps({ open: true })
+    expect(w.find('[data-glyph="chestOpen"]').exists()).toBe(true)
+    expect(w.emitted('opened')).toHaveLength(1)
+  })
+})

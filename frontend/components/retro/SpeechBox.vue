@@ -49,6 +49,7 @@ function startTyping() {
 }
 
 watch(() => props.line, startTyping, { immediate: true })
+watch(isReduced, (r) => { if (r) revealAll() })
 onBeforeUnmount(clearTimer)
 
 const typed = computed(() => props.line.slice(0, visibleChars.value))
