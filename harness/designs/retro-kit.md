@@ -26,7 +26,7 @@
 | `growth` | `#3DE1B0` (was `#10B981`) | **kept, hex changes**; `growth-deep` `#178A69` new |
 | `torch` `torch-deep` | `#F2A83B` `#B8641E` | new |
 | `ember` `ember-deep` | `#FF5A4E` `#B3261E` | new |
-| `streak` → `torch`, `alert` → `ember`, `mute` → `ink-2` | same hex as their target (`streak: tokens.torch`) | aliases until plan 6, then deleted; v1 components keep compiling and pick up the v2 hue |
+| `streak` `alert` `mute` | **superseded by A8:** pinned to their v1 hex `#F59E0B` `#EF4444` `#64748B` (were aliases of `torch`/`ember`/`ink-2`) | v1-only; no file under `components/retro/` references them; deleted in plan 6 |
 | `ink` `paper` `paper-dark` | `#1E293B` `#F8FAFC` `#0F172A` unchanged | v1-only; deleted in plan 6 with the `html` rule in `main.css` |
 | `borderRadius` | `card: 16px`, `btn: 12px` unchanged | v1-only, deleted in plan 6. Retro components use built-ins only: `rounded-none` (0) and `rounded-sm` (2 px). No new radius token. |
 | `fontFamily` | `display: ['VT323', 'monospace']` · `body: ['Nunito', 'system-ui', 'sans-serif']` | replaces Fraunces / Source Sans 3 |
@@ -181,7 +181,7 @@ Fixed strings owned by the kit components (Vietnamese, sentence case): `QuestNod
 - Review checks beyond the acceptance list: the sprout at 128 px matches the sketch pixel for pixel; the five other stages keep the pot rows identical (diff rows 22–31 of each `COMPANION` entry); `ls .output/public/_nuxt | grep -c woff2` is 9.
 
 ## Acceptance
-- [ ] `tests/unit/tokens.test.ts` proves every text pair in §6 ≥ 4.5:1 with the v2 hex; `streak`/`alert`/`mute` equal `torch`/`ember`/`ink-2`; `paper`, `paper-dark`, `ink`, `card`, `btn` still exist.
+- [ ] `tests/unit/tokens.test.ts` proves every text pair in §6 ≥ 4.5:1 with the v2 hex; `streak`/`alert`/`mute` hold their v1 hex (A8, supersedes "equal `torch`/`ember`/`ink-2`"); `paper`, `paper-dark`, `ink`, `card`, `btn` still exist.
 - [ ] No file under `components/retro/` uses a radius above 2 px, a blur, a gradient, a scale tween, an easing curve or a `dark:` variant (`retroRadius.test.ts`).
 - [ ] `HpBar` fill width is a multiple of 4 px for every value 0–100 and the tone changes at 30 and 60; `DayBar` renders three segments and the revive single segment.
 - [ ] Every `RetroButton` variant is 48 px tall and ≥ 48 px wide; `QuestNode` tiles are 56 px; `MapNode` tiles are 40 px with a ≥ 44 px hit area (`p-0.5` on the wrapper).
@@ -299,3 +299,110 @@ Every reaction control writes the emitted events into a `<pre data-log>`. Then r
    This holds both in fake-timer tests and in the browser `[data-log]` after 400 ms. No emit follows an unmount mid-hold.
 9. The `QuestNode` and `MapNode` buttons show a 2 px `torch` outline with a 2 px offset on keyboard focus and no v1 growth ring. The actionable tiles drop 2 px with a `line-dim` border on `:active`, with no transition. The MapNode button measures 44×44 around a 40×40 tile.
 10. No page file, copy string or token changes (`git diff` of `pages/`, `tailwind.config.ts` and §7's strings is empty); `retroRadius.test.ts` still passes with no `dark:` in `components/retro/`. `pages/_kit.vue` is not in `git ls-files`. `npm run lint`, `typecheck`, `test:unit` and `build` are green, and CI is green on the pushed branch.
+
+## Addendum 2 2026-09-27 — amend 2 after re-review
+Scope: a second amend on the kit branch (`amends:` plan 1) for the blocker `retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md`, with the medium bug `retro-amend-tests-miss-live-reduced-motion-flips-and-the-sta.md` folded in (A11). Where this addendum disagrees with §1, §0 Q1 or amend acceptance 10 ("no page file changes"), this addendum wins, for the page lines listed in A9 only. No layout change, no copy change, no new token.
+
+### A8. Decision: v1 aliases pinned; v1 text on a filled colour is `ground-0`; v1 green text follows the scheme
+**Rule.** `streak`, `alert` and `mute` go back to their `main` hex, because they are v1-only names the kit never draws. `growth` keeps its v2 hex, because the kit draws with it. Every v1 text node that sat on a `growth` or `alert` fill in white switches to `text-ground-0`. v1 `text-growth` becomes `text-ink dark:text-growth` below 24 px and `text-growth-deep dark:text-growth` at 24 px and up, and on glyphs. The v1 focus ring follows the same light/dark split.
+
+*Floor chosen: no v1 pair worse than `main`, every pair that passes on `main` still passes, and every pair this amend touches reaches AA* (4.5:1, or 3:1 for text ≥ 24 px and for glyphs/rings). Full AA on every v1 pair in both schemes is **not reachable with one hex per token**. A colour needs relative luminance ≤ 0.183 to reach 4.5:1 on white and ≥ 0.273 to reach it on the v1 dark card `ink` #1E293B, and no hex does both. So the remaining pre-existing pairs (table below) would need scheme-aware tokens or `dark:` edits on about 20 page lines. Plans 2–6 delete those surfaces anyway: each screen moves to `ground-0`, where the kit pairs apply. Each screen plan's acceptance must show that its screen has none of them.
+
+Ratios (WCAG, computed 2026-09-27 from the hex in `tailwind.config.ts` @2e0125c):
+
+| v1 pair (fg on bg) | scheme | `main` | @2e0125c | after A8 | floor |
+|---|---|---|---|---|---|
+| white → **`ground-0`** on `growth` fill (AppButton primary, avatar, QuestRow "Học", RoadmapNode today) | both | 2.54 | 1.67 | **11.69** | 4.5 |
+| white → **`ground-0`** on `alert` fill (AppButton danger, hub banner, revive alert) | both | 3.76 | 3.08 | **5.18** | 4.5 |
+| `mute` on `paper` / white | light | 4.55 / 4.76 | 3.38 / 3.53 | **4.55 / 4.76** | 4.5 |
+| `mute` on `paper-dark` / `ink` | dark | 3.75 / 3.07 | 5.05 / 4.14 | 3.75 / 3.07 | = main (pre-existing) |
+| small `text-growth` → **`ink`** on white / `paper` | light | 2.54 / 2.42 | 1.67 / 1.59 | **14.63 / 13.98** | 4.5 |
+| large/glyph `text-growth` → **`growth-deep`** on white / `paper` | light | 2.54 / 2.42 | 1.67 / 1.59 | **4.31 / 4.12** | 3 |
+| `text-growth` on `paper-dark` / `ink` | dark | 7.04 / 5.77 | 10.71 / 8.77 | **10.71 / 8.77** | 4.5 |
+| focus ring `growth` → **`growth-deep`** on white / `paper` | light | 2.54 / 2.42 | 1.67 / 1.59 | **4.31 / 4.12** | 3 |
+| `text-streak` on white / `paper` | light | 2.15 / 2.05 | 2.01 / 1.92 | 2.15 / 2.05 | = main (pre-existing) |
+| `text-streak` on `paper-dark` / `ink` | dark | 8.31 / 6.81 | 8.87 / 7.27 | **8.31 / 6.81** | 4.5 |
+| `text-alert` on `paper-dark` (bare) | dark | 4.74 | 5.80 | **4.74** | 4.5 |
+| `text-alert` on `alert/10` over white · `paper` · `ink` · `paper-dark` | both | 3.29 · 3.17 · 3.56 · 4.35 | 2.74 · 2.64 · 4.25 · 5.20 | = main | = main (pre-existing) |
+
+- **Why pin rather than re-hue.** Pinning `alert` is the only choice that does not regress the light error text (`ember` on the `alert/10` tint is 2.74 < 3.29). Pinning `streak` keeps the light streak pill at `main`'s value (`torch` would give 2.01 < 2.15). Pinning `mute` restores light AA across its 19 uses. The dark `mute` value falls back from the branch's 5.05 to `main`'s 3.75, which is exactly `main`; that is a documented trade, not a regression.
+- **Why `ground-0` and not white on fills.** It is the kit's own pair (RetroButton primary is `bg-growth text-ground-0`). It passes on both hex values of `alert` and in both schemes, because a fill looks the same in either scheme. Hover `/90` stays above the floor over white (growth 12.19, alert 5.79) and over `ink` (growth 9.88). Danger hover over `ink` is 4.47, a hover-only state on revive's dark card; the white-text version on `main` measures 4.36 there, and 3.76 at rest.
+- **Why `ink` for small green text in light.** No kit token gives a green ≥ 4.5:1 on white (`growth-deep` is 4.31). The done state is still carried by the copy ("Xong", "✓ Đã hoàn thành") and by the `growth-deep` `[✓]` glyph beside it.
+- **Kit untouched.** `growth`, `growth-deep`, `ground-0`, `torch`, `ember` keep their hex, and every kit pair in §6 and A2 is unchanged. `components/retro/*` never uses `streak`/`alert`/`mute` classes (guard in A10). `CompanionSprite`/`HpBar` already map the tone *names* straight to `tokens.torch`/`tokens.ember`.
+- **Non-text graphics, accepted until their screen plan:** the v1 progress fills (`bg-growth` against the `mute/20` track: light 1.97 → 1.30, dark 4.67 → 7.10), the selected-option `border-growth` (light 2.54 → 1.67; ContentViewer, GoalCard, onboarding), and the `PlantSvg` `text-growth` fill. The bars carry numeric text, and plans 2–6 replace all three with `HpBar`/`DayBar`/`CompanionSprite`. The evaluator may file the selected-option border as a low bug.
+- **Pending branches** (growth moment, roadmap tree, name-your-plant, streak shield): whichever of each pair merges second applies A8 to its new lines. `text-streak`/`text-alert`/`text-mute` need nothing once the pins land. On roadmap-tree `components/roadmap/RoadmapNode.vue`, the `HÔM NAY` pill at :33 and the button at :45 become `text-ground-0`; the `statusClass` today branch at :12 becomes `text-ink dark:text-growth`, because it is 13 px; and the :22 ring becomes `focus-visible:ring-growth-deep dark:focus-visible:ring-growth`. On roadmap-tree, `components/roadmap/RoadmapMarker.vue:10` becomes `border-growth text-growth-deep dark:text-growth`, because it is a glyph. On growth-moment, `components/plant/GrowthChip.vue:9` becomes `bg-growth/15 text-ink dark:text-growth`: 13.38 light, and 6.21 on `ink` in dark.
+
+### A9. Build contract (line numbers @2e0125c)
+| File:line | Change |
+|---|---|
+| `frontend/tailwind.config.ts:37-42` | `streak: '#F59E0B'`, `alert: '#EF4444'`, `mute: '#64748B'` (move into `v1Only`); comment: "v1-only, pinned to v1 hex (design A8); the kit never uses them; deleted in plan 6" |
+| `frontend/assets/css/main.css:14-15` | `:focus-visible { @apply outline-none ring-2 ring-growth-deep ring-offset-2 }`; inside the existing dark `@media` block (:9) add `:focus-visible { @apply ring-growth }` |
+| `frontend/components/ui/AppButton.vue:16-17` | `primary: 'bg-growth text-ground-0 hover:bg-growth/90'` · `danger: 'bg-alert text-ground-0 hover:bg-alert/90'` |
+| `frontend/components/AppHeader.vue:21` | `text-white` → `text-ground-0` |
+| `frontend/components/quest/QuestRow.vue:13` | `'text-growth'` → `'text-growth-deep dark:text-growth'` (glyph) |
+| `frontend/components/quest/QuestRow.vue:18` | `text-white` → `text-ground-0` |
+| `frontend/components/quest/QuestRow.vue:21` | `'text-growth'` → `'text-ink dark:text-growth'` (14 px) |
+| `frontend/components/roadmap/RoadmapNode.vue:11` | `today: 'border-growth bg-growth text-ground-0 scale-105'` |
+| `frontend/components/ui/SegmentedProgress.vue:24` | `met ? 'text-growth-deep dark:text-growth' : ''` (24 px) |
+| `frontend/pages/index.vue:32` | `text-white` → `text-ground-0` (the inner "Cứu cây ngay" inherits) |
+| `frontend/pages/revive.vue:48` | `text-growth` → `text-growth-deep dark:text-growth` (24 px) |
+| `frontend/pages/revive.vue:74` | `text-white` → `text-ground-0` |
+| `frontend/pages/learn/[id].vue:90` | `text-growth` → `text-ink dark:text-growth` (16 px) |
+| `frontend/tests/unit/tokens.test.ts:41-45` | replace the alias `it` with the A10 v1 block |
+| `frontend/tests/unit/retroRadius.test.ts` | add an `it.each(files)` that fails on `/\b(text|bg|border|fill|ring|outline)-(streak|alert|mute)\b/` |
+
+### A10. `tokens.test.ts` v1 pairs (copy as written; `contrastRatio` is the existing helper)
+- `it('pins the v1-only aliases to their v1 hex (A8)')`: `alert` is `#EF4444`, `streak` is `#F59E0B`, `mute` is `#64748B`. Also `alert !== ember`, `streak !== torch`, `mute !== ink-2`.
+- `it('v1 text pairs meet the A8 floor')`, as a table of `[fg, bg, min, label]`:
+
+| fg | bg | min | scheme · use |
+|---|---|---|---|
+| `ground-0` | `growth` | 4.5 | both · text on the growth fill |
+| `ground-0` | `alert` | 4.5 | both · text on the alert fill |
+| `mute` | `paper` | 4.5 | light · caption on html |
+| `mute` | `#FFFFFF` | 4.5 | light · caption in AppCard |
+| `ink` | `#FFFFFF` | 4.5 | light · small done text |
+| `ink` | `paper` | 4.5 | light · small done text |
+| `growth-deep` | `#FFFFFF` | 3 | light · large green text, glyph, ring |
+| `growth-deep` | `paper` | 3 | light · large green text, glyph, ring |
+| `growth` | `paper-dark` | 4.5 | dark · green text |
+| `growth` | `ink` | 4.5 | dark · green text in AppCard |
+| `streak` | `paper-dark` | 4.5 | dark · streak text |
+| `streak` | `ink` | 4.5 | dark · streak text in AppCard |
+| `alert` | `paper-dark` | 4.5 | dark · bare error text |
+
+- `it('v1 pre-existing sub-AA pairs do not regress below main (A8)')`: `mute` is ≥ 3.7 on `paper-dark` and ≥ 3.0 on `ink`; `streak` is ≥ 2.0 on `#FFFFFF`; `alert` is ≥ 3.7 on `#FFFFFF`. White is a literal, since there is no `white` token.
+
+### A11. SpeechBox under a mid-line OS flip (folds the medium bug)
+- **Behaviour:** if `isReduced` turns `true` while a line is still typing, the whole line appears at once and `settled` fires exactly once. If the line had already settled, nothing happens (no second emit). If `isReduced` turns `false`, nothing happens: the shown line stays whole and the next `line` types normally.
+- **Build:** add `watch(isReduced, (r) => { if (r) revealAll() })` after `SpeechBox.vue:51`. `revealAll` already guards `settled`. Do **not** add `isReduced` to the `line` watch sources, because that would retype the line and emit again. `CompanionSprite`'s `[react, isReduced]` watch stays as it is.
+- **Tests:** follow the medium bug's expected output. The `useReducedMotion` mock returns a shared `ref(false)` that the test flips.
+  - Per consumer (Chest, DayBar, HpBar, QuestNode, SpeechBox, CompanionSprite): mount without `reduced`, flip the ref to `true`, `await nextTick()`, and assert the reduced render.
+  - SpeechBox specifically: flip after 2 characters; the full line shows and there is one `settled`. Flip after settle; still one emit.
+  - A `CompanionSprite` OS-default block: OS `true` gives the hold, then `reacted`. Explicit `reduced=false` gives the animation class.
+  - `StateBlock` error: the panel `style` contains `tokens.ember`, and the empty state's does not.
+
+### A12. Browser reproduction
+Run `nuxi dev` in the worktree with Playwright at 375×812, with no backend and `aelp.auth` seeded (as in the re-review). Stub with `page.route`:
+- `/api/v1/pet/status` → `{stage:'wilted', health_points:0, …}` for the hub banner and the revive alarm;
+- `/api/v1/quests/daily` → one `next` task, for QuestRow "Học";
+- everything else → abort.
+
+For each of `emulateMedia({colorScheme:'light'})` and `'dark'`, read the computed `color` and the first painted ancestor `background-color`, then compute the ratio:
+1. `/login` button: `rgb(11, 10, 31)` on `rgb(61, 225, 176)`, ≥ 11.6. Caption `p.text-mute`: `rgb(100, 116, 139)` on `rgb(248, 250, 252)`, 4.55 (light), or on `rgb(15, 23, 42)`, 3.75 (dark, = main).
+2. `/` avatar and QuestRow "Học": the same pair as 1. Hub banner: `rgb(11, 10, 31)` on `rgb(239, 68, 68)`, ≥ 5.1. AppCard `h2.text-mute` on `rgb(255, 255, 255)` is 4.76 (light), or on `rgb(30, 41, 59)` is 3.07 (dark, = main).
+3. `/revive`: the alarm band has the same pair as the hub banner; the danger AppButton `rgb(11, 10, 31)` on `rgb(239, 68, 68)`.
+4. `/learn/<stubbed id>`: "‹ Quay lại" is `rgb(100, 116, 139)` on `rgb(248, 250, 252)`.
+5. Tab onto the `/login` button. Computed `box-shadow` contains `rgb(23, 138, 105)` in light, and `rgb(61, 225, 176)` in dark.
+
+Screenshots `a2-{login,hub,revive}-{light,dark}-375.png` go in the plan's Notes. No computed `color` of `rgb(255, 255, 255)` may sit on a `growth` or `alert` fill.
+
+## Acceptance (amend 2)
+1. `tailwind.config.ts` has `streak #F59E0B`, `alert #EF4444`, `mute #64748B`; every v2 hex, including `growth #3DE1B0`, is unchanged, and all kit pairs in `tokens.test.ts` still pass.
+2. Every A10 pair passes in `tokens.test.ts`, and the non-regression block passes.
+3. No `text-white` remains on a `bg-growth`/`bg-alert` element under `components/` or `pages/` (`grep -rnE 'bg-(growth|alert)[^/].*text-white' frontend/components frontend/pages` prints nothing).
+4. Every A9 row is applied, and no other page line changes (`git diff --stat` touches only `pages/index.vue`, `pages/revive.vue` and `pages/learn/[id].vue` among pages, and only the listed lines). No copy or layout changes.
+5. `retroRadius.test.ts` also fails on any `streak`/`alert`/`mute` class under `components/retro/`, and passes.
+6. A12 steps 1–5 give the listed computed colours and ratios in both schemes, and the screenshots are in Notes.
+7. SpeechBox: a mid-line flip to reduced reveals the line and emits `settled` once, with no emit after settling (A11). Each of the six consumers has a live-flip test; `CompanionSprite` has the OS-default block; the `StateBlock` error test asserts `tokens.ember`.
+8. `npm run lint`, `typecheck`, `test:unit` and `build` are green, and CI is green on the pushed branch.

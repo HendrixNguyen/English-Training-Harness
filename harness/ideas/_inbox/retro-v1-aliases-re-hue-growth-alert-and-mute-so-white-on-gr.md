@@ -1,10 +1,11 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: high
 blocks: harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md
+plan: harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md
 ---
 # Retro v1 aliases re-hue growth, alert and mute, so white-on-growth buttons drop to 1.67:1 and text-mute to 3.4:1 on live v1 pages
 
@@ -31,3 +32,23 @@ The sign-in button is the first control a new learner has to read. The kit itsel
 - Uses: `frontend/components/ui/AppButton.vue:16-17`, `components/AppHeader.vue:21`, `components/quest/QuestRow.vue:18`, `components/roadmap/RoadmapNode.vue:11`, `pages/index.vue:32`, `pages/revive.vue:74`. `grep -rnoE 'text-mute' pages components` gives 19.
 - Browser (Playwright, `nuxi dev`, no backend, 375×812): `/login` button computed `rgb(255,255,255)` on `rgb(61,225,176)` = 1.67:1 in both schemes. The hub avatar is the same. Hub `text-mute` is `rgb(135,131,181)` on `rgb(248,250,252)` = 3.38:1 and on white = 3.53:1 (light). Screenshots: `harness/reviews/retro-kit-screens/rr-login-light-375.png`, `rr-hub-light-375.png`.
 - Review: `harness/reviews/2026-09-27-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n-2.md` (re-review).
+
+## Evaluation
+**Verdict: select, priority high (blocker).** It fails the review on plan 1, and a learner hits it on the first control they see (the `/login` button at 1.67:1).
+
+**Root cause (evaluator, read at `2e0125c`).** `frontend/tailwind.config.ts:37-42` defines the v1 aliases as `streak: v2.torch`, `alert: v2.ember` and `mute: v2['ink-2']`, and re-hues `growth` to #3DE1B0. Design §1 accepted this without listing the v1 text pairs drawn in those hues. `tests/unit/tokens.test.ts:41-45` asserts only that the aliases equal their v2 targets and checks kit pairs on `ground-*`, so nothing measures the v1 pairs on `paper`, white, `paper-dark` or `ink`.
+
+**Fix.** Designer rule, `harness/designs/retro-kit.md` Addendum 2, A8–A12:
+- Pin `streak`, `alert` and `mute` back to their `main` hex. They are v1-only names the kit never draws.
+- Keep `growth` at v2.
+- v1 text on a growth or alert fill becomes `text-ground-0`.
+- Small v1 green text becomes `text-ink dark:text-growth`; large text and glyphs become `text-growth-deep dark:text-growth`.
+- The v1 focus ring gets the same split.
+
+This needs 4 page lines. A8 overrides the plan-1 "no pages" rule for those lines only.
+
+**Floor.** No v1 pair is worse than on `main`, and every pair this amend touches reaches AA. Full AA on every v1 pair in both schemes cannot be done with one hex per token (proof in A8). The pairs that were already below AA stay at their `main` value until plans 2–6 replace those surfaces.
+
+**Dependencies.** None beyond the branch.
+
+**Plan.** A second amend, `amends:` plan 1, on the same branch. The medium bug `retro-amend-tests-miss-live-reduced-motion-flips-and-the-sta.md` is folded in.

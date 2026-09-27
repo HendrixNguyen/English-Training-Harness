@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md
 ---
 # Retro amend tests miss live reduced-motion flips and the StateBlock ember tone, and SpeechBox ignores a mid-line OS flip
 
@@ -25,3 +26,17 @@ The amend made the OS reduced-motion setting the default for six kit components 
 - Plan: `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`, amend `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md`, branch @ `2e0125c`.
 - Validator pass (read-only) during the re-review. The 13 touched test files pass 114/114, so these are gaps, not failures.
 - Files: `frontend/components/retro/SpeechBox.vue:51`, `frontend/tests/unit/StateBlock.test.ts:34`, `frontend/tests/unit/CompanionSprite.test.ts` (describes at :7 and :62, no `useReducedMotion` mock).
+
+## Evaluation
+**Verdict: select, priority medium; folded into the amend-2 plan for the blocker `retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md`.** It lands on the same branch and touches the same test suite, and it is small (under 1 h).
+
+**Why it matters.** A learner who turns on reduced motion mid-line keeps seeing typing. The tests also let a reverted tone binding pass unnoticed.
+
+**Root cause.** `SpeechBox.vue:51` watches only `props.line`, so an `isReduced` flip is ignored until the next line arrives. `StateBlock.test.ts:34` asserts `style.length > 0`, which `RetroPanel`'s ring always satisfies.
+
+**Fix (design A11).**
+- Add `watch(isReduced, r => { if (r) revealAll() })`. `revealAll` already guards `settled`, so the event fires only once.
+- Do not add `isReduced` to the `line` watch, because that would retype the line.
+- Add a live-flip test for each of the six consumers, an OS-default block for `CompanionSprite`, and a `tokens.ember` assertion for the `StateBlock` error state.
+
+The `CountdownTimer` re-assert and the falsy `PixelArt` palette are minor, and this plan does not cover them.

@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 13:24. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 13:39. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,9 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-- `harness/ideas/_inbox/fontsource-per-subset-css-has-no-unicode-range-so-all-nine-v.md` — Fontsource per-subset CSS has no unicode-range, so all nine VT323 and Nunito faces claim every codepoint [low]
-- `harness/ideas/_inbox/retro-amend-tests-miss-live-reduced-motion-flips-and-the-sta.md` — Retro amend tests miss live reduced-motion flips and the StateBlock ember tone, and SpeechBox ignores a mid-line OS flip [medium]
-- `harness/ideas/_inbox/retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro v1 aliases re-hue growth, alert and mute, so white-on-growth buttons drop to 1.67:1 and text-mute to 3.4:1 on live v1 pages [high]
+_none_
 
 ## Proposed
 
@@ -44,6 +42,7 @@ _none_
 - `harness/ideas/_inbox/config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` — config.go still says JWT_SECRET is not in the 1st-thinking env list, and boot refusals print config: config: [low]
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/durable-flag-and-live-row-success-tests-leave-updated-at-and.md` — Durable-flag and live-row success tests leave updated_at and the Daily error path unasserted [low]
+- `harness/ideas/_inbox/fontsource-per-subset-css-has-no-unicode-range-so-all-nine-v.md` — Fontsource per-subset CSS has no unicode-range, so all nine VT323 and Nunito faces claim every codepoint [low]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
 - `harness/ideas/_inbox/integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped [low]
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
@@ -81,6 +80,7 @@ _none_
 
 ## Approved
 
+- `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high]
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]

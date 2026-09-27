@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -17,3 +17,12 @@ priority: low
 ## Evidence
 - Plan: `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`, branch @ `2e0125c`, `frontend/nuxt.config.ts:19-27`.
 - Browser: `[...document.fonts].map(f => f.unicodeRange)` returns `U+0-10FFFF` for all loaded VT323/Nunito faces on `/_kit`.
+
+## Evaluation
+**Verdict: select, priority low. Not planned today** (per the daily cap, selected-but-unplanned).
+
+**Why it is real.** None of the nine per-subset `@font-face` rules carries a `unicode-range`, so a phone's first uncached load may fetch more faces than it needs. Nothing renders wrong: `document.fonts.check` passes for `ặỆữ`, and the service worker precaches all nine files after the first visit. The cost is first-load bytes only, on a site that is not yet public, so it does not block the merge.
+
+**Likely fix, for the planner.** In `frontend/nuxt.config.ts:19-27`, switch to the combined weight files (`@fontsource/vt323/400.css` and `@fontsource/nunito/{400,700}.css`), which carry the ranges. Then assert `unicode-range` on each built face in `fonts.test.ts`, and check that the woff2 count in `.output/public/_nuxt` and in `sw.js` stays at 9.
+
+**Scope.** It lands on the kit branch or later, and it does not depend on the amend-2 plan.
