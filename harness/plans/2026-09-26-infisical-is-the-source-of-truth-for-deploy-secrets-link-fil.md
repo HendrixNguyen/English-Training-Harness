@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md
-status: draft
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-26-medium-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil
+worktree: .worktrees/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil
 ---
 # Infisical is the source of truth for deploy secrets: `.infisical.json` in the repo, an "Env source of truth" runbook section, Railway sync by Infisical — Plan
 
@@ -56,3 +58,38 @@ python3 tools/harness/cli.py validate
 git push -u origin harness/2026-09-26-medium-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil   # CI green (harness-tooling; nothing else changes)
 ```
 Owner (not the executor): `infisical export --env prod --format dotenv > /tmp/check.env && wc -l /tmp/check.env && rm /tmp/check.env` from a fresh clone prints 24+ lines.
+
+## Execution summary
+
+**Built** on `harness/2026-09-26-medium-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil` (worktree `.worktrees/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil`, base `origin/main` 0392e5d), three commits:
+- `0e272f6` deploy: `.infisical.json` (`workspaceId` 8573a7c5-4e89-4d44-8ead-8f4bc8528cc9 — matches the idea — and `defaultEnvironment: prod`, nothing else) + the `.gitignore` comment under `.env*`.
+- docs: new `## Env source of truth — Infisical` between *Environment* and *Target A* with the seven points in plan order; owner checklist gets the `infisical login && infisical export …` box first, the secrets box stores into Infisical `prod`, the Railway box says variables are synced from Infisical, the `FRONTEND_ORIGIN` box sets it in Infisical; *Smoke check* gets the `infisical run --env prod -- sh -c 'deploy/smoke-api.sh "$API_URL" "$PAGES_URL"'` example; CODEMAP Deploy paragraph gets the Infisical sentence.
+- docs: Target B paste step and the *Run it locally* gitignore note point at `infisical export`.
+
+**Deviations**
+- No "fill the file" wording existed (`grep -n fill deploy/README.md` → nothing), so the Infisical box was **prepended** as the new first box rather than replacing one; the Supabase/Upstash boxes stay as first-time setup.
+- After Task 2 as written, `grep -c 'infisical' deploy/README.md` was **6** (< 8, it counts lowercase lines). Added the third commit wiring `infisical export` into the two other places that consume `deploy/.env` (Target B, Run it locally) — same intent, no new behaviour. Now 8.
+- `FRONTEND_ORIGIN` checklist box reworded to "set in Infisical, the sync pushes it" — consistent with point 5 (never hand-edit Railway).
+- No secrets were read, created or printed; no Infisical/Railway console action was taken.
+
+**Verification** (in the worktree)
+```
+$ python3 -c '…assert set(d)=={"workspaceId","defaultEnvironment"} and d["defaultEnvironment"]=="prod"; print("ok")'
+ok
+$ git check-ignore -v deploy/.env && ! git check-ignore .infisical.json
+.gitignore:8:.env*	deploy/.env          (and .infisical.json not ignored)
+$ grep -n 'Env source of truth' deploy/README.md harness/CODEMAP.md
+deploy/README.md:31:## Env source of truth — Infisical   (+ checklist lines 145/148/149, smoke, Target B, local notes)
+harness/CODEMAP.md:29:… (env table, Env source of truth, …) Env source of truth: the Infisical project id lives in `.infisical.json` …
+$ grep -c 'infisical' deploy/README.md
+8
+$ git ls-files | grep -c '^deploy/.env$'
+0
+$ python3 tools/harness/cli.py validate      → ok
+$ python3 -m unittest discover -s tools/harness/tests   → Ran 43 tests … OK
+```
+
+### Runtime proof
+Documentation + one JSON link file; nothing to build or boot (the plan says "no code"). The `infisical` commands need the owner's login and are the owner's check (below). CI on the pushed branch: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36303403232 — **success** (backend-unit, backend-integration, frontend, docker-images, harness-tooling all green).
+
+**Owner-side:** from a fresh clone, `infisical login` then `infisical export --env prod --format dotenv > /tmp/check.env && wc -l /tmp/check.env && rm /tmp/check.env` should print 24+ lines; set up the Infisical → Railway secret sync (Railway account token → Infisical Railway connection → `prod` → project `english-learning` / env `production` / service `api`, auto-redeploy on); optionally add `API_URL`/`PAGES_URL` to `prod` for the `infisical run` smoke example.

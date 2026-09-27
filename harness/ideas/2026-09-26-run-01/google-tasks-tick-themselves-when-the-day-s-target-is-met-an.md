@@ -1,10 +1,11 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 3
 priority: medium
+plan: harness/plans/2026-09-27-google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md
 ---
 
 ## Why
@@ -31,3 +32,5 @@ Technical (backend `google`, hook from `quests`; frontend copy only):
 
 ## Evaluation
 _Evaluator, 2026-09-27 — daily decide (feature queue)._ **Select — medium, not planned today.** *Is the Why real?* Yes: `google.Sync` inserts 28 tasks and never touches them again (`tasks.go` has no patch and keeps no ids), so the Google surface lies from day 2. *One plan?* Yes, backend-only (~1 day), no design doc. *Dependencies:* a new table (two unmerged branches already add `0004_*`), a hook beside `Pet.OnTargetMet` in `quests/pet.go` (edited by the unmerged `…a-pet-state-failure…` branch) and worker wiring in `cmd/api/main.go` (seven unmerged branches). The 2026-09-26 review run did not produce the daily PR, so planning against today's `main` would conflict at integration. Plan in the first feature slot after that PR merges; the `due-plus-re-slot…` fix applies to its ZSET too.
+
+_Evaluator, 2026-09-27 — 14:00 feature run:_ plan written — `harness/plans/2026-09-27-google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` (draft, medium). Backend-only; the optional settings-screen copy is dropped (YAGNI), so no design doc. Execution is gated on the 2026-09-26 daily PR and the listed branches being on `origin/main` (the plan's **Depends on** block).

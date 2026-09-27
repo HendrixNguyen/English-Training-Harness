@@ -30,3 +30,6 @@ Technical (backend `quests` small additive read; frontend hub):
 - `docs/PRODUCT.md` "What success looks like" (daily target hit rate, D7/D30, streak, roadmap completion); 1st-thinking §1 (≥ 30 min/day retention), §6.1 (4 modules × 7 days).
 - Prior run 2026-09-26 notes: a 7-day met/missed *strip* was dropped as a second view of roadmap-tree data; this is a once-per-week moment, not a second view.
 - Duolingo-style progress reports and why they retain: https://trophy.so/blog/how-to-create-duolingo-style-progress-reports-for-your-app ; celebrating user milestones tied to real progress: https://www.appcues.com/blog/celebrate-user-success-improve-retention
+
+## Evaluation
+_Evaluator, 2026-09-27 — 14:00 feature run._ **Deferred — left `proposed`.** Sound and small, but a once-a-week moment with lower daily impact than today's two picks, and it extends `GET /api/v1/roadmap` (roadmap-tree branch, unmerged) and mounts on `pages/index.vue`, which four unmerged branches edit. Carry over; a good candidate once the 2026-09-26 daily PR is on `main`.

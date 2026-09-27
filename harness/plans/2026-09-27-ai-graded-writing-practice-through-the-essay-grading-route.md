@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-24-run-01/ai-graded-writing-practice-through-the-essay-grading-route.md
-status: draft
+status: approved
 priority: medium
 merged: false
 ---

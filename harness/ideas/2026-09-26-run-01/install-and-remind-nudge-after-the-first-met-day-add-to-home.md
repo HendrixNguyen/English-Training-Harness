@@ -1,10 +1,11 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 5
 priority: medium
+plan: harness/plans/2026-09-27-install-and-remind-nudge-after-the-first-met-day-add-to-home.md
 ---
 
 ## Why
@@ -33,3 +34,5 @@ Technical (frontend only):
 
 ## Evaluation
 _Evaluator, 2026-09-27 — daily decide (feature queue)._ **Select — medium, not planned today.** *Is the Why real?* Yes, and it is the strongest retention argument in this run: nothing in `frontend/` handles `beforeinstallprompt` or asks for notification permission outside `/settings`, so on iPhone the whole reminder system is inert until the learner installs the PWA. *One plan?* Yes, frontend-only (~half a day) after a design doc in the retro hub. *Dependencies:* it reuses `stores/settings.ts` / `utils/push.ts` (settings branch, done, unmerged) and waits for the growth timeline's `done` (growth-moment branch, done, unmerged); both edit `pages/index.vue`, which is also changed by the retro restyle. Plan it first among this run's features once the 2026-09-26 daily PR is on `main`, designer first.
+
+_Evaluator, 2026-09-27 — 14:00 feature run:_ plan written — `harness/plans/2026-09-27-install-and-remind-nudge-after-the-first-met-day-add-to-home.md` (draft, medium). Design `harness/designs/install-and-remind-nudge-after-the-first-met-day-add-to-home.md`; frontend-only. Execution is gated on the 2026-09-26 daily PR and the listed branches being on `origin/main` (the plan's **Depends on** block).

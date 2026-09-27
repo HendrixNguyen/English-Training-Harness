@@ -35,3 +35,6 @@ Technical (backend `onboarding`; frontend onboarding page):
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-…` (selected) — the quiz endpoint has no spec block yet.
 - `docs/PRODUCT.md` "Wrong level"; 1st-thinking §1 (CEFR progression), §4 (`quiz:placement`), §5.1 step 4; backend spec §6.1.
 - Adaptive placement in practice (start moderate, harder on correct, easier on wrong; score by item difficulty): https://duolingo.fandom.com/wiki/Placement_test ; Duolingo English Test scoring white paper: https://duolingo-papers.s3.amazonaws.com/reports/Duolingo_whitepaper_test_scoring_2024_v1.pdf ; CAT item selection and calibration: https://arxiv.org/pdf/2410.21033
+
+## Evaluation
+_Evaluator, 2026-09-27 — 14:00 feature run._ **Deferred — left `proposed`.** The Why is real (two items per level cannot separate B1/B2; the day-28 re-check would repeat the same ten items), but it rewrites the same onboarding exchange as the level-result-in-30-seconds plan (draft, 2026-09-27) and the level-true branch (done, unmerged), and it only helps new sign-ups. Re-evaluate once those land; plan it together with the day-28 checkpoint's re-check.

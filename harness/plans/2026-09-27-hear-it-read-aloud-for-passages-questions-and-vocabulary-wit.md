@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-26-run-01/hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md
-status: draft
+status: approved
 priority: medium
 merged: false
 order: 2

@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/adaptive-reminder-timing-and-pre-decay-rescue-push.md
-status: draft
+status: failed
 priority: low
 merged: false
+branch: harness/2026-09-27-low-adaptive-reminder-timing-and-pre-decay-rescue-push
+worktree: .worktrees/adaptive-reminder-timing-and-pre-decay-rescue-push
 ---
 # Pre-decay rescue push: one "your plant needs {n} more minutes" Web Push at local 22:00 on an unmet day — Plan
 
@@ -313,3 +315,61 @@ git push -u origin harness/2026-09-27-low-adaptive-reminder-timing-and-pre-decay
 - **Why the flag is claimed after the met check, not before the counter read:** a met day must leave no trace; a Redis failure must not consume the day's single rescue.
 - **Why not the ZSET:** `queue:webpush:delay` carries one score per user — the *scheduled* reminder — and `Tick` sends `DefaultPayload`; enqueueing the rescue there would overwrite the user's reminder slot and send the wrong copy. The rescue goes straight through `Sender`, which is the existing send path.
 - **Runtime prerequisite (not a code dependency):** VAPID keys set on the API host (`deploy/README.md`) — like `RunWorker`, `RunRescue` starts only inside the `pushSender != nil` branch.
+
+## Execution summary
+
+**Partial by design — Tasks 1–3 done, Task 4 blocked by the plan's own dependency gate.**
+Task 4 blocked: 2026-09-26 daily PR not on origin/main.
+
+- Branch `harness/2026-09-27-low-adaptive-reminder-timing-and-pre-decay-rescue-push`, worktree `.worktrees/adaptive-reminder-timing-and-pre-decay-rescue-push`, based on `origin/main` @ `0392e5d`. Pushed.
+- Commits: `04f74ca` store: rescue:{user}:{date} key builder and 48h TTL · `b5973db` notify: Rescue.Sweep — one pre-decay rescue push at local 22:00 on an unmet day · `825d588` notify: RunRescue hourly loop; integration test for candidates and the SET NX flag.
+- Built: `store.RescueKey`/`store.RescueTTL` (append-only in `keys.go`, `TestRescueKey` in `keys_test.go`); `notify/rescue.go` (`RescueLocalHour`, `RescueCandidate`, `RescueRepo`, `(*PgRepo).RescueCandidates`, `RescueFlags`/`RedisRescueFlags`, `RescueMinutes`, `RescuePayload`, `RescueStats`, `Rescue`/`NewRescue`/`Sweep`, `NextTopOfHour`, `RunRescue`); `rescue_test.go` (11 unit tests); `rescue_integration_test.go` (`TestIntegrationRescueCandidatesAndFlagClaim`). No existing notify file touched.
+- Not built (Task 4): the `main.go` wiring (`go notify.RunRescue(ctx, rescue)`) and the CODEMAP `notify`/`store` paragraphs. Until Task 4 lands the job exists but never runs.
+
+### Deviations
+- `TestRescueKey` asserts `RescueTTL == 48*time.Hour` only; the extra `== DailyAccumulatedTTL` comparison was dropped because `go vet` flags a constant-vs-constant `||` as "suspect or" (both are 48h, so the intent is kept).
+- `TestRescueSweepSendsOnlyInLocalHour22`: with 720 s done the payload asserted is "18 phút" (1800−720 = 1080 s = 18 min); the plan's "12 min done" comment describes the input, not the copy.
+- `TestRescueSweepIsSilentWithoutASubscription` race case uses a `fixedCandidatesRepo` fake (the plan's "custom RescueRepo fake"), declared in `rescue_test.go`.
+- `TestRunRescue…`: `now` returns 14:59:59 UTC on its first reading and 15:00:00 UTC afterwards, so the sweep after the timer fires sees local hour 22 in Ho Chi Minh City (a fixed `now` would sweep at 21:59:59 and never send).
+- Integration credentials: the plan's `postgres:postgres@…/postgres` URL does not match `backend/docker-compose.yml` (`english:english@…/english`); used the compose values, per the plan's own note. Scratch project `COMPOSE_PROJECT_NAME=rescue-push`, ports 5441/6391.
+
+### Verification (from `backend/`, clean env: `env -u DATABASE_URL -u REDIS_URL -u TEST_DATABASE_URL -u TEST_REDIS_URL`)
+```
+go build ./...            → BUILD-OK
+gofmt -l .                → (empty)
+go vet ./...              → VET-OK
+go test -timeout 120s ./... -count=1 -race → ok for all 13 packages (cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store)
+go test -timeout 60s ./internal/notify -run 'Rescue|NextTopOfHour' -count=1 -race -v
+  --- PASS: TestRescueMinutes / TestRescuePayloadCopy / TestRescueSweepSendsOnlyInLocalHour22 /
+  TestRescueSweepUsesTheUsersLocalDateAcrossMidnightUTC / TestRescueSweepSendsAtMostOncePerDay /
+  TestRescueSweepSkipsAMetDay / TestRescueSweepSkipsAUserWhenRedisFails /
+  TestRescueSweepIsSilentWithoutASubscription / TestRescueSweepPrunesGoneSubscriptionsAndContinues /
+  TestNextTopOfHourRescue / TestRunRescueSweepsAndStopsWhenTheContextIsCancelled (1.00s)
+  --- SKIP: TestIntegrationRescueCandidatesAndFlagClaim (no TEST_* URLs — expected)
+Integration (docker compose up -d --wait, project rescue-push, 5441/6391; go test -timeout 300s ./... -run Integration -p 1 -count=1 -v):
+  PASS=14 SKIP=0 FAIL=0; func TestIntegration* count = 14
+  --- PASS: TestIntegrationRescueCandidatesAndFlagClaim (0.02s)
+  make down → containers and network removed; scratch .env deleted; `docker ps` shows no rescue-push containers
+git diff --stat origin/main -- internal/notify → rescue.go, rescue_integration_test.go, rescue_test.go only (704 insertions)
+git diff origin/main -- internal/store/keys.go | grep -c '^-[^-]' → 0 (append-only)
+grep RunRescue cmd/api/main.go ../harness/CODEMAP.md → absent (gate held)
+```
+
+### Runtime proof
+- No boot / end-to-end path yet: nothing in `cmd/api` calls the new code until Task 4, so starting the API would exercise none of it. The real-service path (Postgres candidates join + Redis `SET NX EX` with a 48 h TTL) is proven by the integration test above.
+- CI on the pushed branch: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36303591527 — **success** (backend-unit, backend-integration, frontend, docker-images, harness-tooling all green).
+
+### What remains for Task 4
+1. Wait for `harness/daily-2026-09-26` to exist on origin and be an ancestor of `origin/main` (gate: `git fetch origin && git merge-base --is-ancestor $(git rev-parse origin/harness/daily-2026-09-26) origin/main && echo ok`). At execution time `origin/harness/daily-2026-09-26` did not exist.
+2. Then `/harness`: set this plan `failed → approved` and re-execute Task 4 only, on this same branch: `git fetch origin main && git merge origin/main --no-edit`, add the `notify.NewRescue(...)` + `go notify.RunRescue(ctx, rescue)` block after `RunWorker` inside `if pushSender != nil { … }` (reuse a `notifyRepo` variable if the merge brings one), `go build/vet/test ./cmd/api`, CODEMAP `notify` + `store` paragraphs, commit `api: start notify.RunRescue beside RunWorker; CODEMAP`, then the boot/runtime proof and CI.
+3. Follow-ups (a)–(e) from Task 4 Step 5 still to be recorded for the reviewer.
+
+## Failure
+
+Not a code failure — the plan's dependency gate held. Reproduction:
+```
+git fetch origin
+git rev-parse -q --verify origin/harness/daily-2026-09-26   # → no such ref on origin
+git merge-base --is-ancestor $(git rev-parse origin/harness/daily-2026-09-26) origin/main && echo ok   # → fatal: Not a valid object name; not ok
+```
+Tasks 1–3 are complete, pushed and CI-green; Task 4 (`backend/cmd/api/main.go` wiring + CODEMAP) was not started, as the plan instructs. Suggested next step: once the 2026-09-26 daily PR is on `origin/main`, move this plan back to `approved` and execute Task 4 on the existing branch/worktree (no new branch).
