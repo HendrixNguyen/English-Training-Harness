@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 10:13. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 12:21. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,11 +9,20 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Restyled StateBlock and CountdownTimer put near-white ink-0 text on v1 white surfaces, so every error, empty and timer line is invisible on light-scheme phones — blocks `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/companionsprite-motion-is-off-the-pixel-grid-at-every-size-b.md` — CompanionSprite motion is off the pixel grid at every size but 128 px, levelup is a CSS filter not a palette swap, and down lacks its translate [low]
+- `harness/ideas/_inbox/companionsprite-never-emits-reacted-when-animations-are-off-.md` — CompanionSprite never emits reacted when animations are off, and reduced motion has no static reaction frames [medium]
+- `harness/ideas/_inbox/os-prefers-reduced-motion-does-not-reach-hpbar-daybar-speech.md` — OS prefers-reduced-motion does not reach HpBar, DayBar, SpeechBox typing or Chest; only the reduced prop does [medium]
+- `harness/ideas/_inbox/questnode-and-mapnode-tiles-lack-the-torch-focus-ring-and-pr.md` — QuestNode and MapNode tiles lack the torch focus ring and pressed inset, and MapNode has no 44 px hit area [medium]
+- `harness/ideas/_inbox/questnode-icon-palettes-miss-chars-their-glyphs-use-so-book-.md` — QuestNode icon palettes miss chars their glyphs use, so book, scroll and sword pixels render solid black [medium]
+- `harness/ideas/_inbox/restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Restyled StateBlock and CountdownTimer put near-white ink-0 text on v1 white surfaces, so every error, empty and timer line is invisible on light-scheme phones [high]
+- `harness/ideas/_inbox/retro-kit-components-inherit-the-v1-page-text-colour-and-ret.md` — Retro kit components inherit the v1 page text colour and RetroToast has no fill, so panel, toast and map-node text is dark-on-dark [medium]
+- `harness/ideas/_inbox/retro-kit-small-contract-gaps-hpbar-shows-unclamped-values-b.md` — Retro kit small contract gaps: HpBar shows unclamped values, bar steps use total not delta, band panels keep their ring, reduced QuestNode drops its cursor, MapNode missed ring is not ember [low]
+- `harness/ideas/_inbox/retro-kit-tests-miss-boundaries-and-one-asserts-nothing-ches.md` — Retro kit tests miss boundaries and one asserts nothing: Chest unmount, SpeechBox mid-type unmount, empty inputs, out-of-range values [low]
+- `harness/ideas/_inbox/retrobutton-keeps-its-4-px-depth-shadow-when-disabled-or-loa.md` — RetroButton keeps its 4 px depth shadow when disabled or loading [low]
 
 ## Proposed
 
@@ -88,7 +97,7 @@ _none_
 ## Done (last 10)
 
 - `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan [high] (unreviewed)
-- `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high] (unreviewed)
+- `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` — Retro kit (plan 1 of 6): v2 tokens, VT323 + Nunito, `components/retro/*`, the companion sprite — no page changes — Plan [high] (review: fail)
 - `harness/plans/2026-09-26-parseroadmap-day-sum-rejection-has-no-test-the-90-and-9-minu.md` — airouter amend: `TestParseRoadmapRejects` proves the day-sum rule — rows only the day budget can reject, keyed by reason — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-every-public-table-is-readable-and-writable-through-supabase.md` — Migration 0004: row-level security on every table (Supabase closes the anon REST hole; plain Postgres unaffected) — Plan [high] (unreviewed)
 - `harness/plans/2026-09-26-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md` — Pages ship is honest: wait for the edge before the smoke check, no `404.html` on Pages so deep links answer 200, and the `/login` return-trip check — Plan [high] (unreviewed)
