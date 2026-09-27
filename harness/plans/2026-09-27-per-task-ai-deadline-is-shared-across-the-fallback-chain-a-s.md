@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/_inbox/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md
-status: approved
+status: done
 priority: medium
 merged: false
+branch: harness/2026-09-27-medium-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s
+worktree: .worktrees/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s
 ---
 # Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan
 
@@ -116,3 +118,49 @@ git push -u origin harness/2026-09-27-medium-per-task-ai-deadline-is-shared-acro
 - **Split rule.** Even split over the providers left is the simplest rule that guarantees every configured provider a floor of `budget / n`. On the roadmap (180 s, three providers) that is 60 s for a hanging Gemini, then 60 s for OpenAI (measured 53 s) and 60 s for DeepSeek (measured 78 s — would not finish as the *third* attempt after a hang, but does as the second after a fast failure with ≈ 90 s). That is the trade-off the reviewer named (one fast failure plus one slow success) and it only bites when two providers misbehave in one call; a weighted split is a follow-up if measurements ever show it matters.
 - **Terminal 4xx classification** (`route-falls-back-on-terminal-4xx-…`, still `selected`) is deliberately not in this plan: it needs a typed provider error and a per-status policy, and this plan's own `thinkingBudget` is a fresh source of vendor-specific 400s (a Pro model rejecting `0`) that must keep falling back — see that idea's Evaluation.
 - Production runs one provider (OpenRouter), so Task 1 changes nothing there by construction (`attemptBudget(remaining, 1) == remaining`); Tasks 2–3 only matter once a Gemini key is set.
+
+## Execution summary
+
+Built and all four tasks landed as separate commits on `harness/2026-09-27-medium-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s`:
+
+1. `afad9e3` — `attemptBudget(remaining, providersLeft)` in `timeouts.go`; `Route` (`router.go`) now runs each attempt under `context.WithTimeout(ctx, budget)` derived from `time.Until(deadline)` and the count of configured-but-untried providers, decrementing after each attempt. New fakes `hang` and `deadlineProbe` in `router_test.go`; three new `Route` tests plus the `attemptBudget` table in `timeouts_test.go`.
+2. `e60d784` — `GeminiProvider.thinkingBudget` (new `NewGeminiProvider` parameter), sent as `generationConfig.thinkingConfig.thinkingBudget`; `Config.GeminiThinkingBudget` / `GEMINI_THINKING_BUDGET` (`strconv.Atoi`, default `DefaultGeminiThinkingBudget = 0`, logs and defaults on a parse error). Confirmed via context7 (Google's public Gemini API docs, 2026-09-27) that the classic `generateContent` endpoint this package calls still accepts `thinkingConfig.thinkingBudget`; Google's newer Interactions API (`v1beta/interactions`, gemini-3.x) has moved to a `thinking_level` enum, but its own docs say "`thinking_budget` is retained for backward compatibility" and that the two must not be combined on one request — so `thinkingBudget` was kept rather than switched to `thinkingLevel`. Recorded in `gemini.go`'s doc comment.
+3. `5b0bfc6` — a Gemini STOP (or absent-finishReason) candidate whose joined text is blank now returns `gemini: empty response (finishReason %q)` (checked after the finishReason branch, so `SAFETY` still names itself); an OpenAI-compatible empty `choices[0].message.content` returns `openai-compat(<model>): empty response` (checked after `logCall` so the token-usage line still reaches the operator on a blank answer).
+4. `b6f33af` — `harness/CODEMAP.md`'s airouter bullet and `CLAUDE.md`'s AI router paragraph + env-variable list updated. `backend/.env.example` / `deploy/.env.example` were left untouched (owned by unmerged branches per the plan) — see Follow-ups.
+
+### Deviations from the plan
+- **Plan-file bookkeeping done from the worktree, not ROOT.** The orchestrator's task explicitly said not to edit or stage anything in the main checkout for this run (it was mid-session on `harness/review-auto-merge` with another session's uncommitted work, and not even on the branch that carries this plan file). So `cli.py set status=executing/…` and this summary were applied to the plan's copy inside `.worktrees/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s/harness/plans/...md` instead of ROOT's, and were **not committed to the pushed branch** (only `harness/CODEMAP.md` is a harness-file change carried by the branch, per the plan's own File structure). The owner/orchestrator will need to replay `status=done` (see below) onto ROOT's copy once it is back on a branch that has this file, or accept this worktree's copy as the record.
+- No other deviations; all Tasks/Steps followed as written.
+
+### Verification (plan's block, from `.worktrees/.../backend`)
+```
+$ go build ./... && gofmt -l internal/airouter && go vet ./internal/airouter
+(clean)
+$ go test -timeout 120s ./internal/airouter -count=1 -race -v 2>&1 | grep -E '^(--- |ok|FAIL)'
+... 41 tests, all PASS or SKIP (TestIntegrationRateLimiterAllowsFiveThenBlocks skips locally) ...
+ok  	github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter	2.472s
+$ go test -timeout 300s ./... -count=1
+ok for every package (cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store)
+$ grep -n 'attemptBudget' internal/airouter/timeouts.go internal/airouter/router.go        → present
+$ grep -n 'thinkingBudget' internal/airouter/gemini.go internal/airouter/gemini_test.go    → present
+$ grep -n 'GEMINI_THINKING_BUDGET' internal/airouter/config.go ../CLAUDE.md ../harness/CODEMAP.md → present
+$ grep -n 'empty response' internal/airouter/gemini.go internal/airouter/openai.go         → present
+$ git diff --name-only origin/main
+CLAUDE.md, backend/internal/airouter/{config,config_test,gemini,gemini_test,openai,openai_test,router,router_test,timeouts,timeouts_test}.go, harness/CODEMAP.md
+(+ harness/STATE.md, harness/plans/<this file>.md — uncommitted local bookkeeping only, not part of the 4 pushed commits)
+```
+
+### Runtime proof
+This plan changes only the AI-provider fallback/timeout logic inside `internal/airouter`, which has no HTTP routes of its own ("No routes, no tables" — CODEMAP) and, per the plan's own Global Constraints, needs no Docker services ("Unit tests only — nothing here needs Docker; do not run `make up`"). Runtime evidence within that scope:
+- `go build -o /tmp/... ./cmd/api` succeeds — the binary that wires `airouter.NewRouter` still builds.
+- Run without any env vars: `2026/09/27 10:27:04 config: DATABASE_URL is required` then a clean exit — the documented "no env vars" failure mode is safe (no panic, no partial startup), unchanged by this fix.
+- The actual bug path — a hanging preferred provider starving the fallback — is exercised end-to-end through the real, unmodified `Router.Route` call path (not mocked out) by `TestRouteCutsAHangingPreferredProviderSoTheFallbackStillAnswers`: a `hang` provider that genuinely blocks on `<-ctx.Done()` under a real 200ms `context.WithTimeout`, alongside a fallback that answers — this reproduces the exact scenario in the idea's "Evidence" section (`hang` provider as `ProviderGemini`, immediate provider as `ProviderOpenAI`) and now returns the fallback's answer well within the deadline, where before this fix it returned `err=context deadline exceeded, fallbackCalls=0`.
+- Docker: confirmed `docker ps` shows nothing created by this session (only pre-existing, unrelated containers from parallel work: `migrate-lock-*`, `scio3-*`); no compose stack was started for this plan.
+
+### CI
+Branch: `harness/2026-09-27-medium-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s`
+Run: https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36291451596 — conclusion: **success**. All jobs green: `docker-images`, `backend-unit`, `backend-integration`, `harness-tooling`, `frontend`.
+
+### Follow-ups for the reviewer
+- `backend/.env.example` and `deploy/.env.example` were left untouched (owned by unmerged branches, per the plan) — they should eventually get a `#GEMINI_THINKING_BUDGET=0` line.
+- `status=done` needs to be applied to ROOT's copy of this plan file by the orchestrator/owner once it is on a branch that carries `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` (see Deviations above).
