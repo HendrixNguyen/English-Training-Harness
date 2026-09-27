@@ -20,17 +20,8 @@ CRITICAL CONSTRAINTS:
 
 // RoadmapSchema is "the requested schema" §6.1 refers to. ParseRoadmap
 // enforces it; onboarding persists what passes. The three task types are the
-// §3.2 task_category values. Its "content" shapes and bounds come from the
-// content.go constants via roadmapSchemaTemplate, so the two cannot drift.
-var RoadmapSchema = fmt.Sprintf(roadmapSchemaTemplate,
-	MinWords, MaxWords,
-	MinVocabQuestions, MaxVocabQuestions,
-	minPassageRunes, maxPassageRunes,
-	MinReadingQuestions, MaxReadingQuestions,
-	MinPracticeQuestions, MaxPracticeQuestions,
-)
-
-const roadmapSchemaTemplate = `{
+// §3.2 task_category values.
+const RoadmapSchema = `{
   "title": "string",
   "cefr_level": "A1|A2|B1|B2|C1|C2",
   "modules": [
@@ -42,22 +33,16 @@ const roadmapSchemaTemplate = `{
         {
           "title": "string",
           "tasks": [
-            {"type": "vocabulary", "title": "string", "duration_minutes": 10,
-             "content": {"words": [{"term": "string", "definition": "string", "example": "string"}],
-                         "questions": [QUESTION]}},
-            {"type": "reading",    "title": "string", "duration_minutes": 10,
-             "content": {"passage": "string", "questions": [QUESTION]}},
-            {"type": "practice",   "title": "string", "duration_minutes": 10,
-             "content": {"questions": [QUESTION]}}
+            {"type": "vocabulary", "title": "string", "duration_minutes": 10, "content": {}},
+            {"type": "reading",    "title": "string", "duration_minutes": 10, "content": {}},
+            {"type": "practice",   "title": "string", "duration_minutes": 10, "content": {}}
           ]
         }
       ]
     }
   ]
 }
-QUESTION = {"id": "q1", "prompt": "string", "options": {"A": "string", "B": "string", "C": "string", "D": "string"}, "answer": "A|B|C|D", "explanation": "string"}
-"modules" has exactly 4 entries, each "days" exactly 7, each "tasks" exactly 3 with the three types in that order.
-"content" is required and typed by task: vocabulary has %d-%d words (each with term and definition; example optional) and %d-%d questions; reading has one passage of %d-%d characters in English at the learner's level and %d-%d questions about it; practice has %d-%d questions. Every question has exactly options A, B, C, D, an "answer" that is one of those four letters, and a one-sentence "explanation". Question ids are unique within a task.`
+"modules" has exactly 4 entries, each "days" exactly 7, each "tasks" exactly 3 with the three types in that order. "content" is free-form JSON for the task material (word lists, passages, prompts).`
 
 // RoadmapUserPrompt is the user turn for TaskRoadmapGen.
 func RoadmapUserPrompt(cefrLevel, targetGoal string, dailyMinutes int) string {

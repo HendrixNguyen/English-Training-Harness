@@ -179,7 +179,7 @@ func fixtureRoadmap() airouter.Roadmap {
 		for d := 1; d <= airouter.DaysPerModule; d++ {
 			day := airouter.Day{Title: fmt.Sprintf("Day %d", (m-1)*airouter.DaysPerModule+d)}
 			for _, tt := range airouter.TaskTypes {
-				day.Tasks = append(day.Tasks, airouter.Task{Type: tt, Title: tt + " task", DurationMinutes: 10, Content: airouter.SampleContent(tt)})
+				day.Tasks = append(day.Tasks, airouter.Task{Type: tt, Title: tt + " task", DurationMinutes: 10, Content: json.RawMessage(`{}`)})
 			}
 			mod.Days = append(mod.Days, day)
 		}

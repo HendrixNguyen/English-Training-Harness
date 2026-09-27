@@ -1,7 +1,6 @@
 package airouter
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -28,22 +27,5 @@ func TestRoadmapUserPromptCarriesTheLearnerAndTheSchema(t *testing.T) {
 		if !strings.Contains(p, want) {
 			t.Errorf("RoadmapUserPrompt missing %q", want)
 		}
-	}
-}
-
-func TestRoadmapSchemaStatesTheContentShapesAndBounds(t *testing.T) {
-	for _, want := range []string{
-		`"words"`, `"term"`, `"definition"`, `"example"`, `"passage"`, `"questions"`, `"options"`, `"A"`, `"D"`, `"answer"`, `"explanation"`,
-		fmt.Sprintf("%d-%d words", MinWords, MaxWords),
-		fmt.Sprintf("%d-%d questions", MinReadingQuestions, MaxReadingQuestions),
-		fmt.Sprintf("%d-%d questions", MinPracticeQuestions, MaxPracticeQuestions),
-		fmt.Sprintf("%d-%d characters", minPassageRunes, maxPassageRunes),
-	} {
-		if !strings.Contains(RoadmapSchema, want) {
-			t.Errorf("RoadmapSchema missing %q", want)
-		}
-	}
-	if strings.Contains(RoadmapSchema, "free-form") {
-		t.Error("RoadmapSchema still calls content free-form")
 	}
 }
