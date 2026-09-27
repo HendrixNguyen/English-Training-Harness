@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 14:34. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 14:38. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -82,7 +82,7 @@ _none_
 
 ## Executing
 
-- `harness/plans/2026-09-27-adaptive-reminder-timing-and-pre-decay-rescue-push.md` — Pre-decay rescue push: one "your plant needs {n} more minutes" Web Push at local 22:00 on an unmet day — Plan [low]
+_none_
 
 ## Done (last 10)
 
@@ -99,4 +99,4 @@ _none_
 
 ## Failed
 
-_none_
+- `harness/plans/2026-09-27-adaptive-reminder-timing-and-pre-decay-rescue-push.md` — Pre-decay rescue push: one "your plant needs {n} more minutes" Web Push at local 22:00 on an unmet day — Plan [low]
