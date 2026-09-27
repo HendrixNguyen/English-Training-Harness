@@ -18,6 +18,12 @@ const (
 	// pet slice: the challenge is bound to the local day it started, and 24h is
 	// shorter than DailyAccumulatedTTL, whose counter the pass check reads.
 	PetReviveTTL = 24 * time.Hour
+
+	// PushFailTTL bounds the push:fail consecutive-failure counter. Not in
+	// spec §4 — one attempt per day, so the window must outlive
+	// notify.MaxConsecutiveFailures (3) days with slack; an expired counter
+	// simply restarts the count at 1.
+	PushFailTTL = 7 * 24 * time.Hour
 )
 
 // WebPushDelayQueueKey is the single ZSET of scheduled reminders (spec §4).
@@ -43,3 +49,9 @@ func AIRateLimitKey(userID string) string { return fmt.Sprintf("ratelimit:ai:%s"
 // challenge (Hash: started_at, local_date, start_seconds; TTL PetReviveTTL).
 // Not in spec §4; added by the pet slice and documented in CODEMAP.
 func PetReviveKey(userID string) string { return fmt.Sprintf("pet:revive:%s", userID) }
+
+// PushFailKey is push:fail:{subscription_id} — the count of consecutive
+// non-gone send failures for one push_subscriptions row (String, INCR+EXPIRE
+// PushFailTTL on failure, DEL on success). Not in spec §4; added by notify
+// hardening and documented in CODEMAP.
+func PushFailKey(subscriptionID string) string { return fmt.Sprintf("push:fail:%s", subscriptionID) }
