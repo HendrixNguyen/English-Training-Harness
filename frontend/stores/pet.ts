@@ -116,7 +116,23 @@ export const usePetStore = defineStore('pet', {
       try {
         const res = await useApi().post<ReviveResponse>('/api/v1/pet/revive', { answers: {} })
         if (res.revival_passed) {
-          if (this.status) Object.assign(this.status, res.pet_state)
+          // The revive growth moment (design §2, §5): 0 -> 50, wilted -> sprout.
+          // Captured before the assign, same shape as `applyProgress`'s delta,
+          // so the hub's `consumeDelta()` plays it once regardless of which
+          // action produced it.
+          if (this.status) {
+            const from = { health: this.status.health_points, streak: this.status.current_streak, stage: this.status.stage }
+            Object.assign(this.status, res.pet_state)
+            this.lastDelta = {
+              healthFrom: from.health,
+              healthTo: res.pet_state.health_points,
+              streakFrom: from.streak,
+              streakTo: res.pet_state.current_streak ?? from.streak,
+              stageFrom: from.stage,
+              stageTo: res.pet_state.stage,
+              targetMetNow: false,
+            }
+          }
           this.challenge = null
           storageOrNull()?.removeItem(REVIVE_STORAGE_KEY)
         } else if (!this.challenge || this.challenge.date !== today) {

@@ -152,6 +152,32 @@ describe('usePetStore', () => {
     expect(localStorage.getItem(REVIVE_STORAGE_KEY)).toBeNull()
   })
 
+  it('revive: a pass records the growth-moment delta for the hub (design §2, §5)', async () => {
+    api.get.mockResolvedValue({ ...status, health_points: 0, stage: 'wilted', current_streak: 5 })
+    api.post.mockResolvedValue({ revival_passed: true, pet_state: { health_points: 50, stage: 'sprout', current_streak: 0 } })
+    const pet = usePetStore()
+    await pet.load()
+    await pet.revive('2026-09-23', 1000)
+    expect(pet.lastDelta).toEqual({
+      healthFrom: 0,
+      healthTo: 50,
+      stageFrom: 'wilted',
+      stageTo: 'sprout',
+      streakFrom: 5,
+      streakTo: 0,
+      targetMetNow: false,
+    })
+  })
+
+  it('revive: a fail leaves lastDelta null', async () => {
+    api.get.mockResolvedValue({ ...status, health_points: 0, stage: 'wilted' })
+    api.post.mockResolvedValue({ revival_passed: false, pet_state: { health_points: 0, stage: 'wilted', current_streak: 0 } })
+    const pet = usePetStore()
+    await pet.load()
+    await pet.revive('2026-09-23', 120)
+    expect(pet.lastDelta).toBeNull()
+  })
+
   it('revive: 409 pet_not_wilted sets notWilted and returns null', async () => {
     api.post.mockRejectedValue(new ApiError(409, 'pet_not_wilted'))
     const pet = usePetStore()
