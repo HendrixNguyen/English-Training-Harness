@@ -59,6 +59,71 @@ describe('usePetStore', () => {
     expect(pet.status).toMatchObject({ health_points: 0, current_streak: 0 })
   })
 
+  it('applyProgress records a delta the hub consumes exactly once', async () => {
+    api.get.mockResolvedValue({ ...status })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({ pet_health: 100, streak_count: 6, targetMetChanged: true })
+    expect(pet.lastDelta).toEqual({
+      healthFrom: 80,
+      healthTo: 100,
+      streakFrom: 5,
+      streakTo: 6,
+      stageFrom: 'sprout',
+      stageTo: 'sapling',
+      targetMetNow: true,
+    })
+    expect(pet.status?.stage).toBe('sapling')
+    expect(pet.consumeDelta()).toEqual({
+      healthFrom: 80,
+      healthTo: 100,
+      streakFrom: 5,
+      streakTo: 6,
+      stageFrom: 'sprout',
+      stageTo: 'sapling',
+      targetMetNow: true,
+    })
+    expect(pet.consumeDelta()).toBeNull()
+    expect(pet.lastDelta).toBeNull()
+  })
+
+  it('applyProgress records nothing when nothing changed', async () => {
+    api.get.mockResolvedValue({ ...status })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({ pet_health: 80, streak_count: 5, targetMetChanged: false })
+    expect(pet.consumeDelta()).toBeNull()
+    expect(pet.status).toMatchObject({ health_points: 80, current_streak: 5 })
+  })
+
+  it('applyProgress leaves the plant alone and records no delta when the response omits the pet fields', async () => {
+    api.get.mockResolvedValue({ ...status })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({})
+    expect(pet.status).toMatchObject({ health_points: 80, current_streak: 5, stage: 'sprout' })
+    expect(pet.consumeDelta()).toBeNull()
+  })
+
+  it('applyProgress takes a wilted plant to sprout when the day is met', async () => {
+    api.get.mockResolvedValue({ ...status, health_points: 0, stage: 'wilted', current_streak: 0 })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({ pet_health: 20, streak_count: 1, targetMetChanged: true })
+    expect(pet.status).toMatchObject({ health_points: 20, current_streak: 1, stage: 'sprout' })
+    expect(pet.isWilted).toBe(false)
+    expect(pet.lastDelta).toMatchObject({ stageFrom: 'wilted', stageTo: 'sprout' })
+  })
+
+  it('applyProgress clears a stale unconsumed delta', async () => {
+    api.get.mockResolvedValue({ ...status })
+    const pet = usePetStore()
+    await pet.load()
+    pet.applyProgress({ pet_health: 100, streak_count: 6, targetMetChanged: true })
+    pet.applyProgress({ pet_health: 100, streak_count: 6, targetMetChanged: false })
+    expect(pet.consumeDelta()).toBeNull()
+  })
+
   it('revive: first call starts a challenge anchored to the current daily seconds', async () => {
     api.get.mockResolvedValue({ ...status, health_points: 0, stage: 'wilted' })
     api.post.mockResolvedValue({ revival_passed: false, pet_state: { health_points: 0, stage: 'wilted', current_streak: 0 } })

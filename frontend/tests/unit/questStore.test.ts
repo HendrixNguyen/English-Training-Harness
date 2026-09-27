@@ -89,4 +89,28 @@ describe('useQuestStore', () => {
     await q.complete('ex-2', 60)
     expect(api.post).toHaveBeenCalledWith('/api/v1/quests/progress', { exercise_id: 'ex-2', duration_seconds: 60 })
   })
+
+  it('complete reports targetMetChanged only when the response newly meets the target', async () => {
+    api.get.mockResolvedValue(daily)
+    const q = useQuestStore()
+    await q.load()
+    expect(q.targetMet).toBe(false)
+
+    api.post.mockResolvedValue({ daily_seconds_spent: 1800, daily_minutes_spent: 30, is_target_met: true, pet_health: 100, streak_count: 6 })
+    const first = await q.complete('ex-2', 600)
+    expect(first.targetMetChanged).toBe(true)
+    expect(q.targetMet).toBe(true)
+    expect(first.pet_health).toBe(100)
+
+    const second = await q.complete('ex-3', 600)
+    expect(second.targetMetChanged).toBe(false)
+
+    setActivePinia(createPinia())
+    api.get.mockResolvedValue(daily)
+    const q2 = useQuestStore()
+    await q2.load()
+    api.post.mockResolvedValue({ daily_seconds_spent: 600, daily_minutes_spent: 10, is_target_met: false, pet_health: 80, streak_count: 5 })
+    const third = await q2.complete('ex-1', 600)
+    expect(third.targetMetChanged).toBe(false)
+  })
 })
