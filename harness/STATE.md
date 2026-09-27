@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 12:21. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 12:33. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,16 +13,7 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-- `harness/ideas/_inbox/companionsprite-motion-is-off-the-pixel-grid-at-every-size-b.md` — CompanionSprite motion is off the pixel grid at every size but 128 px, levelup is a CSS filter not a palette swap, and down lacks its translate [low]
-- `harness/ideas/_inbox/companionsprite-never-emits-reacted-when-animations-are-off-.md` — CompanionSprite never emits reacted when animations are off, and reduced motion has no static reaction frames [medium]
-- `harness/ideas/_inbox/os-prefers-reduced-motion-does-not-reach-hpbar-daybar-speech.md` — OS prefers-reduced-motion does not reach HpBar, DayBar, SpeechBox typing or Chest; only the reduced prop does [medium]
-- `harness/ideas/_inbox/questnode-and-mapnode-tiles-lack-the-torch-focus-ring-and-pr.md` — QuestNode and MapNode tiles lack the torch focus ring and pressed inset, and MapNode has no 44 px hit area [medium]
-- `harness/ideas/_inbox/questnode-icon-palettes-miss-chars-their-glyphs-use-so-book-.md` — QuestNode icon palettes miss chars their glyphs use, so book, scroll and sword pixels render solid black [medium]
-- `harness/ideas/_inbox/restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Restyled StateBlock and CountdownTimer put near-white ink-0 text on v1 white surfaces, so every error, empty and timer line is invisible on light-scheme phones [high]
-- `harness/ideas/_inbox/retro-kit-components-inherit-the-v1-page-text-colour-and-ret.md` — Retro kit components inherit the v1 page text colour and RetroToast has no fill, so panel, toast and map-node text is dark-on-dark [medium]
-- `harness/ideas/_inbox/retro-kit-small-contract-gaps-hpbar-shows-unclamped-values-b.md` — Retro kit small contract gaps: HpBar shows unclamped values, bar steps use total not delta, band panels keep their ring, reduced QuestNode drops its cursor, MapNode missed ring is not ember [low]
-- `harness/ideas/_inbox/retro-kit-tests-miss-boundaries-and-one-asserts-nothing-ches.md` — Retro kit tests miss boundaries and one asserts nothing: Chest unmount, SpeechBox mid-type unmount, empty inputs, out-of-range values [low]
-- `harness/ideas/_inbox/retrobutton-keeps-its-4-px-depth-shadow-when-disabled-or-loa.md` — RetroButton keeps its 4 px depth shadow when disabled or loading [low]
+_none_
 
 ## Proposed
 
@@ -46,6 +37,7 @@ _none_
 - `harness/ideas/_inbox/a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md` — A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line [medium]
 - `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
 - `harness/ideas/_inbox/codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs [low]
+- `harness/ideas/_inbox/companionsprite-motion-is-off-the-pixel-grid-at-every-size-b.md` — CompanionSprite motion is off the pixel grid at every size but 128 px, levelup is a CSS filter not a palette swap, and down lacks its translate [low]
 - `harness/ideas/_inbox/config-gin-mode-validation-is-unreachable-in-the-binary-beca.md` — config GIN_MODE validation is unreachable in the binary because gin init panics first, and its comments claim otherwise [low]
 - `harness/ideas/_inbox/config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` — config.go still says JWT_SECRET is not in the 1st-thinking env list, and boot refusals print config: config: [low]
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
@@ -57,6 +49,9 @@ _none_
 - `harness/ideas/_inbox/onboarding-s-invalid-request-copy-asks-the-learner-to-fix-fi.md` — Onboarding's invalid_request copy asks the learner to fix fields the quiz step no longer shows [low]
 - `harness/ideas/_inbox/pgrefreshtokensource-has-no-sentinel-for-a-missing-user-so-a.md` — PgRefreshTokenSource has no sentinel for a missing user, so a deleted user gets 500 not 409 [low]
 - `harness/ideas/_inbox/refresh-token-sealing-tests-miss-the-sealer-error-path-and-a.md` — Refresh-token sealing tests miss the sealer-error path and a short-but-valid v1 payload, and one can panic instead of fail [low]
+- `harness/ideas/_inbox/retro-kit-small-contract-gaps-hpbar-shows-unclamped-values-b.md` — Retro kit small contract gaps: HpBar shows unclamped values, bar steps use total not delta, band panels keep their ring, reduced QuestNode drops its cursor, MapNode missed ring is not ember [low]
+- `harness/ideas/_inbox/retro-kit-tests-miss-boundaries-and-one-asserts-nothing-ches.md` — Retro kit tests miss boundaries and one asserts nothing: Chest unmount, SpeechBox mid-type unmount, empty inputs, out-of-range values [low]
+- `harness/ideas/_inbox/retrobutton-keeps-its-4-px-depth-shadow-when-disabled-or-loa.md` — RetroButton keeps its 4 px depth shadow when disabled or loading [low]
 - `harness/ideas/_inbox/revive-s-absolute-save-erases-a-concurrent-ontargetmet-s-20-.md` — Revive's absolute Save erases a concurrent OnTargetMet's +20 and streak [low]
 - `harness/ideas/_inbox/route-falls-back-on-terminal-4xx-so-one-bad-prompt-buys-thre.md` — Route falls back on terminal 4xx so one bad prompt buys three paid provider calls [low]
 - `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
@@ -84,6 +79,7 @@ _none_
 
 ## Approved
 
+- `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high]
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]

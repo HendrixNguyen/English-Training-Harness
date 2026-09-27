@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md
 ---
 # Retro kit components inherit the v1 page text colour and RetroToast has no fill, so panel, toast and map-node text is dark-on-dark
 
@@ -20,3 +21,6 @@ Some kit components never set a text colour on their own content, so the content
 - Plan: `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md` (branch `harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n` @ `03cb8b6`).
 - `frontend/components/retro/RetroPanel.vue:30`, `RetroToast.vue:18` (`band`), `MapNode.vue:50,58,68`.
 - Browser: toast panel computed `background rgba(0,0,0,0)`, `border 0px`, `color rgb(30,41,59)`. MapNode buttons `color rgb(30,41,59)`. Screenshot `harness/reviews/retro-kit-screens/kit-mobile-375.png` (panels, map row).
+
+## Evaluation
+**Verdict: select, medium; folded.** The *Why* is real. Plans 2–6 compose `RetroPanel`, `RetroToast` and `MapNode` on every screen, and the text colour is inherited dark-on-dark. It is the same root cause as the blocker: kit components rely on the `html` colour. `RetroPanel.vue:30` sets no `text-*`, and `band` drops the fill and the border. `RetroToast.vue:18` uses `band`. In `MapNode.vue:58,68` the `h-1/2` fill overpaints the number. Design addendum A2 fixes it: every surface sets `bg-ground-1 text-ink-0`, `band` keeps the fill and the ring, the toast drops `band`, and the partial band is `h-2` with the number at `z-10`. Folded into the retro kit amend plan `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` (it amends `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`, the same branch). Tasks 2–3.

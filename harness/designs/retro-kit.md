@@ -191,3 +191,111 @@ Fixed strings owned by the kit components (Vietnamese, sentence case): `QuestNod
 - [ ] No v1 component is deleted or renamed; every page still builds; `revivePage`, `onboardingPage` and every other existing unit test pass unchanged.
 - [ ] `pages/_kit.vue` (or any preview page) is not in `git ls-files`; the plan's Notes carry the reviewer's screenshots.
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build` green, and CI green on the pushed branch.
+
+## Addendum 2026-09-27 — amend after review
+Scope: one amend plan on the kit branch (`amends:` plan 1) covering the blocker `restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` and the medium bugs `retro-kit-components-inherit-the-v1-page-text-colour-and-ret.md`, `questnode-icon-palettes-miss-chars-their-glyphs-use-so-book-.md`, `companionsprite-never-emits-reacted-when-animations-are-off-.md`, `os-prefers-reduced-motion-does-not-reach-hpbar-daybar-speech.md`, `questnode-and-mapnode-tiles-lack-the-torch-focus-ring-and-pr.md`. The four low bugs are not designed here. **No page changes** (§0 Q1 stands); no copy changes (§7 stands); no new token. Where this addendum and §3–§5 disagree, the addendum wins.
+
+### A1. Decision: the kit carries its own dark ground — no light variants
+**Every surface component sets its own ground and its own ink on its root; nothing inherits page colour or page ground.** Surface components are `RetroPanel` (all modes), `RetroToast`, the `QuestNode`/`MapNode` tiles, `RetroButton`, and the two restyled v1 components `StateBlock` and `CountdownTimer`. Inline components (`HpBar`, `DayBar`, `Badge`, `Chest`, `CompanionSprite`, the `QuestNode` text column) set an explicit `text-*` on every text node they render and are placed only on a kit ground (inside a `RetroPanel`, or on a migrated page whose `<main>` is `bg-ground-0 text-ink-0`, which is the screen plans' job). No component relies on `html`'s colour, and no `dark:` appears in `components/retro/` (the `retroRadius` guard stays as written).
+
+*Reason.* The kit is dark-native by owner decision (UI-KIT "Dark/light"): a daylight palette would be a new kit revision, not a fix, and scheme-aware classes would need `dark:` variants or a second palette, both of which the kit forbids. Light variants would also be throw-away: plan 6 flips `html` to `ground-0` and deletes `paper`, so anything written for the white card dies with it. A component that paints its own `ground-1` and `ink-0` is readable on any parent: v1 white card, v1 slate card, or the kit's `ground-0`. Its contrast becomes the kit's own pairs (ink-0 16.0:1, ink-1 8.9:1, ember 5.8:1 on `ground-1`), which `tokens.test.ts` already proves. The same markup then survives plan 6 unchanged. The cost is small and temporary: until plans 2–6, a light-scheme learner sees a small dark dialogue box inside a white v1 card. It is readable and in style, and it reads as the incoming look rather than a bug.
+
+### A2. Surfaces and ink (build contract)
+- **`StateBlock`** (props, `role="status"` on the root, and the button inside it unchanged, so the page tests' `[role="status"] button` still resolves):
+  - `loading`: root `inline-flex items-center gap-2 bg-ground-1 p-2`, keeping `aria-busy="true"` and `aria-label="Đang tải"`. Three `h-2 w-2 bg-line-lit` cells with `retro-dots` at 0/150/300 ms delay. The keyframe dims each cell to 0.35 and lights it to 1, so a lit cell *is* `line-lit`. There is no `bg-ground-2` cell. Under reduced motion all three sit at opacity 1 (the static `…` frame).
+  - `empty`/`error`: root `<div role="status">` wrapping a `RetroPanel`. Error uses `tone="ember"` and empty uses `tone="plain"`, per the kit table's "error uses `tone=ember`". The panel content stays `<p class="flex items-center gap-2 font-body text-[17px] text-ink-0">` + the `RetroButton`. The v1 `AppCard`'s `p-4` gives the panel ring its 4 px of room.
+- **`CountdownTimer`**: root `inline-flex items-baseline gap-1 border-2 border-line-dim bg-ground-1 px-2`. The caption stays `text-ink-1` and the digits stay `text-ink-0`, or `text-ember` at 0. `aria-live="off"` stays. It now reads on `bg-paper` and `bg-paper-dark` alike.
+- **`RetroPanel`**: the `<section>` always carries `border-2 border-line-lit bg-ground-1 text-ink-0` and the ring `box-shadow`. `band` only swaps `p-4` for `p-2 w-full`. *Clarification of §5:* the band keeps its fill, line and ring, because revive's alarm band is `tone=ember` (retro-revive.md) and its tone lives on the ring.
+- **`RetroToast`**: renders `<RetroPanel :tone>` **without** `band`, so it gets the fill, the 2+2 px ring and `text-ink-0` with no extra class.
+- **`QuestNode`** tile `<button>`: add `text-ink-0`, or `text-ink-2` when `locked` (the text column already sets its own ink).
+- **`MapNode`**: the visual tile (see A5) carries `bg-ground-1 text-ink-0`, or `text-ink-2` when `locked`. The day number is `relative z-10`. *Clarification of the kit's "partial half-filled":* the partial fill is a bottom band of two 4-px cells (`absolute inset-x-0 bottom-0 h-2 bg-growth`), not `h-1/2`. A half-height growth block under `ink-0` digits would be about 1.4:1. The executor confirms in the `/_kit` screenshot that the digits' ink box does not touch the band.
+
+### A3. `PixelArt` palette fallback
+`palette` becomes optional (`Partial<Record<PaletteChar, string>>`, default `{}`). `PixelArt` first sets `--px-<c>` for **every** char in `PALETTE`, resolved to the token hex, then overlays `palette`. Every `--px-*` a rect can reference is therefore always defined. Callers pass only overrides. Delete the per-component `hexPalette(...)` helpers in `QuestNode`, `MapNode`, `Chest` and `StateBlock`: they only restate `PALETTE`, and `CompanionSprite`/`Badge` already build from `PALETTE`. The only overrides that remain:
+- health tint and unknown-stage `ink-2` (`CompanionSprite`);
+- unearned (`Badge`);
+- the reduced level-up frame (A4);
+- the `StateBlock` cross, which is already drawn in `e` and so needs none;
+- **locked `QuestNode` icon**: every non-`k` char → `ink-2`, with `k` kept, so the icon dims with the rest of the tile. The padlock overlay stays as drawn.
+
+### A4. Reduced motion: `useReducedMotion()` and static frames
+- **`composables/useReducedMotion.ts`** (kit addition; reason: one owner for the media query, so pages never wire it). Module-level `ref<boolean>`, initialised on first call from `window.matchMedia('(prefers-reduced-motion: reduce)').matches`, with one `change` listener that updates the ref. It returns `Readonly<Ref<boolean>>`. `ssr: false` is set in `nuxt.config.ts`, so there is no hydration concern. If `matchMedia` is missing (old happy-dom), it returns `false`.
+- **Default for every `reduced` prop** (`CompanionSprite`, `HpBar`, `DayBar`, `QuestNode`, `Chest`, `SpeechBox`): declare `reduced?: boolean` with `withDefaults({ reduced: undefined })`. **Trap:** without the explicit `undefined` default, Vue casts an absent Boolean prop to `false` and the OS value is never read. Each component computes `const isReduced = computed(() => props.reduced ?? osReduced.value)` and uses only `isReduced`. An explicit `reduced=false` overrides the OS setting, which keeps tests deterministic. `SpeechBox` passes `:reduced="isReduced"` to its portrait sprite.
+- **Bars:** the fill `<i data-fill>` (HpBar) and `<i data-segment>` (DayBar) also get class `retro-anim`, so the existing CSS block wins over the inline transition even before JS runs. The inline `transition` is omitted when `isReduced`.
+- **`QuestNode` cursor:** always rendered for `current`. Only the `retro-blink` class is dropped when `isReduced`, which gives a static `▶` rather than no cursor.
+- **Supersedes §3's "Reduced motion is CSS-only — no JS media-query reads".** CSS still stops keyframes. JS timers (typing, chest, the sprite hold) and inline transitions read `isReduced`.
+- **`CompanionSprite` static reactions** (when `isReduced` and `react` becomes `hit|miss|levelup`; this replaces §4's `reduced` row):
+
+| `react` | Static frame, held 300 ms | `data-frame` during / after |
+|---|---|---|
+| `hit` | inline `transform: translateY(calc(var(--px) * -2px))` on the element that carries `retro-hop` today (plant raised 2 units) | `1` / `0` |
+| `levelup` | palette override: every non-`k` char → `tokens.torch` | `1` / `0` |
+| `miss` | base frame (per §4) | `0` / `0` |
+
+  One `setTimeout(300)` is started from a `watch` on `react`. On fire, the frame returns to base and the component emits `reacted(react)`, for all three kinds. The timer is cleared when `react` changes again and on unmount. Without `isReduced`, the `animationend` path is unchanged. The sprite does not reset `react` itself; the caller returns it to `idle` on `reacted`, as today. `idle` under reduced is the static base, and `down` is unchanged.
+
+### A5. Focus, pressed, hit area
+- **Torch focus**, on the `QuestNode` tile button and the `MapNode` button: `focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch focus-visible:ring-0 focus-visible:ring-offset-0`. The last two neutralise the v1 global `:focus-visible { ring-2 ring-growth ring-offset-2 }` from `main.css`, which otherwise draws a growth ring next to the torch outline.
+- **Pressed inset**, no transition, bound only when the tile can act (`open`/`current` for QuestNode, not `locked` for MapNode):
+  - QuestNode: `active:translate-y-[2px] active:border-line-dim` on the button.
+  - MapNode: `group-active:translate-y-[2px] group-active:border-line-dim` on the inner tile.
+- **MapNode hit wrapper**: the `<button>` becomes the wrapper `group relative p-0.5` and measures 44×44. It keeps `type`, `aria-*`, the `@click` and the focus classes. The visual tile moves into a child `<span data-tile class="relative flex h-10 w-10 items-center justify-center border-2 bg-ground-1 text-ink-0">`, which gets the state border classes. The number, glyphs, partial band, fog overlay and `sprite` slot move with it.
+
+### A6. Tests (Vitest, happy-dom)
+- **`useReducedMotion.test.ts`**: stub `matchMedia` with `matches: true` to get `true`; firing `change` flips the ref.
+- **Per-component reduced default**: with `vi.mock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))` and **no** `reduced` prop:
+  - `HpBar`/`DayBar` fills have no inline `transition` and carry `retro-anim`;
+  - `SpeechBox` shows the full line at mount;
+  - `Chest` shows `chestOpen` and emits `opened` synchronously;
+  - `QuestNode` `current` has the cursor without `retro-blink`;
+  - an explicit `reduced=false` restores the animated path.
+- **`CompanionSprite`** (fake timers, reduced):
+  - `hit`: `data-frame="1"` and the translate style; no emit at 299 ms; at 300 ms `reacted` is `['hit']` and `data-frame="0"`.
+  - `levelup`: `--px-g` equals `torch` during the hold.
+  - `miss`: emits at 300 ms.
+  - Unmounting during a hold emits nothing.
+- **`pixelPalette.test.ts`**: mount every component under `components/retro/` plus `StateBlock` in every state, including locked/unearned/`down`/unknown stage/reduced level-up hold. Every `rect[fill^="var(--px-"]` must have that variable present and non-empty in its `<svg>` inline style.
+- **Colour contracts**:
+  - `RetroPanel` (plain, tone, band) root has `bg-ground-1 text-ink-0 border-2`;
+  - the `RetroToast` panel has `bg-ground-1` and a ring `box-shadow`;
+  - the `MapNode` `[data-tile]` has `text-ink-0`, or `text-ink-2` when locked; the number has `z-10`; the partial band is `h-2`;
+  - the `QuestNode` tile has `text-ink-0`/`text-ink-2`, and the locked icon palette is `ink-2`.
+- **New `StateBlock.test.ts` / `CountdownTimer.test.ts`**:
+  - the StateBlock loading root has `bg-ground-1`, and each of its 3 cells has `bg-line-lit`;
+  - error/empty render a `RetroPanel` with tone `ember`/`plain` inside `[role="status"]`, with the button inside it;
+  - the CountdownTimer root has `bg-ground-1`, and the digits get `text-ember` at 0.
+- **Focus/hit classes**: both tiles carry the five focus classes; MapNode's button has `p-0.5` and `[data-tile]` has `h-10 w-10`; the `active:` classes are absent on locked/done tiles.
+
+### A7. Browser reproduction (reviewer's steps, rerun by executor and reviewer)
+Set up the throwaway `pages/_kit.vue` (§6, deleted before the final commit) and add a **"v1 surfaces"** section with **no** `bg-ground-0` wrapper:
+- `StateBlock` loading/empty/error inside an `AppCard`;
+- `CountdownTimer` at 125 s and at 0 on the bare `html` ground.
+
+Every reaction control writes the emitted events into a `<pre data-log>`. Then run Playwright against `npm run dev` at 375×812, with no backend:
+1. `emulateMedia({ colorScheme: 'light' })` and then `'dark'`. For each, screenshot `/`, `/learn/x` and `/_kit`. For every text node in `[role="status"]` and in the timer, read the computed `color` and the first non-transparent `background-color` up the ancestor chain, and compute the WCAG ratio.
+2. On `/_kit`, check that the loader cells' computed `background-color` is `rgb(201, 196, 244)`.
+3. Collect every `svg.retro-pixel rect` with a computed fill of `rgb(0, 0, 0)` that is not a `k` rect.
+4. With `reducedMotion: 'reduce'`, check that `[data-fill]` and `[data-segment]` report computed `transitionDuration` `0s`. Click the hit, levelup and miss reactions and wait 400 ms: `[data-log]` lists each one. A typed SpeechBox line is complete at once, and the chest is open at once.
+5. Tab onto a QuestNode and a MapNode: the computed `outline-color` is `rgb(242, 168, 59)` and no growth `box-shadow` is present. The MapNode button's `getBoundingClientRect()` is 44×44.
+
+## Acceptance (amend)
+1. Under `prefers-color-scheme: light` **and** `dark`, at 375 px with no backend, every `StateBlock` empty/error text on `/` and `/learn/:id` (inside the v1 `AppCard`) and the `CountdownTimer` digits and caption on `/_kit`'s bare v1 ground have a computed contrast ≥ 4.5:1 against their nearest painted background. Screenshots `hub-light-375.png`, `hub-dark-375.png`, `learn-light-375.png`, `learn-dark-375.png`, `kit-v1-light-375.png` and `kit-v1-dark-375.png` are in the plan's Notes.
+2. `StateBlock` loading renders three cells whose computed background is `line-lit` (`rgb(201, 196, 244)`) on a `ground-1` plate; no `bg-ground-2` cell remains.
+3. `StateBlock`, `CountdownTimer`, `RetroPanel` (plain, toned, band), `RetroToast`, and the `QuestNode`/`MapNode` tiles each set their own `bg-ground-1` (or state ground) and `text-ink-*` on their root. The toast has a `ground-1` fill, a 2 px `line-lit` border and the 2+2 px ring, and does not use `band`.
+4. `MapNode` digits are `ink-0` (`ink-2` when locked), `z-10`, and clear of the `h-2` partial band.
+5. No `<rect>` in any kit component or state references an undefined `--px-*` variable (`pixelPalette.test.ts`), and the browser shows zero non-outline `rgb(0, 0, 0)` rects. The locked `QuestNode` icon is drawn in `ink-2`.
+6. `useReducedMotion()` exists. With it mocked `true` and no `reduced` prop:
+   - `HpBar`/`DayBar` fills have no transition;
+   - `SpeechBox` shows the whole line;
+   - `Chest` opens at once;
+   - the `QuestNode` cursor is static;
+   - explicit `reduced=false` overrides it.
+7. Under emulated `reducedMotion: 'reduce'`, `[data-fill]`/`[data-segment]` computed `transitionDuration` is `0s`, and the SpeechBox and Chest appear at once.
+8. Under reduced motion, `CompanionSprite` holds the static frame for 300 ms and then emits `reacted`:
+   - `hit`: plant raised 2 units, `data-frame="1"`;
+   - `levelup`: torch palette;
+   - `miss`: base.
+   
+   This holds both in fake-timer tests and in the browser `[data-log]` after 400 ms. No emit follows an unmount mid-hold.
+9. The `QuestNode` and `MapNode` buttons show a 2 px `torch` outline with a 2 px offset on keyboard focus and no v1 growth ring. The actionable tiles drop 2 px with a `line-dim` border on `:active`, with no transition. The MapNode button measures 44×44 around a 40×40 tile.
+10. No page file, copy string or token changes (`git diff` of `pages/`, `tailwind.config.ts` and §7's strings is empty); `retroRadius.test.ts` still passes with no `dark:` in `components/retro/`. `pages/_kit.vue` is not in `git ls-files`. `npm run lint`, `typecheck`, `test:unit` and `build` are green, and CI is green on the pushed branch.
