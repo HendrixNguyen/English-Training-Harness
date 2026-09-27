@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-27-run-01/kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md
-status: draft
+status: approved
 priority: medium
 merged: false
 order: 1
