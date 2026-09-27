@@ -50,9 +50,10 @@ function clearHoldTimer() {
 
 /** Folded bug companionsprite-motion-is-off-the-pixel-grid: non-reduced
  * `levelup` is a 3-frame palette swap (torch -> ink-0 -> base tone) stepped
- * on `setTimeout(100)`, replacing the old `retro-flash` CSS filter keyframe
- * (deleted from retro.css). `null` is frame 2 / the base tone — no override.
- * All three timers are cleared on every `react` change and on unmount. */
+ * on `setTimeout(100)`, replacing the old CSS filter keyframe class this
+ * reaction used (deleted from retro.css). `null` is frame 2 / the base tone
+ * — no override. All three timers are cleared on every `react` change and
+ * on unmount. */
 const levelupFrame = ref<0 | 1 | null>(null)
 let levelupTimers: ReturnType<typeof setTimeout>[] = []
 
