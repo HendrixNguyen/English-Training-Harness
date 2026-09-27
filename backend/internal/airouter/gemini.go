@@ -25,20 +25,52 @@ const (
 	// questions). Without it the model's default budget truncates long
 	// roadmaps, which ParseRoadmap then rejects as malformed JSON. Current Flash
 	// models accept up to 65536; 32768 leaves headroom for typed content.
+	//
+	// On Flash-class models this budget is shared with thinking: thinking
+	// tokens count against maxOutputTokens, and Flash's default thinking
+	// budget is dynamic (up to ~24k), so without thinkingConfig the visible
+	// JSON answer could shrink to a fraction of 32768 — a truncated roadmap
+	// that ParseRoadmap rejects with no clue why. GeminiThinkingBudget (below)
+	// gives the whole budget to the answer by default.
 	GeminiMaxOutputTokens = 32768
+
+	// DefaultGeminiThinkingBudget is GEMINI_THINKING_BUDGET's default: 0, no
+	// thinking, so the whole GeminiMaxOutputTokens budget goes to the strict
+	// JSON answer this workload needs. -1 asks for Google's dynamic budget; a
+	// positive number is a fixed cap.
+	//
+	// Flash and Flash-Lite models accept thinkingBudget: 0; Pro-class models
+	// reject it with a 400 (they require some minimum, e.g. 128) — an operator
+	// pointing GEMINI_MODEL at a Pro model must also set GEMINI_THINKING_BUDGET
+	// to that model's minimum.
+	//
+	// Contract check (2026-09-27, Google's public Gemini API reference via
+	// context7): the classic generateContent endpoint this package calls
+	// still accepts generationConfig.thinkingConfig.thinkingBudget. Google's
+	// newer Interactions API (v1beta/interactions, gemini-3.x) has moved to a
+	// thinking_level enum (low/medium/high) instead, but its own docs say
+	// "thinking_budget is retained for backward compatibility" on the
+	// endpoints that accept it, and that thinkingBudget/thinkingLevel must
+	// not both be set on one request — so thinkingBudget is kept here rather
+	// than switched to thinkingLevel.
+	DefaultGeminiThinkingBudget = 0
 )
 
 // GeminiProvider calls models/{model}:generateContent in JSON mode.
 type GeminiProvider struct {
-	apiKey  string
-	baseURL string
-	model   string
-	client  *http.Client
+	apiKey         string
+	baseURL        string
+	model          string
+	thinkingBudget int
+	client         *http.Client
 }
 
 // NewGeminiProvider builds a provider. Empty baseURL/model/client take the
-// defaults; tests pass an httptest server URL.
-func NewGeminiProvider(apiKey, baseURL, model string, client *http.Client) *GeminiProvider {
+// defaults; tests pass an httptest server URL. thinkingBudget is sent as
+// generationConfig.thinkingConfig.thinkingBudget (GeminiThinkingBudget /
+// GEMINI_THINKING_BUDGET, config.go) — DefaultGeminiThinkingBudget when the
+// caller does not care.
+func NewGeminiProvider(apiKey, baseURL, model string, thinkingBudget int, client *http.Client) *GeminiProvider {
 	if baseURL == "" {
 		baseURL = DefaultGeminiBaseURL
 	}
@@ -48,7 +80,7 @@ func NewGeminiProvider(apiKey, baseURL, model string, client *http.Client) *Gemi
 	if client == nil {
 		client = &http.Client{} // no Timeout: the per-task deadline is in the context (timeouts.go)
 	}
-	return &GeminiProvider{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), model: model, client: client}
+	return &GeminiProvider{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), model: model, thinkingBudget: thinkingBudget, client: client}
 }
 
 func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
@@ -62,6 +94,7 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 			"response_mime_type": "application/json",
 			"temperature":        0.2,
 			"maxOutputTokens":    GeminiMaxOutputTokens,
+			"thinkingConfig":     map[string]any{"thinkingBudget": g.thinkingBudget},
 		},
 	}
 	label := fmt.Sprintf("gemini(%s)", g.model)
@@ -108,6 +141,15 @@ func (g *GeminiProvider) GenerateContent(ctx context.Context, systemPrompt, user
 	var sb strings.Builder
 	for _, part := range parsed.Candidates[0].Content.Parts {
 		sb.WriteString(part.Text)
+	}
+	// A STOP (or absent-finishReason) candidate whose joined text is blank is
+	// not a successful answer — handing "" to ParseRoadmap/ParsePlacement
+	// would surface as an opaque JSON-decode error instead of naming the
+	// provider as the cause, and Route would treat it as success and never
+	// fall back. Checked after the finishReason branch above so a non-STOP
+	// reason (e.g. SAFETY) keeps naming that reason instead.
+	if strings.TrimSpace(sb.String()) == "" {
+		return "", fmt.Errorf("gemini: empty response (finishReason %q)", parsed.Candidates[0].FinishReason)
 	}
 	return sb.String(), nil
 }

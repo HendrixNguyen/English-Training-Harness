@@ -78,6 +78,11 @@ func (o *OpenAICompatibleProvider) GenerateContent(ctx context.Context, systemPr
 		return "", fmt.Errorf("openai-compat(%s): empty choices", o.model)
 	}
 	logCall(ctx, label, started, parsed.Usage.PromptTokens, parsed.Usage.CompletionTokens)
+	// Logged before this check (rather than skipped) so the token-usage line
+	// still reaches the operator even when the answer came back blank.
+	if strings.TrimSpace(parsed.Choices[0].Message.Content) == "" {
+		return "", fmt.Errorf("openai-compat(%s): empty response", o.model)
+	}
 	return parsed.Choices[0].Message.Content, nil
 }
 

@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -35,12 +36,18 @@ func post(t *testing.T, r *gin.Engine, body string) *httptest.ResponseRecorder {
 
 // spec64Body is the §6.4 request. The spec's example endpoint is the
 // placeholder "push_subscription_endpoint_string", which is not a URL; a real
-// FCM-shaped endpoint stands in for it because endpoints are validated.
-const spec64Body = `{"notification_time": "20:00:00", "push_subscription": {"endpoint": "https://fcm.googleapis.com/fcm/send/dA1b2C3:APA91b-example", "p256dh": "BNc5T...", "auth": "aX8v..."}}`
+// FCM-shaped endpoint stands in for it because endpoints are validated, and
+// the keys are real (also validated) generated the same way browserSubscription
+// (push_test.go) does.
+func spec64Body(t *testing.T) string {
+	t.Helper()
+	p256dh, auth := validKeys(t)
+	return `{"notification_time": "20:00:00", "push_subscription": {"endpoint": "https://fcm.googleapis.com/fcm/send/dA1b2C3:APA91b-example", "p256dh": "` + p256dh + `", "auth": "` + auth + `"}}`
+}
 
 func TestSettingsHandlerAcceptsTheSpec64BodyAndAnswersTheSpec64Response(t *testing.T) {
 	h := newHarness()
-	w := post(t, router(h.svc, "u1"), spec64Body)
+	w := post(t, router(h.svc, "u1"), spec64Body(t))
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", w.Code, w.Body)
 	}
@@ -91,16 +98,17 @@ func TestSettingsHandlerRejectsBadBodies(t *testing.T) {
 
 func TestSettingsHandlerRequiresAUserAndMapsMissingRowTo404(t *testing.T) {
 	h := newHarness()
-	if w := post(t, router(h.svc, ""), spec64Body); w.Code != http.StatusUnauthorized {
+	if w := post(t, router(h.svc, ""), spec64Body(t)); w.Code != http.StatusUnauthorized {
 		t.Errorf("no user: status = %d, want 401", w.Code)
 	}
-	if w := post(t, router(h.svc, "ghost"), spec64Body); w.Code != http.StatusNotFound || w.Body.String() != `{"error":"user_not_found"}` {
+	if w := post(t, router(h.svc, "ghost"), spec64Body(t)); w.Code != http.StatusNotFound || w.Body.String() != `{"error":"user_not_found"}` {
 		t.Errorf("missing row: status = %d, body = %s", w.Code, w.Body)
 	}
 }
 
 func TestSettingsHandlerRejectsHostileEndpointsWith400AndWritesNothing(t *testing.T) {
 	// The reviewer's reproduction, verbatim, plus one per layer of the deny list.
+	p256dh, auth := validKeys(t)
 	for name, endpoint := range map[string]string{
 		"metadata service (review repro)": "https://169.254.169.254/latest/meta-data/",
 		"loopback":                        "https://127.0.0.1:8080/api/v1/healthz",
@@ -111,7 +119,41 @@ func TestSettingsHandlerRejectsHostileEndpointsWith400AndWritesNothing(t *testin
 		"userinfo":                        "https://u:p@fcm.googleapis.com/fcm/send/abc",
 	} {
 		h := newHarness()
-		body := `{"notification_time":"00:01","push_subscription":{"endpoint":"` + endpoint + `","p256dh":"BNc5T","auth":"aX8v"}}`
+		body := `{"notification_time":"00:01","push_subscription":{"endpoint":"` + endpoint + `","p256dh":"` + p256dh + `","auth":"` + auth + `"}}`
+		w := post(t, router(h.svc, "u1"), body)
+		if w.Code != http.StatusBadRequest || w.Body.String() != `{"error":"invalid_request"}` {
+			t.Errorf("%s: status = %d, body = %s", name, w.Code, w.Body)
+		}
+		if len(h.log.calls) != 0 {
+			t.Errorf("%s: 400 but the service still called %v", name, h.log.calls)
+		}
+	}
+}
+
+func TestSettingsHandlerRejectsMalformedKeysAndOverlongEndpointsWith400(t *testing.T) {
+	p256dh, auth := validKeys(t)
+	rawP, err := base64.RawURLEncoding.DecodeString(p256dh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 0xFF as the leading byte forces a '/' as the first standard-base64
+	// character deterministically (unlike re-encoding a real point, whose
+	// standard-base64 form only sometimes differs from its base64url form).
+	standardP := base64.StdEncoding.EncodeToString(append([]byte{0xff}, rawP[1:]...))
+	rawA, err := base64.RawURLEncoding.DecodeString(auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth17 := base64.RawURLEncoding.EncodeToString(append(append([]byte(nil), rawA...), 0))
+	overlongEndpoint := "https://fcm.googleapis.com/fcm/send/" + strings.Repeat("a", MaxEndpointLength)
+
+	for name, body := range map[string]string{
+		"malformed p256dh":       `{"notification_time":"00:01","push_subscription":{"endpoint":"https://push.example/bad-p256dh","p256dh":"BNc5T...","auth":"` + auth + `"}}`,
+		"standard-base64 p256dh": `{"notification_time":"00:01","push_subscription":{"endpoint":"https://push.example/std-p256dh","p256dh":"` + standardP + `","auth":"` + auth + `"}}`,
+		"auth 17 bytes":          `{"notification_time":"00:01","push_subscription":{"endpoint":"https://push.example/bad-auth","p256dh":"` + p256dh + `","auth":"` + auth17 + `"}}`,
+		"overlong endpoint":      `{"notification_time":"00:01","push_subscription":{"endpoint":"` + overlongEndpoint + `","p256dh":"` + p256dh + `","auth":"` + auth + `"}}`,
+	} {
+		h := newHarness()
 		w := post(t, router(h.svc, "u1"), body)
 		if w.Code != http.StatusBadRequest || w.Body.String() != `{"error":"invalid_request"}` {
 			t.Errorf("%s: status = %d, body = %s", name, w.Code, w.Body)
