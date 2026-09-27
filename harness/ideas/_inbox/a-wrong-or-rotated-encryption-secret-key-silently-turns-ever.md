@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: medium
+plan: harness/plans/2026-09-27-a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md
 ---
 # A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line
 
@@ -30,3 +31,7 @@ Rollout path: `.env.example:44` documents what rotating or losing the key does, 
 _Evaluator, 2026-09-25 — daily decide (AGENTS.md standing priority: rank on user impact; ≤ 5 plans today)._
 
 **Select — medium. Not planned today.** Confirmed on `main`: `backend/internal/google/token.go` wraps `secrets.ErrOpen` and `secrets.ErrNotSealed` into one `ErrNoRefreshToken`, `service.go` maps it to `ErrReauthRequired`, and nothing on that path logs, so a wrong `ENCRYPTION_SECRET_KEY` presents as every user needing to re-consent. Real operator hazard at the first Railway deploy. *Why not today:* the `google` package has a finished, unmerged branch (`harness/2026-09-24-medium-every-google-403-becomes-409-reauth-required-so-a-quota-erro`, edits `handler.go`/`client.go` and adds route logging) that the 20:00 review merges tonight; a second branch on the same files today would conflict at the daily merge. First in line tomorrow, on top of that branch's logging convention. Decision recorded for the plan: log one line at `ErrOpen` with the user id and the sentinel name (never the value), stay silent for empty rows, note `ErrNotSealed` at info; a boot-time key fingerprint is a later, optional step.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Planned — medium, auto-approved.** Root cause re-confirmed on `main`: `token.go` `openStored` folds `secrets.ErrOpen`/`ErrNotSealed` into `ErrNoRefreshToken` with no log, and `SyncHandler`'s `ErrReauthRequired` case answers 409 before `logSyncFailure` is reached. The unmerged google branch from 09-25 that the earlier evaluation waited on has landed. Today's google branch (`…403-accessnotconfigured…`) touches `client.go`, `schedule.go` and several test files, but not `token.go`/`token_test.go`, so the fix stays in those two files: log in `openStored` with the user id and the sentinel (never the value), and wrap with a second `%w` so callers can tell `ErrOpen` apart. Boot-time key fingerprint deferred. Plan: `harness/plans/2026-09-27-a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md`.

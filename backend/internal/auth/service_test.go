@@ -138,3 +138,39 @@ func TestSignInPropagatesAnExchangeFailure(t *testing.T) {
 		t.Fatal("expected an error, got nil")
 	}
 }
+
+func TestSignInFailsAndWritesNoSessionWhenTheRepoFails(t *testing.T) {
+	ex := &fakeExchanger{
+		token:   GoogleToken{AccessToken: "at"},
+		profile: GoogleProfile{Sub: "google-1", Email: "a@example.com"},
+	}
+	repo := &fakeRepo{err: errors.New("pg down")}
+	sess := newFakeSessions()
+	svc := newTestService(ex, repo, sess)
+
+	if _, err := svc.SignIn(context.Background(), "code", "uri"); err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+
+	if _, err := sess.Get(context.Background(), "google-1"); err == nil {
+		t.Error("expected no session written after a repo failure")
+	}
+}
+
+func TestSignInFailsWhenTheSessionWriteFails(t *testing.T) {
+	ex := &fakeExchanger{
+		token:   GoogleToken{AccessToken: "at"},
+		profile: GoogleProfile{Sub: "google-1", Email: "a@example.com"},
+	}
+	fakeErr := errors.New("dial tcp: i/o timeout")
+	sess := &fakeSessions{vals: map[string]string{}, ttls: map[string]time.Duration{}, err: fakeErr}
+	svc := newTestService(ex, newFakeRepo(), sess)
+
+	_, err := svc.SignIn(context.Background(), "code", "uri")
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("err = %v, want it to wrap %v", err, fakeErr)
+	}
+}

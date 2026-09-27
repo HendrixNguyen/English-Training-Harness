@@ -1,6 +1,6 @@
 # tools/harness/cli.py
 """Single entry point for every harness state mutation. Agents call this; they never hand-edit frontmatter."""
-import argparse, datetime, json, os, pathlib, re, subprocess, sys, time, unicodedata
+import argparse, datetime, json, os, pathlib, re, shutil, subprocess, sys, time, unicodedata
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
@@ -145,6 +145,8 @@ def cmd_new_review(a):
         path = pathlib.Path("harness/reviews") / f"{today()}-{slug}-{n}.md"
         n += 1
     fm = {"plan": a.plan, "verdict": a.verdict, "bugs": a.bugs or []}
+    if a.covers:
+        fm["covers"] = a.covers
     body = template("review", title=title, plan=a.plan, branch=pfm.get("branch") or "-", worktree=pfm.get("worktree") or "-")
     code = write(path, fm, body)
     if code == 0:
@@ -269,19 +271,143 @@ def cmd_unlock(a):
     print("unlocked"); return 0
 
 
+def _git_worktree_list():
+    try:
+        r = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True)
+    except OSError:
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def parse_worktree_list(text):
+    """[(path, branch_or_None), ...] in file order, from `git worktree list --porcelain` text."""
+    entries = []
+    path = branch = None
+    for line in text.splitlines() + [""]:
+        if line.startswith("worktree "):
+            path = line[len("worktree "):].strip()
+        elif line.startswith("branch "):
+            ref = line[len("branch "):].strip()
+            branch = ref[len("refs/heads/"):] if ref.startswith("refs/heads/") else ref
+        elif not line.strip():
+            if path is not None:
+                entries.append((path, branch))
+            path = branch = None
+    return entries
+
+
+def stale_worktrees(plans, entries, cwd):
+    """Worktrees whose branch belongs to a merged plan — git's list, not a directory scan."""
+    merged_branches = {p.fm["branch"] for p in plans if p.fm.get("merged") and p.fm.get("branch")}
+    legacy_names = {pathlib.Path(p.fm["worktree"]).name for p in plans
+                    if p.fm.get("merged") and p.fm.get("worktree") and not p.fm.get("branch")}
+    known_branches = {p.fm["branch"] for p in plans if p.fm.get("branch")}
+    out = []
+    for path, branch in entries[1:]:
+        norm = path.rstrip("/")
+        if cwd == norm or cwd.startswith(norm + "/"):
+            continue
+        if branch in merged_branches:
+            out.append(norm)
+        elif (branch is None or branch not in known_branches) and pathlib.Path(norm).name in legacy_names:
+            out.append(norm)
+    return sorted(set(out))
+
+
 def cmd_stale_worktrees(a):
     res = scan(".")
-    merged = {pathlib.Path(p.fm.get("worktree", "")).name for p in res.plans if p.fm.get("merged")}
-    for wt in sorted(pathlib.Path(".worktrees").glob("*")) if pathlib.Path(".worktrees").exists() else []:
-        if wt.name in merged:
-            print(wt.as_posix())
+    text = _git_worktree_list()
+    if text is None:
+        merged = {pathlib.Path(p.fm.get("worktree", "")).name for p in res.plans if p.fm.get("merged")}
+        for wt in sorted(pathlib.Path(".worktrees").glob("*")) if pathlib.Path(".worktrees").exists() else []:
+            if wt.name in merged:
+                print(wt.as_posix())
+        return 0
+    cwd = pathlib.Path.cwd().resolve().as_posix()
+    for path in stale_worktrees(res.plans, parse_worktree_list(text), cwd):
+        print(path)
     return 0
+
+
+# ---- doctor ----------------------------------------------------------------
+# Checks this machine and every tool adapter against .agents/toolchain.json.
+# Reads config files only; never reads secrets or runs the tools.
+
+def _json(path):
+    try:
+        return json.loads(pathlib.Path(path).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _codex_servers(path=".codex/config.toml"):
+    try:
+        text = pathlib.Path(path).read_text()
+    except OSError:
+        return set()
+    return set(re.findall(r"^\[mcp_servers\.([A-Za-z0-9_-]+)\]", text, re.M))
+
+
+def cmd_doctor(a):
+    tc = _json(".agents/toolchain.json")
+    if not tc:
+        print("FAIL toolchain: .agents/toolchain.json missing or not JSON"); return 1
+    fails = 0
+
+    def report(level, what, msg):
+        nonlocal fails
+        fails += level == "FAIL"
+        print(f"{level:<4} {what}{': ' + msg if msg else ''}")
+
+    for need, group in (("required", "FAIL"), ("optional", "WARN")):
+        for name, why in sorted(tc.get("clis", {}).get(need, {}).items()):
+            report("ok" if shutil.which(name) else group, f"cli {name}", "" if shutil.which(name) else f"not on PATH ({why})")
+
+    claude = _json(".claude/settings.json")
+    enabled = {k for k, v in claude.get("enabledPlugins", {}).items() if v}
+    declared = {
+        "claude-code": set(_json(".mcp.json").get("mcpServers", {})),
+        "codex": _codex_servers(),
+        "gemini-cli": set(_json(".gemini/settings.json").get("mcpServers", {})),
+    }
+    plugin_mcp = {pk["name"] for pk in tc.get("skill_packs", []) if pk.get("claude_plugin") in enabled}
+    for name, srv in sorted(tc.get("mcp_servers", {}).items()):
+        missing = [t for t, have in declared.items() if name not in have and not (t == "claude-code" and name in plugin_mcp)]
+        level = "ok" if not missing else ("FAIL" if srv.get("required") else "WARN")
+        report(level, f"mcp {name}", f"not declared for {', '.join(missing)}" if missing else "")
+
+    for pk in tc.get("skill_packs", []):
+        ok = pk.get("claude_plugin") in enabled
+        report("ok" if ok else ("FAIL" if pk.get("required") else "WARN"), f"skill-pack {pk['name']}",
+               "" if ok else f"{pk.get('claude_plugin')} not enabled in .claude/settings.json")
+
+    base = pathlib.Path(tc.get("project_skills", {}).get("path", ".agents/skills"))
+    for name in tc.get("project_skills", {}).get("names", []):
+        ok = (base / name / "SKILL.md").is_file()
+        report("ok" if ok else "FAIL", f"skill {name}", "" if ok else f"{base / name / 'SKILL.md'} missing")
+
+    for role, spec in sorted(tc.get("roles", {}).items()):
+        gaps = [p for p in (spec["role"], str(base / spec["skill"] / "SKILL.md"), f".claude/agents/harness-{role}.md")
+                if not pathlib.Path(p).is_file()]
+        report("ok" if not gaps else "FAIL", f"role {role}", f"missing {', '.join(gaps)}" if gaps else "")
+
+    hook = tc.get("hooks", {}).get("session_start", "")
+    for tool, path in (("claude-code", ".claude/settings.json"), ("codex", ".codex/hooks.json"), ("gemini-cli", ".gemini/settings.json")):
+        try:
+            ok = bool(hook) and hook in pathlib.Path(path).read_text()
+        except OSError:
+            ok = False
+        report("ok" if ok else "FAIL", f"hook {tool}", "" if ok else f"{path} does not run `{hook}`")
+
+    print(f"\n{'FAIL' if fails else 'ok'}: {fails} problem(s)")
+    return 1 if fails else 0
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="harness")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("validate").set_defaults(fn=cmd_validate)
+    sub.add_parser("doctor").set_defaults(fn=cmd_doctor)
     sub.add_parser("state").set_defaults(fn=cmd_state)
     p = sub.add_parser("context"); p.add_argument("--hook", action="store_true"); p.set_defaults(fn=cmd_context)
     p = sub.add_parser("slug"); p.add_argument("title"); p.set_defaults(fn=cmd_slug)
@@ -295,6 +421,7 @@ def main(argv=None):
     p = sub.add_parser("new-plan"); p.add_argument("--idea", required=True); p.set_defaults(fn=cmd_new_plan)
     p = sub.add_parser("new-review"); p.add_argument("--plan", required=True)
     p.add_argument("--verdict", required=True, choices=["pass", "pass-with-bugs", "fail"]); p.add_argument("--bugs", nargs="*")
+    p.add_argument("--covers", nargs="*")
     p.set_defaults(fn=cmd_new_review)
     p = sub.add_parser("set"); p.add_argument("file"); p.add_argument("pairs", nargs="+"); p.set_defaults(fn=cmd_set)
     p = sub.add_parser("next"); p.add_argument("--stage", required=True, choices=["evaluate", "execute", "review"])

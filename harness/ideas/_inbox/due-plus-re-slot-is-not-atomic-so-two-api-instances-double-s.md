@@ -49,3 +49,7 @@ against one due member, and the fake sender records exactly one send.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Real user impact on Railway even at one replica: a rolling deploy overlaps old and new containers, and any reminder due in that window fires twice. Smallest correct fix is the leader lock (`SET notify:worker:leader NX EX 60`, refreshed each tick) — a few lines in `worker.go`/`queue.go` plus an integration test with two `Service` values over one Redis. Wait for the notify branch to merge (it is `done`, unmerged) before planning; the plan edits files that do not exist on `main` yet.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Not planned today — file conflict.** `notify/*` and `store/keys.go` are held by today's unmerged `…no-per-user-subscription-cap…` branch.

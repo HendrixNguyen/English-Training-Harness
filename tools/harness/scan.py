@@ -25,7 +25,7 @@ class ScanResult:
     invalid: list = field(default_factory=list)
 
     def reviews_for(self, plan_rel):
-        return [r for r in self.reviews if r.fm.get("plan") == plan_rel]
+        return [r for r in self.reviews if r.fm.get("plan") == plan_rel or plan_rel in (r.fm.get("covers") or [])]
 
     def plan_for_idea(self, idea_rel):
         return next((p for p in self.plans if p.fm.get("idea") == idea_rel), None)

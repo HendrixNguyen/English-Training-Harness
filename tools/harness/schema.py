@@ -81,4 +81,6 @@ def validate(kind, fm):
         errs.append("merged must be true/false")
     if kind == "review" and not isinstance(fm.get("bugs"), list):
         errs.append("bugs must be a list")
+    if kind == "review" and "covers" in fm and not isinstance(fm["covers"], list):
+        errs.append("covers must be a list")
     return errs

@@ -2,6 +2,7 @@ package quests
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -117,6 +118,27 @@ func TestProgressHandlerReturnsTheSpec62Body(t *testing.T) {
 		if strings.Contains(w.Body.String(), stale) {
 			t.Errorf("body leaks non-§6.2 field %s: %s", stale, w.Body.String())
 		}
+	}
+}
+
+func TestProgressHandlerOmitsThePetFieldsWhenTheReadFails(t *testing.T) {
+	h := newHarness(t, time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC))
+	h.pet.stateErr = errors.New("pet_states unreachable")
+
+	w := postJSON(newQuestRouter(h.svc, "u1"), "/api/v1/quests/progress",
+		`{"exercise_id":"ex-2-reading","duration_seconds":600}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{`"daily_seconds_spent"`, `"is_target_met"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body = %s, missing %s", body, want)
+		}
+	}
+	if strings.Contains(body, "pet_health") || strings.Contains(body, "streak_count") {
+		t.Errorf("body = %s, want neither pet_health nor streak_count when the pet read failed", body)
 	}
 }
 

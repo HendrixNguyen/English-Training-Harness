@@ -1,9 +1,11 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 3
+priority: medium
+plan: harness/plans/2026-09-27-google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md
 ---
 
 ## Why
@@ -27,3 +29,8 @@ Technical (backend `google`, hook from `quests`; frontend copy only):
 - Code: `backend/internal/google/tasks.go:30-35` (`TasksClient` = InsertTaskList / DeleteTaskList / InsertTask — no patch, no ids kept); `service.go:129-150` (insert loop, `DayDue`); `backend/internal/store/migrations/0002_google_sync.up.sql:8-13` (only `tasklist_id` + a count are stored); CODEMAP `quests` (`Pet.OnTargetMet` fires exactly on the crossing call — the hook point) and `notify` (`RunWorker` shape, re-slot-first rule).
 - Inbox context (not re-filed): `harness/ideas/_inbox/a-user-deleted-tasks-list-is-never-rebuilt-and-sync-keeps-an.md` (a stale list is what users delete); `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` (same ZSET pattern; whichever fix lands there applies here — a double PATCH to `completed` is idempotent anyway).
 - Research: Google Tasks `tasks.patch` sets `status: "completed"` with patch semantics — https://developers.google.com/tasks/reference/rest/v1/tasks/patch and https://developers.google.com/tasks/reference/rest/v1/tasks ; Web Push on iOS reaches only Home Screen web apps, so the calendar notification is the fallback entry point — https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
+
+## Evaluation
+_Evaluator, 2026-09-27 — daily decide (feature queue)._ **Select — medium, not planned today.** *Is the Why real?* Yes: `google.Sync` inserts 28 tasks and never touches them again (`tasks.go` has no patch and keeps no ids), so the Google surface lies from day 2. *One plan?* Yes, backend-only (~1 day), no design doc. *Dependencies:* a new table (two unmerged branches already add `0004_*`), a hook beside `Pet.OnTargetMet` in `quests/pet.go` (edited by the unmerged `…a-pet-state-failure…` branch) and worker wiring in `cmd/api/main.go` (seven unmerged branches). The 2026-09-26 review run did not produce the daily PR, so planning against today's `main` would conflict at integration. Plan in the first feature slot after that PR merges; the `due-plus-re-slot…` fix applies to its ZSET too.
+
+_Evaluator, 2026-09-27 — 14:00 feature run:_ plan written — `harness/plans/2026-09-27-google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` (draft, medium). Backend-only; the optional settings-screen copy is dropped (YAGNI), so no design doc. Execution is gated on the 2026-09-26 daily PR and the listed branches being on `origin/main` (the plan's **Depends on** block).

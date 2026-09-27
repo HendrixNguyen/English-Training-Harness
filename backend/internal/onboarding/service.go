@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
@@ -20,8 +21,27 @@ var ErrInvalidRequest = errors.New("onboarding: invalid request")
 // passed through untouched.
 var ErrAITimeout = errors.New("onboarding: AI call timed out")
 
+// ErrNoActiveRoadmap means Regenerate was called by a user who never
+// onboarded (no active roadmap to replace). The handler maps it to 404
+// no_active_roadmap.
+var ErrNoActiveRoadmap = errors.New("onboarding: no active roadmap")
+
+// cefrOrder is the fixed CEFR ladder used by stepAllowed (bounds Regenerate's
+// level change to one step either way), GradeFloor and maxLevel (grade.go).
+// C2 is reachable only through the AI grader — the placement Bank tops out
+// at C1, so GradeFloor's floor never reaches it.
+var cefrOrder = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
+
 // DailyMinutes is the study commitment the roadmap prompt is built for (§1).
 const DailyMinutes = 30
+
+// DefaultPlantName is the name a blank plant_name gets. Decided here, not by
+// the DDL default ('My Green Buddy', spec §3.2 — kept, since it must equal
+// 0001_init), because the product speaks Vietnamese.
+const DefaultPlantName = "Mầm Non"
+
+// MaxPlantNameRunes bounds plant_name after trimming (runes, not bytes).
+const MaxPlantNameRunes = 30
 
 // Service runs the §5.1 steps 4-5 flow. The request/response DTOs and the
 // Pet/Generator seams are in types.go.
@@ -58,7 +78,9 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		if err != nil {
 			return AssessmentResult{}, err
 		}
-		pet, err := s.pet.Ensure(ctx, userID)
+		// Deliberately no rename: the active-roadmap path writes nothing (see
+		// the inbox bug on re-submits).
+		pet, err := s.pet.Ensure(ctx, userID, "")
 		if err != nil {
 			return AssessmentResult{}, err
 		}
@@ -124,7 +146,7 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		return AssessmentResult{}, err
 	}
 
-	pet, err := s.pet.Ensure(ctx, userID)
+	pet, err := s.pet.Ensure(ctx, userID, plantNameOrDefault(req.PlantName))
 	if err != nil {
 		return AssessmentResult{}, err
 	}
@@ -132,6 +154,66 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 		log.Printf("onboarding: clearing quiz hash for %s: %v", userID, err) // it expires anyway
 	}
 	return AssessmentResult{Status: "success", AssessedLevel: level, RoadmapID: roadmapID, PetState: pet, Created: true}, nil
+}
+
+// Regenerate replaces the caller's active roadmap with a fresh one — at the
+// current CEFR level, or one step up/down — using the same generation path
+// and limiter as Assess. It writes nothing until the roadmap has parsed
+// (ReplaceRoadmap is the only write, one transaction).
+func (s *Service) Regenerate(ctx context.Context, userID string, req RegenerateRequest) (RegenerateResult, error) {
+	if _, ok, err := s.repo.ActiveRoadmapID(ctx, userID); err != nil {
+		return RegenerateResult{}, err
+	} else if !ok {
+		return RegenerateResult{}, ErrNoActiveRoadmap
+	}
+
+	profile, err := s.repo.Profile(ctx, userID)
+	if err != nil {
+		return RegenerateResult{}, err
+	}
+
+	level := req.CEFRLevel
+	if level == "" {
+		level = profile.CEFRCurrent
+	}
+	if !cefrLevels[level] || !stepAllowed(profile.CEFRCurrent, level) {
+		return RegenerateResult{}, fmt.Errorf("%w: cefr_level must be within one step of %s", ErrInvalidRequest, profile.CEFRCurrent)
+	}
+
+	if err := s.limiter.Allow(ctx, userID); err != nil {
+		return RegenerateResult{}, err
+	}
+
+	var roadmap airouter.Roadmap
+	if err := s.routeJSON(ctx, airouter.TaskRoadmapGen, airouter.RoadmapSystemPrompt, airouter.RoadmapUserPrompt(level, profile.TargetGoal, DailyMinutes), func(raw string) error {
+		rm, err := airouter.ParseRoadmap(raw)
+		roadmap = rm
+		return err
+	}); err != nil {
+		return RegenerateResult{}, err
+	}
+
+	roadmapID, err := s.repo.ReplaceRoadmap(ctx, userID, level, roadmap)
+	if err != nil {
+		return RegenerateResult{}, err
+	}
+	log.Printf("onboarding: regenerated roadmap %s for %s at %s", roadmapID, userID, level)
+	return RegenerateResult{Status: "success", AssessedLevel: level, RoadmapID: roadmapID}, nil
+}
+
+// stepAllowed reports whether requested is current or one CEFR step away
+// (A1..C2). Both must be known levels; an unknown level is never allowed.
+func stepAllowed(current, requested string) bool {
+	ci, cok := cefrIndex(current)
+	ri, rok := cefrIndex(requested)
+	if !cok || !rok {
+		return false
+	}
+	d := ci - ri
+	if d < 0 {
+		d = -d
+	}
+	return d <= 1
 }
 
 // routeJSON calls the router and parses; a malformed body is retried once,
@@ -187,6 +269,9 @@ func validate(req AssessmentRequest) error {
 	if _, err := time.Parse("15:04:05", req.NotificationTime); err != nil {
 		return fmt.Errorf("%w: notification_time must be HH:MM:SS", ErrInvalidRequest)
 	}
+	if n := utf8.RuneCountInString(strings.TrimSpace(req.PlantName)); n > MaxPlantNameRunes {
+		return fmt.Errorf("%w: plant_name must be at most %d characters", ErrInvalidRequest, MaxPlantNameRunes)
+	}
 	if len(req.Answers) == 0 {
 		return fmt.Errorf("%w: answers must not be empty", ErrInvalidRequest)
 	}
@@ -205,4 +290,13 @@ func validate(req AssessmentRequest) error {
 		seen[a.QuestionID] = true
 	}
 	return nil
+}
+
+// plantNameOrDefault trims raw and, if empty, answers DefaultPlantName —
+// the create path's "blank → Mầm Non" rule.
+func plantNameOrDefault(raw string) string {
+	if name := strings.TrimSpace(raw); name != "" {
+		return name
+	}
+	return DefaultPlantName
 }

@@ -50,11 +50,6 @@ func PlacementUserPrompt(answers []Answer) string {
 
 var cefrLevels = map[string]bool{"A1": true, "A2": true, "B1": true, "B2": true, "C1": true, "C2": true}
 
-// cefrOrder is the fixed ladder GradeFloor and maxLevel walk. C2 is reachable
-// only through the AI grader — the placement Bank tops out at C1, so the
-// floor never reaches it (see GradeFloor).
-var cefrOrder = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
-
 // GradeFloor derives a deterministic floor from the bank's own correct
 // answers, independent of the AI grader: a learner who answers both items of
 // a level correctly has proven at least that level. It walks the ladder from
