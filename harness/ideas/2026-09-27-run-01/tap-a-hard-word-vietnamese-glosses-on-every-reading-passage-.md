@@ -1,9 +1,11 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-27-run-01
 order: 4
+priority: high
+plan: harness/plans/2026-09-27-tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md
 ---
 # Tap a hard word: Vietnamese glosses on every reading passage so the learner never leaves the room to translate
 
@@ -32,3 +34,10 @@ Technical (backend `airouter` content schema; frontend learning room):
 - Frontend spec §7.3 (distraction-free room); `docs/PRODUCT.md` "The interface is in Vietnamese … never has to struggle with English just to use the app".
 - `harness/ideas/_inbox/gemini-thinking-tokens-share-maxoutputtokens-…` (medium) — the output budget any content growth must respect.
 - L1 vs L2 glosses meta-analysis (L1 more effective, 26 studies): https://journals.sagepub.com/doi/abs/10.1177/1362168820981394 ; glosses and incidental vocabulary learning from reading, meta-analysis: https://www.frontiersin.org/journals/language-sciences/articles/10.3389/flang.2026.1815571/full ; glossed vs non-glossed reading (45 % vs 27 % words learned): https://www.sciencedirect.com/science/article/abs/pii/S1041608015300212
+
+## Evaluation
+_Evaluator, 2026-09-27 — 14:00 feature run._ **Select — high.**
+*Is the Why real?* Yes, and stronger than the idea states. `frontend/utils/content.ts` classifies content as `words | questions | raw` only; a reading task's `passage` is never rendered anywhere in `frontend/` (`grep -rn passage frontend` finds nothing outside tests). Once the typed-content branch lands, every reading task — one of the three daily tasks — shows 3–5 comprehension questions about a passage the learner cannot see. That is a happy-path break every learner hits every day, so the plan's first job is to render the passage; the glossary rides on that render. L1 glosses are the best-evidenced vocabulary intervention in this run.
+*One plan?* Yes (~1 day): airouter optional `glossary` in the reading schema + prompt + validator (~3 h), frontend `reading` kind in `classifyContent`, passage panel with gloss terms and a gloss card (~5 h). No migration, no endpoint, no wire change beyond an optional field inside `content_json`.
+*Dependencies:* the typed-content branch (`airouter/content.go`, `prompt.go`), the level-true branch (`prompt.go`), the 59-of-84 branch (onboarding uses the schema) and the task-timer branch (`pages/learn/[id].vue`) must be on `origin/main` first — the plan gates on them. The read-aloud plan (draft, same day) also edits `ContentViewer.vue` and gates its passage placement on a passage component existing; this plan creates that component, so whichever lands second rebases onto the other — noted in both directions in this plan.
+*Priority:* high — without the passage render the reading task is unusable; auto-approved.

@@ -1,10 +1,11 @@
 ---
 type: feature
-status: selected
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 4
 priority: medium
+plan: harness/plans/2026-09-27-missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md
 ---
 
 ## Why
@@ -31,3 +32,5 @@ Technical (backend `quests`, frontend roadmap + hub):
 
 ## Evaluation
 _Evaluator, 2026-09-27 — daily decide (feature queue)._ **Select — medium, not planned today.** *Is the Why real?* Yes: `quests/repo.go` rejects any exercise whose `day_number` is not today, so a skipped day's lessons are gone; the recovery mechanic is well evidenced. *One plan?* Yes (backend `?day=N` + relaxed `CheckExercise`, frontend catch-up view), but it needs a design doc on the retro roadmap world map. *Dependencies:* its entry point is the roadmap-tree plan (`GET /api/v1/roadmap`, done, unmerged) and it edits `quests/repo.go`/`service.go` and `stores/quest.ts`, all in flight on unmerged branches. Plan after the 2026-09-26 daily PR merges, designer first.
+
+_Evaluator, 2026-09-27 — 14:00 feature run:_ plan written — `harness/plans/2026-09-27-missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` (draft, medium). Design `harness/designs/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md`; the plan adds the design's `completed_tasks` field to `GET /api/v1/roadmap`. Execution is gated on the 2026-09-26 daily PR and the listed branches being on `origin/main` (the plan's **Depends on** block).

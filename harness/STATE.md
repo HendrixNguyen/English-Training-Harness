@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 10:13. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 14:21. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -19,16 +19,11 @@ _none_
 
 - `harness/ideas/2026-09-27-run-01/adaptive-placement-a-30-item-a1c2-ladder-replaces-the-fixed-.md` — Adaptive placement: a 30-item A1–C2 ladder replaces the fixed ten questions every learner and every day-28 re-check sees
 - `harness/ideas/2026-09-27-run-01/answers-are-remembered-server-graded-accuracy-per-task-feeds.md` — Answers are remembered: server-graded accuracy per task feeds the world map, task swaps and the day-28 checkpoint
-- `harness/ideas/2026-09-27-run-01/kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md` — Khó quá / dễ quá: swap one task for a level-fitted replacement through the unused exercise_generation route
 - `harness/ideas/2026-09-27-run-01/region-clear-an-end-of-week-recap-on-the-hub-with-days-met-m.md` — Region clear: an end-of-week recap on the hub with days met, minutes, words and the plant's stage
-- `harness/ideas/2026-09-27-run-01/tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md` — Tap a hard word: Vietnamese glosses on every reading passage so the learner never leaves the room to translate
 
 ## Selected
 
 - `harness/ideas/2026-09-22-run-02/reconcile-pet-states-stage-between-erd-and-ddl-wilted-defaul.md` — Reconcile pet_states stage between ERD and DDL (wilted, default) [low]
-- `harness/ideas/2026-09-26-run-01/google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` — (untitled) [medium]
-- `harness/ideas/2026-09-26-run-01/install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — (untitled) [medium]
-- `harness/ideas/2026-09-26-run-01/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` — (untitled) [medium]
 - `harness/ideas/_inbox/a-multi-day-sweep-outage-collapses-every-missed-day-into-one.md` — A multi-day sweep outage collapses every missed day into one penalty [medium]
 - `harness/ideas/_inbox/a-non-uuid-exercise-id-on-post-quests-progress-answers-500-i.md` — A non-UUID exercise_id on POST quests progress answers 500 instead of 400 or 404 [low]
 - `harness/ideas/_inbox/a-re-submitted-assessment-silently-discards-target-goal-noti.md` — A re-submitted assessment silently discards target_goal notification_time and timezone and still answers status success [medium]
@@ -65,8 +60,12 @@ _none_
 
 ## Planned (awaiting approval)
 
+- `harness/plans/2026-09-27-kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md` — Khó quá / Dễ quá — swap one task for a level-fitted replacement — Plan [medium]
 - `harness/plans/2026-09-27-level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — Level result in 30 seconds: grade first, write the roadmap in the background (`202 generating`, `roadmap:gen:{user_id}`, `404 roadmap_generating`, the onboarding result step and the hub drawing state) — Plan [medium]
 - `harness/plans/2026-09-27-hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — Hear it — read-aloud for passages, questions and flashcards (`useSpeech`, `SpeakButton`) on `/learn/:id` — Plan [medium]
+- `harness/plans/2026-09-27-google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md` — Google Tasks tick themselves when the day's target is met, and the calendar event opens the app — Plan [medium]
+- `harness/plans/2026-09-27-missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md` — Missed days are not lost — "Học bù" on any earlier day, minutes count toward today — Plan [medium]
+- `harness/plans/2026-09-27-install-and-remind-nudge-after-the-first-met-day-add-to-home.md` — Install-and-remind nudge — the companion asks to call you tomorrow after your first met day — Plan [medium]
 - `harness/plans/2026-09-26-day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint (backend): `POST /api/v1/roadmaps/next` re-grades the level and replaces the roadmap; `GET /quests/daily` says `roadmap_complete` — Plan [medium]
 - `harness/plans/2026-09-26-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md` — Infisical is the source of truth for deploy secrets: `.infisical.json` in the repo, an "Env source of truth" runbook section, Railway sync by Infisical — Plan [medium]
 - `harness/plans/2026-09-27-ai-graded-writing-practice-through-the-essay-grading-route.md` — AI-graded writing practice (backend): `writing` practice tasks in the roadmap and `POST /api/v1/quests/writing/grade` through the `essay_grading` route — Plan [medium]
@@ -75,6 +74,7 @@ _none_
 
 ## Approved
 
+- `harness/plans/2026-09-27-tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md` — The reading passage finally renders — with tap-a-word Vietnamese glosses — Plan [high]
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium]
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium]
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium]

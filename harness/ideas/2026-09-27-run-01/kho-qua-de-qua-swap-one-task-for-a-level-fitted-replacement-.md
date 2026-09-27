@@ -1,9 +1,11 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-27-run-01
 order: 1
+priority: medium
+plan: harness/plans/2026-09-27-kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md
 ---
 # Khó quá / dễ quá: swap one task for a level-fitted replacement through the unused exercise_generation route
 
@@ -34,3 +36,10 @@ Technical (backend `quests` + `airouter`; frontend learning room):
 - `harness/plans/2026-09-24-typed-task-content-with-answer-keys-…` — the per-task `content` shape and `validateContent` this idea reuses.
 - 1st-thinking §1 (adaptive, AI-personalised), §6.2 (router), §4 (`ratelimit:ai`); backend spec §6.2.
 - Adaptive difficulty and motivation / drop-out: https://www.sciencedirect.com/science/article/abs/pii/S0360131513001711 ; student-facing adaptive interventions and drop-out when solving probability is low: https://arxiv.org/pdf/2306.07853 ; LLM exercise generation for language learning: https://arxiv.org/pdf/2306.02457
+
+## Evaluation
+_Evaluator, 2026-09-27 — 14:00 feature run._ **Select — medium.**
+*Is the Why real?* Yes: "too easy / too hard" is the product's named second quit reason, the only correction in flight (regenerate) replaces the whole roadmap, and `TaskExerciseGen` is routed but has no caller. A one-tap per-task swap is the smallest learner-visible form of "adaptive".
+*One plan?* Yes (~1 day): one endpoint, one prompt, a migration of two nullable columns, one learning-room control.
+*Dependencies:* the typed-content branch (`validateContent`), the level-true branch (`prompt.go`, `level.go` for the ±1 CEFR step), the task-timer branch (`pages/learn/[id].vue`) and the two pending `0004_*` migrations (`0004_rls`, `0004_pet_shields`) — the swap migration must take the next free number after they land, so the plan gates execution on the 2026-09-26 daily PR. New Go code goes in new files (`quests/swap.go`, `airouter/exercise.go`) because `quests/repo.go`, `service.go` and `airouter/prompt.go` are touched by unmerged branches.
+*Priority:* medium — clear learning value, not a happy-path break; ranked above adaptive placement because it helps every existing learner on any day, while placement only helps new sign-ups and overlaps the in-flight level-result plan.
