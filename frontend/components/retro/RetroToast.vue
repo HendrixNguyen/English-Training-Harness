@@ -15,7 +15,7 @@ const head = computed(() => queue.value[0])
     class="retro-rise fixed inset-x-4 mx-auto max-w-md"
     style="bottom: calc(80px + env(safe-area-inset-bottom))"
   >
-    <RetroPanel :tone="head.tone ?? 'plain'" band>
+    <RetroPanel :tone="head.tone ?? 'plain'">
       {{ head.line }}
     </RetroPanel>
   </div>

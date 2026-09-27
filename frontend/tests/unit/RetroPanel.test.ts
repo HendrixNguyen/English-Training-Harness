@@ -32,4 +32,24 @@ describe('RetroPanel (design §5)', () => {
     const html = w.html()
     expect(html.indexOf('the-portrait')).toBeLessThan(html.indexOf('the-body'))
   })
+
+  it.each(['plain', 'ember'] as const)('tone=%s always sets its own ground-1, text-ink-0, border-2 and a ring (design amend A1/A2)', (tone) => {
+    const w = mount(RetroPanel, { props: { tone }, slots: { default: 'x' } })
+    const section = w.find('section')
+    expect(section.classes()).toContain('bg-ground-1')
+    expect(section.classes()).toContain('text-ink-0')
+    expect(section.classes()).toContain('border-2')
+    expect(section.attributes('style') ?? '').toContain('box-shadow')
+  })
+
+  it('band swaps p-4 for p-2 w-full but keeps the fill, line and ring (design amend A2 clarification)', () => {
+    const w = mount(RetroPanel, { props: { band: true }, slots: { default: 'x' } })
+    const section = w.find('section')
+    expect(section.classes()).toContain('bg-ground-1')
+    expect(section.classes()).toContain('border-2')
+    expect(section.classes()).toContain('p-2')
+    expect(section.classes()).toContain('w-full')
+    expect(section.classes()).not.toContain('p-4')
+    expect(section.attributes('style') ?? '').toContain('box-shadow')
+  })
 })

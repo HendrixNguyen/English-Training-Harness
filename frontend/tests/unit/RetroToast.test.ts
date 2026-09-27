@@ -45,4 +45,16 @@ describe('RetroToast + useRetroToast (design §5)', () => {
     const w = mount(RetroToast)
     expect(w.find('[role="status"]').exists()).toBe(false)
   })
+
+  it('the panel has a ground-1 fill and a ring box-shadow, and does not use band (design amend A2)', async () => {
+    const { show } = useRetroToast()
+    const w = mount(RetroToast)
+    show('a')
+    await w.vm.$nextTick()
+    const section = w.find('section')
+    expect(section.classes()).toContain('bg-ground-1')
+    expect(section.classes()).not.toContain('p-2')
+    expect(section.classes()).not.toContain('w-full')
+    expect(section.attributes('style') ?? '').toContain('box-shadow')
+  })
 })

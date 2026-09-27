@@ -32,8 +32,10 @@ const border = computed(() => ({
   done: 'border-line-lit',
   current: 'border-growth',
   open: 'border-line-lit',
-  locked: 'border-line-dim text-ink-2',
+  locked: 'border-line-dim',
 })[props.state])
+
+const ink = computed(() => (props.state === 'locked' ? 'text-ink-2' : 'text-ink-0'))
 
 const actionWord = computed(() => ({ done: 'Đã xong', current: 'Vào', open: 'Vào', locked: 'Khoá' })[props.state])
 const disabled = computed(() => props.state === 'locked' || props.state === 'done')
@@ -52,7 +54,7 @@ function onClick() {
       <button
         type="button"
         class="relative flex h-14 w-14 shrink-0 items-center justify-center border-2 bg-ground-1"
-        :class="border"
+        :class="[border, ink]"
         :aria-current="state === 'current' ? 'step' : undefined"
         :aria-disabled="disabled ? 'true' : undefined"
         @click="onClick"

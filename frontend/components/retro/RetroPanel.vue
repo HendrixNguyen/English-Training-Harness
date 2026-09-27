@@ -26,8 +26,8 @@ const ringStyle = computed(() => ({
 
 <template>
   <section
-    class="relative"
-    :class="[band ? 'p-2' : 'border-2 border-line-lit bg-ground-1 p-4', speaker ? 'mt-3' : '']"
+    class="relative border-2 border-line-lit bg-ground-1 text-ink-0"
+    :class="[band ? 'p-2 w-full' : 'p-4', speaker ? 'mt-3' : '']"
     :style="ringStyle"
     :aria-labelledby="speaker ? headingId : undefined"
     :aria-live="speaker ? 'polite' : undefined"

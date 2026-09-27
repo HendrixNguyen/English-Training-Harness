@@ -61,6 +61,14 @@ describe('QuestNode (design §5)', () => {
     }
   })
 
+  it('the tile button carries text-ink-0, or text-ink-2 when locked (design amend A2)', () => {
+    const open = mount(QuestNode, { props: { task, index: 0, state: 'open' } })
+    expect(open.find('button').classes()).toContain('text-ink-0')
+    const locked = mount(QuestNode, { props: { task, index: 0, state: 'locked' } })
+    expect(locked.find('button').classes()).toContain('text-ink-2')
+    expect(locked.find('button').classes()).not.toContain('text-ink-0')
+  })
+
   it('draws the connector lit/dim/none', () => {
     const lit = mount(QuestNode, { props: { task, index: 0, state: 'open', connector: 'lit' } })
     expect(lit.find('[data-connector]').classes()).toContain('bg-growth')
