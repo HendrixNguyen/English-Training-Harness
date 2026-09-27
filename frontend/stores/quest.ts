@@ -30,8 +30,9 @@ export interface ProgressResponse {
   daily_seconds_spent: number
   daily_minutes_spent: number
   is_target_met: boolean
-  pet_health: number
-  streak_count: number
+  // omitted when the backend's pet read failed (CODEMAP quests); never 0-for-unknown
+  pet_health?: number
+  streak_count?: number
 }
 
 interface Timer {

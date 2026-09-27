@@ -53,10 +53,11 @@ export const usePetStore = defineStore('pet', {
         this.loading = false
       }
     },
-    applyProgress(res: { pet_health: number, streak_count: number }) {
+    /** §6.2 progress response. Either field is absent when the backend's pet read failed; keep the last known plant then. */
+    applyProgress(res: { pet_health?: number, streak_count?: number }) {
       if (!this.status) return
-      this.status.health_points = res.pet_health
-      this.status.current_streak = res.streak_count
+      if (typeof res.pet_health === 'number') this.status.health_points = res.pet_health
+      if (typeof res.streak_count === 'number') this.status.current_streak = res.streak_count
     },
     hydrateChallenge() {
       const raw = storageOrNull()?.getItem(REVIVE_STORAGE_KEY)
