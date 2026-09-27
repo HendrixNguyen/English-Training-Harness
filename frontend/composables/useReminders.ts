@@ -108,10 +108,9 @@ export function useReminders(deps?: Deps): {
   }
 
   async function saveTime(time: string) {
-    const cur = store.remindersOn ? await currentSubscription() : null
-    if (store.remindersOn && !cur) {
-      // The browser dropped the subscription since we last checked: this is a
-      // fact about the device, not about the save, so it's the one place
+    const cur = state.value === 'on' ? await currentSubscription() : null
+    if (state.value === 'on' && !cur) {
+      // The browser dropped the subscription since init: a fact about the device, the one place
       // saveTime writes `state`.
       store.setRemindersOn(false)
       state.value = 'off'

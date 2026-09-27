@@ -176,6 +176,35 @@ describe('useReminders', () => {
       expect((win.Notification as unknown as { requestPermission: ReturnType<typeof vi.fn> }).requestPermission).not.toHaveBeenCalled()
       expect(r.state.value).toBe(label)
     })
+
+    it('with a stale remindersOn flag, saveTime (ok and failing) leaves the state unchanged', async () => {
+      useSettingsStore().setRemindersOn(true)
+      api.post.mockResolvedValue({ status: 'updated', notification_time: '07:30:00' })
+      const { r } = build()
+      await r.init()
+      expect(r.state.value).toBe(label)
+      await r.saveTime('07:30')
+      expect(r.state.value).toBe(label)
+      expect(r.problem.value).toBe(null)
+      expect(api.post.mock.calls[0][1]).not.toHaveProperty('push_subscription')
+
+      api.post.mockRejectedValue(new ApiError(500, 'internal_error'))
+      await r.saveTime('07:30')
+      expect(r.state.value).toBe(label)
+      expect(r.problem.value).toBe('error')
+    })
+  })
+
+  it('a stale remindersOn flag with a real denied permission: saveTime keeps denied and posts no subscription', async () => {
+    useSettingsStore().setRemindersOn(true)
+    api.post.mockResolvedValue({ status: 'updated', notification_time: '07:30:00' })
+    const { win } = fakeBrowser({ permission: 'denied', existing: true })
+    const r = useReminders({ vapidPublicKey: VAPID, win })
+    await r.init()
+    expect(r.state.value).toBe('denied')
+    await r.saveTime('07:30')
+    expect(r.state.value).toBe('denied')
+    expect(api.post.mock.calls[0][1]).not.toHaveProperty('push_subscription')
   })
 
   it('a successful save clears a previous problem back to null', async () => {
