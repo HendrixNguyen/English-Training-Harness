@@ -8,43 +8,78 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
 // ErrReauthRequired means Google no longer honours this user's refresh token
-// (invalid_grant), or rejects the request as unauthorized (401) or as a
-// permissions/scope problem (403 without a throttling reason). The handler
-// answers 409 reauth_required so the client sends the user through /login
-// again (auth.AuthCodeURL asks for calendar.events + tasks with prompt=consent).
+// (invalid_grant), or rejects the request as unauthorized (401), or as a
+// scope/permission problem (403 whose reason is in reauthReasons, or a 403
+// with no parseable reason at all — the legacy shape). The handler answers
+// 409 reauth_required so the client sends the user through /login again
+// (auth.AuthCodeURL asks for calendar.events + tasks with prompt=consent).
 //
-// A 403 whose error reason is one of throttleReasons is *not* reauth: Calendar
-// v3 and Tasks v1 answer quota exhaustion with 403, and re-consenting cannot
-// fix a quota. Those, and 429, are UpstreamError (→ 502, "try again later").
+// Every other parsed 403 reason — the quota family, accessNotConfigured /
+// SERVICE_DISABLED (the Calendar or Tasks API is off in the GCP project),
+// domainPolicy, … — is *not* reauth: re-consenting cannot fix any of them.
+// Those, and 429, are UpstreamError (→ 502, "try again later").
 var ErrReauthRequired = errors.New("google: re-authentication required")
 
-// throttleReasons are the error.errors[].reason values Google uses for quota
-// and rate limiting on Calendar v3 and Tasks v1 (they arrive as 403).
-var throttleReasons = map[string]bool{
-	"rateLimitExceeded":     true,
-	"userRateLimitExceeded": true,
-	"dailyLimitExceeded":    true,
-	"quotaExceeded":         true,
+// reauthReasons are the only reasons re-consent can fix: error.errors[].reason
+// on Calendar v3 / Tasks v1, and the google.rpc.ErrorInfo detail reason Google
+// uses for the same problem in the newer status+details error shape.
+var reauthReasons = map[string]bool{
+	"insufficientPermissions":         true,
+	"forbidden":                       true,
+	"ACCESS_TOKEN_SCOPE_INSUFFICIENT": true,
 }
 
-// googleErrorReason returns error.errors[0].reason from Google's standard
-// error envelope, or "" when the body is not that shape.
-func googleErrorReason(raw []byte) string {
+// googleErrorReasons returns every non-empty reason from Google's error
+// envelope — error.errors[].reason first, then error.details[].reason (the
+// google.rpc.ErrorInfo shape) — in order, or nil when the body is not that
+// shape (including the legacy HTML/plain-text 403).
+func googleErrorReasons(raw []byte) []string {
 	var env struct {
 		Error struct {
 			Errors []struct {
 				Reason string `json:"reason"`
 			} `json:"errors"`
+			Details []struct {
+				Reason string `json:"reason"`
+			} `json:"details"`
 		} `json:"error"`
 	}
-	if err := json.Unmarshal(raw, &env); err != nil || len(env.Error.Errors) == 0 {
-		return ""
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil
 	}
-	return env.Error.Errors[0].Reason
+	var reasons []string
+	for _, e := range env.Error.Errors {
+		if e.Reason != "" {
+			reasons = append(reasons, e.Reason)
+		}
+	}
+	for _, d := range env.Error.Details {
+		if d.Reason != "" {
+			reasons = append(reasons, d.Reason)
+		}
+	}
+	return reasons
+}
+
+// isReauth403 decides whether a 403 body should send the user through
+// re-consent: no parseable reason at all (empty body, HTML 403 — the legacy
+// shape), or any parsed reason is a scope/permission reason.
+func isReauth403(raw []byte) bool {
+	reasons := googleErrorReasons(raw)
+	if len(reasons) == 0 {
+		return true
+	}
+	for _, r := range reasons {
+		if reauthReasons[r] {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrNotFound means the Calendar event or Tasks list we stored an id for no
@@ -72,10 +107,11 @@ func (e *UpstreamError) Error() string {
 func defaultHTTPClient() *http.Client { return &http.Client{Timeout: 15 * time.Second} }
 
 // doJSON sends in (JSON-encoded, or nothing when nil) with a bearer token,
-// maps the status code as documented on the errors above (401 and non-throttle
-// 403 → ErrReauthRequired; 404/410 → ErrNotFound; 409 → ErrAlreadyExists;
-// everything else non-2xx, including throttling 403 and 429 → *UpstreamError),
-// and decodes a 2xx body into out when out is non-nil.
+// maps the status code as documented on the errors above (401 and a
+// scope/permission (or unparseable) 403 → ErrReauthRequired; 404/410 →
+// ErrNotFound; 409 → ErrAlreadyExists; everything else non-2xx, including a
+// non-auth-reason 403 (quota, API disabled, domain policy, …) and 429 →
+// *UpstreamError), and decodes a 2xx body into out when out is non-nil.
 func doJSON(ctx context.Context, client *http.Client, service, method, url, accessToken string, in, out any) error {
 	var body io.Reader
 	if in != nil {
@@ -110,14 +146,15 @@ func doJSON(ctx context.Context, client *http.Client, service, method, url, acce
 	switch {
 	case resp.StatusCode == http.StatusUnauthorized:
 		return fmt.Errorf("%w: %s returned 401", ErrReauthRequired, service)
-	case resp.StatusCode == http.StatusForbidden && !throttleReasons[googleErrorReason(raw)]:
-		return fmt.Errorf("%w: %s returned 403 %s", ErrReauthRequired, service, googleErrorReason(raw))
+	case resp.StatusCode == http.StatusForbidden && isReauth403(raw):
+		return fmt.Errorf("%w: %s returned 403 %s", ErrReauthRequired, service, strings.Join(googleErrorReasons(raw), ","))
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return fmt.Errorf("%w: %s returned %d", ErrNotFound, service, resp.StatusCode)
 	case resp.StatusCode == http.StatusConflict:
 		return fmt.Errorf("%w: %s returned 409", ErrAlreadyExists, service)
 	case resp.StatusCode < 200 || resp.StatusCode > 299:
-		// Includes throttling 403s and 429: the handler answers 502.
+		// Includes every 403 with a known non-auth reason — quota, API
+		// disabled, domain policy — and 429: the handler answers 502.
 		return &UpstreamError{Service: service, Status: resp.StatusCode, Body: string(raw)}
 	}
 	if out == nil || len(raw) == 0 {
