@@ -34,6 +34,18 @@ Both deployables build into provider-neutral images — `backend/Dockerfile` and
 
 The three `NUXT_PUBLIC_*` values are baked into the static site at build time (Nuxt `runtimeConfig.public`); changing one means a rebuild — a Cloudflare Pages env var change or a new `frontend/Dockerfile` build-arg, never a runtime change. State once: the public VAPID key must be the same string on both sides.
 
+## Env source of truth — Infisical
+
+The production env lives in the Infisical Secret Manager project **`english-learning`**, environment **`prod`** — not in any one file or dashboard. `.infisical.json` at the repo root links every checkout to it (it holds only the project id and the default environment, never a value); `deploy/.env` is generated from it and stays gitignored. Agents never read or write the values — every step below is the owner's (or an invited collaborator's).
+
+1. **Log in** — once per machine: `infisical login`.
+2. **Regenerate `deploy/.env`** — from the repo root: `infisical export --env prod --format dotenv > deploy/.env`. This is the whole file; rerun it whenever a secret changes.
+3. **Push a change back** — edit `deploy/.env`, then `grep -E '^[A-Z_]+=.+' deploy/.env > /tmp/nonblank.env && infisical secrets set --env prod --file /tmp/nonblank.env && rm /tmp/nonblank.env`. The filter matters: `infisical secrets set --file` aborts the whole upload on a single blank value (e.g. an unused optional key), so only non-empty lines are sent. To change one key, `infisical secrets set --env prod KEY=value` is enough.
+4. **Invite a collaborator** — Infisical organization → *Members* → invite, then grant them the `english-learning` project. The free plan allows 5 identities.
+5. **Railway** — the variables on the `api` service are pushed by Infisical's **Railway secret sync**, never edited by hand in the Railway dashboard (a hand edit is overwritten on the next sync). Owner setup, once: create a Railway account token → add it in Infisical as a *Railway* connection → create a secret sync from `prod` to Railway project `english-learning` / environment `production` / service `api`, with auto-redeploy on. After that, step 3 is how a Railway variable changes.
+6. **Build-time values** — the three `NUXT_PUBLIC_*` values are not secrets and stay GitHub **repository variables**, as *Ship from `production`* says; they are not synced from Infisical.
+7. **Later** — Infisical can be self-hosted on the Dokploy box (parked with *Target B*).
+
 ## Target A — Railway Free today (no card)
 
 **API on Railway** — new service from the GitHub repo, **Root Directory `backend`**, builder **Dockerfile**, healthcheck path `/healthz`, **App Sleeping off** (the cron worker and reminder queue run in-process — a sleeping service never decays plants or fires reminders), `GOMEMLIMIT=64MiB`, plus the API rows of the table above. Budget: Railway Free is $1/month of usage with no card; when it is spent Railway shows "workloads stopped" and the API is down until the month resets or the owner upgrades to Hobby ($5); logs are kept 3 days.
@@ -93,6 +105,7 @@ Migrations run at API boot and are not reverted by any of this; a release whose 
 ## Target B — Dokploy later (deploy only; CD is parked)
 
 Install Dokploy on the server (`curl -sSL https://dokploy.com/install.sh | sh`, the official one-liner — Docker + Traefik). Create a **Compose** application from this repo with compose path `deploy/compose.yml` and paste the contents of `deploy/.env` as its environment. Public HTTPS via Traefik + Let's Encrypt on ports 80/443, or a Cloudflare Tunnel when the box is behind NAT (Google OAuth and Web Push refuse plain HTTP). A domain each for `web` (port 80) and `api` (port 8080). Enable Dokploy's scheduled Postgres backup to an S3-compatible bucket — the `postgres_data` volume is the only copy otherwise. `FRONTEND_ORIGIN` is the web domain; `NUXT_PUBLIC_API_BASE` is the api domain. `deploy/.env` must carry the same `OPENAI_BASE_URL`/`OPENAI_MODEL` the Railway service has (the live deployment routes through OpenRouter, not OpenAI's own API).
+Install Dokploy on the server (`curl -sSL https://dokploy.com/install.sh | sh`, the official one-liner — Docker + Traefik). Create a **Compose** application from this repo with compose path `deploy/compose.yml` and paste the contents of `deploy/.env` (regenerated with `infisical export --env prod --format dotenv > deploy/.env`, see *Env source of truth*) as its environment. Public HTTPS via Traefik + Let's Encrypt on ports 80/443, or a Cloudflare Tunnel when the box is behind NAT (Google OAuth and Web Push refuse plain HTTP). A domain each for `web` (port 80) and `api` (port 8080). Enable Dokploy's scheduled Postgres backup to an S3-compatible bucket — the `postgres_data` volume is the only copy otherwise. `FRONTEND_ORIGIN` is the web domain; `NUXT_PUBLIC_API_BASE` is the api domain.
 
 Continuous delivery to Dokploy (registry push + deploy webhook on a push to `production`, as a second job in `deploy.yml`) is parked in `harness/BACKLOG.md` until this target is live — until then, deploys here are manual.
 
@@ -123,7 +136,7 @@ unset COMPOSE_PROJECT_NAME
 rm -f deploy/.env
 ```
 
-`deploy/.env` is gitignored — never commit it. If this repo is checked out as a git worktree, run these commands from the worktree root, not the main checkout (AGENTS.md).
+`deploy/.env` is gitignored — never commit it. The scratch file above is for a local boot only; the production file is always `infisical export --env prod --format dotenv > deploy/.env` (see *Env source of truth*). If this repo is checked out as a git worktree, run these commands from the worktree root, not the main checkout (AGENTS.md).
 
 ## Smoke check
 
@@ -132,15 +145,18 @@ Run after every deploy:
 - `deploy/smoke-api.sh <api-base-url> <frontend-origin>` — `/healthz` is `200` with `{"status":"ok"}` (Postgres and Redis both reachable); `POST /api/v1/auth/google` with an empty body is `400 invalid_request` — the API has **no** OAuth redirect endpoint of its own, the consent URL is built by the PWA, so this only proves the route exists; a CORS preflight from `<frontend-origin>` is `204` and echoes that origin in `Access-Control-Allow-Origin`; a preflight from a foreign origin is `403`.
 - `deploy/smoke-web.sh <web-base-url>` — `/` is `200`; the OAuth return trip `/login?code&state` is `200` with no redirect (no `-L`: a `308` here means the query string, and the sign-in, was dropped); a deep path (e.g. `/learn/abc`) is `200` via the SPA fallback (strict everywhere — Pages holds this because the upload carries no `404.html`, the Docker image because of `try_files`); `sw.js` and `manifest.webmanifest` are `200` with `Cache-Control: no-cache`; a hashed `/_nuxt/*.js` asset is `200` with `Cache-Control: public, max-age=31536000, immutable`. The `Deploy` workflow runs this only after its own "Wait for the Pages edge" step (≤ 90 s, polling the asset cache-control and the deep-link check), so a fresh Pages deployment's short no-store window doesn't fail the ship.
 
+With the env in Infisical, the checks can take their URLs from it: `infisical run --env prod -- sh -c 'deploy/smoke-api.sh "$API_URL" "$PAGES_URL"'` — `API_URL` and `PAGES_URL` must exist as secrets in `prod` (or pass the two URLs literally instead).
+
 ## Owner checklist
 
+- [ ] infisical login && infisical export --env prod --format dotenv > deploy/.env — the env comes from Infisical (see *Env source of truth*); the boxes below are first-time setup, and every value they produce goes into Infisical `prod`, not a file.
 - [ ] Create the Supabase project; copy the session-mode pooler connection string.
 - [ ] After the API's first boot against it (migration `0004_rls` has run): Project Settings → Data API → disable (or remove `public` from *Exposed schemas*) — the API connects directly and never uses PostgREST.
 - [ ] Create the Upstash Redis database; copy the `rediss://` URL.
-- [ ] Generate secrets — `openssl rand -base64 32` for `JWT_SECRET`, `openssl rand -hex 32` for `ENCRYPTION_SECRET_KEY`, `npx web-push generate-vapid-keys` for the VAPID pair — store them in a password manager, never in the repo.
-- [ ] Create the Railway service (root `backend`, builder Dockerfile, App Sleeping off, healthcheck `/healthz`), set every API variable from the table above, note the generated domain.
+- [ ] Generate secrets — `openssl rand -base64 32` for `JWT_SECRET`, `openssl rand -hex 32` for `ENCRYPTION_SECRET_KEY`, `npx web-push generate-vapid-keys` for the VAPID pair — store them in Infisical `prod` (see *Env source of truth*), never in the repo.
+- [ ] Create the Railway service (root `backend`, builder Dockerfile, App Sleeping off, healthcheck `/healthz`), API variables synced from Infisical (see *Env source of truth* step 5 — never set by hand), note the generated domain.
 - [ ] Create the Cloudflare Pages project `english-learning` as a **direct-upload** project (no Git connection); note the domain.
-- [ ] Set `FRONTEND_ORIGIN` on Railway to the Pages origin and redeploy.
+- [ ] Set `FRONTEND_ORIGIN` in Infisical `prod` to the Pages origin; the Railway sync pushes it and redeploys.
 - [ ] In Google Cloud Console, add the Pages origin as an authorized JavaScript origin and `https://<pages-domain>/login` as the redirect URI on the OAuth client; add Gemini/OpenAI/DeepSeek keys if any provider is used.
 - [ ] Create the Cloudflare API token (custom, **Account → Cloudflare Pages → Edit**) and set the five repository variables and two secrets from *Ship from `production`*.
 - [ ] Point the Railway `api` service's Source branch at `production` with **Wait for CI** on.
