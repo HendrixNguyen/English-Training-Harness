@@ -52,4 +52,10 @@ const style = computed(() => ({ '--rb-shadow': VARIANT[props.variant].shadow }))
   transform: translateY(2px);
   box-shadow: 0 2px 0 0 var(--rb-shadow, transparent);
 }
+/* folded bug: disabled/loading kept the 4px depth shadow, which reads as
+   still-pressable chrome under a control that no longer responds to taps. */
+.rb:disabled,
+.rb[aria-busy='true'] {
+  box-shadow: none;
+}
 </style>

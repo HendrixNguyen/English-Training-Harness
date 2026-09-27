@@ -38,6 +38,22 @@ describe('SpeechBox (design §5)', () => {
     expect(live.find('[data-typed]').exists()).toBe(false)
   })
 
+  it('folded bug: exactly one aria-live region in the rendered tree, even with a speaker name', () => {
+    const w = mount(SpeechBox, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80 } })
+    expect(w.findAll('[aria-live]')).toHaveLength(1)
+    expect(w.find('[data-live-line]').attributes('aria-live')).toBe('polite')
+  })
+
+  it('folded bug: is a keyboard-focusable skip target — Enter and Space reveal the line and emit settled once', async () => {
+    const w = mount(SpeechBox, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80 } })
+    expect(w.attributes('tabindex')).toBe('0')
+    await w.trigger('keydown.enter')
+    expect(w.find('[data-typed]').text()).toBe('Tớ khát rồi')
+    expect(w.emitted('settled')).toHaveLength(1)
+    await w.trigger('keydown.space')
+    expect(w.emitted('settled')).toHaveLength(1)
+  })
+
   it('restarts typing when the line changes', async () => {
     const w = mount(SpeechBox, { props: { line: 'Aaa', name: 'Mầm', stage: 'sprout', health: 80 } })
     vi.advanceTimersByTime(30 * 3)

@@ -30,6 +30,14 @@ describe('MapNode (design §5)', () => {
     expect(w.attributes('aria-label')).toContain('bỏ lỡ')
   })
 
+  it('folded bug (retro-roadmap R6): missed is a hollow ember ring — no ember fill, day number in ink-1', () => {
+    const w = mount(MapNode, { props: { day: 6, state: 'missed', title: 'x' } })
+    const tile = w.find('[data-tile]')
+    expect(tile.classes().join(' ')).not.toContain('bg-ember')
+    expect(tile.classes()).toContain('text-ink-1')
+    expect(tile.classes()).not.toContain('text-ink-0')
+  })
+
   it('locked: ink-2, aria-disabled, no select on click', async () => {
     const w = mount(MapNode, { props: { day: 20, state: 'locked', title: 'x' } })
     expect(w.find('[data-tile]').classes().join(' ')).toContain('text-ink-2')

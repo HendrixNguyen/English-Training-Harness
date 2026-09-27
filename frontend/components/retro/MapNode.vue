@@ -30,8 +30,14 @@ const border = computed(() => ({
 })[props.state])
 
 /** design amend A2: the tile paints its own ink; A5: pressed inset on
- * every state except locked. */
-const ink = computed(() => (props.state === 'locked' ? 'text-ink-2' : 'text-ink-0'))
+ * every state except locked. Folded bug (retro-roadmap R6): a missed day
+ * is a hollow ember ring, not full-strength ink — the day number dims to
+ * `ink-1` so the tile itself reads as quieter than a normal day. */
+const ink = computed(() => {
+  if (props.state === 'locked') return 'text-ink-2'
+  if (props.state === 'missed') return 'text-ink-1'
+  return 'text-ink-0'
+})
 const pressed = computed(() => (props.state === 'locked' ? '' : 'group-active:translate-y-[2px] group-active:border-line-dim'))
 
 const label = computed(() => `Ngày ${props.day}: ${props.title}, ${WORD[props.state]}`)

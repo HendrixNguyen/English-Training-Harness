@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { tokens } from '~/tailwind.config'
 import { minutesOf, percentOf, segmentFills } from '~/utils/progress'
 import { useReducedMotion } from '~/composables/useReducedMotion'
@@ -16,7 +16,9 @@ const props = withDefaults(defineProps<{
   met?: boolean
   cells?: number
   reduced?: boolean
-}>(), { segments: 3, segmentSeconds: 600, met: false, cells: 20, reduced: undefined })
+  /** folded bug: the group had no accessible name. */
+  label?: string
+}>(), { segments: 3, segmentSeconds: 600, met: false, cells: 20, reduced: undefined, label: 'Phòng hôm nay' })
 
 const os = useReducedMotion()
 const isReduced = computed(() => props.reduced ?? os.value)
@@ -28,12 +30,25 @@ const totalMinutes = computed(() => minutesOf(target.value))
 const pct = computed(() => percentOf(props.valueSeconds, target.value))
 const segmentPx = computed(() => props.cells * 4)
 
-function segStyle(fill: number) {
-  const lit = Math.round(fill * props.cells)
+function litOf(fill: number) {
+  return Math.round(fill * props.cells)
+}
+
+/** folded bug: same steps()-tracks-the-delta rule as HpBar (design amend),
+ * kept per segment index since each segment fills independently. */
+const previousLits = ref<number[]>([])
+watch(fills, (_newFills, oldFills) => {
+  previousLits.value = (oldFills ?? []).map(litOf)
+}, { flush: 'sync' })
+
+function segStyle(fill: number, index: number) {
+  const lit = litOf(fill)
+  const prev = previousLits.value[index] ?? lit
+  const steps = Math.max(1, Math.abs(lit - prev))
   return {
     width: `${lit * 4}px`,
     backgroundColor: tokens.growth,
-    ...(isReduced.value ? {} : { transition: `width 300ms steps(${Math.max(1, lit)})` }),
+    ...(isReduced.value ? {} : { transition: `width 300ms steps(${steps})` }),
   }
 }
 </script>
@@ -49,6 +64,7 @@ function segStyle(fill: number) {
       :aria-valuenow="Math.min(valueSeconds, target)"
       aria-valuemin="0"
       :aria-valuemax="target"
+      :aria-label="label"
     >
       <div
         v-for="(fill, i) in fills"
@@ -56,7 +72,7 @@ function segStyle(fill: number) {
         class="h-3 border-2 border-line-dim bg-ground-2"
         :style="{ width: `${segmentPx}px` }"
       >
-        <i data-segment class="retro-anim block h-full" :style="segStyle(fill)" />
+        <i data-segment class="retro-anim block h-full" :style="segStyle(fill, i)" />
       </div>
     </div>
     <p class="mt-1 text-right text-sm" :class="met ? 'text-growth' : 'text-ink-1'">

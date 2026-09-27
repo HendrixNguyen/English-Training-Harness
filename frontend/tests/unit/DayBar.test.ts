@@ -27,6 +27,24 @@ describe('DayBar (design §5, ports SegmentedProgress.test.ts)', () => {
     expect(group.attributes('aria-valuenow')).toBe('1200')
     expect(group.attributes('aria-valuemax')).toBe('1800')
   })
+
+  it('folded bug: has an accessible name, default "Phòng hôm nay"', () => {
+    const w = mount(DayBar, { props: { valueSeconds: 1200 } })
+    expect(w.find('[role="progressbar"]').attributes('aria-label')).toBe('Phòng hôm nay')
+  })
+
+  it('a custom label prop overrides the accessible name (revive single segment)', () => {
+    const w = mount(DayBar, { props: { valueSeconds: 450, segments: 1, segmentSeconds: 900, cells: 40, label: 'Nhiệm vụ hồi sinh' } })
+    expect(w.find('[role="progressbar"]').attributes('aria-label')).toBe('Nhiệm vụ hồi sinh')
+  })
+
+  it('folded bug: each segment transition steps by the change in lit cells, not the raw cell count', async () => {
+    const w = mount(DayBar, { props: { valueSeconds: 0 } })
+    await w.setProps({ valueSeconds: 300 })
+    const segs = w.findAll('[data-segment]')
+    // segment 0 goes from 0/600s to 300/600s: 0 -> 10 lit cells (cells=20) = steps(10)
+    expect(segs[0].attributes('style') ?? '').toContain('steps(10)')
+  })
 })
 
 describe('DayBar reduced default (design amend A4)', () => {

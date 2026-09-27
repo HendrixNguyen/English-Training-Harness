@@ -52,6 +52,15 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* H3: the status-bar streak Badge's pulse — lit torch outline <-> rest,
+ * stepped, no scale (replaces the v1 AppHeader smooth streak-pulse).
+ * `torch` is tailwind.config.ts `tokens.torch` (#F2A83B) — a literal hex,
+ * since this stylesheet has no design-token CSS variables of its own. */
+@keyframes retro-badge-pulse {
+  0%, 49% { outline: 2px solid #F2A83B; outline-offset: 2px; }
+  50%, 100% { outline: 2px solid transparent; outline-offset: 2px; }
+}
+
 .retro-breath {
   animation: retro-breath 1000ms steps(1) infinite;
 }
@@ -72,6 +81,9 @@
 }
 .retro-rise {
   animation: retro-rise 150ms steps(1);
+}
+.retro-badge-pulse {
+  animation: retro-badge-pulse 300ms steps(2);
 }
 
 @media (prefers-reduced-motion: reduce) {

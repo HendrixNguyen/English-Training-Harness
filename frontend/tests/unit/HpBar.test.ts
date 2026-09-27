@@ -44,6 +44,26 @@ describe('HpBar (design §5)', () => {
     const w = mount(HpBar, { props: { value: 50, reduced: true } })
     expect(w.find('[data-fill]').attributes('style') ?? '').not.toContain('transition')
   })
+
+  it('folded bug: clamps the label and aria-valuenow to 0..max, never the raw value', () => {
+    const low = mount(HpBar, { props: { value: -5 } })
+    expect(low.text()).toContain('HP 0/100')
+    expect(low.find('[role="meter"]').attributes('aria-valuenow')).toBe('0')
+
+    const high = mount(HpBar, { props: { value: 130 } })
+    expect(high.text()).toContain('HP 100/100')
+    expect(high.find('[role="meter"]').attributes('aria-valuenow')).toBe('100')
+  })
+
+  it('folded bug: the fill transition steps by the change in lit cells, not the raw cell count', async () => {
+    const w = mount(HpBar, { props: { value: 40 } })
+    await w.setProps({ value: 44 })
+    expect(w.find('[data-fill]').attributes('style') ?? '').toContain('steps(1)')
+
+    const w2 = mount(HpBar, { props: { value: 0 } })
+    await w2.setProps({ value: 100 })
+    expect(w2.find('[data-fill]').attributes('style') ?? '').toContain('steps(25)')
+  })
 })
 
 describe('HpBar reduced default (design amend A4)', () => {

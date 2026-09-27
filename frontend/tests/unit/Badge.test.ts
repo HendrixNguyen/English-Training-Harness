@@ -21,4 +21,21 @@ describe('Badge (design §5)', () => {
     expect(earned.find('svg').attributes('style')).toContain(`--px-t: ${tokens.torch}`)
     expect(notEarned.find('svg').attributes('style')).toContain(`--px-t: ${tokens['line-dim']}`)
   })
+
+  it('(H3) pulse adds a stepped outline-pulse class, no scale, using the shared 300ms steps(2) keyframe', () => {
+    const w = mount(Badge, { props: { kind: 'streak', count: 7, pulse: true } })
+    const classes = w.classes().join(' ')
+    expect(classes).toContain('retro-badge-pulse')
+    expect(classes).not.toMatch(/scale/)
+  })
+
+  it('(H3) no pulse class when pulse is false', () => {
+    const w = mount(Badge, { props: { kind: 'streak', count: 7, pulse: false } })
+    expect(w.classes().join(' ')).not.toContain('retro-badge-pulse')
+  })
+
+  it('(H3) reduced motion drops the pulse class', () => {
+    const w = mount(Badge, { props: { kind: 'streak', count: 7, pulse: true, reduced: true } })
+    expect(w.classes().join(' ')).not.toContain('retro-badge-pulse')
+  })
 })

@@ -64,8 +64,14 @@ function revealAll() {
 </script>
 
 <template>
-  <div @click="revealAll">
-    <RetroPanel :speaker="name">
+  <div
+    tabindex="0"
+    class="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch"
+    @click="revealAll"
+    @keydown.enter.prevent="revealAll"
+    @keydown.space.prevent="revealAll"
+  >
+    <RetroPanel :speaker="name" :live-region="false">
       <template #portrait>
         <CompanionSprite crop="face" :size="48" :stage="stage" :health="health" :reduced="isReduced" />
       </template>

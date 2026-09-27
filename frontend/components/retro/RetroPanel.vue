@@ -14,7 +14,11 @@ const props = withDefaults(defineProps<{
   tone?: 'plain' | 'growth' | 'torch' | 'ember'
   band?: boolean
   fog?: boolean
-}>(), { speaker: undefined, tone: 'plain', band: false, fog: false })
+  /** A caller that already owns its own single live region (e.g. `SpeechBox`'s
+   * hidden full-line span) sets this to `false` so the panel does not add a
+   * second one — a screen reader region should never announce twice. */
+  liveRegion?: boolean
+}>(), { speaker: undefined, tone: 'plain', band: false, fog: false, liveRegion: true })
 
 const headingId = useId()
 
@@ -30,7 +34,7 @@ const ringStyle = computed(() => ({
     :class="[band ? 'p-2 w-full' : 'p-4', speaker ? 'mt-3' : '']"
     :style="ringStyle"
     :aria-labelledby="speaker ? headingId : undefined"
-    :aria-live="speaker ? 'polite' : undefined"
+    :aria-live="speaker && liveRegion ? 'polite' : undefined"
   >
     <h2
       v-if="speaker"

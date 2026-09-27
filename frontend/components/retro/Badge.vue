@@ -2,16 +2,27 @@
 import { computed } from 'vue'
 import { tokens } from '~/tailwind.config'
 import { GLYPHS, PALETTE } from '~/utils/pixelArt'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 import PixelArt from './PixelArt.vue'
 
 /** 32-px pixel emblem (design §5). `earned` draws every colour as
  * authored; an unearned badge dims every non-outline char to `line-dim`
- * and hides the `k` outline so only the muted silhouette shows. */
+ * and hides the `k` outline so only the muted silhouette shows.
+ * `pulse` (design H3, replaces the v1 `AppHeader` smooth streak-pulse):
+ * a stepped 2-frame outline pulse, no scale — `retro-badge-pulse` in
+ * `assets/css/retro.css`, already covered by the shared reduced-motion
+ * block, but the class itself is withheld under reduced motion too so a
+ * static badge never carries a no-op animation class. */
 const props = withDefaults(defineProps<{
   kind: 'streak' | 'shield' | 'star'
   count?: number
   earned?: boolean
-}>(), { count: undefined, earned: true })
+  pulse?: boolean
+  reduced?: boolean
+}>(), { count: undefined, earned: true, pulse: false, reduced: undefined })
+
+const os = useReducedMotion()
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const KIND_GLYPH = { streak: 'flame', shield: 'shield', star: 'star' } as const
 const KIND_LABEL = { streak: 'chuỗi', shield: 'khiên', star: 'sao' } as const
@@ -34,7 +45,12 @@ const label = computed(() => (props.kind === 'streak' ? `${KIND_LABEL.streak} ${
 </script>
 
 <template>
-  <span class="inline-flex items-center gap-1" role="img" :aria-label="label">
+  <span
+    class="inline-flex items-center gap-1"
+    :class="{ 'retro-badge-pulse': pulse && !isReduced }"
+    role="img"
+    :aria-label="label"
+  >
     <PixelArt :rows="rows" :palette="palette" :size="32" />
     <span v-if="count !== undefined" class="font-display text-xl leading-6" :class="earned ? 'text-torch' : 'text-line-dim'">x{{ count }}</span>
   </span>
