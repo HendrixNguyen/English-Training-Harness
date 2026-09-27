@@ -32,7 +32,7 @@ One paragraph per package/module. Read this before exploring code. Executors upd
 
 ## Harness tooling (`tools/harness/`)
 
-- `frontmatter.py` YAML-subset parser · `schema.py` required keys/enums/transitions · `scan.py` walk + validate · `state.py` STATE.md renderer + `render_context` (the session-start briefing: STATE's actionable sections verbatim, Proposed/Selected/Done collapsed to counts, plus a CODEMAP index built from `## ` headings and `- **name**` bullets — keep that bullet shape) · `cli.py` all mutations; `context [--hook]` is read-only and is what every tool's `SessionStart` hook calls. Tests: `python3 -m unittest discover -s tools/harness/tests`.
+- `frontmatter.py` YAML-subset parser · `schema.py` required keys/enums/transitions · `scan.py` walk + validate · `state.py` STATE.md renderer + `render_context` (the session-start briefing: STATE's actionable sections verbatim, Proposed/Selected/Done collapsed to counts, plus a CODEMAP index built from `## ` headings and `- **name**` bullets — keep that bullet shape) · `cli.py` all mutations; `context [--hook]` is read-only and is what every tool's `SessionStart` hook calls. `stale-worktrees` lists worktrees from `git worktree list --porcelain` whose branch belongs to a merged plan (absolute paths; `.worktrees/` glob only without git); a review's `covers:` list makes `reviews_for` count it for the amend plans it re-verified. Tests: `python3 -m unittest discover -s tools/harness/tests`.
 
 ## CI (`.github/workflows/ci.yml`)
 

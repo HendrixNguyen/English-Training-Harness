@@ -36,6 +36,12 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(validate("review", {"plan": "harness/plans/x.md", "verdict": "pass", "bugs": []}), [])
         self.assertIn("verdict: 'meh' not in", " ".join(validate("review", {"plan": "p", "verdict": "meh", "bugs": []})))
 
+    def test_covers_must_be_a_list(self):
+        errs = validate("review", {"plan": "p", "verdict": "pass", "bugs": [], "covers": "harness/plans/x.md"})
+        self.assertIn("covers must be a list", errs)
+        errs = validate("review", {"plan": "p", "verdict": "pass", "bugs": [], "covers": ["harness/plans/x.md"]})
+        self.assertEqual(errs, [])
+
     def test_transitions(self):
         self.assertIn("approved", TRANSITIONS["plan"]["draft"])
         self.assertNotIn("done", TRANSITIONS["plan"]["draft"])
