@@ -26,8 +26,13 @@ const border = computed(() => ({
   today: 'border-growth bg-ground-2',
   partial: 'border-line-lit',
   missed: 'border-ember',
-  locked: 'border-line-dim text-ink-2',
+  locked: 'border-line-dim',
 })[props.state])
+
+/** design amend A2: the tile paints its own ink; A5: pressed inset on
+ * every state except locked. */
+const ink = computed(() => (props.state === 'locked' ? 'text-ink-2' : 'text-ink-0'))
+const pressed = computed(() => (props.state === 'locked' ? '' : 'group-active:translate-y-[2px] group-active:border-line-dim'))
 
 const label = computed(() => `Ngày ${props.day}: ${props.title}, ${WORD[props.state]}`)
 const disabled = computed(() => props.state === 'locked')
@@ -40,28 +45,29 @@ function onClick() {
 <template>
   <button
     type="button"
-    class="relative flex h-10 w-10 items-center justify-center border-2 bg-ground-1"
-    :class="border"
+    class="group relative p-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch focus-visible:ring-0 focus-visible:ring-offset-0"
     :aria-label="label"
     :aria-current="state === 'today' ? 'step' : undefined"
     :aria-disabled="disabled ? 'true' : undefined"
     :aria-expanded="expanded"
     @click="onClick"
   >
-    <span class="font-display text-xl leading-6">{{ day }}</span>
+    <span data-tile class="relative flex h-10 w-10 items-center justify-center border-2 bg-ground-1" :class="[border, ink, pressed]">
+      <span class="relative z-10 font-display text-xl leading-6">{{ day }}</span>
 
-    <span v-if="state === 'cleared'" data-glyph="star" class="absolute -right-1 -top-1">
-      <PixelArt :rows="GLYPHS.star" :size="12" />
+      <span v-if="state === 'cleared'" data-glyph="star" class="absolute -right-1 -top-1">
+        <PixelArt :rows="GLYPHS.star" :size="12" />
+      </span>
+
+      <span v-if="state === 'missed'" data-glyph="ring" class="absolute -right-1 -top-1">
+        <PixelArt :rows="GLYPHS.ring" :size="12" />
+      </span>
+
+      <span v-if="state === 'partial'" data-partial-fill class="absolute inset-x-0 bottom-0 h-2 bg-growth" aria-hidden="true" />
+
+      <span v-if="state === 'locked'" class="absolute inset-0 bg-ground-2/60" aria-hidden="true" />
+
+      <slot name="sprite" />
     </span>
-
-    <span v-if="state === 'missed'" data-glyph="ring" class="absolute -right-1 -top-1">
-      <PixelArt :rows="GLYPHS.ring" :size="12" />
-    </span>
-
-    <span v-if="state === 'partial'" data-partial-fill class="absolute inset-x-0 bottom-0 h-1/2 bg-growth" aria-hidden="true" />
-
-    <span v-if="state === 'locked'" class="absolute inset-0 bg-ground-2/60" aria-hidden="true" />
-
-    <slot name="sprite" />
   </button>
 </template>

@@ -37,6 +37,9 @@ const border = computed(() => ({
 
 const ink = computed(() => (props.state === 'locked' ? 'text-ink-2' : 'text-ink-0'))
 
+/** design amend A5: pressed inset only when the tile can act. */
+const pressed = computed(() => (props.state === 'open' || props.state === 'current' ? 'active:translate-y-[2px] active:border-line-dim' : ''))
+
 const actionWord = computed(() => ({ done: 'Đã xong', current: 'Vào', open: 'Vào', locked: 'Khoá' })[props.state])
 const disabled = computed(() => props.state === 'locked' || props.state === 'done')
 
@@ -53,8 +56,8 @@ function onClick() {
       </span>
       <button
         type="button"
-        class="relative flex h-14 w-14 shrink-0 items-center justify-center border-2 bg-ground-1"
-        :class="[border, ink]"
+        class="relative flex h-14 w-14 shrink-0 items-center justify-center border-2 bg-ground-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch focus-visible:ring-0 focus-visible:ring-offset-0"
+        :class="[border, ink, pressed]"
         :aria-current="state === 'current' ? 'step' : undefined"
         :aria-disabled="disabled ? 'true' : undefined"
         @click="onClick"

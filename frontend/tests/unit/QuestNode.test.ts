@@ -69,6 +69,29 @@ describe('QuestNode (design §5)', () => {
     expect(locked.find('button').classes()).not.toContain('text-ink-0')
   })
 
+  it('carries the torch focus classes (design amend A5)', () => {
+    const w = mount(QuestNode, { props: { task, index: 0, state: 'open' } })
+    const classes = w.find('button').classes()
+    for (const c of ['focus-visible:outline', 'focus-visible:outline-2', 'focus-visible:outline-offset-2', 'focus-visible:outline-torch', 'focus-visible:ring-0', 'focus-visible:ring-offset-0']) {
+      expect(classes).toContain(c)
+    }
+  })
+
+  it('open/current get the pressed inset classes; locked/done do not (design amend A5)', () => {
+    for (const state of ['open', 'current'] as const) {
+      const w = mount(QuestNode, { props: { task, index: 0, state } })
+      const classes = w.find('button').classes()
+      expect(classes).toContain('active:translate-y-[2px]')
+      expect(classes).toContain('active:border-line-dim')
+    }
+    for (const state of ['locked', 'done'] as const) {
+      const w = mount(QuestNode, { props: { task, index: 0, state } })
+      const classes = w.find('button').classes()
+      expect(classes).not.toContain('active:translate-y-[2px]')
+      expect(classes).not.toContain('active:border-line-dim')
+    }
+  })
+
   it('draws the connector lit/dim/none', () => {
     const lit = mount(QuestNode, { props: { task, index: 0, state: 'open', connector: 'lit' } })
     expect(lit.find('[data-connector]').classes()).toContain('bg-growth')
