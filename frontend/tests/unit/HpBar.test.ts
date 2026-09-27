@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import HpBar from '~/components/retro/HpBar.vue'
 import { tokens } from '~/tailwind.config'
 
@@ -42,5 +43,30 @@ describe('HpBar (design §5)', () => {
   it('has no transition under reduced motion', () => {
     const w = mount(HpBar, { props: { value: 50, reduced: true } })
     expect(w.find('[data-fill]').attributes('style') ?? '').not.toContain('transition')
+  })
+})
+
+describe('HpBar reduced default (design amend A4)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('with no reduced prop, falls back to the OS setting: no transition, retro-anim class', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: HpBarMocked } = await import('~/components/retro/HpBar.vue')
+    const w = mount(HpBarMocked, { props: { value: 50 } })
+    const fill = w.find('[data-fill]')
+    expect(fill.attributes('style') ?? '').not.toContain('transition')
+    expect(fill.classes()).toContain('retro-anim')
+  })
+
+  it('an explicit reduced=false overrides the OS setting', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: HpBarMocked } = await import('~/components/retro/HpBar.vue')
+    const w = mount(HpBarMocked, { props: { value: 50, reduced: false } })
+    expect(w.find('[data-fill]').attributes('style') ?? '').toContain('transition')
   })
 })

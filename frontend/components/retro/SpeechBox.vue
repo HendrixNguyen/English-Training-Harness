@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import RetroPanel from './RetroPanel.vue'
 import CompanionSprite from './CompanionSprite.vue'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 
 /**
  * `RetroPanel` with the companion's portrait and the line typing in at
@@ -15,9 +16,12 @@ const props = withDefaults(defineProps<{
   stage?: string
   health?: number
   reduced?: boolean
-}>(), { name: undefined, stage: 'sprout', health: 100, reduced: false })
+}>(), { name: undefined, stage: 'sprout', health: 100, reduced: undefined })
 
 const emit = defineEmits<{ settled: [] }>()
+
+const os = useReducedMotion()
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const visibleChars = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
@@ -28,7 +32,7 @@ function clearTimer() {
 
 function startTyping() {
   clearTimer()
-  if (props.reduced) {
+  if (isReduced.value) {
     visibleChars.value = props.line.length
     if (props.line.length > 0) emit('settled')
     return
@@ -62,7 +66,7 @@ function revealAll() {
   <div @click="revealAll">
     <RetroPanel :speaker="name">
       <template #portrait>
-        <CompanionSprite crop="face" :size="48" :stage="stage" :health="health" />
+        <CompanionSprite crop="face" :size="48" :stage="stage" :health="health" :reduced="isReduced" />
       </template>
       <p class="font-body text-[17px] text-ink-0">
         <span data-typed aria-hidden="true">{{ typed }}</span>

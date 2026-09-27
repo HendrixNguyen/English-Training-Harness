@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { tokens } from '~/tailwind.config'
 import { minutesOf, percentOf, segmentFills } from '~/utils/progress'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 
 /**
  * The 30-minute day as `segments` HpBar-style tracks (design §5). Revive
@@ -15,7 +16,10 @@ const props = withDefaults(defineProps<{
   met?: boolean
   cells?: number
   reduced?: boolean
-}>(), { segments: 3, segmentSeconds: 600, met: false, cells: 20, reduced: false })
+}>(), { segments: 3, segmentSeconds: 600, met: false, cells: 20, reduced: undefined })
+
+const os = useReducedMotion()
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const target = computed(() => props.segments * props.segmentSeconds)
 const fills = computed(() => segmentFills(props.valueSeconds, props.segmentSeconds, props.segments))
@@ -29,7 +33,7 @@ function segStyle(fill: number) {
   return {
     width: `${lit * 4}px`,
     backgroundColor: tokens.growth,
-    ...(props.reduced ? {} : { transition: `width 300ms steps(${Math.max(1, lit)})` }),
+    ...(isReduced.value ? {} : { transition: `width 300ms steps(${Math.max(1, lit)})` }),
   }
 }
 </script>
@@ -52,7 +56,7 @@ function segStyle(fill: number) {
         class="h-3 border-2 border-line-dim bg-ground-2"
         :style="{ width: `${segmentPx}px` }"
       >
-        <i data-segment class="block h-full" :style="segStyle(fill)" />
+        <i data-segment class="retro-anim block h-full" :style="segStyle(fill)" />
       </div>
     </div>
     <p class="mt-1 text-right text-sm" :class="met ? 'text-growth' : 'text-ink-1'">

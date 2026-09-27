@@ -4,6 +4,7 @@ import { tokens } from '~/tailwind.config'
 import { healthTone, normalizeStage } from '~/utils/plant'
 import { COMPANION, PALETTE } from '~/utils/pixelArt'
 import PixelArt from './PixelArt.vue'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 
 const props = withDefaults(defineProps<{
   stage: string
@@ -13,9 +14,14 @@ const props = withDefaults(defineProps<{
   crop?: 'full' | 'face'
   react?: 'idle' | 'hit' | 'miss' | 'levelup' | 'down'
   reduced?: boolean
-}>(), { name: undefined, size: 128, crop: 'full', react: 'idle', reduced: false })
+}>(), { name: undefined, size: 128, crop: 'full', react: 'idle', reduced: undefined })
 
 const emit = defineEmits<{ reacted: [react: 'hit' | 'miss' | 'levelup'] }>()
+
+const os = useReducedMotion()
+/** design amend A4: an explicit prop overrides the OS setting; Task 5
+ * wires the reduced static-reaction hold and `reacted` emit. */
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const norm = computed(() => normalizeStage(props.stage))
 
@@ -48,7 +54,7 @@ const rows = computed(() => (isDown.value ? COMPANION.wilted : COMPANION[norm.va
  * keyframe (design's motion budget: "the reduced variant is designed, not
  * disabled"). */
 const animClass = computed(() => {
-  if (props.reduced || isDown.value) return ''
+  if (isReduced.value || isDown.value) return ''
   if (props.react === 'idle') return props.stage === 'wilted' ? '' : 'retro-breath'
   return { hit: 'retro-hop', miss: 'retro-shake', levelup: 'retro-flash', down: '' }[props.react]
 })
@@ -75,7 +81,7 @@ function onAnimationend() {
     :aria-label="label"
     :data-stage="norm.stage"
     :data-react="react"
-    :data-frame="reduced ? 0 : 1"
+    :data-frame="isReduced ? 0 : 1"
     @animationend="onAnimationend"
   >
     <PixelArt

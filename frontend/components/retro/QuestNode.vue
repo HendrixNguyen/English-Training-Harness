@@ -4,6 +4,7 @@ import { tokens } from '~/tailwind.config'
 import { GLYPHS, PALETTE } from '~/utils/pixelArt'
 import type { QuestTask } from '~/stores/quest'
 import PixelArt from './PixelArt.vue'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 
 /** The hub path tile (design §5). Icon by `task.task_type`: book =
  * vocabulary, scroll = reading, sword = practice. */
@@ -13,9 +14,12 @@ const props = withDefaults(defineProps<{
   state: 'done' | 'current' | 'open' | 'locked'
   connector?: 'lit' | 'dim' | 'none'
   reduced?: boolean
-}>(), { connector: 'none', reduced: false })
+}>(), { connector: 'none', reduced: undefined })
 
 const emit = defineEmits<{ enter: [id: string] }>()
+
+const os = useReducedMotion()
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const TASK_GLYPH: Record<string, keyof typeof GLYPHS> = { vocabulary: 'book', reading: 'scroll', practice: 'sword' }
 const taskGlyph = computed(() => TASK_GLYPH[props.task.task_type] ?? 'book')
@@ -52,7 +56,7 @@ function onClick() {
   <li class="flex flex-col items-center">
     <div class="flex w-full items-center gap-3">
       <span class="w-2 shrink-0" aria-hidden="true">
-        <PixelArt v-if="state === 'current' && !reduced" :rows="GLYPHS.cursor" :size="16" class="retro-blink" />
+        <PixelArt v-if="state === 'current'" :rows="GLYPHS.cursor" :size="16" :class="isReduced ? '' : 'retro-blink'" />
       </span>
       <button
         type="button"

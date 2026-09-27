@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { tokens } from '~/tailwind.config'
 import { healthTone } from '~/utils/plant'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 
 /**
  * HP-style bar (design §5). Fill snaps to 4-px cells so the width is
@@ -14,7 +15,11 @@ const props = withDefaults(defineProps<{
   label?: string
   cells?: number
   reduced?: boolean
-}>(), { max: 100, label: 'HP', cells: 25, reduced: false })
+}>(), { max: 100, label: 'HP', cells: 25, reduced: undefined })
+
+const os = useReducedMotion()
+/** design amend A4: an explicit prop overrides the OS setting. */
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const TONE_HEX: Record<'growth' | 'streak' | 'alert', string> = {
   growth: tokens.growth,
@@ -30,7 +35,7 @@ const tone = computed(() => TONE_HEX[healthTone(ratio.value * 100)])
 const fillStyle = computed(() => ({
   width: `${lit.value * 4}px`,
   backgroundColor: tone.value,
-  ...(props.reduced ? {} : { transition: `width 300ms steps(${Math.max(1, Math.abs(lit.value))})` }),
+  ...(isReduced.value ? {} : { transition: `width 300ms steps(${Math.max(1, Math.abs(lit.value))})` }),
 }))
 </script>
 
@@ -46,7 +51,7 @@ const fillStyle = computed(() => ({
       :aria-valuemax="max"
       :aria-label="label"
     >
-      <i data-fill class="block h-full" :style="fillStyle" />
+      <i data-fill class="retro-anim block h-full" :style="fillStyle" />
     </div>
   </div>
 </template>

@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SpeechBox from '~/components/retro/SpeechBox.vue'
 
@@ -47,5 +48,28 @@ describe('SpeechBox (design §5)', () => {
     vi.advanceTimersByTime(30 * 3)
     await w.vm.$nextTick()
     expect(w.find('[data-typed]').text()).toBe('Bbb')
+  })
+})
+
+describe('SpeechBox reduced default (design amend A4)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('with no reduced prop, falls back to the OS setting: shows the full line at mount', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: SpeechBoxMocked } = await import('~/components/retro/SpeechBox.vue')
+    const w = mount(SpeechBoxMocked, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80 } })
+    expect(w.find('[data-typed]').text()).toBe('Tớ khát rồi')
+  })
+
+  it('an explicit reduced=false overrides the OS setting', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: SpeechBoxMocked } = await import('~/components/retro/SpeechBox.vue')
+    const w = mount(SpeechBoxMocked, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80, reduced: false } })
+    expect(w.find('[data-typed]').text()).toBe('')
   })
 })

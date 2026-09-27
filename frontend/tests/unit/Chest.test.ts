@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Chest from '~/components/retro/Chest.vue'
 
@@ -41,5 +42,36 @@ describe('Chest (design §5)', () => {
     await w.setProps({ open: true })
     w.unmount()
     expect(() => vi.advanceTimersByTime(500)).not.toThrow()
+  })
+})
+
+describe('Chest reduced default (design amend A4)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('with no reduced prop, falls back to the OS setting: opens at once and emits synchronously', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: ChestMocked } = await import('~/components/retro/Chest.vue')
+    const w = mount(ChestMocked, { props: { items, open: false } })
+    await w.setProps({ open: true })
+    expect(w.find('[data-glyph="chestOpen"]').exists()).toBe(true)
+    expect(w.emitted('opened')).toHaveLength(1)
+  })
+
+  it('an explicit reduced=false overrides the OS setting', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: ChestMocked } = await import('~/components/retro/Chest.vue')
+    const w = mount(ChestMocked, { props: { items, open: false, reduced: false } })
+    await w.setProps({ open: true })
+    expect(w.find('[data-glyph="chestOpen"]').exists()).toBe(false)
+    vi.advanceTimersByTime(200)
+    await w.vm.$nextTick()
+    expect(w.find('[data-glyph="chestOpen"]').exists()).toBe(true)
   })
 })

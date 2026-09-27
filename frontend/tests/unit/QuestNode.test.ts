@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import QuestNode from '~/components/retro/QuestNode.vue'
 import { tokens } from '~/tailwind.config'
 import type { QuestTask } from '~/stores/quest'
@@ -99,5 +100,30 @@ describe('QuestNode (design §5)', () => {
     expect(dim.find('[data-connector]').classes()).toContain('bg-line-dim')
     const none = mount(QuestNode, { props: { task, index: 0, state: 'open', connector: 'none' } })
     expect(none.find('[data-connector]').exists()).toBe(false)
+  })
+})
+
+describe('QuestNode cursor reduced default (design amend A4)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('with no reduced prop, falls back to the OS setting: renders the cursor without retro-blink', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: QuestNodeMocked } = await import('~/components/retro/QuestNode.vue')
+    const w = mount(QuestNodeMocked, { props: { task, index: 0, state: 'current' } })
+    const cursorSvg = w.find('svg')
+    expect(cursorSvg.exists()).toBe(true)
+    expect(cursorSvg.classes()).not.toContain('retro-blink')
+  })
+
+  it('an explicit reduced=false restores the blinking cursor', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: QuestNodeMocked } = await import('~/components/retro/QuestNode.vue')
+    const w = mount(QuestNodeMocked, { props: { task, index: 0, state: 'current', reduced: false } })
+    expect(w.find('svg').classes()).toContain('retro-blink')
   })
 })

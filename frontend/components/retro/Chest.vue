@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { GLYPHS } from '~/utils/pixelArt'
 import PixelArt from './PixelArt.vue'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 
 /** Reward reveal (design §5): the closed chest swaps to open (one 200ms
  * timer, cleared on unmount; at once under reduced motion) and the
@@ -10,9 +11,12 @@ const props = withDefaults(defineProps<{
   items: { icon: string, label: string }[]
   open: boolean
   reduced?: boolean
-}>(), { reduced: false })
+}>(), { reduced: undefined })
 
 const emit = defineEmits<{ opened: [] }>()
+
+const os = useReducedMotion()
+const isReduced = computed(() => props.reduced ?? os.value)
 
 const revealed = ref(false)
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -24,7 +28,7 @@ function clearTimer() {
 watch(() => props.open, (open) => {
   clearTimer()
   if (!open) { revealed.value = false; return }
-  if (props.reduced) {
+  if (isReduced.value) {
     revealed.value = true
     emit('opened')
     return

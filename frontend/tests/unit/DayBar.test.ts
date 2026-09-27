@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import DayBar from '~/components/retro/DayBar.vue'
 
 describe('DayBar (design §5, ports SegmentedProgress.test.ts)', () => {
@@ -25,5 +26,31 @@ describe('DayBar (design §5, ports SegmentedProgress.test.ts)', () => {
     const group = w.find('[role="progressbar"]')
     expect(group.attributes('aria-valuenow')).toBe('1200')
     expect(group.attributes('aria-valuemax')).toBe('1800')
+  })
+})
+
+describe('DayBar reduced default (design amend A4)', () => {
+  afterEach(() => {
+    vi.doUnmock('~/composables/useReducedMotion')
+    vi.resetModules()
+  })
+
+  it('with no reduced prop, falls back to the OS setting: no transition, retro-anim class', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: DayBarMocked } = await import('~/components/retro/DayBar.vue')
+    const w = mount(DayBarMocked, { props: { valueSeconds: 1200 } })
+    for (const seg of w.findAll('[data-segment]')) {
+      expect(seg.attributes('style') ?? '').not.toContain('transition')
+      expect(seg.classes()).toContain('retro-anim')
+    }
+  })
+
+  it('an explicit reduced=false overrides the OS setting', async () => {
+    vi.resetModules()
+    vi.doMock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => ref(true) }))
+    const { default: DayBarMocked } = await import('~/components/retro/DayBar.vue')
+    const w = mount(DayBarMocked, { props: { valueSeconds: 1200, reduced: false } })
+    expect(w.find('[data-segment]').attributes('style') ?? '').toContain('transition')
   })
 })
