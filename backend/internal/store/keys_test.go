@@ -59,3 +59,13 @@ func TestTTLs(t *testing.T) {
 		}
 	}
 }
+
+func TestRescueKey(t *testing.T) {
+	if got, want := RescueKey("u1", "2026-09-22"), "rescue:u1:2026-09-22"; got != want {
+		t.Errorf("RescueKey = %q, want %q", got, want)
+	}
+	// The flag must never outlive the daily:accumulated counter it guards.
+	if RescueTTL != 48*time.Hour {
+		t.Errorf("RescueTTL = %v, want 48h (= DailyAccumulatedTTL)", RescueTTL)
+	}
+}

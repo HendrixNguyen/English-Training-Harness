@@ -43,3 +43,14 @@ func AIRateLimitKey(userID string) string { return fmt.Sprintf("ratelimit:ai:%s"
 // challenge (Hash: started_at, local_date, start_seconds; TTL PetReviveTTL).
 // Not in spec §4; added by the pet slice and documented in CODEMAP.
 func PetReviveKey(userID string) string { return fmt.Sprintf("pet:revive:%s", userID) }
+
+// RescueTTL bounds the rescue flag. Not in spec §4 — added by the rescue
+// push (notify): 48h matches DailyAccumulatedTTL, the counter it guards.
+const RescueTTL = 48 * time.Hour
+
+// RescueKey is rescue:{user_id}:{YYYY-MM-DD} — set once (SET NX) when the
+// pre-decay rescue push for that LOCAL date was sent (TTL RescueTTL). The
+// date is the same local date DailyAccumulatedKey uses.
+func RescueKey(userID, localDate string) string {
+	return fmt.Sprintf("rescue:%s:%s", userID, localDate)
+}
