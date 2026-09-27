@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CompanionSprite from '~/components/retro/CompanionSprite.vue'
 import { PLANT_STAGES } from '~/utils/plant'
 import { tokens } from '~/tailwind.config'
@@ -26,10 +26,14 @@ describe('CompanionSprite (design §4)', () => {
     expect(w.attributes('style')).toContain('rotate(90')
   })
 
-  it('runs no retro-* animation class when reduced, and shows a static frame', () => {
+  it('runs no retro-* animation class when reduced', () => {
     const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'hit', reduced: true } })
     const html = w.html()
     expect(html).not.toMatch(/class="[^"]*\bretro-(breath|hop|shake|flash)\b/)
+  })
+
+  it('idle under reduced motion is the static base frame (data-frame 0)', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'idle', reduced: true } })
     expect(w.attributes('data-frame')).toBe('0')
   })
 
@@ -46,5 +50,60 @@ describe('CompanionSprite (design §4)', () => {
   it('tints ember below 30 HP', () => {
     const w = mount(CompanionSprite, { props: { stage: 'sapling', health: 25 } })
     expect(w.find('svg').attributes('style')).toContain(`--px-g: ${tokens.ember}`)
+  })
+
+  it('the non-reduced animationend path still emits reacted', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'hit' } })
+    w.trigger('animationend')
+    expect(w.emitted('reacted')).toEqual([['hit']])
+  })
+})
+
+describe('CompanionSprite static reactions under reduced motion (design amend A4)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('hit: data-frame 1 and translateY during the hold; no emit at 299ms; emits and returns to 0 at 300ms', async () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'hit', reduced: true } })
+    expect(w.attributes('data-frame')).toBe('1')
+    expect(w.attributes('style')).toContain('translateY(calc(var(--px) * -2px))')
+    vi.advanceTimersByTime(299)
+    expect(w.emitted('reacted')).toBeUndefined()
+    vi.advanceTimersByTime(1)
+    await w.vm.$nextTick()
+    expect(w.emitted('reacted')).toEqual([['hit']])
+    expect(w.attributes('data-frame')).toBe('0')
+  })
+
+  it('levelup: --px-g is torch during the hold, and emits at 300ms', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'levelup', reduced: true } })
+    expect(w.find('svg').attributes('style')).toContain(`--px-g: ${tokens.torch}`)
+    vi.advanceTimersByTime(300)
+    expect(w.emitted('reacted')).toEqual([['levelup']])
+  })
+
+  it('miss: data-frame stays 0, and emits at 300ms', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'miss', reduced: true } })
+    expect(w.attributes('data-frame')).toBe('0')
+    vi.advanceTimersByTime(300)
+    expect(w.emitted('reacted')).toEqual([['miss']])
+  })
+
+  it('changing react mid-hold restarts the timer and emits only for the new value', async () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'hit', reduced: true } })
+    vi.advanceTimersByTime(150)
+    await w.setProps({ react: 'miss' })
+    vi.advanceTimersByTime(150)
+    expect(w.emitted('reacted')).toBeUndefined()
+    vi.advanceTimersByTime(150)
+    expect(w.emitted('reacted')).toEqual([['miss']])
+  })
+
+  it('unmounting mid-hold emits nothing and leaves no pending timer', () => {
+    const w = mount(CompanionSprite, { props: { stage: 'sprout', health: 80, react: 'hit', reduced: true } })
+    w.unmount()
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(1000)
+    expect(w.emitted('reacted')).toBeUndefined()
   })
 })

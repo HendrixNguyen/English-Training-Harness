@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { tokens } from '~/tailwind.config'
 import { healthTone, normalizeStage } from '~/utils/plant'
 import { COMPANION, PALETTE } from '~/utils/pixelArt'
@@ -37,11 +37,39 @@ const TONE_HEX: Record<'growth' | 'streak' | 'alert', string> = {
  * same fallback v1's `PlantSvg` used. */
 const pxColor = computed(() => (norm.value.known ? TONE_HEX[healthTone(props.health)] : tokens['ink-2']))
 
+/** design amend A4 reaction table: `hit`/`miss`/`levelup` hold a single
+ * static frame for 300ms under reduced motion, then emit `reacted` — one
+ * `setTimeout`, restarted on every `react` change and cleared on unmount.
+ * `holding` drives the frame; `idle`/`down` never enter it. */
+const holding = ref(false)
+let holdTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearHoldTimer() {
+  if (holdTimer) { clearTimeout(holdTimer); holdTimer = null }
+}
+
+watch([() => props.react, isReduced], ([react, reduced]) => {
+  clearHoldTimer()
+  holding.value = false
+  if (reduced && (react === 'hit' || react === 'miss' || react === 'levelup')) {
+    holding.value = true
+    holdTimer = setTimeout(() => {
+      holding.value = false
+      emit('reacted', react)
+    }, 300)
+  }
+}, { immediate: true })
+
+onBeforeUnmount(clearHoldTimer)
+
 const palette = computed(() => {
   const out: Record<string, string> = {}
   for (const [char, roleName] of Object.entries(PALETTE)) out[char] = (tokens as Record<string, string>)[roleName]
   out.g = pxColor.value
   out.G = pxColor.value
+  if (holding.value && props.react === 'levelup') {
+    for (const char of Object.keys(PALETTE)) if (char !== 'k') out[char] = tokens.torch
+  }
   return out
 })
 
@@ -59,7 +87,18 @@ const animClass = computed(() => {
   return { hit: 'retro-hop', miss: 'retro-shake', levelup: 'retro-flash', down: '' }[props.react]
 })
 
-const wrapperStyle = computed(() => (isDown.value ? { transform: 'rotate(90deg)' } : {}))
+const wrapperStyle = computed(() => {
+  if (isDown.value) return { transform: 'rotate(90deg)' }
+  if (holding.value && props.react === 'hit') return { transform: 'translateY(calc(var(--px) * -2px))' }
+  return {}
+})
+
+/** `hit`/`levelup` show frame 1 while holding; `miss`'s static frame is
+ * the base (design amend A4). Non-reduced keeps the legacy `1`. */
+const dataFrame = computed(() => {
+  if (!isReduced.value) return 1
+  return holding.value && (props.react === 'hit' || props.react === 'levelup') ? 1 : 0
+})
 
 const label = computed(() => {
   const named = props.name ? `${props.name}, ` : ''
@@ -81,7 +120,7 @@ function onAnimationend() {
     :aria-label="label"
     :data-stage="norm.stage"
     :data-react="react"
-    :data-frame="isReduced ? 0 : 1"
+    :data-frame="dataFrame"
     @animationend="onAnimationend"
   >
     <PixelArt
