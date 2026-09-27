@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-25-run-01/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md
 status: done
 priority: high
-merged: false
+merged: true
 design: harness/designs/retro-kit.md
 branch: harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n
 worktree: .worktrees/retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n

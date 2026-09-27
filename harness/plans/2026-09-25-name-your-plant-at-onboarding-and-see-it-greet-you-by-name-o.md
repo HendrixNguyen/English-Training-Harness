@@ -2,10 +2,11 @@
 idea: harness/ideas/2026-09-25-run-01/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o.md
 status: done
 priority: medium
-merged: false
+merged: true
 design: harness/designs/plant-name.md
 branch: harness/2026-09-26-medium-name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o
 worktree: .worktrees/name-your-plant-at-onboarding-and-see-it-greet-you-by-name-o
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Name your plant at onboarding and see it greet you by name on the hub — Plan
 

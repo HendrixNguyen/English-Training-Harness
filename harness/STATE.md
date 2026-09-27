@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 20:08. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 21:25. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,11 +9,65 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/settings-saving-the-reminder-time-replaces-the-no-key-unsupp.md` — Settings: saving the reminder time replaces the no-key, unsupported and denied states with off, exposing a switch that cannot work — blocks `harness/plans/2026-09-24-settings-screen-wires-web-push-reminders-and-google-calendar.md`
+- `harness/ideas/_inbox/a-typed-content-roadmap-needs-about-20k-output-tokens-so-gen.md` — A typed-content roadmap needs about 20k output tokens so generation cannot finish inside the 180 s budget or gpt-4o-mini's 16k cap — blocks `harness/plans/2026-09-24-typed-task-content-with-answer-keys-so-every-quest-renders-a.md`
+- `harness/ideas/_inbox/roadmap-page-never-refetches-today-goes-stale-and-a-new-lear.md` — Roadmap page never refetches: today goes stale and a new learner keeps seeing 'no roadmap' until a full reload — blocks `harness/plans/2026-09-25-roadmap-tree-shows-the-real-plan-module-and-day-titles-with-.md`
+- `harness/ideas/_inbox/onboarding-declares-cefrorder-in-both-the-regenerate-and-the.md` — onboarding declares cefrOrder in both the regenerate and the level-floor branches so the daily merge does not compile — blocks `harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md`
+- `harness/ideas/_inbox/session-renewal-signs-the-learner-out-when-a-non-2xx-or-a-pa.md` — Session renewal signs the learner out when a non-2xx or a parallel request races the rotated token — blocks `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md`
+- `harness/ideas/_inbox/orphan-window-test-fails-once-the-google-403-branch-is-merge.md` — Orphan-window test fails once the google 403 branch is merged: the fake now names the second Google-assigned insert evt_second-2 — blocks `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
+- `harness/ideas/_inbox/a-failed-google-sync-on-a-bad-refresh-token-logs-two-lines-f.md` — A failed Google sync on a bad refresh token logs two lines for one event [low]
+- `harness/ideas/_inbox/a-malformed-frontend-origin-is-refused-only-after-migrations.md` — A malformed FRONTEND_ORIGIN is refused only after migrations have run against the database [low]
+- `harness/ideas/_inbox/a-typed-content-roadmap-needs-about-20k-output-tokens-so-gen.md` — A typed-content roadmap needs about 20k output tokens so generation cannot finish inside the 180 s budget or gpt-4o-mini's 16k cap [high]
+- `harness/ideas/_inbox/already-onboarded-learners-now-see-the-english-default-my-gr.md` — Already-onboarded learners now see the English default 'My Green Buddy' as the plant's name on the hub, banners and bubble [medium]
+- `harness/ideas/_inbox/auth-session-store-flattens-the-redis-error-with-v-so-a-clie.md` — auth session store flattens the Redis error with %v so a client cancel is logged as an outage [low]
+- `harness/ideas/_inbox/backend-spec-is-silent-on-push-fail-key-subscription-key-val.md` — Backend spec is silent on push fail key, subscription key validation and the 10-subscription cap [low]
+- `harness/ideas/_inbox/boot-store-migrate-still-has-no-deadline-now-that-the-adviso.md` — Boot store.Migrate still has no deadline now that the advisory-lock leak is fixed [low]
+- `harness/ideas/_inbox/concurrent-subscription-saves-for-one-user-overshoot-the-10-.md` — Concurrent subscription saves for one user overshoot the 10-row cap [low]
+- `harness/ideas/_inbox/gemini-thinking-budget-is-missing-from-both-env-examples-and.md` — GEMINI_THINKING_BUDGET is missing from both env examples and thinkingConfig cannot be omitted [low]
+- `harness/ideas/_inbox/google-403-allow-list-refactor-dropped-the-pins-for-userrate.md` — Google 403 allow-list refactor dropped the pins for userRateLimitExceeded and quotaExceeded and logs a dangling space for a no-reason 403 [low]
+- `harness/ideas/_inbox/growth-moment-plant-name-and-roadmap-tree-ui-is-built-on-kit.md` — Growth moment, plant-name and roadmap-tree UI is built on kit v1; kit v2 on main forbids its radii and eased scale motion [low]
+- `harness/ideas/_inbox/hub-bubble-tells-a-learner-who-practised-yesterday-hom-qua-t.md` — Hub bubble tells a learner who practised yesterday 'Hôm qua tớ nhớ bạn' — missed-day check uses elapsed hours, not calendar days [medium]
+- `harness/ideas/_inbox/infisical-push-back-step-leaves-production-secrets-in-a-worl.md` — Infisical push-back step leaves production secrets in a world-readable /tmp file when the upload fails [low]
+- `harness/ideas/_inbox/learnpage-test-finds-the-completion-button-by-its-mt-4-spaci.md` — learnPage test finds the completion button by its mt-4 spacing class [low]
+- `harness/ideas/_inbox/level-guidance-asks-c2-for-300-380-word-passages-but-parsero.md` — Level guidance asks C2 for 300-380-word passages but ParseRoadmap caps passages at 2000 characters [medium]
+- `harness/ideas/_inbox/login-shows-generic-retry-copy-for-409-email-in-use-so-a-loc.md` — login shows generic retry copy for 409 email_in_use so a locked-out learner retries forever [low]
+- `harness/ideas/_inbox/migration-lock-wait-log-and-error-always-quote-30s-even-when.md` — Migration lock wait log and error always quote 30s even when the caller deadline or a cancel is the bound [low]
+- `harness/ideas/_inbox/notify-tick-counts-a-subscription-pruned-and-clears-its-fail.md` — notify Tick counts a subscription pruned and clears its failure counter even when DeleteSubscription fails [low]
+- `harness/ideas/_inbox/onboarding-declares-cefrorder-in-both-the-regenerate-and-the.md` — onboarding declares cefrOrder in both the regenerate and the level-floor branches so the daily merge does not compile [high]
+- `harness/ideas/_inbox/orphan-window-test-fails-once-the-google-403-branch-is-merge.md` — Orphan-window test fails once the google 403 branch is merged: the fake now names the second Google-assigned insert evt_second-2 [high]
+- `harness/ideas/_inbox/pages-without-404-html-answers-a-missing-nuxt-chunk-with-ind.md` — Pages without 404.html answers a missing /_nuxt/ chunk with index.html as 200 under the one-year immutable header [medium]
+- `harness/ideas/_inbox/parseorigins-still-accepts-an-empty-port-an-empty-host-a-zer.md` — ParseOrigins still accepts an empty port, an empty host, a zero-padded or out-of-range port and a non-ASCII host [low]
+- `harness/ideas/_inbox/plant-name-field-rejects-vietnamese-typed-in-decomposed-unic.md` — Plant-name field rejects Vietnamese typed in decomposed Unicode, including the suggested 'Mầm Non' [low]
+- `harness/ideas/_inbox/post-roadmaps-regenerate-answers-400-to-a-chunked-request-wi.md` — POST roadmaps regenerate answers 400 to a chunked request with an empty body [low]
 - `harness/ideas/_inbox/retro-amend-2-test-gaps-dark-focus-ring-cascade-unguarded-sp.md` — Retro amend 2 test gaps: dark focus-ring cascade unguarded, SpeechBox flip-back case asserts no emit count [low]
+- `harness/ideas/_inbox/rls-migration-leaves-supabase-default-privileges-so-future-t.md` — RLS migration leaves Supabase default privileges so future tables views and functions are granted to anon again [medium]
+- `harness/ideas/_inbox/roadmap-hom-nay-chip-and-hoc-ngay-button-put-white-text-on-g.md` — Roadmap 'HÔM NAY' chip and 'Học ngay' button put white text on growth (2.5:1 on the branch, 1.7:1 on main's kit) [medium]
+- `harness/ideas/_inbox/roadmap-page-never-refetches-today-goes-stale-and-a-new-lear.md` — Roadmap page never refetches: today goes stale and a new learner keeps seeing 'no roadmap' until a full reload [high]
+- `harness/ideas/_inbox/roadmap-tree-marks-day-28-as-today-forever-once-the-28-days-.md` — Roadmap tree marks day 28 as today forever once the 28 days are over (DayNumber clamps) [low]
+- `harness/ideas/_inbox/session-renewal-signs-the-learner-out-when-a-non-2xx-or-a-pa.md` — Session renewal signs the learner out when a non-2xx or a parallel request races the rotated token [high]
+- `harness/ideas/_inbox/settings-page-misses-the-design-hero-time-and-breaks-ui-kit-.md` — Settings page misses the design hero time and breaks UI kit v2 rules (rounded blurred switch, 3 to 1 status text, invisible time-picker icon) [low]
+- `harness/ideas/_inbox/settings-re-consent-with-google-returns-the-learner-to-the-h.md` — Settings re-consent with Google returns the learner to the hub instead of settings, so the sync has to be found and tapped again [low]
+- `harness/ideas/_inbox/settings-reminder-switch-can-disagree-with-the-real-push-sub.md` — Settings reminder switch can disagree with the real push subscription after a failed time save or a cleared subscription [medium]
+- `harness/ideas/_inbox/settings-reminders-requesting-renders-the-switch-on-a-stale-.md` — Settings reminders: requesting renders the switch on, a stale saveError can mislabel a failed enable, and several guards are mutation-proof in tests [low]
+- `harness/ideas/_inbox/settings-saving-the-reminder-time-replaces-the-no-key-unsupp.md` — Settings: saving the reminder time replaces the no-key, unsupported and denied states with off, exposing a switch that cannot work [high]
+- `harness/ideas/_inbox/settings-sync-status-always-says-hom-nay-for-a-sync-persiste.md` — Settings sync status always says hom nay for a sync persisted from an earlier day [low]
+- `harness/ideas/_inbox/stale-worktrees-has-no-test-for-the-legacy-basename-match-on.md` — stale-worktrees has no test for the legacy basename match on git's list or for skipping an ancestor of the cwd [low]
+- `harness/ideas/_inbox/store-reset-refusal-still-has-no-direct-test-deferred-by-the.md` — store reset refusal still has no direct test (deferred by the integration-gate plan until integration_test.go is free) [low]
+- `harness/ideas/_inbox/streak-shield-integration-test-never-scans-a-fresh-row-s-shi.md` — Streak-shield integration test never scans a fresh row's shields and races no shielded PenaliseMiss [low]
+- `harness/ideas/_inbox/sw-header-strip-comment-and-codemap-say-a-cached-token-is-ne.md` — SW header-strip comment and CODEMAP say a cached token is newer when it is older [low]
+- `harness/ideas/_inbox/task-timer-credits-idle-wall-clock-time-one-10-minute-task-l.md` — Task timer credits idle wall-clock time: one 10-minute task left open posts up to 60 minutes and can meet the day alone [medium]
+- `harness/ideas/_inbox/testassessraisestheaileveltothefloor-s-prompt-check-is-vacuo.md` — TestAssessRaisesTheAILevelToTheFloor's prompt check is vacuous because RoadmapSchema always contains C1 [low]
+- `harness/ideas/_inbox/testvalidatecontentrejects-asserts-only-the-task-location-so.md` — TestValidateContentRejects asserts only the task location so a row can pass for the wrong rule [low]
+- `harness/ideas/_inbox/the-drain-overrun-log-line-reads-server-server-drain-grace-e.md` — The drain overrun log line reads server: server: drain grace exceeded [low]
+- `harness/ideas/_inbox/the-nuxt-immutable-cache-rule-also-covers-the-unhashed-build.md` — The /_nuxt/* immutable cache rule also covers the unhashed builds/latest.json app manifest [low]
+- `harness/ideas/_inbox/the-shield-earn-line-shows-every-day-the-streak-sits-on-a-mu.md` — The shield earn line shows every day the streak sits on a multiple of 7 including the next morning before practice [medium]
+- `harness/ideas/_inbox/the-worker-join-after-a-drain-overrun-waits-a-fresh-8-s-grac.md` — The worker join after a drain overrun waits a fresh 8 s grace so worst-case shutdown is 16 s past the Railway window [low]
+- `harness/ideas/_inbox/two-done-branches-both-add-migration-0004-pet-shields-and-rl.md` — Two done branches both add migration 0004 pet shields and rls [medium]
+- `harness/ideas/_inbox/two-unmerged-branches-both-add-migration-0004-0004-rls-and-0.md` — Two unmerged branches both add migration 0004 (0004_rls and 0004_pet_shields) [low]
+- `harness/ideas/_inbox/typed-reading-tasks-show-questions-without-their-passage-and.md` — Typed reading tasks show questions without their passage and vocabulary tasks hide their questions until the frontend slice lands [medium]
 - `harness/ideas/_inbox/v1contrast-source-guard-only-scans-class-attributes-so-scrip.md` — v1Contrast source guard only scans class attributes, so script-level class maps can put text-white on a growth fill unnoticed [low]
 
 ## Proposed
@@ -83,16 +137,16 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (unreviewed)
-- `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high] (unreviewed)
-- `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high] (unreviewed)
-- `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped — Plan [low] (unreviewed)
-- `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (unreviewed)
-- `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low] (unreviewed)
-- `harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs — Plan [low] (unreviewed)
+- `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (review: pass-with-bugs)
+- `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high] (review: pass) (merged)
+- `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high] (review: pass) (merged)
+- `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped — Plan [low] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low] (review: pass-with-bugs) (merged)
+- `harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs — Plan [low] (review: pass) (merged)
 
 ## Failed
 

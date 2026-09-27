@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-26-high-deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-
 worktree: .worktrees/deploy-smoke-checks-the-pwa-seconds-after-upload-when-pages-
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Pages ship is honest: wait for the edge before the smoke check, no `404.html` on Pages so deep links answer 200, and the `/login` return-trip check — Plan
 

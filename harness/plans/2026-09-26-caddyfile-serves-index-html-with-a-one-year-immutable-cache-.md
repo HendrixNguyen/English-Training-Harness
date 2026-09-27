@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/caddyfile-serves-index-html-with-a-one-year-immutable-cache-.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-26-medium-caddyfile-serves-index-html-with-a-one-year-immutable-cache-
 worktree: .worktrees/caddyfile-serves-index-html-with-a-one-year-immutable-cache-
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Dokploy target hardening: Caddy answers 404 for a missing chunk and `no-cache` for the shell, compose passes the AI base-URL/model variables, smoke-api reports every check — Plan
 

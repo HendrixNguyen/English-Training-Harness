@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-27-medium-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s
 worktree: .worktrees/per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan
 

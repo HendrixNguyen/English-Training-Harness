@@ -2,7 +2,7 @@
 idea: harness/ideas/_inbox/restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md
 status: done
 priority: high
-merged: false
+merged: true
 amends: harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md
 design: harness/designs/retro-kit.md
 branch: harness/2026-09-26-high-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n

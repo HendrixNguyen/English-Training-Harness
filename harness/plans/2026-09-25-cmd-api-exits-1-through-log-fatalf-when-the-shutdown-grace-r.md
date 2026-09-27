@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-25-medium-cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r
 worktree: .worktrees/cmd-api-exits-1-through-log-fatalf-when-the-shutdown-grace-r
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # cmd/api: a drain overrun returns instead of Fatalf-ing, workers are joined, a second signal forces, and requests get a `ReadTimeout` — Plan
 

@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-26-high-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a
 worktree: .worktrees/59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Roadmap regeneration: `POST /api/v1/roadmaps/regenerate` replaces the active roadmap (optionally one CEFR step up or down) so a roadmap stored before the typed-content contract can be re-made — Plan
 

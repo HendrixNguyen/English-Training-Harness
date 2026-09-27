@@ -2,10 +2,11 @@
 idea: harness/ideas/2026-09-25-run-01/growth-moment-after-every-task-health-gain-streak-and-target.md
 status: done
 priority: medium
-merged: false
+merged: true
 design: harness/designs/growth-moment.md
 branch: harness/2026-09-26-medium-growth-moment-after-every-task-health-gain-streak-and-target
 worktree: .worktrees/growth-moment-after-every-task-health-gain-streak-and-target
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Growth moment after every task: health gain, streak and target-met celebration on the hub — Plan
 
