@@ -2,16 +2,24 @@ package notify
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 )
 
-var validSub = &Subscription{Endpoint: "https://push.example/ep1", P256dh: "BNc5T", Auth: "aX8v"}
+// validSubscription is a subscription with real, decodable key material —
+// what a browser actually sends. Endpoint stays fixed per call site.
+func validSubscription(t *testing.T) *Subscription {
+	t.Helper()
+	p256dh, auth := validKeys(t)
+	return &Subscription{Endpoint: "https://push.example/ep1", P256dh: p256dh, Auth: auth}
+}
 
 func TestUpdateSettingsStoresSubscriptionPreferencesAndSchedulesTonight(t *testing.T) {
 	h := newHarness()
+	validSub := validSubscription(t)
 	res, err := h.svc.UpdateSettings(context.Background(), "u1", SettingsRequest{
 		NotificationTime: "20:00", Timezone: "Asia/Ho_Chi_Minh", Subscription: validSub,
 	})
@@ -57,12 +65,20 @@ func TestUpdateSettingsWithoutASubscriptionOnlyMovesTheTime(t *testing.T) {
 }
 
 func TestUpdateSettingsRejectsBadInputBeforeWriting(t *testing.T) {
+	validP256dh, validAuth := validKeys(t)
+	rawAuth, err := base64.RawURLEncoding.DecodeString(validAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth15 := base64.RawURLEncoding.EncodeToString(rawAuth[:15])
 	cases := map[string]SettingsRequest{
 		"bad clock":                {NotificationTime: "25:00"},
 		"missing clock":            {NotificationTime: ""},
 		"bad timezone":             {NotificationTime: "20:00", Timezone: "Mars/Olympus"},
 		"subscription no endpoint": {NotificationTime: "20:00", Subscription: &Subscription{P256dh: "x", Auth: "y"}},
 		"subscription no keys":     {NotificationTime: "20:00", Subscription: &Subscription{Endpoint: "https://e"}},
+		"subscription bad p256dh":  {NotificationTime: "20:00", Subscription: &Subscription{Endpoint: "https://push.example/ep-bad-p256dh", P256dh: "BNc5T", Auth: validAuth}},
+		"subscription bad auth":    {NotificationTime: "20:00", Subscription: &Subscription{Endpoint: "https://push.example/ep-bad-auth", P256dh: validP256dh, Auth: auth15}},
 	}
 	for name, req := range cases {
 		h := newHarness()

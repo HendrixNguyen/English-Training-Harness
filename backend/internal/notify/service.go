@@ -73,6 +73,9 @@ func (s *Service) UpdateSettings(ctx context.Context, userID string, req Setting
 		if err := ValidateEndpoint(req.Subscription.Endpoint); err != nil {
 			return SettingsResult{}, fmt.Errorf("%w: %w", ErrInvalidRequest, err)
 		}
+		if err := ValidateSubscriptionKeys(req.Subscription.P256dh, req.Subscription.Auth); err != nil {
+			return SettingsResult{}, fmt.Errorf("%w: %w", ErrInvalidRequest, err)
+		}
 	}
 
 	if err := s.repo.UpdatePreferences(ctx, userID, clock, req.Timezone); err != nil {
