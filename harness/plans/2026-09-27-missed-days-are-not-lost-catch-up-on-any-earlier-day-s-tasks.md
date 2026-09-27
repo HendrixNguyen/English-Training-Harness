@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-26-run-01/missed-days-are-not-lost-catch-up-on-any-earlier-day-s-tasks.md
-status: draft
+status: approved
 priority: medium
 merged: false
 order: 4
