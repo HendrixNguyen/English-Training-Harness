@@ -48,3 +48,5 @@ means updating both" note is then removed rather than maintained.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — low.** Correct: `0003` would be applied by `Migrate` and never rolled back by `reset()`. The `0003` migration plan must fix this first (derive the down list and version count from `MigrationsFS`) or it will trip on it — batch there.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Deferred, status unchanged.** The fix lives entirely in `backend/internal/store/integration_test.go` (`reset()`, the two version literals), which the unmerged 2026-09-26 pet-shields and RLS branches both rewrite (each adds a `0004_*` migration and updates these literals); planning it today would guarantee a conflict the daily integration merge cannot resolve. Re-plan once the 2026-09-26 daily PR merges — it then pairs naturally with the two `0004` migrations that make the hard-coded list wrong again. Note for that plan: the sibling B4 plan's new tests derive the expected version set from `MigrationsFS` instead of a literal count, which is the pattern `reset()` should adopt.

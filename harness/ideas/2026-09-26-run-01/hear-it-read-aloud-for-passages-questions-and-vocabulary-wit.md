@@ -1,9 +1,11 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 2
+priority: medium
+plan: harness/plans/2026-09-27-hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md
 ---
 
 ## Why
@@ -26,3 +28,14 @@ Technical (frontend only):
 - Code: `frontend/components/learn/ContentViewer.vue:11-54` (`words` / `questions` kinds only); `grep -rn speechSynthesis frontend` → no match; `harness/designs/retro-learning-room.md:82` ("Đoạn văn", "Thẻ {n} / {N}", "Lật") — the panels the button goes on.
 - Depends on (information only): the typed-content contract (`harness/plans/2026-09-24-typed-task-content-…` backend half, done) and the high inbox bug `59-of-84-roadmap-tasks-render-as-raw-json-…` for the passage to exist on screen; the button itself works on today's `words`/`questions` already.
 - Research: `SpeechSynthesis` support across Chrome 33+, Edge 14+, Firefox 49+, Safari 7+, Samsung Internet 5+; synthesis is local and works offline — https://www.testmuai.com/learning-hub/speech-synthesis-api-browser-support/ ; Safari limitations (`getVoices()` can be empty, user-gesture requirement) — https://weboutloud.io/bulletin/speech_synthesis_in_safari/ ; API reference — https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API
+
+## Evaluation
+_Evaluator, 2026-09-27 — daily decide (feature queue, planned today as **F5**)._
+
+**Verdict: select, priority medium.**
+
+- **Is the *Why* real?** Yes. The spec's second task category is "reading/listening" (1st-thinking §6.1) and nothing under `frontend/` produces sound (`git grep -n speechSynthesis origin/main -- frontend` → no match; the same on every unmerged 2026-09-25/26 branch). For a Vietnamese learner, hearing a word or a prompt said properly is the most direct learning value one control can add, and the Web Speech API gives it offline, per-device, with no provider, no rate limit and no AI budget. It adds one chip to an existing screen, not a new surface.
+- **Achievable in one plan?** Yes — frontend only, ~5 h: a singleton composable, one chip component, two kit glyphs, their unit tests against a fake `speechSynthesis`, then wiring into the room. No backend, no wire change, no new dependency.
+- **Dependencies.** The design (`harness/designs/hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md`) was drawn against the retro kit on `harness/2026-09-26-high-retro-adventure-ui-…` (`PixelArt`, `GLYPHS`, `retro.css` `retro-blink`, `useRetroToast`) and the page on `harness/2026-09-25-high-task-timer-…` (`onBeforeUnmount`, `complete()`); both are `done` and unmerged because the 2026-09-26 review run never ran, so the plan is gated on the 2026-09-26 daily code PR. The `59-of-84` and `typed-task-content` branches carry no `frontend/` change (checked with `git diff --stat origin/main...<branch> -- frontend`), so after the merge `ContentViewer.vue` still renders only `words | questions | raw` and `utils/content.ts` has no `passage` kind: a reading task's `passage` is not on screen until the retro learning-room plan (`harness/designs/retro-learning-room.md` — `ItemPassage`, `ItemFlashcard`, `ItemQuestion`, the passage sheet; not yet planned) lands. The plan therefore wires the chip into today's `ContentViewer` (question `prompt`, word `term`) unconditionally and into the learning-room item components in a gated last task that runs only if they are on `origin/main` when execution starts; otherwise the passage placement is handed to the learning-room plan through a note in the design.
+- **Priority rationale.** Medium: clear learning and retention value on the happy path of every task, but nothing is broken without it and it does not block a merge. Not high, so the plan stays `draft` for the owner's `/approve`.
+- **Kit exception.** UI-KIT "Motion budget" says "no audio API in scope"; the design records this feature as the owner-selected exception (speech behind an explicit tap, still no sound effects) and the plan updates that bullet.

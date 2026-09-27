@@ -1,9 +1,10 @@
 ---
 type: feature
-status: proposed
+status: selected
 source: ideator
 run: 2026-09-26-run-01
 order: 5
+priority: medium
 ---
 
 ## Why
@@ -29,3 +30,6 @@ Technical (frontend only):
 - Code: `grep -rn beforeinstallprompt\|standalone\|requestPermission frontend` → only `nuxt.config.ts:52` (`display: standalone` in the manifest); `harness/designs/settings.md:71-72` (denied/unsupported rows with the iOS recipe — reused, not duplicated); CODEMAP `notify` (the worker only sends to stored subscriptions; nothing subscribes users today outside `/settings`).
 - Harness context: `harness/plans/2026-09-24-settings-screen-…` (done; provides `stores/settings.ts`, `utils/push.ts`); `harness/plans/2026-09-25-growth-moment-…` (planned; the `done` moment this card waits for); `harness/ideas/2026-09-22-run-01/adaptive-reminder-timing-and-pre-decay-rescue-push.md` (selected; every push it schedules needs this subscription to exist).
 - Research: iOS/iPadOS 16.4+ deliver Web Push only to Home Screen web apps and only after a permission request from direct user interaction — https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/ and https://webkit.org/blog/13966/webkit-features-in-safari-16-4/ ; reminder architecture as the retention backbone (Duolingo) — https://www.digia.tech/post/duolingo-habit-forming-reminders-retention-architecture/
+
+## Evaluation
+_Evaluator, 2026-09-27 — daily decide (feature queue)._ **Select — medium, not planned today.** *Is the Why real?* Yes, and it is the strongest retention argument in this run: nothing in `frontend/` handles `beforeinstallprompt` or asks for notification permission outside `/settings`, so on iPhone the whole reminder system is inert until the learner installs the PWA. *One plan?* Yes, frontend-only (~half a day) after a design doc in the retro hub. *Dependencies:* it reuses `stores/settings.ts` / `utils/push.ts` (settings branch, done, unmerged) and waits for the growth timeline's `done` (growth-moment branch, done, unmerged); both edit `pages/index.vue`, which is also changed by the retro restyle. Plan it first among this run's features once the 2026-09-26 daily PR is on `main`, designer first.
