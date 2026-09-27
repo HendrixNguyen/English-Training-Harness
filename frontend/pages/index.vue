@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Badge from '~/components/retro/Badge.vue'
 import CompanionSprite from '~/components/retro/CompanionSprite.vue'
 import DayBar from '~/components/retro/DayBar.vue'
@@ -8,9 +8,9 @@ import QuestNode from '~/components/retro/QuestNode.vue'
 import RetroButton from '~/components/retro/RetroButton.vue'
 import RetroPanel from '~/components/retro/RetroPanel.vue'
 import RetroToast from '~/components/retro/RetroToast.vue'
-import SpeechBox from '~/components/retro/SpeechBox.vue'
 import StateBlock from '~/components/ui/StateBlock.vue'
 import { useGrowthMoment } from '~/composables/useGrowthMoment'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 import { useRetroToast } from '~/composables/useRetroToast'
 import { useAuthStore } from '~/stores/auth'
 import { usePetStore } from '~/stores/pet'
@@ -67,6 +67,41 @@ const shieldsAriaLabel = computed(() => {
   return spentLine.value && spentDateLabel.value ? `${base}, một chiếc vừa đỡ cho ngày ${spentDateLabel.value}` : base
 })
 
+// design §3 item 2: the companion panel is one `RetroPanel` (portrait +
+// HP bar + speech line), not `SpeechBox`'s own nested panel-and-portrait —
+// `SpeechBox` composes a second `RetroPanel` with a 48px face crop of its
+// own, which would draw a duplicate name tab and a duplicate sprite inside
+// the hub's single dialogue box. The typing/skip/one-live-region contract
+// Task 1 tested on `SpeechBox` is reproduced here for the line alone.
+const osReducedMotion = useReducedMotion()
+const speechVisibleChars = ref(0)
+let speechTypingTimer: ReturnType<typeof setInterval> | null = null
+
+function clearSpeechTypingTimer() {
+  if (speechTypingTimer) { clearInterval(speechTypingTimer); speechTypingTimer = null }
+}
+
+function startTypingSpeech(line: string) {
+  clearSpeechTypingTimer()
+  if (osReducedMotion.value) { speechVisibleChars.value = line.length; return }
+  speechVisibleChars.value = 0
+  if (line.length === 0) return
+  speechTypingTimer = setInterval(() => {
+    speechVisibleChars.value += 1
+    if (speechVisibleChars.value >= line.length) clearSpeechTypingTimer()
+  }, 30)
+}
+
+const typedSpeechLine = computed(() => bubble.value.slice(0, speechVisibleChars.value))
+
+function revealSpeechLine() {
+  if (speechVisibleChars.value >= bubble.value.length) return
+  clearSpeechTypingTimer()
+  speechVisibleChars.value = bubble.value.length
+}
+
+onBeforeUnmount(clearSpeechTypingTimer)
+
 const bubble = computed(() => (pet.status
   ? speechLine({
       stage: pet.status.stage,
@@ -80,6 +115,8 @@ const bubble = computed(() => (pet.status
       name: plantName.value,
     })
   : ''))
+
+watch(bubble, startTypingSpeech, { immediate: true })
 
 function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked' | 'open' {
   if (completed) return 'done'
@@ -282,14 +319,17 @@ async function selectSignOut() {
       </div>
       <HpBar class="mt-2" :value="displayHealth(pet.status.health_points)" :max="100" />
       <p v-if="spentLine" class="mt-1 font-body text-sm text-ink-1">{{ spentLine }}</p>
-      <SpeechBox
+      <p
         v-if="!pet.isWilted"
-        class="mt-2"
-        :line="bubble"
-        :name="plantName"
-        :stage="displayStage(pet.status.stage)"
-        :health="displayHealth(pet.status.health_points)"
-      />
+        tabindex="0"
+        class="speech-line mt-2 font-body text-[17px] text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch"
+        @click="revealSpeechLine"
+        @keydown.enter.prevent="revealSpeechLine"
+        @keydown.space.prevent="revealSpeechLine"
+      >
+        <span data-typed aria-hidden="true">{{ typedSpeechLine }}</span>
+        <span data-live-line class="sr-only" aria-live="polite">{{ bubble }}</span>
+      </p>
       <RetroButton v-else class="mt-3" variant="danger" block @click="goToRevive">
         Hồi sinh {{ plantName }}
       </RetroButton>
@@ -346,3 +386,17 @@ async function selectSignOut() {
     <RetroToast />
   </main>
 </template>
+
+<style scoped>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>
