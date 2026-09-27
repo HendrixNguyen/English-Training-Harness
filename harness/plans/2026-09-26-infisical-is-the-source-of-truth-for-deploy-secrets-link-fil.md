@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md
-status: draft
+status: approved
 priority: medium
 merged: false
 ---
