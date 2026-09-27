@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 13:02. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 13:24. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -9,11 +9,13 @@ _none_
 
 ## Blockers (merge refused until fixed)
 
-_none_
+- `harness/ideas/_inbox/retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro v1 aliases re-hue growth, alert and mute, so white-on-growth buttons drop to 1.67:1 and text-mute to 3.4:1 on live v1 pages — blocks `harness/plans/2026-09-26-retro-adventure-ui-mobile-first-16-bit-jrpg-restyle-with-a-n.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/fontsource-per-subset-css-has-no-unicode-range-so-all-nine-v.md` — Fontsource per-subset CSS has no unicode-range, so all nine VT323 and Nunito faces claim every codepoint [low]
+- `harness/ideas/_inbox/retro-amend-tests-miss-live-reduced-motion-flips-and-the-sta.md` — Retro amend tests miss live reduced-motion flips and the StateBlock ember tone, and SpeechBox ignores a mid-line OS flip [medium]
+- `harness/ideas/_inbox/retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro v1 aliases re-hue growth, alert and mute, so white-on-growth buttons drop to 1.67:1 and text-mute to 3.4:1 on live v1 pages [high]
 
 ## Proposed
 
