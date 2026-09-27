@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
 	"time"
 )
 
@@ -51,13 +52,14 @@ func (f *fakeOAuth) AccessToken(_ context.Context, refresh string) (string, erro
 }
 
 type fakeCalendar struct {
-	log      *callLog
-	nextID   string
-	patchErr error // returned by PatchEvent (e.g. ErrNotFound)
-	errs     map[string]error
-	known    map[string]bool // ids Google has seen: a repeat insert is a 409, like the real API
-	inserted []Event
-	patched  []patchedEvent
+	log         *callLog
+	nextID      string
+	patchErr    error // returned by PatchEvent (e.g. ErrNotFound)
+	errs        map[string]error
+	known       map[string]bool // ids Google has seen: a repeat insert is a 409, like the real API
+	inserted    []Event
+	patched     []patchedEvent
+	autoInserts int // Google-assigned inserts so far; the real API never repeats an assigned id
 }
 
 func (f *fakeCalendar) fail(method string) error { return f.errs[method] }
@@ -69,7 +71,12 @@ func (f *fakeCalendar) InsertEvent(_ context.Context, tok string, ev Event) (str
 	}
 	id := ev.ID
 	if id == "" {
-		id = f.nextID
+		f.autoInserts++
+		if f.autoInserts == 1 {
+			id = f.nextID
+		} else {
+			id = fmt.Sprintf("%s-%d", f.nextID, f.autoInserts)
+		}
 	}
 	if f.known == nil {
 		f.known = map[string]bool{}
@@ -246,4 +253,38 @@ func newHarness() *harness {
 	}
 	h.svc = NewService(h.tokens, h.oauth, h.cal, h.tasks, h.repo, func() time.Time { return h.now })
 	return h
+}
+
+func TestFakeCalendarAssignsAFreshIDPerGoogleAssignedInsert(t *testing.T) {
+	f := &fakeCalendar{log: &callLog{}, nextID: "evt_new"}
+	ctx := context.Background()
+
+	id1, err := f.InsertEvent(ctx, "t", Event{})
+	if err != nil {
+		t.Fatalf("first auto-id insert: %v", err)
+	}
+	if id1 != "evt_new" {
+		t.Fatalf("id1 = %q, want evt_new", id1)
+	}
+	id2, err := f.InsertEvent(ctx, "t", Event{})
+	if err != nil {
+		t.Fatalf("second auto-id insert: %v", err)
+	}
+	if id2 != "evt_new-2" {
+		t.Fatalf("id2 = %q, want evt_new-2", id2)
+	}
+	if len(f.inserted) != 2 {
+		t.Fatalf("inserted = %d, want 2", len(f.inserted))
+	}
+
+	if _, err := f.InsertEvent(ctx, "t", Event{ID: "evt_new"}); !errors.Is(err, ErrAlreadyExists) {
+		t.Fatalf("re-inserting a Google-assigned id: err = %v, want ErrAlreadyExists", err)
+	}
+
+	if _, err := f.InsertEvent(ctx, "t", Event{ID: "aelpx"}); err != nil {
+		t.Fatalf("client-id insert: %v", err)
+	}
+	if _, err := f.InsertEvent(ctx, "t", Event{ID: "aelpx"}); !errors.Is(err, ErrAlreadyExists) {
+		t.Fatalf("repeat client-id insert: err = %v, want ErrAlreadyExists", err)
+	}
 }
