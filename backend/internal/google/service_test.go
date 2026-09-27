@@ -223,6 +223,49 @@ func TestAReservedButGoneIDFallsBackToAGoogleAssignedInsert(t *testing.T) {
 	}
 }
 
+// The 410 fallback insert has no idempotency key either: a failed save right
+// after it orphans the Google-assigned event, once per failed attempt. The
+// Tasks-half analogue is TestAFailedSaveAfterTheListInsertOrphansTheListAndIsDocumented;
+// this branch is not covered by the deterministic id. If a future change closes
+// the gap, update this test to assert one Google-assigned insert.
+func TestAFailedSaveAfterTheGoneIDFallbackOrphansTheEventAndIsDocumented(t *testing.T) {
+	h := newHarness()
+	h.cal.known = map[string]bool{PracticeEventID("u1"): true}
+	h.cal.patchErr = ErrNotFound
+	h.cal.nextID = "evt_first"
+	h.repo.failSaveAt = 1 // the save right after the fallback insert
+
+	if _, err := h.svc.Sync(context.Background(), "u1"); !errors.Is(err, errSaveBoom) {
+		t.Fatalf("first sync: err = %v, want errSaveBoom", err)
+	}
+	// fakeCalendar.InsertEvent returns before appending on a 409, so only the
+	// Google-assigned fallback insert is recorded: it exists at Google, but
+	// nothing stored its id.
+	if len(h.cal.inserted) != 1 || h.cal.inserted[0].ID != "" || h.repo.state.CalendarEventID != "" {
+		t.Fatalf("after first sync: inserted=%+v state=%+v", h.cal.inserted, h.repo.state)
+	}
+
+	h.repo.failSaveAt = 0
+	h.cal.nextID = "evt_second"
+	res, err := h.svc.Sync(context.Background(), "u1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.CalendarEventID != "evt_second" {
+		t.Fatalf("second sync: res=%+v", res)
+	}
+	// Two Google-assigned events now exist: evt_first orphaned, evt_second stored.
+	assigned := 0
+	for _, ev := range h.cal.inserted {
+		if ev.ID == "" {
+			assigned++
+		}
+	}
+	if assigned != 2 {
+		t.Fatalf("Google-assigned inserts = %d, want 2: %+v", assigned, h.cal.inserted)
+	}
+}
+
 // The Tasks half has no idempotency key: state this rather than pretend.
 func TestAFailedSaveAfterTheListInsertOrphansTheListAndIsDocumented(t *testing.T) {
 	h := newHarness()
