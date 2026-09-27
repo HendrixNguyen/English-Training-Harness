@@ -29,7 +29,7 @@ function rowState(taskId: string, completed: boolean): 'done' | 'next' | 'locked
     <NuxtLink
       v-if="pet.isWilted"
       to="/revive"
-      class="mb-4 flex items-center justify-between rounded-card bg-alert px-4 py-3 font-semibold text-white"
+      class="mb-4 flex items-center justify-between rounded-card bg-alert px-4 py-3 font-semibold text-ground-0"
     >
       <span>⚠️ Cây xanh đang bị héo rũ!</span>
       <span class="text-sm underline">Cứu cây ngay</span>

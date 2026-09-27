@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-27 12:21. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-09-27 20:05. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -13,7 +13,8 @@ _none_
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
-_none_
+- `harness/ideas/_inbox/retro-amend-2-test-gaps-dark-focus-ring-cascade-unguarded-sp.md` — Retro amend 2 test gaps: dark focus-ring cascade unguarded, SpeechBox flip-back case asserts no emit count [low]
+- `harness/ideas/_inbox/v1contrast-source-guard-only-scans-class-attributes-so-scrip.md` — v1Contrast source guard only scans class attributes, so script-level class maps can put text-white on a growth fill unnoticed [low]
 
 ## Proposed
 
@@ -35,16 +36,21 @@ _none_
 - `harness/ideas/_inbox/a-rejected-cachestorage-delete-now-fails-sign-in-for-a-user-.md` — A rejected CacheStorage delete now fails sign-in for a user who is already signed in [low]
 - `harness/ideas/_inbox/a-user-deleted-tasks-list-is-never-rebuilt-and-sync-keeps-an.md` — A user-deleted Tasks list is never rebuilt and sync keeps answering synced with a stale count [low]
 - `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` — Assessment request has no overall cap; malformed-output retry doubles the 180 s roadmap budget [low]
+- `harness/ideas/_inbox/companionsprite-motion-is-off-the-pixel-grid-at-every-size-b.md` — CompanionSprite motion is off the pixel grid at every size but 128 px, levelup is a CSS filter not a palette swap, and down lacks its translate [low]
 - `harness/ideas/_inbox/config-gin-mode-validation-is-unreachable-in-the-binary-beca.md` — config GIN_MODE validation is unreachable in the binary because gin init panics first, and its comments claim otherwise [low]
 - `harness/ideas/_inbox/config-go-still-says-jwt-secret-is-not-in-the-1st-thinking-e.md` — config.go still says JWT_SECRET is not in the 1st-thinking env list, and boot refusals print config: config: [low]
 - `harness/ideas/_inbox/due-plus-re-slot-is-not-atomic-so-two-api-instances-double-s.md` — Due plus re-slot is not atomic so two API instances double-send the same reminder [medium]
 - `harness/ideas/_inbox/durable-flag-and-live-row-success-tests-leave-updated-at-and.md` — Durable-flag and live-row success tests leave updated_at and the Daily error path unasserted [low]
+- `harness/ideas/_inbox/fontsource-per-subset-css-has-no-unicode-range-so-all-nine-v.md` — Fontsource per-subset CSS has no unicode-range, so all nine VT323 and Nunito faces claim every codepoint [low]
 - `harness/ideas/_inbox/get-onboarding-quiz-is-shipped-but-absent-from-backend-spec-.md` — GET onboarding quiz is shipped but absent from backend spec 6.1 and 1st-thinking 7 [low]
 - `harness/ideas/_inbox/no-index-supports-the-quests-lookups-on-roadmaps-and-exercis.md` — No index supports the quests lookups on roadmaps and exercises [low]
 - `harness/ideas/_inbox/no-test-pins-that-login-awaits-signin-s-cache-clear-before-n.md` — No test pins that login awaits signIn's cache clear before navigating to the hub [low]
 - `harness/ideas/_inbox/onboarding-s-invalid-request-copy-asks-the-learner-to-fix-fi.md` — Onboarding's invalid_request copy asks the learner to fix fields the quiz step no longer shows [low]
 - `harness/ideas/_inbox/pgrefreshtokensource-has-no-sentinel-for-a-missing-user-so-a.md` — PgRefreshTokenSource has no sentinel for a missing user, so a deleted user gets 500 not 409 [low]
 - `harness/ideas/_inbox/refresh-token-sealing-tests-miss-the-sealer-error-path-and-a.md` — Refresh-token sealing tests miss the sealer-error path and a short-but-valid v1 payload, and one can panic instead of fail [low]
+- `harness/ideas/_inbox/retro-kit-small-contract-gaps-hpbar-shows-unclamped-values-b.md` — Retro kit small contract gaps: HpBar shows unclamped values, bar steps use total not delta, band panels keep their ring, reduced QuestNode drops its cursor, MapNode missed ring is not ember [low]
+- `harness/ideas/_inbox/retro-kit-tests-miss-boundaries-and-one-asserts-nothing-ches.md` — Retro kit tests miss boundaries and one asserts nothing: Chest unmount, SpeechBox mid-type unmount, empty inputs, out-of-range values [low]
+- `harness/ideas/_inbox/retrobutton-keeps-its-4-px-depth-shadow-when-disabled-or-loa.md` — RetroButton keeps its 4 px depth shadow when disabled or loading [low]
 - `harness/ideas/_inbox/revive-s-absolute-save-erases-a-concurrent-ontargetmet-s-20-.md` — Revive's absolute Save erases a concurrent OnTargetMet's +20 and streak [low]
 - `harness/ideas/_inbox/route-falls-back-on-terminal-4xx-so-one-bad-prompt-buys-thre.md` — Route falls back on terminal 4xx so one bad prompt buys three paid provider calls [low]
 - `harness/ideas/_inbox/signing-in-on-a-second-device-silently-logs-the-first-one-ou.md` — signing in on a second device silently logs the first one out [medium]
@@ -80,6 +86,8 @@ _none_
 ## Done (last 10)
 
 - `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (unreviewed)
+- `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high] (unreviewed)
+- `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high] (unreviewed)
 - `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium] (unreviewed)
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (unreviewed)
@@ -87,8 +95,6 @@ _none_
 - `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (unreviewed)
 - `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low] (unreviewed)
 - `harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs — Plan [low] (unreviewed)
-- `harness/plans/2026-09-27-a-wrong-or-rotated-encryption-secret-key-silently-turns-ever.md` — A wrong or rotated ENCRYPTION_SECRET_KEY silently turns every Google sync into reauth_required with no log line — Plan [medium] (unreviewed)
-- `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md` — Stay signed in: `auth.Require` renews a session below half-life and the PWA adopts the new token silently; an expired session says why on `/login` — Plan [high] (unreviewed)
 
 ## Failed
 
