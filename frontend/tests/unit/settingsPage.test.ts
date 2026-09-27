@@ -10,7 +10,7 @@ import { ApiError } from '~/utils/apiClient'
 
 const api = { get: vi.fn(), post: vi.fn() }
 vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
-const reminders = { state: ref<string>('off'), init: vi.fn(), enable: vi.fn(), disable: vi.fn(), saveTime: vi.fn() }
+const reminders = { state: ref<string>('off'), problem: ref<string | null>(null), init: vi.fn(), enable: vi.fn(), disable: vi.fn(), saveTime: vi.fn() }
 vi.mock('~/composables/useReminders', () => ({ useReminders: () => reminders }))
 const navigateTo = vi.fn()
 vi.stubGlobal('navigateTo', navigateTo)
@@ -30,6 +30,7 @@ describe('/settings', () => {
     localStorage.clear()
     api.post.mockReset()
     reminders.state.value = 'off'
+    reminders.problem.value = null
     reminders.enable.mockReset()
     reminders.disable.mockReset()
     reminders.saveTime.mockReset()
@@ -82,15 +83,31 @@ describe('/settings', () => {
     expect(reminders.saveTime).toHaveBeenCalledWith('06:30')
   })
 
-  it('error and invalid states show the alert lines', async () => {
-    reminders.state.value = 'error'
+  it('a save problem shows the alert line without changing the switch', async () => {
+    reminders.problem.value = 'error'
     let w = mountPage()
     await flushPromises()
     expect(w.text()).toContain('Không lưu được. Thử lại.')
-    reminders.state.value = 'invalid'
+    reminders.problem.value = 'invalid'
     w = mountPage()
     await flushPromises()
     expect(w.text()).toContain('Giờ nhắc không hợp lệ.')
+  })
+
+  it('saving from no-key never reveals the switch, and a failed save still shows the error line', async () => {
+    reminders.state.value = 'no-key'
+    const w = mountPage()
+    await w.find('input[type="time"]').setValue('07:30')
+    const save = w.findAll('button').find(b => b.text() === 'Lưu giờ nhắc')!
+    await save.trigger('click')
+    expect(reminders.saveTime).toHaveBeenCalledWith('07:30')
+    await flushPromises()
+    expect(w.find('[role=switch]').exists()).toBe(false)
+
+    reminders.problem.value = 'error'
+    await flushPromises()
+    expect(w.find('[role=switch]').exists()).toBe(false)
+    expect(w.text()).toContain('Không lưu được. Thử lại.')
   })
 
   it('Google sync success shows the task count and switches the button to Đồng bộ lại', async () => {

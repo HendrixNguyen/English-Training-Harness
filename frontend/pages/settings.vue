@@ -18,25 +18,31 @@ const time = ref('20:00')
 onMounted(() => {
   settings.hydrate()
   time.value = settings.notificationTime
-  reminders.init()
+  void reminders.init()
 })
 
 const timeChanged = computed(() => time.value !== settings.notificationTime)
 const switchOn = computed(() => reminders.state.value === 'on' || reminders.state.value === 'requesting')
 const showSwitch = computed(() => !['unsupported', 'no-key'].includes(reminders.state.value))
 
-/** Design §4.1 status lines, one per state. */
-const reminderLine = computed(() => ({
+/** Design §4.1 status lines, one per availability state. */
+const stateLine = computed(() => ({
   off: 'Đang tắt · Bạn sẽ không nhận thông báo.',
   requesting: 'Đang xin phép trình duyệt…',
   on: `Đang nhắc lúc ${settings.notificationTime} mỗi ngày.`,
   denied: 'Trình duyệt đang chặn thông báo. Mở cài đặt trang web, cho phép Thông báo, rồi thử lại.',
   unsupported: 'Thiết bị này chưa nhắc được qua trình duyệt. Trên iPhone: Chia sẻ → Thêm vào Màn hình chính, rồi mở lại.',
   'no-key': '',
+} as Record<string, string>)[reminders.state.value] ?? '')
+/** Design §4.1 `error`/`invalid` rows: the switch is unchanged, only the alert line changes. */
+const problemLine = computed(() => ({
   error: 'Không lưu được. Thử lại.',
   invalid: 'Giờ nhắc không hợp lệ.',
-} as Record<string, string>)[reminders.state.value] ?? '')
-const reminderIsAlert = computed(() => reminders.state.value === 'error' || reminders.state.value === 'invalid')
+} as Record<string, string>)[reminders.problem.value ?? ''] ?? '')
+// A save problem takes over the line even on `no-key`, where the switch stays hidden
+// but the time field and "Lưu giờ nhắc" still work and can still fail.
+const reminderLine = computed(() => reminders.problem.value ? problemLine.value : stateLine.value)
+const reminderIsAlert = computed(() => reminders.problem.value !== null)
 
 function toggle(on: boolean) {
   if (on) void reminders.enable(time.value)

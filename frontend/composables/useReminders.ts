@@ -2,16 +2,24 @@ import { ref, type Ref } from 'vue'
 import { useSettingsStore } from '~/stores/settings'
 import { flattenSubscription, pushSupport, urlBase64ToUint8Array, type FlatSubscription } from '~/utils/push'
 
-export type ReminderState = 'off' | 'requesting' | 'on' | 'denied' | 'unsupported' | 'no-key' | 'error' | 'invalid'
+export type ReminderState = 'off' | 'requesting' | 'on' | 'denied' | 'unsupported' | 'no-key'
+/** How the last save went, independent of `state`. Null clears the alert line. */
+export type SaveProblem = 'error' | 'invalid' | null
 
 interface Deps {
   vapidPublicKey: string
   win?: typeof window
 }
 
-/** Design harness/designs/settings.md §4.1 — the reminder card's state machine over the browser Push API. */
+/**
+ * Design harness/designs/settings.md §4.1 — the reminder card's state machine over the browser Push API.
+ * `state` is what the device can do and whether the switch is on; `problem` is how the last save went.
+ * They are independent refs on purpose: a save result must never overwrite `no-key`/`unsupported`/`denied`,
+ * and a failed save must never flip an `on` switch to `off` (amend, 2026-09-27).
+ */
 export function useReminders(deps?: Deps): {
   state: Ref<ReminderState>
+  problem: Ref<SaveProblem>
   init(): void
   enable(time: string): Promise<void>
   disable(): Promise<void>
@@ -21,6 +29,7 @@ export function useReminders(deps?: Deps): {
   const vapid = deps?.vapidPublicKey ?? ''
   const store = useSettingsStore()
   const state = ref<ReminderState>('off')
+  const problem = ref<SaveProblem>(null)
 
   async function pushManager(): Promise<PushManager> {
     const reg = await win.navigator.serviceWorker.ready
@@ -48,6 +57,9 @@ export function useReminders(deps?: Deps): {
   }
 
   async function enable(time: string) {
+    // Refuse where push cannot work at all: no key/support, or the browser already blocks it.
+    if (pushSupport(vapid, win) !== 'ok' || win.Notification.permission === 'denied') return
+    problem.value = null
     state.value = 'requesting'
     const permission = await win.Notification.requestPermission()
     if (permission !== 'granted') {
@@ -64,15 +76,18 @@ export function useReminders(deps?: Deps): {
         applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource,
       })
     } catch {
-      state.value = 'error'
+      state.value = 'off'
+      problem.value = 'error'
       return
     }
     const flat = flattenSubscription(sub.toJSON())
     if (!flat || !(await store.saveReminder(time, flat))) {
       // The server never learned about this subscription: do not leave the
-      // browser holding one that will never be sent to.
+      // browser holding one that will never be sent to. The switch returns to
+      // its previous position, off.
       await sub.unsubscribe()
-      state.value = store.saveError === 'invalid' ? 'invalid' : 'error'
+      state.value = 'off'
+      problem.value = store.saveError === 'invalid' ? 'invalid' : 'error'
       return
     }
     store.setRemindersOn(true)
@@ -80,6 +95,7 @@ export function useReminders(deps?: Deps): {
   }
 
   async function disable() {
+    problem.value = null
     const cur = await currentSubscription()
     if (cur) await cur.sub.unsubscribe()
     // No unsubscribe endpoint: the server prunes this endpoint on its next 404/410.
@@ -90,12 +106,8 @@ export function useReminders(deps?: Deps): {
   async function saveTime(time: string) {
     const cur = store.remindersOn ? await currentSubscription() : null
     const ok = await store.saveReminder(time, cur?.flat ?? null)
-    if (!ok) {
-      state.value = store.saveError === 'invalid' ? 'invalid' : 'error'
-      return
-    }
-    state.value = store.remindersOn ? 'on' : 'off'
+    problem.value = ok ? null : (store.saveError === 'invalid' ? 'invalid' : 'error')
   }
 
-  return { state, init, enable, disable, saveTime }
+  return { state, problem, init, enable, disable, saveTime }
 }
