@@ -51,6 +51,22 @@ describe('useReminders', () => {
     expect(r.state.value).toBe('denied')
   })
 
+  it('ready is false until init settles, both on a capable browser landing on and on no-key', async () => {
+    const { win } = fakeBrowser({ existing: true })
+    useSettingsStore().setRemindersOn(true)
+    const r = useReminders({ vapidPublicKey: VAPID, win })
+    expect(r.ready.value).toBe(false)
+    await r.init()
+    expect(r.ready.value).toBe(true)
+    expect(r.state.value).toBe('on')
+
+    const b = useReminders({ vapidPublicKey: '', win })
+    expect(b.ready.value).toBe(false)
+    await b.init()
+    expect(b.ready.value).toBe(true)
+    expect(b.state.value).toBe('no-key')
+  })
+
   it('enable asks permission, subscribes with the VAPID key bytes, posts the flat subscription, and lands on', async () => {
     api.post.mockResolvedValue({ status: 'updated', notification_time: '20:00:00' })
     const { win, subscribe, requestPermission } = fakeBrowser()

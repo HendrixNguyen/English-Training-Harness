@@ -20,6 +20,7 @@ interface Deps {
 export function useReminders(deps?: Deps): {
   state: Ref<ReminderState>
   problem: Ref<SaveProblem>
+  ready: Ref<boolean>
   init(): Promise<void>
   enable(time: string): Promise<void>
   disable(): Promise<void>
@@ -30,6 +31,7 @@ export function useReminders(deps?: Deps): {
   const store = useSettingsStore()
   const state = ref<ReminderState>('off')
   const problem = ref<SaveProblem>(null)
+  const ready = ref(false)
 
   async function pushManager(): Promise<PushManager> {
     const reg = await win.navigator.serviceWorker.ready
@@ -44,20 +46,24 @@ export function useReminders(deps?: Deps): {
   }
 
   async function init() {
-    const support = pushSupport(vapid, win)
-    if (support !== 'ok') {
-      state.value = support
-      return
+    try {
+      const support = pushSupport(vapid, win)
+      if (support !== 'ok') {
+        state.value = support
+        return
+      }
+      if (win.Notification.permission === 'denied') {
+        state.value = 'denied'
+        return
+      }
+      // Trust localStorage's remindersOn only as far as the browser still agrees:
+      // confirm a real subscription before showing `on`.
+      const cur = store.remindersOn ? await currentSubscription() : null
+      if (store.remindersOn && !cur) store.setRemindersOn(false)
+      state.value = cur ? 'on' : 'off'
+    } finally {
+      ready.value = true
     }
-    if (win.Notification.permission === 'denied') {
-      state.value = 'denied'
-      return
-    }
-    // Trust localStorage's remindersOn only as far as the browser still agrees:
-    // confirm a real subscription before showing `on`.
-    const cur = store.remindersOn ? await currentSubscription() : null
-    if (store.remindersOn && !cur) store.setRemindersOn(false)
-    state.value = cur ? 'on' : 'off'
   }
 
   async function enable(time: string) {
@@ -119,5 +125,5 @@ export function useReminders(deps?: Deps): {
     problem.value = ok ? null : (store.saveError === 'invalid' ? 'invalid' : 'error')
   }
 
-  return { state, problem, init, enable, disable, saveTime }
+  return { state, problem, ready, init, enable, disable, saveTime }
 }

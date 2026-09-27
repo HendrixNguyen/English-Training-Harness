@@ -102,7 +102,7 @@ function onSync() {
         <span id="reminder-label" class="font-semibold">Bật nhắc học</span>
         <AppSwitch
           :model-value="switchOn"
-          :disabled="reminders.state.value === 'denied'"
+          :disabled="!reminders.ready.value || reminders.state.value === 'denied'"
           :busy="reminders.state.value === 'requesting'"
           labelledby="reminder-label"
           @update:model-value="toggle"

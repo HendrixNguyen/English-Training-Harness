@@ -10,7 +10,7 @@ import { ApiError } from '~/utils/apiClient'
 
 const api = { get: vi.fn(), post: vi.fn() }
 vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
-const reminders = { state: ref<string>('off'), problem: ref<string | null>(null), init: vi.fn(), enable: vi.fn(), disable: vi.fn(), saveTime: vi.fn() }
+const reminders = { state: ref<string>('off'), problem: ref<string | null>(null), ready: ref(true), init: vi.fn(), enable: vi.fn(), disable: vi.fn(), saveTime: vi.fn() }
 vi.mock('~/composables/useReminders', () => ({ useReminders: () => reminders }))
 const navigateTo = vi.fn()
 vi.stubGlobal('navigateTo', navigateTo)
@@ -31,6 +31,7 @@ describe('/settings', () => {
     api.post.mockReset()
     reminders.state.value = 'off'
     reminders.problem.value = null
+    reminders.ready.value = true
     reminders.enable.mockReset()
     reminders.disable.mockReset()
     reminders.saveTime.mockReset()
@@ -59,6 +60,18 @@ describe('/settings', () => {
     await flushPromises()
     expect(w.find('[role="switch"]').attributes('aria-disabled')).toBe('true')
     expect(w.text()).toContain('Trình duyệt đang chặn thông báo')
+  })
+
+  it('the switch is disabled until init settles, then enabled', async () => {
+    reminders.ready.value = false
+    const w = mountPage()
+    await flushPromises()
+    expect(w.find('[role="switch"]').attributes('disabled')).toBeDefined()
+    await w.find('[role="switch"]').trigger('click')
+    expect(reminders.enable).not.toHaveBeenCalled()
+    reminders.ready.value = true
+    await flushPromises()
+    expect(w.find('[role="switch"]').attributes('disabled')).toBeUndefined()
   })
 
   it('unsupported explains Add to Home Screen; no-key hides the switch but keeps the time field', async () => {
