@@ -10,17 +10,11 @@ status() { curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$1"; }
 cache_control() { curl -sS --max-time 10 -I "$1" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}'; }
 
 check "index" "200" "$(status "$web/")"
-# SMOKE_WEB_SPA_WARN=1 downgrades only this check to a warning: Cloudflare Pages
-# serves the generated 404.html before the _redirects splat, so deep links
-# answer 404 there until that fix lands (harness inbox: pages-ignores-the-
-# redirects-spa-rewrite-while-404-html-exist). The deploy workflow sets it; the
-# docker-images CI job does not, so the Caddy image is still held to 200.
-spa=$(status "$web/learn/abc")
-if [ "${SMOKE_WEB_SPA_WARN:-}" = "1" ] && [ "$spa" != "200" ]; then
-  echo "WARN spa fallback (/learn/abc): expected '200', got '$spa' (SMOKE_WEB_SPA_WARN=1)"
-else
-  check "spa fallback (/learn/abc)" "200" "$spa"
-fi
+check "login return trip (/login?code&state)" "200" "$(status "$web/login?code=x&state=y")"
+# no -L: the 2026-09-25 outage was a 308 to /login/ that dropped the OAuth query.
+# On Pages this holds because the upload carries no 404.html (implicit SPA
+# mode); in the Caddy image because of try_files.
+check "spa fallback (/learn/abc)" "200" "$(status "$web/learn/abc")"
 check "sw.js present" "200" "$(status "$web/sw.js")"
 check "sw.js cache-control" "no-cache" "$(cache_control "$web/sw.js")"
 check "manifest cache-control" "no-cache" "$(cache_control "$web/manifest.webmanifest")"
