@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -82,6 +84,10 @@ func (r *PgUserRepo) UpsertByGoogleID(ctx context.Context, googleID, email, full
 		email, fullName, googleID, stored, defaultTargetGoal,
 	).Scan(&u.ID, &u.Email, &nullName, &nullCEFR)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "users_email_key" {
+			return User{}, fmt.Errorf("%w: google_id %s", ErrEmailTaken, googleID)
+		}
 		return User{}, fmt.Errorf("auth: upserting user: %w", err)
 	}
 	if nullName != nil {

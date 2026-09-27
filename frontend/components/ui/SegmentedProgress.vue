@@ -21,7 +21,7 @@ const totalMinutes = computed(() => minutesOf(target.value))
   <div>
     <div class="flex items-baseline justify-between">
       <span class="text-xs font-semibold uppercase tracking-wider text-mute">{{ label }}:</span>
-      <span class="font-display text-2xl" :class="met ? 'text-growth' : ''">
+      <span class="font-display text-2xl" :class="met ? 'text-growth-deep dark:text-growth' : ''">
         {{ minutes }} / {{ totalMinutes }} phút
       </span>
     </div>

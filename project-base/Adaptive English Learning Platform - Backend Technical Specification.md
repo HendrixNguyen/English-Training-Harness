@@ -158,7 +158,41 @@ CREATE TABLE google_sync (
 ALTER TABLE pet_states
     ADD COLUMN last_target_met_date DATE,
     ADD COLUMN judged_through DATE;
+
+-- Added by migration 0004 (RLS): row-level security on every table. Supabase exposes the
+-- public schema through PostgREST with full grants to anon/authenticated; RLS with no
+-- policies denies them everything. The API's role bypasses RLS (postgres on Supabase,
+-- table owner elsewhere), so the app is unaffected. Convention: every future CREATE TABLE
+-- is followed by ENABLE ROW LEVEL SECURITY (TestEveryTableCreatedByAMigrationHasRLS).
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pet_states ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE roadmaps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE google_sync ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+
+-- Supabase only: drop the default REST grants. Skipped where the roles do not exist.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+        REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        REVOKE ALL ON ALL TABLES IN SCHEMA public FROM authenticated;
+        REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM authenticated;
+    END IF;
+END $$;
 ```
+
+RLS is enabled with no policies: the API's own role bypasses RLS on both deployment targets
+(`postgres` on Supabase has `rolbypassrls = true`; on plain Postgres/Dokploy the connecting
+role owns the tables, and owners bypass RLS unless `FORCE ROW LEVEL SECURITY` is set, which
+this migration does not use), so behaviour is unchanged for the app — Supabase's Data API
+should be disabled (or `public` removed from *Exposed schemas*) so the anon/authenticated
+roles have no path to these tables at all.
 
 \---
 
@@ -267,19 +301,36 @@ func NewRouter() (*Router, error) {
 ```
 
 * POST /api/v1/onboarding/assessment  
-  * Description: Submitting placement quiz answers, invoking Gemini AI for CEFR grading, generating 28-day roadmap JSON, and creating initial pet state.  
+  * Description: Submitting placement quiz answers, invoking Gemini AI for CEFR grading, generating 28-day roadmap JSON, and creating initial pet state. plant_name is optional — trimmed, 1–30 characters; blank or absent names the plant "Mầm Non" (the DDL default is not used by this endpoint).  
   * Request Headers: Authorization: Bearer \<JWT\>, Content-Type: application/json  
   * Request Body:
 
 ```json
-{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}
+{"target_goal": "IELTS 7.0 Preparation", "notification_time": "20:00:00", "timezone": "Asia/Ho_Chi_Minh", "plant_name": "Mầm Non", "answers": [{ "question_id": "q1", "selected_option": "B" }, { "question_id": "q2", "selected_option": "A" }]}
 ```
 
   * Response (201 Created):
 
 ```json
-{"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff", "pet_state": {"plant_name": "My Green Buddy", "health_points": 100, "stage": "sprout"}}
+{"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff", "pet_state": {"plant_name": "Mầm Non", "health_points": 100, "stage": "sprout"}}
 ```
+
+* POST /api/v1/roadmaps/regenerate (added 2026-09-26)  
+  * Description: Replaces the caller's active roadmap with a freshly generated one, at the current CEFR level or one step up/down, using the same generation path, parser and rate limiter as onboarding. One transaction: sets users.cefr\_current, deactivates the previous roadmap (kept for history) and inserts the new roadmap with its 84 exercises. day\_number restarts at 1\.  
+  * Request Headers: Authorization: Bearer \<JWT\>, Content-Type: application/json (body optional)  
+  * Request Body:
+
+```json
+{"cefr_level": "B1"}
+```
+
+  * Response (201 Created):
+
+```json
+{"status": "success", "assessed_level": "B1", "roadmap_id": "b11c22d3-44e5-66f7-88a9-00bbccddeeff"}
+```
+
+  * Errors: 400 invalid\_request (cefr\_level not in the enum, or more than one step from the current level), 404 no\_active\_roadmap (never onboarded — use POST /onboarding/assessment), 429 rate\_limited, 503 ai\_unavailable, 502 ai\_bad\_output, 504 ai\_timeout, 502 ai\_upstream\_failed, 500 internal\_error.
 
 ## **6.2 Quests & Progress Endpoints**
 
@@ -386,6 +437,7 @@ func NewRouter() (*Router, error) {
 1.  Provision PostgreSQL & Redis plugins on Railway and execute DDL migration scripts.  
 2.  Inject DATABASE\_URL, REDIS\_URL, GOOGLE\_CLIENT\_ID, GOOGLE\_CLIENT\_SECRET, GEMINI\_API\_KEY, OPENAI\_API\_KEY, DEEPSEEK\_API\_KEY, ENCRYPTION\_SECRET\_KEY, JWT\_SECRET (at least 32 bytes), VAPID\_PUBLIC\_KEY/VAPID\_PRIVATE\_KEY, and FRONTEND\_ORIGIN (the PWA's origin, comma-separated if several).  
 3.  Deploy compiled Go binary in a lightweight Docker container on Railway.
+4.  Addendum (2026-09-25, see `deploy/README.md`): `ENCRYPTION_SECRET_KEY` (64 hex) and `JWT_SECRET` (≥ 32 bytes) are boot requirements; `FRONTEND_ORIGIN` must list the PWA's exact origin. Hosting today is the free split (API on Railway Free, Postgres on Supabase via the session-mode pooler on port 5432 with `sslmode=require` — Railway egress is IPv4-only — Redis on Upstash over `rediss://`, PWA on Cloudflare Pages); later the owner's Dokploy server runs `deploy/compose.yml`. The images are `backend/Dockerfile` and `frontend/Dockerfile`.
 
 # 
 

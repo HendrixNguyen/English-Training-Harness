@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md: closed by its Task 2/3/4 on the same google branch"
 ---
 # PracticeEventID is a lossy filter that can return a 4-character id and collide, with no guard and no test
 
@@ -57,3 +58,5 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 *Confirmed from the idea's probe (not re-run).* `backend/internal/google/schedule.go:95-112` filters to `[a-v0-9]` with no length guard; `PracticeEventID("")` and `PracticeEventID("wxyz")` both yield the 4-character `"aelp"`. Not reachable in production: `users.id` is a UUID and `auth.UserID(c)` is the JWT subject issued from it.
 
 *Fix, when planned.* Either document and check the canonical-UUID precondition (return an error / panic on anything else) or hash the id and base32hex-encode the digest for a fixed in-bounds length; tests for empty, all-dropped and a differs-only-in-dropped-characters pair. Low.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Folded into `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` as Task 4.** Confirmed on `origin/main` `backend/internal/google/schedule.go:102-111`: the `[a-v0-9]` filter has no length guard, so `""` and `"wxyz"` both yield the 4-character `"aelp"` and `"a-b"` / `"ab"` collide. Fix chosen: keep the existing mapping for a canonical UUID (32 hex digits once the four hyphens are dropped) — live `google_sync.calendar_event_id` rows and the retry's 409-consumption depend on that id never changing — and for any other input return `"aelp" + hex(sha256(userID))[:32]`: fixed 36 characters, inside base32hex, deterministic and injective in practice, so the postcondition holds for every input without changing the signature. Tests cover empty, all-dropped, a differs-only-in-dropped-characters pair and the unchanged UUID id. Status becomes `rejected` only as the harness's "closed by another plan" marker.

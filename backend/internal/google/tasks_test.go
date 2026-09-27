@@ -76,3 +76,37 @@ func TestTasksInsertTaskMapsReauth(t *testing.T) {
 		t.Errorf("err = %v, want ErrReauthRequired", err)
 	}
 }
+
+func TestTasksMapsAQuota403ToUpstreamNotReauth(t *testing.T) {
+	srv, _ := fakeGoogleAPI(t, map[string]struct {
+		Status int
+		Body   string
+	}{"POST /lists/l1/tasks": fakeAnswer(403, `{"error":{"code":403,"errors":[{"domain":"usageLimits","reason":"userRateLimitExceeded"}]}}`)})
+	c := NewHTTPTasksClient()
+	c.BaseURL = srv.URL
+	err := c.InsertTask(context.Background(), "tok", "l1", Task{Title: "Day 1"})
+	var up *UpstreamError
+	if !errors.As(err, &up) || up.Service != "tasks" || up.Status != 403 {
+		t.Fatalf("err = %v, want *UpstreamError{tasks, 403}", err)
+	}
+	if errors.Is(err, ErrReauthRequired) {
+		t.Fatal("a Tasks quota 403 must not force re-consent")
+	}
+}
+
+func TestTasksMapsAnAPIDisabled403ToUpstreamNotReauth(t *testing.T) {
+	srv, _ := fakeGoogleAPI(t, map[string]struct {
+		Status int
+		Body   string
+	}{"POST /users/@me/lists": fakeAnswer(403, `{"error":{"code":403,"message":"Google Tasks API has not been used in project 123 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/tasks.googleapis.com/overview?project=123 then retry.","errors":[{"message":"Google Tasks API has not been used in project 123 before or it is disabled.","domain":"usageLimits","reason":"accessNotConfigured","extendedHelp":"https://console.developers.google.com"}],"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"consumer":"projects/123","service":"tasks.googleapis.com"}}]}}`)})
+	c := NewHTTPTasksClient()
+	c.BaseURL = srv.URL
+	_, err := c.InsertTaskList(context.Background(), "tok", TasklistTitle)
+	var up *UpstreamError
+	if !errors.As(err, &up) || up.Service != "tasks" || up.Status != 403 {
+		t.Fatalf("err = %v, want *UpstreamError{tasks, 403}", err)
+	}
+	if errors.Is(err, ErrReauthRequired) {
+		t.Fatal("an API-disabled 403 must not force re-consent")
+	}
+}

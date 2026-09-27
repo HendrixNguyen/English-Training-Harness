@@ -76,3 +76,7 @@ is already `is_active = FALSE` by the time the client reads it — so the client
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium (survivor of the 0003 migration group).** Confirmed: check-then-act across two AI calls with no constraint; the invariant survives only because `UPDATE users` happens to run first. Plan: migration `0003` with `CREATE UNIQUE INDEX … ON roadmaps (user_id) WHERE is_active`, the quests indexes (`no-index-supports…`), `NOT NULL user_id` on the three child tables (`spec-3-2-leaves-user-id-nullable…`), backend spec DDL updated; `ActiveRoadmapID` read `FOR UPDATE` inside the transaction, unique-violation → the existing-roadmap 200; `store.reset()` derives the down list from the FS (`store-reset-hard-codes…`) and `Migrate` gets `fstest.MapFS` tests (`migrate-is-only-tested…`). One store+onboarding branch.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Not planned today — file conflict.** Same onboarding files as the three unmerged onboarding branches, plus a new migration whose number would collide with the unmerged `0004_rls` and `0004_pet_shields`. Also shares `onboarding/service.go`/`repo.go` with the re-submit bug — plan the two together after those branches merge.

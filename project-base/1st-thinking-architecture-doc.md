@@ -665,11 +665,15 @@ return parsedResp.Choices\[0\].Message.Content, nil
 
 }
 
+**Addendum (2026-09-25, evaluator):** the `http.Client{Timeout: 30 * time.Second}` in the snippets above is superseded. Deadlines are per task and travel in the context (`airouter.TaskTimeout`: 180 s for `roadmap_generation`, 30 s otherwise); the drivers' client has no timeout. `DefaultGeminiModel` is `gemini-3.8-flash` (`gemini-2.5-flash` answers 404 for accounts created after 2026-09). Each provider call retries once on 429/502/503/504 and logs elapsed time, token usage and the upstream error. The onboarding assessment keeps the graded level in `quiz:placement:{user_id}` (§4) so a re-submit after a failed roadmap step is not graded again.
+
 \#\# 7\. Core REST API Endpoint Specifications
 
 \* \*\*POST /api/v1/auth/google\*\*: OAuth code token swap & JWT issuance.
 
-\* \*\*POST /api/v1/onboarding/assessment\*\*: Submits placement quiz answers, grades level, triggers AI roadmap generation.
+\* \*\*POST /api/v1/onboarding/assessment\*\*: Submits placement quiz answers and an optional plant\_name, grades level, triggers AI roadmap generation.
+
+\* \*\*POST /api/v1/roadmaps/regenerate\*\* (added 2026-09-26): Replaces the active roadmap with a freshly generated one, at the current CEFR level or one step up/down, in one transaction; the previous roadmap is kept for history.
 
 \* \*\*GET /api/v1/quests/daily\*\*: Fetches current day's 30-minute exercise suite (3x 10-min tasks).
 

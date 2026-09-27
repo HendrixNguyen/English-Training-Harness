@@ -103,8 +103,8 @@ func TestIntegrationDailyAndProgressAgainstRealServices(t *testing.T) {
 	if out.DailySecondsSpent != 1800 || out.DailyMinutesSpent != 30 || !out.IsTargetMet || !out.NewlyMet {
 		t.Errorf("out = %+v, want 1800s/30m and the target newly met", out)
 	}
-	if out.PetHealth != 100 || out.StreakCount != 0 {
-		t.Errorf("pet = (%d, %d), want NopPet's §3.2 defaults (100, 0)", out.PetHealth, out.StreakCount)
+	if h, s := petOf(out); h != 100 || s != 0 {
+		t.Errorf("pet = (%d, %d), want NopPet's §3.2 defaults (100, 0)", h, s)
 	}
 
 	var minutes int

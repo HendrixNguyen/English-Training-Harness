@@ -1,9 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: human
 run: 2026-09-25-run-01
 priority: high
+plan: harness/plans/2026-09-25-containerised-deploy-dockerfiles-production-compose-runbook-.md
 ---
 # Containerised deploy: Dockerfiles, production compose, runbook and CI image build
 
@@ -35,3 +36,24 @@ Out of scope: registry pushes and a deploy webhook (a later idea, once the Dokpl
 - Spec: 1st-thinking §2.1 (cron and worker in-process — the host must stay awake), §4 (`queue:webpush:delay` persistent), §8; backend spec §9 (Railway checklist, env list); frontend design §5 (JWT in `Authorization`, no cookies — so no CORS credentials flag).
 - Free-tier survey (owner conversation 2026-09-24, full text on local branch `claude/free-vps-deployment-91d777`, commit e5ac6f0, idea "Deploy on Railway Free with Supabase and Upstash"): Railway Free $1/month usage, no card, awake by default (https://railway.com/pricing, https://docs.railway.com/reference/app-sleeping); Supabase free 500 MB, pauses after 7 idle days, IPv4 via pooler; Upstash Redis free 500K commands/month (worker poll ≈ 86K); rejected Render (sleeps, in-memory KV), Cloud Run (no CPU between requests), Oracle/Koyeb/Northflank/Fly (card required).
 - Dokploy: self-hosted PaaS on Docker + Traefik; deploys Dockerfile, Nixpacks or Compose apps; managed Postgres/Redis with volumes; scheduled DB backups to S3; GitHub webhook redeploys — https://docs.dokploy.com
+
+## Evaluation
+
+**Verdict: select, `priority: high`.** The *Why* is real and the strongest in the queue: every merged feature — Google sign-in, the installable PWA, Web Push, the plant decaying while nobody visits — is invisible until a learner can reach a public HTTPS origin, and the codebase has no Dockerfile in either deployable (checked 2026-09-25: `backend/` has only the dev-only `docker-compose.yml`; `frontend/` has none; CI has `backend-unit`, `backend-integration`, `frontend`, `harness-tooling` and no image build). The owner's hosting decision (Railway Free + Supabase + Upstash + Cloudflare Pages now, own Dokploy server later) is settled and is not re-litigated here; the deliverable stays provider-neutral so moving hosts is a config change plus the runbook's second section.
+
+**Achievable in one plan?** Yes, in roughly half a day, because almost nothing the plan needs is missing from the code:
+- `backend/cmd/api/main.go` serves `GET /healthz` (`internal/health`: 200 when Postgres and Redis ping, 503 otherwise), listens on `":"+cfg.Port` with `PORT` read by `config.Load`, embeds migrations (`internal/store/migrations.go` `//go:embed`) and tzdata (`main.go` asserts `Asia/Ho_Chi_Minh` loads) — so a static `CGO_ENABLED=0` binary is self-contained.
+- `store.NewRedis` uses `redis.ParseURL`, which accepts Upstash's `rediss://` (TLS) URLs; pgx accepts `sslmode=require` for the Supabase pooler.
+- `config.Load` already refuses to boot without `JWT_SECRET` ≥32 bytes and a 64-hex `ENCRYPTION_SECRET_KEY`, and `middleware.CORS` already reads `FRONTEND_ORIGIN` (daily PR #17) — the env table in the runbook documents what exists rather than inventing a contract.
+- `frontend/nuxt.config.ts` is `ssr: false` with `runtimeConfig.public` for the three `NUXT_PUBLIC_*` values (`frontend/.env.example`), so `nuxi generate` emits a static `.output/public` that any file server can host; the `injectManifest` worker is emitted as `sw.js`, which is what the `Cache-Control: no-cache` rule must target.
+
+**Dependencies that do not exist yet:** none in the repo. Outside it, everything is the owner's — accounts, secrets, the Google OAuth console entries, DNS. The plan therefore ends with an explicit *Owner checklist* the executor does not perform, and its `## Verification` is provable without any cloud account: `docker build` of both images, `docker compose -f deploy/compose.yml config`, booting the compose stack locally under a unique `COMPOSE_PROJECT_NAME` on non-default host ports and curling `/healthz`, the OAuth redirect and a CORS preflight against it, plus the CI job.
+
+**Narrowed to keep it finishable today:**
+- The backend's final image is `alpine` (with `ca-certificates` and busybox `wget` for `HEALTHCHECK`) rather than `distroless/static` — distroless has no shell or HTTP client, so a Docker `HEALTHCHECK` there would need a new health-probe mode in the Go binary (app code). The idea offered either; alpine is the one that needs no app change.
+- The web image is Caddy (one `Caddyfile`, SPA fallback and cache headers in six lines) rather than nginx.
+- The CI `docker-images` job builds both images, boots each once (the API must exit with `config: DATABASE_URL is required`, proving the binary runs; the web image must serve `/` and `/sw.js` with the right `Cache-Control`) and runs `docker compose -f deploy/compose.yml config` — it does **not** boot the full compose stack in CI (that is the local verification step) and pushes nothing to a registry (CD is parked in `harness/BACKLOG.md`).
+- Docs are updated in place (README "Hosting" row, CLAUDE.md "Planned architecture", AGENTS.md "Deployment" paragraph, CODEMAP `deploy/` entry, backend spec §9 addendum); no new doc beyond `deploy/README.md`.
+- The post-deploy smoke check is written into the runbook as three `curl` commands the owner (or the review routine, once the URL exists) runs; wiring it into a routine is not part of this plan.
+
+**Priority rationale:** `high` — the idea file already carries it (owner-set), and by the role's rule it blocks users: no user can use anything until this lands. Auto-approve applies (`type: feature`, `priority: high`).

@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -31,9 +33,9 @@ type signInUser struct {
 	CEFRCurrent string `json:"cefr_current"`
 }
 
-// Handler serves POST /api/v1/auth/google (backend spec §6.1). Any failure on
-// Google's side is a 401: the client's only sensible response is to restart the
-// consent flow.
+// Handler serves POST /api/v1/auth/google (backend spec §6.1). Google
+// rejected → 401; the email belongs to another account → 409; the session
+// store is down → 503; anything else → 500. Every failure is logged once.
 func Handler(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req signInRequest
@@ -44,7 +46,17 @@ func Handler(svc *Service) gin.HandlerFunc {
 
 		out, err := svc.SignIn(c.Request.Context(), req.Code, req.RedirectURI)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "google_auth_failed"})
+			log.Printf("auth: sign-in failed: %v", err) // never a token: see errors.go and the handler test
+			switch {
+			case errors.Is(err, ErrGoogleRejected):
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "google_auth_failed"})
+			case errors.Is(err, ErrEmailTaken):
+				c.JSON(http.StatusConflict, gin.H{"error": "email_in_use"})
+			case errors.Is(err, ErrSessionStoreUnavailable):
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "unavailable"})
+			default:
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+			}
 			return
 		}
 
