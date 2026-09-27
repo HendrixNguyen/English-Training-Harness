@@ -98,7 +98,7 @@ Migrations run at API boot and are not reverted by any of this; a release whose 
 
 ## Target B — Dokploy later (deploy only; CD is parked)
 
-Install Dokploy on the server (`curl -sSL https://dokploy.com/install.sh | sh`, the official one-liner — Docker + Traefik). Create a **Compose** application from this repo with compose path `deploy/compose.yml` and paste the contents of `deploy/.env` as its environment. Public HTTPS via Traefik + Let's Encrypt on ports 80/443, or a Cloudflare Tunnel when the box is behind NAT (Google OAuth and Web Push refuse plain HTTP). A domain each for `web` (port 80) and `api` (port 8080). Enable Dokploy's scheduled Postgres backup to an S3-compatible bucket — the `postgres_data` volume is the only copy otherwise. `FRONTEND_ORIGIN` is the web domain; `NUXT_PUBLIC_API_BASE` is the api domain.
+Install Dokploy on the server (`curl -sSL https://dokploy.com/install.sh | sh`, the official one-liner — Docker + Traefik). Create a **Compose** application from this repo with compose path `deploy/compose.yml` and paste the contents of `deploy/.env` (regenerated with `infisical export --env prod --format dotenv > deploy/.env`, see *Env source of truth*) as its environment. Public HTTPS via Traefik + Let's Encrypt on ports 80/443, or a Cloudflare Tunnel when the box is behind NAT (Google OAuth and Web Push refuse plain HTTP). A domain each for `web` (port 80) and `api` (port 8080). Enable Dokploy's scheduled Postgres backup to an S3-compatible bucket — the `postgres_data` volume is the only copy otherwise. `FRONTEND_ORIGIN` is the web domain; `NUXT_PUBLIC_API_BASE` is the api domain.
 
 Continuous delivery to Dokploy (registry push + deploy webhook on a push to `production`, as a second job in `deploy.yml`) is parked in `harness/BACKLOG.md` until this target is live — until then, deploys here are manual.
 
@@ -129,7 +129,7 @@ unset COMPOSE_PROJECT_NAME
 rm -f deploy/.env
 ```
 
-`deploy/.env` is gitignored — never commit it. If this repo is checked out as a git worktree, run these commands from the worktree root, not the main checkout (AGENTS.md).
+`deploy/.env` is gitignored — never commit it. The scratch file above is for a local boot only; the production file is always `infisical export --env prod --format dotenv > deploy/.env` (see *Env source of truth*). If this repo is checked out as a git worktree, run these commands from the worktree root, not the main checkout (AGENTS.md).
 
 ## Smoke check
 
