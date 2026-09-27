@@ -40,7 +40,10 @@ func NewService(tokens RefreshTokenSource, oauth TokenRefresher, cal CalendarCli
 // What that does NOT protect: a failure of SaveSyncState itself right after
 // tasklists.insert (Tasks has no client-supplied id) orphans an empty list
 // the retry cannot find — it deletes only the stored id. The Calendar half
-// is covered by the deterministic id.
+// is covered by the deterministic id except after the 410 fallback. When a
+// user deleted the event and Google has released the id, the event is
+// re-inserted with a Google-assigned id, and a SaveSyncState failure right
+// after that orphans it, once per failed attempt.
 func (s *Service) Sync(ctx context.Context, userID string) (Result, error) {
 	refresh, err := s.tokens.RefreshToken(ctx, userID)
 	if errors.Is(err, ErrNoRefreshToken) {
@@ -94,7 +97,9 @@ func (s *Service) Sync(ctx context.Context, userID string) (Result, error) {
 			if errors.Is(err, ErrNotFound) {
 				// The id is reserved but the event is gone for good (410): one
 				// insert with a Google-assigned id — today's non-idempotent path,
-				// reachable only after a user deleted the event by hand.
+				// reachable only after a user deleted the event by hand — a save
+				// failure after this insert orphans it; see Sync's doc and
+				// TestAFailedSaveAfterTheGoneIDFallbackOrphansTheEventAndIsDocumented.
 				ev.ID = ""
 				id, err = s.cal.InsertEvent(ctx, access, ev)
 			}
