@@ -64,7 +64,11 @@ const remainingMinutes = computed(() => Math.max(0, Math.ceil((REVIVE_SECONDS - 
 // Executor trap (design §8): the alarm only on real wilted data — never on
 // a failed load with nothing cached, and never guessed from `notWilted`.
 const isWiltedReal = computed(() => pet.status !== null && pet.isWilted)
-const isHealthy = computed(() => pet.notWilted || (pet.status !== null && !pet.isWilted))
+// `!passed`: a fresh healthy load (design's "Not wilted" state) and "just
+// revived" both read as pet.isWilted === false — passed.value is what tells
+// them apart, so a revive doesn't fall through to the plain healthy button
+// once the store's own health/stage catch up.
+const isHealthy = computed(() => !passed.value && (pet.notWilted || (pet.status !== null && !pet.isWilted)))
 const isUnknown = computed(() => pet.status === null && pet.error !== null)
 
 const showBand = computed(() => isWiltedReal.value && !passed.value)
@@ -110,7 +114,7 @@ function onReacted() {
 </script>
 
 <template>
-  <main class="mx-auto max-w-md px-4 pb-8">
+  <main class="min-h-screen bg-ground-0 mx-auto max-w-md px-4 pb-8">
     <RetroPanel v-if="showBand" band tone="ember" data-band class="mt-4 text-center">
       <p class="font-display text-[22px] uppercase leading-6 text-ink-0">
         {{ plantName }} đã gục

@@ -180,8 +180,8 @@ describe('/revive (design harness/designs/retro-revive.md) on the kit', () => {
     await nextTick()
     expect(w.findComponent(CompanionSprite).props('react')).toBe('idle')
 
-    const home = w.findAllComponents(RetroButton).find(b => b.text().includes('Về trại'))
-    expect(home).toBeTruthy()
+    const homeButtons = w.findAllComponents(RetroButton).filter(b => b.text().includes('Về trại'))
+    expect(homeButtons).toHaveLength(1)
   })
 
   it('(9) not wilted: no band, "vẫn khoẻ", "Về trại"', async () => {
