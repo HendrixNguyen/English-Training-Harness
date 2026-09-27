@@ -14,10 +14,14 @@ const expanded = reactive<Record<number, boolean>>({})
 
 onMounted(async () => {
   if (!pet.status) void pet.load()
-  if (!roadmap.outline && !roadmap.noRoadmap) await roadmap.load()
-  if (roadmap.outline) expanded[roadmap.outline.day_number] = true
+  await roadmap.load() // every visit: noRoadmap, day_number and minutes are the server's current answer
+  const today = roadmap.outline?.day_number
+  if (today) {
+    for (const k of Object.keys(expanded)) expanded[Number(k)] = false // the default-expanded row is today, not a stale one
+    expanded[today] = true
+  }
   await nextTick()
-  document.getElementById(`day-${roadmap.outline?.day_number ?? 0}`)?.scrollIntoView({ block: 'center' })
+  document.getElementById(`day-${today ?? 0}`)?.scrollIntoView({ block: 'center' })
 })
 </script>
 

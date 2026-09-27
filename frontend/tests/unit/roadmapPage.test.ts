@@ -7,6 +7,7 @@ import RoadmapNode from '~/components/roadmap/RoadmapNode.vue'
 import AppButton from '~/components/ui/AppButton.vue'
 import AppCard from '~/components/ui/AppCard.vue'
 import StateBlock from '~/components/ui/StateBlock.vue'
+import { useRoadmapStore } from '~/stores/roadmap'
 import { ApiError } from '~/utils/apiClient'
 
 const api = { get: vi.fn(), post: vi.fn() }
@@ -198,5 +199,67 @@ describe('/roadmap (design harness/designs/roadmap-tree.md)', () => {
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/roadmap')
     expect(w.text()).toContain('Business English for meetings')
+  })
+})
+
+describe('/roadmap refetches on every visit (amend: design §1, §4.1, §4.2)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    Element.prototype.scrollIntoView = vi.fn()
+    api.get.mockReset()
+    navigateTo.mockReset()
+  })
+
+  it('a cached outline does not stop the page from refetching, and today follows the fresh day_number', async () => {
+    const store = useRoadmapStore()
+    store.outline = buildOutline() // day 9, seeded before mount — a returning visit
+    const fresh = { ...buildOutline(), day_number: 10 } // the server has moved on
+    routeGet(() => Promise.resolve(fresh))
+    const w = mountPage()
+    await flushPromises()
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/roadmap')
+    const day10 = w.find('#day-10')
+    expect(day10.find('button').attributes('aria-current')).toBe('step')
+    expect(day10.find('button').attributes('aria-expanded')).toBe('true')
+    const day9 = w.find('#day-9')
+    expect(day9.find('button').attributes('aria-current')).toBeUndefined()
+    const expandedRows = w.findAll('li[id^="day-"]').filter(li => li.find('button').attributes('aria-expanded') === 'true')
+    expect(expandedRows).toHaveLength(1)
+    expect(expandedRows[0].attributes('id')).toBe('day-10')
+  })
+
+  it('a cached empty state does not stick once the server answers with an active roadmap', async () => {
+    const store = useRoadmapStore()
+    store.noRoadmap = true // seeded before mount — the learner had no roadmap last visit
+    routeGet(() => Promise.resolve(buildOutline()))
+    const w = mountPage()
+    await flushPromises()
+
+    expect(w.text()).not.toContain('Bạn chưa có lộ trình học.')
+    expect(w.text()).toContain('Business English for meetings')
+  })
+
+  it('a cached outline stays on screen while the refetch is in flight (no loading flash)', async () => {
+    const store = useRoadmapStore()
+    store.outline = buildOutline()
+    routeGet(() => new Promise(() => {})) // never resolves within this test
+    const w = mountPage()
+    await flushPromises()
+
+    expect(w.find('[aria-busy="true"]').exists()).toBe(false)
+    expect(w.text()).toContain('Business English for meetings')
+    expect(w.findAll('li[id^="day-"]')).toHaveLength(28)
+  })
+
+  it('a cached empty state shows loading while reloading, not the stale empty state', async () => {
+    const store = useRoadmapStore()
+    store.noRoadmap = true
+    routeGet(() => new Promise(() => {})) // never resolves within this test
+    const w = mountPage()
+    await flushPromises()
+
+    expect(w.text()).not.toContain('Bạn chưa có lộ trình học.')
+    expect(w.find('[aria-busy="true"]').exists()).toBe(true)
   })
 })
