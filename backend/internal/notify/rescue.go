@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -191,4 +192,35 @@ func (r *Rescue) Sweep(ctx context.Context, now time.Time) (RescueStats, error) 
 		}
 	}
 	return stats, errors.Join(errs...)
+}
+
+// NextTopOfHour is the next :00 strictly after now — pet.RunHourly's rule,
+// copied rather than imported (notify never imports pet).
+func NextTopOfHour(now time.Time) time.Time { return now.Truncate(time.Hour).Add(time.Hour) }
+
+// RunRescue is the in-process hourly rescue job, pet.RunHourly's shape:
+// blocks until ctx is cancelled, sweeping at every :00 UTC (the tick at
+// hh:00 UTC catches every zone whose local hour is RescueLocalHour —
+// half-hour zones included). One per deployment, like RunWorker: the SET NX
+// flag makes a second sweeper harmless but not useful.
+func RunRescue(ctx context.Context, r *Rescue) {
+	for {
+		now := r.now()
+		timer := time.NewTimer(NextTopOfHour(now).Sub(now))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+		at := r.now()
+		stats, err := r.Sweep(ctx, at)
+		if err != nil {
+			log.Printf("notify: rescue sweep at %s: %+v, errors: %v", at.UTC().Format(time.RFC3339), stats, err)
+			continue
+		}
+		if stats.InWindow > 0 {
+			log.Printf("notify: rescue sweep at %s: %+v", at.UTC().Format(time.RFC3339), stats)
+		}
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -318,5 +319,58 @@ func TestRescueSweepPrunesGoneSubscriptionsAndContinues(t *testing.T) {
 	}
 	if got := rh.sender.Sent(); len(got) != 1 || got[0] != "https://push.example/4" {
 		t.Errorf("sent = %v, want u4's push", got)
+	}
+}
+
+func TestNextTopOfHourRescue(t *testing.T) {
+	for _, tt := range []struct{ now, want time.Time }{
+		{time.Date(2026, 9, 22, 10, 17, 30, 0, time.UTC), time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC)},
+		{time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC), time.Date(2026, 9, 22, 11, 0, 0, 0, time.UTC)},
+	} {
+		if got := NextTopOfHour(tt.now); !got.Equal(tt.want) {
+			t.Errorf("NextTopOfHour(%s) = %s, want %s", tt.now, got, tt.want)
+		}
+	}
+}
+
+func TestRunRescueSweepsAndStopsWhenTheContextIsCancelled(t *testing.T) {
+	h := newHarness()
+	h.repo.subs["u1"] = []Subscription{{ID: "sub-1", Endpoint: "https://push.example/1", P256dh: "p", Auth: "a"}}
+	flags := &fakeRescueFlags{log: &callLog{}, claimed: map[string]bool{}}
+	// First reading: one second before 15:00 UTC (21:59:59 in Ho Chi Minh
+	// City); every later reading is 15:00 UTC, local hour 22.
+	var calls atomic.Int32
+	top := utc(22, 15)
+	now := func() time.Time {
+		if calls.Add(1) == 1 {
+			return top.Add(-time.Second)
+		}
+		return top
+	}
+	r := NewRescue(&fakeRescueRepo{h.repo}, h.counter, flags, h.sender, now)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		RunRescue(ctx, r)
+		close(done)
+	}()
+
+	deadline := time.After(3 * time.Second)
+	for len(h.sender.Sent()) < 1 {
+		select {
+		case <-deadline:
+			t.Fatal("RunRescue never sent")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("RunRescue did not return after cancel")
+	}
+	if got := h.sender.Sent(); len(got) != 1 {
+		t.Errorf("sent = %v, want exactly one rescue", got)
 	}
 }
