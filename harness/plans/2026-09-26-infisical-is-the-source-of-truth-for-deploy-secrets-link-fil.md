@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-25-run-01/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil.md
-status: approved
+status: executing
 priority: medium
 merged: false
+branch: harness/2026-09-26-medium-infisical-is-the-source-of-truth-for-deploy-secrets-link-fil
+worktree: .worktrees/infisical-is-the-source-of-truth-for-deploy-secrets-link-fil
 ---
 # Infisical is the source of truth for deploy secrets: `.infisical.json` in the repo, an "Env source of truth" runbook section, Railway sync by Infisical — Plan
 

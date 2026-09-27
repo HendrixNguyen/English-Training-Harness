@@ -1,8 +1,10 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/adaptive-reminder-timing-and-pre-decay-rescue-push.md
-status: approved
+status: executing
 priority: low
 merged: false
+branch: harness/2026-09-27-low-adaptive-reminder-timing-and-pre-decay-rescue-push
+worktree: .worktrees/adaptive-reminder-timing-and-pre-decay-rescue-push
 ---
 # Pre-decay rescue push: one "your plant needs {n} more minutes" Web Push at local 22:00 on an unmet day — Plan
 

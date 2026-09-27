@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-26-run-01/google-tasks-tick-themselves-when-the-day-s-target-is-met-an.md
-status: draft
+status: approved
 priority: medium
 merged: false
 order: 3
