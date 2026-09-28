@@ -235,5 +235,29 @@ class CliTests(unittest.TestCase):
         self.run_cli("state")
         self.assertIn("# Harness state", pathlib.Path("harness/STATE.md").read_text())
 
+    def test_knowledge_succeeds_when_no_drift(self):
+        pathlib.Path("harness/CODEMAP.md").write_text("## Backend\n\n- **store** — PostgreSQL client\n- **auth** — Google sign-in\n\n## Frontend\n\n- **shell** — Nuxt wrapper\n")
+        pathlib.Path("backend/internal/store").mkdir(parents=True, exist_ok=True)
+        pathlib.Path("backend/internal/auth").mkdir(parents=True, exist_ok=True)
+        pathlib.Path("frontend/shell").mkdir(parents=True, exist_ok=True)
+        code, out = self.run_cli("knowledge")
+        self.assertEqual(code, 0)
+        self.assertIn("knowledge ok", out)
+
+    def test_knowledge_fails_when_missing_paragraph(self):
+        pathlib.Path("backend/internal/store").mkdir(parents=True, exist_ok=True)
+        # CODEMAP has no paragraph for store
+        pathlib.Path("harness/CODEMAP.md").write_text("## Backend\n\n- **auth** — Google sign-in\n")
+        code, out = self.run_cli("knowledge")
+        self.assertEqual(code, 1)
+        self.assertIn("no CODEMAP paragraph", out)
+
+    def test_knowledge_fails_when_stale_paragraph(self):
+        pathlib.Path("harness/CODEMAP.md").write_text("## Backend\n\n- **store** — PostgreSQL client\n- **removed** — this paragraph has no package\n")
+        pathlib.Path("backend/internal/store").mkdir(parents=True, exist_ok=True)
+        code, out = self.run_cli("knowledge")
+        self.assertEqual(code, 1)
+        self.assertIn("CODEMAP paragraph with no directory", out)
+
 if __name__ == "__main__":
     unittest.main()

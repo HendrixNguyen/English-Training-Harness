@@ -1,4 +1,4 @@
-node_modules/
+.node_modules/
 dist/
 .nuxt/
 .output/
@@ -16,3 +16,6 @@ __pycache__/
 .playwright-mcp/
 test-results/
 playwright-report/
+
+# Kilo project base — local only, not for the team
+kilo.json

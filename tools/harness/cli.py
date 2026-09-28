@@ -278,6 +278,33 @@ def cmd_stale_worktrees(a):
     return 0
 
 
+def cmd_knowledge(a):
+    """Report packages with no CODEMAP paragraph, and paragraphs with no directory. Exit 1 on drift."""
+    codemap = pathlib.Path("harness/CODEMAP.md")
+    if not codemap.exists():
+        print("error: harness/CODEMAP.md not found"); return 1
+    documented = {m.group(1) for l in codemap.read_text().splitlines()
+                  for m in [re.match(r"- \*\*([^*]+)\*\*", l)] if m}
+    internal = pathlib.Path("backend/internal")
+    present = set()
+    if internal.is_dir():
+        present |= {p.name for p in internal.iterdir() if p.is_dir()}
+    frontend = pathlib.Path("frontend")
+    if frontend.is_dir():
+        present |= {p.name for p in frontend.iterdir() if p.is_dir() and p.name not in {".nuxt", "node_modules", ".output"}}
+    missing = sorted(present - documented)
+    stale = sorted(documented - present)
+    for name in missing:
+        print(f"no CODEMAP paragraph: {name}")
+    for name in stale:
+        print(f"CODEMAP paragraph with no directory: {name}")
+    if missing or stale:
+        print(f"knowledge drift: {len(missing)} undocumented, {len(stale)} stale")
+        return 1
+    print(f"knowledge ok: {len(present)} packages documented")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="harness")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -303,6 +330,7 @@ def main(argv=None):
     p = sub.add_parser("lock"); p.add_argument("plan"); p.set_defaults(fn=cmd_lock)
     p = sub.add_parser("unlock"); p.add_argument("plan", nargs="?"); p.set_defaults(fn=cmd_unlock)
     sub.add_parser("stale-worktrees").set_defaults(fn=cmd_stale_worktrees)
+    sub.add_parser("knowledge").set_defaults(fn=cmd_knowledge)
     a = ap.parse_args(argv)
     return a.fn(a)
 
