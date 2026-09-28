@@ -16,6 +16,7 @@ Two things live here today:
 python3 -m unittest discover -s tools/harness/tests -v   # harness tooling tests (stdlib only, no deps)
 python3 -m unittest tools.harness.tests.test_cli -v     # one module
 python3 tools/harness/cli.py validate                    # exit 1 on malformed harness artifacts
+python3 tools/harness/cli.py doctor                      # check CLIs, MCP servers, plugins, roles and hooks against .agents/toolchain.json
 python3 tools/harness/cli.py state                       # regenerate harness/STATE.md
 python3 tools/harness/cli.py context                     # session briefing; the SessionStart hook runs it with --hook
 ```
@@ -49,7 +50,7 @@ The pet/plant engine is the retention mechanism: health 0–100, streak, and a s
 
 `airouter` (§6.2) maps a `TaskType` to a `ProviderType` through a `strategies` map, then to an `LLMProvider` implementation. Current routing: roadmap generation and placement test → Gemini, exercise generation → DeepSeek, essay grading → OpenAI. Only two concrete drivers exist — `GeminiProvider` and `OpenAICompatibleProvider` (used for both OpenAI and DeepSeek, differing only in base URL and model).
 
-Per-task deadlines live in `airouter/timeouts.go` and travel in the context: `TaskTimeout` is 180 s for roadmap generation (the §6.1 answer is ~4.5 k output tokens and takes 53–78 s on the OpenAI/DeepSeek fallbacks) and 30 s for every other task; `onboarding.routeJSON` sets it per `Route` call, `Route` applies it when a caller passes no deadline, and the drivers' `http.Client` has no timeout of its own. A deadline hit surfaces as 504 `ai_timeout`. Each driver retries once after 2 s on 429/502/503/504 and logs elapsed time, token usage and, on failure, the upstream status plus the first 200 chars of the body (never the key). The Gemini default model is `gemini-3.8-flash` — `gemini-2.5-flash` is retired for new accounts.
+Per-task deadlines live in `airouter/timeouts.go` and travel in the context: `TaskTimeout` is 180 s for roadmap generation (the §6.1 answer is ~4.5 k output tokens and takes 53–78 s on the OpenAI/DeepSeek fallbacks) and 30 s for every other task; `onboarding.routeJSON` sets it per `Route` call, `Route` applies it when a caller passes no deadline, and the drivers' `http.Client` has no timeout of its own. `Route` never hands one provider the whole budget when others remain: each attempt runs under its own share of what is left (`attemptBudget`, split evenly over the configured providers not yet tried), so a preferred provider that hangs cannot starve the fallback, and the caller's deadline is never widened. A deadline hit surfaces as 504 `ai_timeout`. Each driver retries once after 2 s on 429/502/503/504 and logs elapsed time, token usage and, on failure, the upstream status plus the first 200 chars of the body (never the key). The Gemini default model is `gemini-3.8-flash` — `gemini-2.5-flash` is retired for new accounts.
 
 Providers are registered only if their API key env var is set, and the router falls back to any available provider when the preferred one is missing. Adding a task type means adding a `strategies` entry; adding a provider behind an OpenAI-compatible API needs no new driver.
 
@@ -63,4 +64,4 @@ REST under `/api/v1`, enumerated in §7. Keep that list in sync with the code.
 
 ## Required environment variables
 
-`DATABASE_URL`, `REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. The router also reads `GEMINI_BASE_URL`, `OPENAI_BASE_URL`, `DEEPSEEK_BASE_URL` and `GEMINI_MODEL`, `OPENAI_MODEL`, `DEEPSEEK_MODEL`.
+`DATABASE_URL`, `REDIS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`. The router also reads `GEMINI_BASE_URL`, `OPENAI_BASE_URL`, `DEEPSEEK_BASE_URL` and `GEMINI_MODEL`, `OPENAI_MODEL`, `DEEPSEEK_MODEL`, plus `GEMINI_THINKING_BUDGET` (default `0`; `-1` asks for Google's dynamic thinking budget).

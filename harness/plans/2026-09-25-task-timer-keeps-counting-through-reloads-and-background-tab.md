@@ -2,9 +2,10 @@
 idea: harness/ideas/2026-09-25-run-01/task-timer-keeps-counting-through-reloads-and-background-tab.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-25-high-task-timer-keeps-counting-through-reloads-and-background-tab
 worktree: .worktrees/task-timer-keeps-counting-through-reloads-and-background-tab
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Task timer keeps counting through reloads and background tabs so studied minutes are never lost — Plan
 

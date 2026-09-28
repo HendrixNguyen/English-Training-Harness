@@ -1,5 +1,6 @@
 # tools/harness/tests/test_cli.py
 import os, io, sys, shutil, tempfile, unittest, pathlib, contextlib, time
+from unittest import mock
 from tools.harness import cli
 from tools.harness.frontmatter import split_document, parse
 

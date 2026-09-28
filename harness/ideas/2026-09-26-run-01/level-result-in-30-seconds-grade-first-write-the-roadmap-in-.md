@@ -1,9 +1,11 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: ideator
 run: 2026-09-26-run-01
 order: 1
+priority: medium
+plan: harness/plans/2026-09-27-level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md
 ---
 
 ## Why
@@ -28,3 +30,14 @@ Technical (backend `onboarding` + `quests`, frontend hub + onboarding page):
 - Design context: `harness/designs/retro-onboarding.md` (waiting step "Tớ đang vẽ bản đồ cho cậu… (khoảng một phút)", calibration row depends on a regenerate endpoint) — this idea gives that waiting state a place to live on the hub too.
 - Related inbox bugs (not re-filed): `harness/ideas/_inbox/two-concurrent-assessment-submits-double-spend-the-ai-and-or.md` (the job key is the same guard); `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` (a background job makes the cap a job property, not a request one).
 - Research: mobile onboarding time-to-first-core-action under 60 s and "in first sessions, delays communicate product quality; a blank spinner feels broken" — https://www.digia.tech/post/mobile-app-onboarding-activation-retention/ ; 1 in 4 users drop after one session, often before the core product — https://www.saasfactor.co/blogs/why-users-drop-off-during-onboarding-and-how-to-fix-it
+
+## Evaluation
+_Evaluator, 2026-09-27 — daily decide (feature queue, planned today as **F4**)._
+
+**Select — medium.** *Is the Why real?* Yes. The very first thing a new learner does is sit on a loading button for the full grade + roadmap round trip (30 s + 53–78 s on the fallbacks, 180 s deadline, one malformed-body retry each), with copy telling them not to close the page, and a learner who does leave lands on "no roadmap" and is sent back to the quiz. The grade is already staged server-side (`quiz:placement:{user_id}` `_level`), so answering after the grade and writing the roadmap in the background is the smallest change that turns a 1–2-minute blank wait into a 30-second result. It is retention value on the first session, not a blocker, hence medium (not high): the flow works today, slowly.
+
+*Achievable in one plan?* Only just. Backend ≈ 5 h (Assess split, a Redis job key with an atomic acquire, a job runner tied to the server's shutdown context, `GET /quests/daily` → `404 roadmap_generating`, specs and CODEMAP); frontend ≈ 3 h (store `roadmapJob`, `ApiError.body`, `usePollRoadmap`, `DrawingBar`, the onboarding result step and the hub drawing/failed/reveal states). ≈ 8 h exceeds the ~6 h norm; splitting is not allowed today, so the plan orders every backend task first and the backend is complete and green on its own before the first frontend task (plan Notes).
+
+*Dependencies.* Every file it edits is also edited by a `done`-but-unmerged branch in the 2026-09-26 daily code PR: `onboarding/{service,repo,types,handler}.go` by `…59-of-84…` (adds `Regenerate` + `Repo.ReplaceRoadmap`, which the background job reuses), `…a-session-a-learner-wants-to-finish-level-true…` (the `GradeFloor` raise inside the grading branch) and `…name-your-plant…` (`Pet.Ensure(ctx, userID, plantName)`, `AssessmentRequest.PlantName`); `quests/{service,repo,handler}.go` by `…get-quests-daily-still-reads…`, `…a-pet-state-failure…`, `…roadmap-tree…`; `cmd/api/main.go` by the same three backend branches; `frontend/pages/{index,onboarding}.vue`, `stores/quest.ts`, `utils/apiClient.ts`, `stores/auth.ts` by `…growth-moment…`, `…pet-streak-shield…`, `…name-your-plant…`, `…task-timer…`, `…stay-signed-in…`, `…a-cleared-reminder-time…`, `…settings-screen…`; and the frontend uses `components/retro/*` from `…retro-adventure…`. The plan is gated on all of them being on `origin/main`. Design: `harness/designs/level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` (done). Note: the design composes with `retro-hub.md` / `retro-onboarding.md`, whose page plans (retro plans 2 and 4 of 6) are not written yet; the plan builds the new states with the retro kit inside today's hub and onboarding pages and records where acceptance 5 is adapted.
+
+*Also delivers.* The `roadmap:gen:{user_id}` job key is the guard for `harness/ideas/_inbox/two-concurrent-assessment-submits-double-spend-the-ai-and-or.md` (a concurrent submit answers 202 without a second roadmap generation; at most one extra grading call in the double-tap window, which that bug's Expected output allows) and the background job's overall deadline (2 × the roadmap `TaskTimeout` = 360 s, the key's TTL) is the cap `harness/ideas/_inbox/assessment-request-has-no-overall-cap-malformed-output-retry.md` asks for, with the request itself bounded by the grading step (2 × 30 s). Both stay `selected`; the reviewer closes them after checking. The partial unique index on `roadmaps (user_id) WHERE is_active` from the concurrent-submit bug is **not** in this plan — the reviewer decides whether that bug stays open for it.

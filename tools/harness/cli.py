@@ -1,6 +1,6 @@
 # tools/harness/cli.py
 """Single entry point for every harness state mutation. Agents call this; they never hand-edit frontmatter."""
-import argparse, datetime, json, os, pathlib, re, subprocess, sys, time, unicodedata
+import argparse, datetime, json, os, pathlib, re, shutil, subprocess, sys, time, unicodedata
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
@@ -145,6 +145,8 @@ def cmd_new_review(a):
         path = pathlib.Path("harness/reviews") / f"{today()}-{slug}-{n}.md"
         n += 1
     fm = {"plan": a.plan, "verdict": a.verdict, "bugs": a.bugs or []}
+    if a.covers:
+        fm["covers"] = a.covers
     body = template("review", title=title, plan=a.plan, branch=pfm.get("branch") or "-", worktree=pfm.get("worktree") or "-")
     code = write(path, fm, body)
     if code == 0:
@@ -269,12 +271,61 @@ def cmd_unlock(a):
     print("unlocked"); return 0
 
 
+def _git_worktree_list():
+    try:
+        r = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True)
+    except OSError:
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def parse_worktree_list(text):
+    """[(path, branch_or_None), ...] in file order, from `git worktree list --porcelain` text."""
+    entries = []
+    path = branch = None
+    for line in text.splitlines() + [""]:
+        if line.startswith("worktree "):
+            path = line[len("worktree "):].strip()
+        elif line.startswith("branch "):
+            ref = line[len("branch "):].strip()
+            branch = ref[len("refs/heads/"):] if ref.startswith("refs/heads/") else ref
+        elif not line.strip():
+            if path is not None:
+                entries.append((path, branch))
+            path = branch = None
+    return entries
+
+
+def stale_worktrees(plans, entries, cwd):
+    """Worktrees whose branch belongs to a merged plan — git's list, not a directory scan."""
+    merged_branches = {p.fm["branch"] for p in plans if p.fm.get("merged") and p.fm.get("branch")}
+    legacy_names = {pathlib.Path(p.fm["worktree"]).name for p in plans
+                    if p.fm.get("merged") and p.fm.get("worktree") and not p.fm.get("branch")}
+    known_branches = {p.fm["branch"] for p in plans if p.fm.get("branch")}
+    out = []
+    for path, branch in entries[1:]:
+        norm = path.rstrip("/")
+        if cwd == norm or cwd.startswith(norm + "/"):
+            continue
+        if branch in merged_branches:
+            out.append(norm)
+        elif (branch is None or branch not in known_branches) and pathlib.Path(norm).name in legacy_names:
+            out.append(norm)
+    return sorted(set(out))
+
+
 def cmd_stale_worktrees(a):
     res = scan(".")
-    merged = {pathlib.Path(p.fm.get("worktree", "")).name for p in res.plans if p.fm.get("merged")}
-    for wt in sorted(pathlib.Path(".worktrees").glob("*")) if pathlib.Path(".worktrees").exists() else []:
-        if wt.name in merged:
-            print(wt.as_posix())
+    text = _git_worktree_list()
+    if text is None:
+        merged = {pathlib.Path(p.fm.get("worktree", "")).name for p in res.plans if p.fm.get("merged")}
+        for wt in sorted(pathlib.Path(".worktrees").glob("*")) if pathlib.Path(".worktrees").exists() else []:
+            if wt.name in merged:
+                print(wt.as_posix())
+        return 0
+    cwd = pathlib.Path.cwd().resolve().as_posix()
+    for path in stale_worktrees(res.plans, parse_worktree_list(text), cwd):
+        print(path)
     return 0
 
 
@@ -331,6 +382,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="harness")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("validate").set_defaults(fn=cmd_validate)
+    sub.add_parser("doctor").set_defaults(fn=cmd_doctor)
     sub.add_parser("state").set_defaults(fn=cmd_state)
     p = sub.add_parser("context"); p.add_argument("--hook", action="store_true"); p.set_defaults(fn=cmd_context)
     p = sub.add_parser("slug"); p.add_argument("title"); p.set_defaults(fn=cmd_slug)
@@ -344,6 +396,7 @@ def main(argv=None):
     p = sub.add_parser("new-plan"); p.add_argument("--idea", required=True); p.set_defaults(fn=cmd_new_plan)
     p = sub.add_parser("new-review"); p.add_argument("--plan", required=True)
     p.add_argument("--verdict", required=True, choices=["pass", "pass-with-bugs", "fail"]); p.add_argument("--bugs", nargs="*")
+    p.add_argument("--covers", nargs="*")
     p.set_defaults(fn=cmd_new_review)
     p = sub.add_parser("set"); p.add_argument("file"); p.add_argument("pairs", nargs="+"); p.set_defaults(fn=cmd_set)
     p = sub.add_parser("next"); p.add_argument("--stage", required=True, choices=["evaluate", "execute", "review"])

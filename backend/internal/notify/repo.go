@@ -12,6 +12,13 @@ import (
 // ErrUserNotFound means the users row is gone (the session outlived it).
 var ErrUserNotFound = errors.New("notify: user not found")
 
+// MaxSubscriptionsPerUser bounds how many push_subscriptions rows one user
+// may hold. There is no unsubscribe endpoint, so a learner whose old browser
+// profiles are gone could never get back under a reject-400 cap; evicting
+// the oldest by created_at instead keeps the device they are on working and
+// bounds Tick's daily fan-out to the same number either way.
+const MaxSubscriptionsPerUser = 10
+
 // Subscription is a §3.2 push_subscriptions row — the PushSubscription the
 // browser handed the PWA. ID is empty on input.
 type Subscription struct {
@@ -33,8 +40,10 @@ type Repo interface {
 	// non-empty, timezone. ErrUserNotFound when no row matched.
 	UpdatePreferences(ctx context.Context, userID, notificationTime, timezone string) error
 	Preferences(ctx context.Context, userID string) (Preferences, error)
-	// SaveSubscription stores s for userID exactly once per endpoint and
-	// takes the endpoint away from any other user that had it.
+	// SaveSubscription stores s for userID exactly once per endpoint, takes
+	// the endpoint away from any other user that had it, and keeps at most
+	// MaxSubscriptionsPerUser rows for userID, evicting the oldest by
+	// created_at.
 	SaveSubscription(ctx context.Context, userID string, s Subscription) error
 	Subscriptions(ctx context.Context, userID string) ([]Subscription, error)
 	DeleteSubscription(ctx context.Context, id string) error
@@ -63,6 +72,18 @@ WHERE NOT EXISTS (SELECT 1 FROM push_subscriptions WHERE endpoint = $2 AND user_
 	subscriptionsSQL = `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at, id`
 
 	deleteSubscriptionSQL = `DELETE FROM push_subscriptions WHERE id = $1`
+
+	// trimSubscriptionsSQL keeps only the newest $2 rows for user $1 by
+	// created_at (ties broken by id), deleting the rest. Run in the same
+	// transaction as saveSubscriptionSQL so a save and its trim are atomic.
+	trimSubscriptionsSQL = `
+DELETE FROM push_subscriptions
+WHERE user_id = $1 AND id NOT IN (
+    SELECT id FROM push_subscriptions
+    WHERE user_id = $1
+    ORDER BY created_at DESC, id DESC
+    LIMIT $2
+)`
 )
 
 // PgRepo is the real Repo.
@@ -95,7 +116,14 @@ func (r *PgRepo) Preferences(ctx context.Context, userID string) (Preferences, e
 }
 
 func (r *PgRepo) SaveSubscription(ctx context.Context, userID string, s Subscription) error {
-	if _, err := r.Pool.Exec(ctx, saveSubscriptionSQL, userID, s.Endpoint, s.P256dh, s.Auth); err != nil {
+	err := pgx.BeginFunc(ctx, r.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, saveSubscriptionSQL, userID, s.Endpoint, s.P256dh, s.Auth); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, trimSubscriptionsSQL, userID, MaxSubscriptionsPerUser)
+		return err
+	})
+	if err != nil {
 		return fmt.Errorf("notify: saving subscription: %w", err)
 	}
 	return nil

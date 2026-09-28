@@ -142,6 +142,61 @@ func TestEventPayloadCarriesIDAndConfirmedStatus(t *testing.T) {
 	}
 }
 
+// TestPracticeEventIDHoldsItsBoundsForEveryInput extends
+// TestPracticeEventIDIsDeterministicBase32Hex: a UUID stays byte-for-byte
+// what it always was (live google_sync.calendar_event_id rows and the
+// retry's 409-consumption depend on it), but every other input — including
+// ones today's lossy filter collapses to the same or a too-short id — must
+// also land in Calendar's 5–1024 base32hex bound, deterministically, and
+// distinctly from every other input.
+func TestPracticeEventIDHoldsItsBoundsForEveryInput(t *testing.T) {
+	const uuidUpper = "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"
+	const uuidLower = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+	const wantUUIDID = "aelpa0eebc999c0b4ef8bb6d6bb9bd380a11"
+
+	inputs := []string{"", "wxyz", "a-b", "ab", "u1", "u2", uuidUpper, uuidLower}
+	base32hex := regexp.MustCompile(`^[a-v0-9]+$`)
+	ids := make(map[string]string, len(inputs))
+
+	for _, in := range inputs {
+		id := PracticeEventID(in)
+		if id != PracticeEventID(in) {
+			t.Fatalf("PracticeEventID(%q) is not deterministic", in)
+		}
+		if !base32hex.MatchString(id) {
+			t.Fatalf("PracticeEventID(%q) = %q is not base32hex", in, id)
+		}
+		if len(id) < 5 || len(id) > 1024 {
+			t.Fatalf("PracticeEventID(%q) = %q, length %d, want 5-1024", in, id, len(id))
+		}
+		ids[in] = id
+	}
+
+	if ids[uuidUpper] != wantUUIDID || ids[uuidLower] != wantUUIDID {
+		t.Fatalf("uuid ids = %q / %q, want both %q", ids[uuidUpper], ids[uuidLower], wantUUIDID)
+	}
+
+	for _, in := range inputs {
+		if in == uuidUpper || in == uuidLower {
+			continue
+		}
+		if len(ids[in]) != 36 {
+			t.Errorf("PracticeEventID(%q) = %q, length %d, want 36", in, ids[in], len(ids[in]))
+		}
+	}
+
+	seen := map[string][]string{}
+	for _, in := range inputs {
+		seen[ids[in]] = append(seen[ids[in]], in)
+	}
+	for id, withThatID := range seen {
+		isUUIDPair := len(withThatID) == 2 && id == wantUUIDID
+		if len(withThatID) > 1 && !isUUIDPair {
+			t.Errorf("id %q is shared by distinct inputs %v", id, withThatID)
+		}
+	}
+}
+
 func TestTaskTitleJoinsTheDaysExercises(t *testing.T) {
 	if got := TaskTitle(3, []string{"Greetings", "Short story", "Order a coffee"}); got != "Day 3: Greetings · Short story · Order a coffee" {
 		t.Errorf("got %q", got)
