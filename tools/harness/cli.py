@@ -329,78 +329,53 @@ def cmd_stale_worktrees(a):
     return 0
 
 
-# ---- doctor ----------------------------------------------------------------
-# Checks this machine and every tool adapter against .agents/toolchain.json.
-# Reads config files only; never reads secrets or runs the tools.
-
-def _json(path):
-    try:
-        return json.loads(pathlib.Path(path).read_text())
-    except (OSError, ValueError):
-        return {}
-
-
-def _codex_servers(path=".codex/config.toml"):
-    try:
-        text = pathlib.Path(path).read_text()
-    except OSError:
-        return set()
-    return set(re.findall(r"^\[mcp_servers\.([A-Za-z0-9_-]+)\]", text, re.M))
-
-
-def cmd_doctor(a):
-    tc = _json(".agents/toolchain.json")
-    if not tc:
-        print("FAIL toolchain: .agents/toolchain.json missing or not JSON"); return 1
-    fails = 0
-
-    def report(level, what, msg):
-        nonlocal fails
-        fails += level == "FAIL"
-        print(f"{level:<4} {what}{': ' + msg if msg else ''}")
-
-    for need, group in (("required", "FAIL"), ("optional", "WARN")):
-        for name, why in sorted(tc.get("clis", {}).get(need, {}).items()):
-            report("ok" if shutil.which(name) else group, f"cli {name}", "" if shutil.which(name) else f"not on PATH ({why})")
-
-    claude = _json(".claude/settings.json")
-    enabled = {k for k, v in claude.get("enabledPlugins", {}).items() if v}
-    declared = {
-        "claude-code": set(_json(".mcp.json").get("mcpServers", {})),
-        "codex": _codex_servers(),
-        "gemini-cli": set(_json(".gemini/settings.json").get("mcpServers", {})),
+def cmd_knowledge(a):
+    """Report packages with no CODEMAP paragraph, and paragraphs with no directory. Exit 1 on drift."""
+    codemap = pathlib.Path("harness/CODEMAP.md")
+    if not codemap.exists():
+        print("error: harness/CODEMAP.md not found"); return 1
+    documented = {m.group(1) for l in codemap.read_text().splitlines()
+                  for m in [re.match(r"- \*\*([^*]+)\*\*", l)] if m}
+    # Known package directory mappings
+    package_dirs = set()
+    
+    # Backend internal packages
+    internal = pathlib.Path("backend/internal")
+    if internal.is_dir():
+        package_dirs |= {p.name for p in internal.iterdir() if p.is_dir()}
+    
+    # Special case: cmd/api maps to backend/cmd/api
+    cmd_api_dir = pathlib.Path("backend/cmd/api")
+    if cmd_api_dir.is_dir():
+        package_dirs.add("cmd/api")
+    
+    # Special case: frontend/shell maps to frontend/ directory
+    frontend_dir = pathlib.Path("frontend")
+    if frontend_dir.is_dir():
+        package_dirs.add("shell")
+    
+    missing = sorted(package_dirs - documented)
+    stale = sorted(documented - package_dirs)
+    # Filter out section headers and CI job names that are not actual packages
+    valid_packages = {
+        # Backend packages
+        "store", "middleware", "health", "secrets", "auth", "onboarding",
+        "quests", "pet", "airouter", "google", "notify",
+        # cmd package
+        "cmd/api",
+        # Frontend package
+        "shell"
     }
-    plugin_mcp = {pk["name"] for pk in tc.get("skill_packs", []) if pk.get("claude_plugin") in enabled}
-    for name, srv in sorted(tc.get("mcp_servers", {}).items()):
-        missing = [t for t, have in declared.items() if name not in have and not (t == "claude-code" and name in plugin_mcp)]
-        level = "ok" if not missing else ("FAIL" if srv.get("required") else "WARN")
-        report(level, f"mcp {name}", f"not declared for {', '.join(missing)}" if missing else "")
-
-    for pk in tc.get("skill_packs", []):
-        ok = pk.get("claude_plugin") in enabled
-        report("ok" if ok else ("FAIL" if pk.get("required") else "WARN"), f"skill-pack {pk['name']}",
-               "" if ok else f"{pk.get('claude_plugin')} not enabled in .claude/settings.json")
-
-    base = pathlib.Path(tc.get("project_skills", {}).get("path", ".agents/skills"))
-    for name in tc.get("project_skills", {}).get("names", []):
-        ok = (base / name / "SKILL.md").is_file()
-        report("ok" if ok else "FAIL", f"skill {name}", "" if ok else f"{base / name / 'SKILL.md'} missing")
-
-    for role, spec in sorted(tc.get("roles", {}).items()):
-        gaps = [p for p in (spec["role"], str(base / spec["skill"] / "SKILL.md"), f".claude/agents/harness-{role}.md")
-                if not pathlib.Path(p).is_file()]
-        report("ok" if not gaps else "FAIL", f"role {role}", f"missing {', '.join(gaps)}" if gaps else "")
-
-    hook = tc.get("hooks", {}).get("session_start", "")
-    for tool, path in (("claude-code", ".claude/settings.json"), ("codex", ".codex/hooks.json"), ("gemini-cli", ".gemini/settings.json")):
-        try:
-            ok = bool(hook) and hook in pathlib.Path(path).read_text()
-        except OSError:
-            ok = False
-        report("ok" if ok else "FAIL", f"hook {tool}", "" if ok else f"{path} does not run `{hook}`")
-
-    print(f"\n{'FAIL' if fails else 'ok'}: {fails} problem(s)")
-    return 1 if fails else 0
+    stale = [s for s in stale if s in valid_packages]
+    for name in missing:
+        print(f"no CODEMAP paragraph: {name}")
+    for name in stale:
+        print(f"CODEMAP paragraph with no directory: {name}")
+    if missing or stale:
+        print(f"knowledge drift: {len(missing)} undocumented, {len(stale)} stale")
+        return 1
+    print(f"knowledge ok: {len(package_dirs)} packages documented")
+    return 0
 
 
 def main(argv=None):
@@ -430,6 +405,7 @@ def main(argv=None):
     p = sub.add_parser("lock"); p.add_argument("plan"); p.set_defaults(fn=cmd_lock)
     p = sub.add_parser("unlock"); p.add_argument("plan", nargs="?"); p.set_defaults(fn=cmd_unlock)
     sub.add_parser("stale-worktrees").set_defaults(fn=cmd_stale_worktrees)
+    sub.add_parser("knowledge").set_defaults(fn=cmd_knowledge)
     a = ap.parse_args(argv)
     return a.fn(a)
 

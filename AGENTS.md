@@ -14,6 +14,8 @@ Five roles in `.agents/roles/` — ideator, evaluator, designer, executor, revie
 
 **Session start:** every agent begins with `python3 tools/harness/cli.py context` — git, the CODEMAP index and the actionable harness state (read-only; it never rewrites `STATE.md`). Claude Code (`.claude/settings.json`), Gemini CLI (`.gemini/settings.json`) and Codex (`.codex/hooks.json`) inject it automatically through a `SessionStart` hook calling `context --hook`; any other agent runs it by hand before its first task.
 
+**Project knowledge:** for a read-order that tells you what to read first, see `docs/ONBOARDING.md`. The per-package technical behaviour lives in `harness/CODEMAP.md`; the executor updates the paragraph for any package they change, and the reviewer corrects it. To keep these documents in sync with the code automatically, run the `knowledge-sync` skill (available in `.kilo/skill/knowledge-sync/`).
+
 **Daily cadence:** the harness runs unattended on five scheduled routines, defined tool-neutrally in `.agents/routines/` (README there has the table and the rules every run shares): 02:00 ideate → 06:00 decide (evaluator picks ≤5 bug plans and ≤5 feature plans) → 10:00 bugfix execute (`type: bug` only) → 14:00 feature execute (`type: feature` / `mvp-slice` only) → 20:00 review + the day's single code PR, all owner-local time (Asia/Saigon). A tool's scheduler is only an adapter whose prompt is "follow `.agents/routines/<name>.md` exactly"; change the routine file, not the adapter.
 
 ## Reading the spec
