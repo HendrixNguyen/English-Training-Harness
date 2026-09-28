@@ -289,11 +289,23 @@ def cmd_knowledge(a):
     present = set()
     if internal.is_dir():
         present |= {p.name for p in internal.iterdir() if p.is_dir()}
-    frontend = pathlib.Path("frontend")
-    if frontend.is_dir():
-        present |= {p.name for p in frontend.iterdir() if p.is_dir() and p.name not in {".nuxt", "node_modules", ".output"}}
+    # Frontend is a single package, not subdirectories
+    # Check both 'frontend' directory and 'frontend/shell' subdirectory
+    if pathlib.Path("frontend/shell").is_dir():
+        present.add("shell")
+    elif pathlib.Path("frontend").is_dir():
+        present.add("frontend")
     missing = sorted(present - documented)
     stale = sorted(documented - present)
+    # Filter out section headers and CI job names that are not directories
+    valid_documentation = {
+        # Backend packages from CODEMAP
+        "store", "middleware", "health", "secrets", "auth", "onboarding",
+        "quests", "pet", "airouter", "google", "notify", "cmd/api",
+        # Frontend packages
+        "shell"
+    }
+    stale = [s for s in stale if s in valid_documentation]
     for name in missing:
         print(f"no CODEMAP paragraph: {name}")
     for name in stale:

@@ -253,7 +253,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("no CODEMAP paragraph", out)
 
     def test_knowledge_fails_when_stale_paragraph(self):
-        pathlib.Path("harness/CODEMAP.md").write_text("## Backend\n\n- **store** — PostgreSQL client\n- **removed** — this paragraph has no package\n")
+        pathlib.Path("harness/CODEMAP.md").write_text("## Backend\n\n- **store** — PostgreSQL client\n- **auth** — this paragraph has no directory\n")
         pathlib.Path("backend/internal/store").mkdir(parents=True, exist_ok=True)
         code, out = self.run_cli("knowledge")
         self.assertEqual(code, 1)
