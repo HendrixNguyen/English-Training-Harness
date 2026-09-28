@@ -285,27 +285,37 @@ def cmd_knowledge(a):
         print("error: harness/CODEMAP.md not found"); return 1
     documented = {m.group(1) for l in codemap.read_text().splitlines()
                   for m in [re.match(r"- \*\*([^*]+)\*\*", l)] if m}
+    # Known package directory mappings
+    package_dirs = set()
+    
+    # Backend internal packages
     internal = pathlib.Path("backend/internal")
-    present = set()
     if internal.is_dir():
-        present |= {p.name for p in internal.iterdir() if p.is_dir()}
-    # Frontend is a single package, not subdirectories
-    # Check both 'frontend' directory and 'frontend/shell' subdirectory
-    if pathlib.Path("frontend/shell").is_dir():
-        present.add("shell")
-    elif pathlib.Path("frontend").is_dir():
-        present.add("frontend")
-    missing = sorted(present - documented)
-    stale = sorted(documented - present)
-    # Filter out section headers and CI job names that are not directories
-    valid_documentation = {
-        # Backend packages from CODEMAP
+        package_dirs |= {p.name for p in internal.iterdir() if p.is_dir()}
+    
+    # Special case: cmd/api maps to backend/cmd/api
+    cmd_api_dir = pathlib.Path("backend/cmd/api")
+    if cmd_api_dir.is_dir():
+        package_dirs.add("cmd/api")
+    
+    # Special case: frontend/shell maps to frontend/ directory
+    frontend_dir = pathlib.Path("frontend")
+    if frontend_dir.is_dir():
+        package_dirs.add("shell")
+    
+    missing = sorted(package_dirs - documented)
+    stale = sorted(documented - package_dirs)
+    # Filter out section headers and CI job names that are not actual packages
+    valid_packages = {
+        # Backend packages
         "store", "middleware", "health", "secrets", "auth", "onboarding",
-        "quests", "pet", "airouter", "google", "notify", "cmd/api",
-        # Frontend packages
+        "quests", "pet", "airouter", "google", "notify",
+        # cmd package
+        "cmd/api",
+        # Frontend package
         "shell"
     }
-    stale = [s for s in stale if s in valid_documentation]
+    stale = [s for s in stale if s in valid_packages]
     for name in missing:
         print(f"no CODEMAP paragraph: {name}")
     for name in stale:
@@ -313,7 +323,7 @@ def cmd_knowledge(a):
     if missing or stale:
         print(f"knowledge drift: {len(missing)} undocumented, {len(stale)} stale")
         return 1
-    print(f"knowledge ok: {len(present)} packages documented")
+    print(f"knowledge ok: {len(package_dirs)} packages documented")
     return 0
 
 
