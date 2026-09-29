@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/parseorigins-accepts-frontend-origin-entries-no-browser-send.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-25-medium-parseorigins-accepts-frontend-origin-entries-no-browser-send
 worktree: .worktrees/parseorigins-accepts-frontend-origin-entries-no-browser-send
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # middleware: `ParseOrigins` refuses origins no browser sends, and lookalikes are pinned to 403 — Plan
 

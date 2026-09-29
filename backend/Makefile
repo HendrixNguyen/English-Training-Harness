@@ -3,23 +3,44 @@
 test:
 	go test ./...
 
-# The Go process does not read .env; export it first:
-#   set -a; . ./.env; set +a; make run
+# The Go process does not read .env. `make run` sources it here, in this
+# recipe's own shell (make runs each recipe line in a fresh /bin/sh), so
+# nothing from .env — least of all a TEST_* variable, which would un-gate the
+# destructive integration tests — leaks into your interactive shell.
+#   cp .env.example .env   # once; then edit, then:
+#   make run
 run:
-	go run ./cmd/api
+	@test -f .env || { echo ".env missing: cp .env.example .env, then edit it"; exit 1; }
+	set -a; . ./.env; set +a; exec go run ./cmd/api
 
 tidy:
 	go mod tidy
 
-# What CI's backend-unit job runs, so a branch can be checked before it is pushed.
-.PHONY: fmt-check vet check
+# What CI's backend-unit job runs, so a branch can be checked before it is
+# pushed — including its first step: the unit suite must prove it needs no
+# service (an exported TEST_* would also un-gate the destructive integration
+# tests and run them without -p 1).
+.PHONY: no-service-vars build fmt-check vet check
+no-service-vars:
+	@for v in DATABASE_URL REDIS_URL TEST_DATABASE_URL TEST_REDIS_URL; do \
+	  if [ -n "$$(printenv "$$v")" ]; then \
+	    echo "$$v is set: make check mirrors CI's backend-unit, which runs with no service variables (unset $$v, or run it in a subshell)"; exit 1; \
+	  fi; \
+	done
+
+build:
+	go build ./...
+
+# gofmt -l exits 2 on a file it cannot parse and lists nothing; fail on that
+# too, or a syntax error would pass this check (the message is already on stderr).
 fmt-check:
-	@unformatted=$$(gofmt -l .); if [ -n "$$unformatted" ]; then echo "gofmt -l:"; echo "$$unformatted"; exit 1; fi
+	@unformatted=$$(gofmt -l .) || { echo "gofmt -l failed (see above)"; exit 1; }; \
+	if [ -n "$$unformatted" ]; then echo "gofmt -l:"; echo "$$unformatted"; exit 1; fi
 
 vet:
 	go vet ./...
 
-check: fmt-check vet
+check: no-service-vars build fmt-check vet
 	go test ./... -count=1 -race
 
 # Ports come from .env (copy .env.example). Set REDIS_PORT / POSTGRES_PORT there
@@ -41,6 +62,9 @@ down:
 # internal/store destructively drops/recreates the schema around its own
 # tests, so running packages' test binaries in parallel (go test's default)
 # races. See .github/workflows/ci.yml's backend-integration job.
+# -race: three of these tests drive shared code from eight goroutines (pet
+# Ensure and PenaliseMiss, store Migrate) — the only place the real
+# repositories are exercised concurrently.
 .PHONY: test-integration
 test-integration:
-	go test ./... -count=1 -v -run Integration -p 1
+	go test ./... -count=1 -v -run Integration -p 1 -race

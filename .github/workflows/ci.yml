@@ -2,18 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main, 'harness/**']
+    # production: every commit on it must prove itself here before
+    # deploy.yml ships it (deploy.yml runs on this workflow's completion).
+    branches: [main, production, 'harness/**', 'release/**', 'hotfix/**']
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  # Branches: one group per ref, superseded runs cancelled. main: one group per
-  # commit, so back-to-back merges each finish their own run (a shared group
-  # would cancel the *pending* run when a third push arrives).
-  group: ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Branches: one group per ref, superseded runs cancelled. main and
+  # production: one group per commit, so back-to-back merges each finish their
+  # own run (a shared group would cancel the *pending* run when a third push
+  # arrives) — and a cancelled production run would never ship.
+  group: ci-${{ github.workflow }}-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/production' }}
 
 jobs:
   backend-unit:
@@ -103,7 +106,10 @@ jobs:
           # another's, so results become order- and timing-dependent. -p 1
           # runs one package's test binary at a time; within a package,
           # tests still run in their own declared order/parallelism.
-          go test ./... -count=1 -v -run Integration -p 1 2>&1 | tee integration.log
+          # -race: three of these tests drive shared code from eight goroutines
+          # (pet Ensure and PenaliseMiss, store Migrate) — the only place the
+          # real repositories are exercised concurrently.
+          go test ./... -count=1 -v -run Integration -p 1 -race 2>&1 | tee integration.log
           want=$(grep -rho '^func TestIntegration[A-Za-z0-9_]*' --include='*_test.go' . | wc -l | tr -d ' ')
           got=$(grep -c '^--- PASS: TestIntegration' integration.log || true)
           if grep -q '^--- SKIP' integration.log; then
@@ -180,7 +186,7 @@ jobs:
           for _ in $(seq 1 20); do curl -sf --max-time 2 http://127.0.0.1:18081/healthz >/dev/null && break; sleep 1; done
           docker run --rm --entrypoint sh aelp-web:ci -c 'grep -rql "api.example.test" /srv' \
             || { echo "::error::NUXT_PUBLIC_API_BASE build arg did not reach the generated site"; exit 1; }
-          deploy/smoke-web.sh http://127.0.0.1:18081
+          SMOKE_WEB_ASSET_404=1 deploy/smoke-web.sh http://127.0.0.1:18081
           docker stop web
       - name: Production compose file is valid
         run: |

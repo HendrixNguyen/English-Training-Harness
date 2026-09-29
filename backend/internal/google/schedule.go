@@ -4,6 +4,8 @@
 package google
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -92,22 +94,46 @@ func (e Event) payload() map[string]any {
 	return p
 }
 
-// PracticeEventID is the client-supplied Calendar id of a user's recurring
-// practice block: "aelp" + the user id lower-cased with every character
-// outside base32hex ([a-v0-9]) dropped — a UUID's 32 hex digits are a subset.
-// Calendar v3 events.insert accepts 5–1024 such characters. Deterministic per
-// user, so a repeat insert (after a SaveSyncState failure or a client
-// disconnect) is a 409 from Google rather than a second event: that is what
-// makes the insert idempotent.
-func PracticeEventID(userID string) string {
-	var b strings.Builder
-	b.WriteString("aelp")
-	for _, r := range strings.ToLower(userID) {
-		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'v') {
-			b.WriteRune(r)
+// isCanonicalUUID reports whether s (already lower-cased) is a UUID in its
+// canonical 8-4-4-4-12 hyphenated form.
+func isCanonicalUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i, r := range s {
+		switch i {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+				return false
+			}
 		}
 	}
-	return b.String()
+	return true
+}
+
+// PracticeEventID is the client-supplied Calendar id of a user's recurring
+// practice block, always "aelp" + 32 lower-case base32hex characters
+// ([a-v0-9]) — Calendar v3 events.insert accepts 5–1024 such characters and
+// this stays comfortably inside that bound for every input.
+//
+// A canonical UUID (users.id's own type) keeps today's mapping — its 32 hex
+// digits, hyphens dropped — unchanged: live google_sync.calendar_event_id
+// rows and the retry's 409-consumption depend on that exact id. Any other
+// string (no caller passes one today: auth.UserID is the JWT subject issued
+// from users.id UUID) is hashed instead, so the 5–1024/base32hex postcondition
+// holds even for input the old hex-filter would collapse to "" or to a value
+// two different users could share.
+func PracticeEventID(userID string) string {
+	lower := strings.ToLower(userID)
+	if isCanonicalUUID(lower) {
+		return "aelp" + strings.ReplaceAll(lower, "-", "")
+	}
+	sum := sha256.Sum256([]byte(userID))
+	return "aelp" + hex.EncodeToString(sum[:])[:32]
 }
 
 // PracticeEvent builds the 30-minute daily block starting at the next

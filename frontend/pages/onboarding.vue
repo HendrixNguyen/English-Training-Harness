@@ -13,7 +13,7 @@ const GOALS = [
 function assessErrorMessage(e: unknown): string {
   if (e instanceof ApiError && e.code === 'rate_limited') return 'Bạn vừa gửi quá nhiều lần. Đợi một phút rồi thử lại.'
   if (e instanceof ApiError && e.code.startsWith('ai_')) return 'Máy chủ AI đang bận, chưa chấm được bài. Thử lại sau ít phút.'
-  if (e instanceof ApiError && e.code === 'invalid_request') return 'Máy chủ không nhận thông tin đã gửi. Kiểm tra lại mục tiêu và giờ nhắc học rồi thử lại.'
+  if (e instanceof ApiError && e.code === 'invalid_request') return 'Máy chủ không nhận thông tin đã gửi. Kiểm tra lại mục tiêu, tên cây và giờ nhắc học rồi thử lại.'
   return 'Không tạo được lộ trình. Thử lại.'
 }
 
@@ -26,7 +26,12 @@ const time = ref('20:00')
 /** <input type="time"> yields HH:MM, or '' once cleared; §6.1 wants HH:MM:SS, built in next(). */
 const TIME_RE = /^\d{2}:\d{2}$/
 const timeValid = computed(() => TIME_RE.test(time.value))
-const canStart = computed(() => goal.value !== null && timeValid.value)
+const plantName = ref('')
+/** Any script's letters and digits, plus spaces — the design's inline rule (plant-name §1). */
+const PLANT_NAME_RE = /^[\p{L}\p{N} ]{1,30}$/u
+const plantNameTrimmed = computed(() => plantName.value.trim())
+const plantNameValid = computed(() => plantNameTrimmed.value === '' || PLANT_NAME_RE.test(plantNameTrimmed.value))
+const canStart = computed(() => goal.value !== null && timeValid.value && plantNameValid.value)
 const questions = ref<QuizQuestion[]>([])
 const index = ref(0)
 const answers = ref<Record<string, string>>({})
@@ -68,6 +73,7 @@ async function next() {
       target_goal: goal.value!,
       notification_time: `${time.value}:00`,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      ...(plantNameTrimmed.value ? { plant_name: plantNameTrimmed.value } : {}),
       answers: Object.entries(answers.value).map(([question_id, selected_option]) => ({ question_id, selected_option })),
     })
     step.value = 'result'
@@ -95,6 +101,11 @@ async function finish() {
       <div class="mt-4 flex gap-3" role="radiogroup" aria-label="Mục tiêu">
         <GoalCard v-for="g in GOALS" :key="g.value" :label="g.label" :emoji="g.emoji" :selected="goal === g.value" @select="goal = g.value" />
       </div>
+      <label class="mt-6 block">
+        <span class="text-sm text-mute">Đặt tên cho cây của bạn (không bắt buộc)</span>
+        <input v-model="plantName" name="plant_name" type="text" maxlength="30" autocomplete="off" enterkeyhint="done" placeholder="Mầm Non" :aria-invalid="!plantNameValid || undefined" :aria-describedby="plantNameValid ? undefined : 'plant-name-note'" class="mt-1 block w-full rounded-btn border border-ink/15 bg-transparent px-3 py-2 dark:border-paper/15">
+        <span v-if="!plantNameValid" id="plant-name-note" class="mt-1 block text-sm text-alert" role="note">Tên cây dài 1–30 ký tự, chỉ gồm chữ, số và dấu cách.</span>
+      </label>
       <label class="mt-6 block">
         <span class="text-sm text-mute">Chọn giờ nhắc học hằng ngày</span>
         <input v-model="time" type="time" required :aria-invalid="!timeValid || undefined" class="mt-1 block w-full rounded-btn border border-ink/15 bg-transparent px-3 py-2 dark:border-paper/15">

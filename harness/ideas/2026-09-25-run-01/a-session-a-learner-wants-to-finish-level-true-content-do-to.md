@@ -1,9 +1,10 @@
 ---
 type: feature
-status: proposed
+status: planned
 source: human
 run: 2026-09-25-run-01
 priority: high
+plan: harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md
 ---
 # A session a learner wants to finish: level-true content, do-to-complete tasks, feedback and growth every task
 
@@ -32,3 +33,16 @@ Technical:
 - `pages/learn/[id].vue:26-27,44-47,112`: timer started on open, button disabled until `remainingSeconds === 0`; `components/learn/CountdownTimer.vue`; no answer feedback anywhere in `ContentViewer.vue`.
 - Spec: frontend §6.1 (gamified minimalist, micro-animated), §7.2 (dashboard path + plant speech bubble), §7.3 (learning room wireframe); 1st-thinking §1 (30 min/day retention), §5.2 (daily loop).
 - Related ideas: `growth-moment-after-every-task-health-gain-streak-and-target` (planned, medium), `spaced-repetition-vocabulary-review-in-the-daily-quest`, `ai-graded-writing-practice-through-the-essay-grading-route`.
+
+## Evaluation
+_Evaluator, 2026-09-26 — daily decide (feature queue; owner idea, high)._
+
+**Select — high. Planned today: the backend part (level-true content + placement floor). The other three causes are owned elsewhere.**
+
+*Is the Why real?* Yes — the owner's first session, with database evidence. Of the four causes: (1) broken rendering is the inbox bug `59-of-84…` (backend contract done on the typed-content branch; regenerate route planned today; frontend = retro learning room, plan 3); (2) do-to-complete and (4) per-answer reward are exactly `harness/designs/retro-learning-room.md` (XP in the top bar, "Trúng!/Trượt…", chest) plus the draft `growth-moment` plan; (3) content below the learner is not owned by anything yet — that is this plan.
+
+*Root cause of (3), read on `main`:* `airouter.RoadmapUserPrompt` (`prompt.go:48`) passes only `Current CEFR level: A2` / `Target goal: Business English` / minutes — no descriptor of what the level means, no instruction to write in the goal's register, so a free model defaults to greetings and numbers. And the level itself: `onboarding.Bank` has two items per level A1–C1; the grader is an LLM asked to "estimate"; `ParsePlacement` accepts whatever level it returns. A learner who answers 10/10 (including the C1 items) can still be graded A2 by a weak free model, and nothing in Go contradicts it.
+
+*Achievable in one plan?* Yes, ≈3 h, backend only: (a) `airouter.LevelGuidance(level)` — a CEFR descriptor per level (vocabulary range, grammar, passage length, register) and an explicit goal-register instruction appended to `RoadmapUserPrompt`; (b) a deterministic placement floor `onboarding.GradeFloor(answers)` — the highest level at which both bank items are correct with every lower level at least half right — applied as `level = max(ai, floor)` in `Assess`, logged. The calibration tap ("too easy / about right / too hard") is frontend (retro onboarding, plan 4) on top of today's regenerate route (`cefr_level` ± 1) — not here.
+
+*Priority.* High — the roadmap the regenerate route produces must be worth doing; auto-approved.

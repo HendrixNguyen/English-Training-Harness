@@ -1,6 +1,10 @@
 package airouter
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+	"strconv"
+)
 
 // Config is everything NewRouter needs. Keys are the backend spec §9 / §8
 // variables; base URLs and models are optional overrides (tests, proxies,
@@ -11,6 +15,10 @@ type Config struct {
 	GeminiAPIKey  string
 	GeminiBaseURL string
 	GeminiModel   string
+	// GeminiThinkingBudget is GEMINI_THINKING_BUDGET (gemini.go has the full
+	// contract): 0 = no thinking, the default for this strict-JSON workload;
+	// -1 = Google's dynamic budget; a positive number = a fixed cap.
+	GeminiThinkingBudget int
 
 	OpenAIAPIKey  string
 	OpenAIBaseURL string
@@ -33,10 +41,20 @@ func ConfigFromEnv(lookup func(string) string) Config {
 		}
 		return v
 	}
+	thinkingBudget := DefaultGeminiThinkingBudget
+	if v := lookup("GEMINI_THINKING_BUDGET"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			thinkingBudget = n
+		} else {
+			log.Printf("airouter: GEMINI_THINKING_BUDGET=%q is not an integer, defaulting to %d", v, DefaultGeminiThinkingBudget)
+		}
+	}
+
 	return Config{
-		GeminiAPIKey:  lookup("GEMINI_API_KEY"),
-		GeminiBaseURL: or(lookup("GEMINI_BASE_URL"), DefaultGeminiBaseURL),
-		GeminiModel:   or(lookup("GEMINI_MODEL"), DefaultGeminiModel),
+		GeminiAPIKey:         lookup("GEMINI_API_KEY"),
+		GeminiBaseURL:        or(lookup("GEMINI_BASE_URL"), DefaultGeminiBaseURL),
+		GeminiModel:          or(lookup("GEMINI_MODEL"), DefaultGeminiModel),
+		GeminiThinkingBudget: thinkingBudget,
 
 		OpenAIAPIKey:  lookup("OPENAI_API_KEY"),
 		OpenAIBaseURL: or(lookup("OPENAI_BASE_URL"), DefaultOpenAIBaseURL),
@@ -55,7 +73,7 @@ func ConfigFromEnv(lookup func(string) string) Config {
 func NewRouter(cfg Config) *Router {
 	providers := map[ProviderType]LLMProvider{}
 	if cfg.GeminiAPIKey != "" {
-		providers[ProviderGemini] = NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiBaseURL, cfg.GeminiModel, cfg.HTTPClient)
+		providers[ProviderGemini] = NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiBaseURL, cfg.GeminiModel, cfg.GeminiThinkingBudget, cfg.HTTPClient)
 	}
 	if cfg.OpenAIAPIKey != "" {
 		providers[ProviderOpenAI] = NewOpenAICompatibleProvider(cfg.OpenAIBaseURL, cfg.OpenAIAPIKey, cfg.OpenAIModel, cfg.HTTPClient)

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -20,3 +20,8 @@ priority: low
 - `backend/internal/onboarding/service.go:131-165` on `c4c8873`: `routeJSON` loops `attempt < 2`, and each attempt calls `route()`, which does `context.WithTimeout(ctx, airouter.TaskTimeout(task))`.
 - `backend/cmd/api/server.go:26-31` (comment acknowledges "one malformed-body retry each").
 - `frontend/pages/onboarding.vue` waiting copy: "thường mất 1–2 phút".
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Needs a malformed first roadmap and a slow second one; the copy promise (1–2 min) is the user-visible part. Next free bug slot after the provider-timeout items, planned as one overall `Assess` deadline.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Select — low, not planned today.** `onboarding/service.go` is edited by three `done`-but-unmerged branches (`…59-of-84…`, `…a-session-a-learner-wants-to-finish-level-true…`, `…name-your-plant…`). Plan it together with `two-concurrent-assessment-submits…` and the `level-result-in-30-seconds` feature (F4 today, draft) once they are on `main`: with the roadmap generated as a background job the cap becomes a job property, and one `roadmap:gen:{user_id}` key guards both.

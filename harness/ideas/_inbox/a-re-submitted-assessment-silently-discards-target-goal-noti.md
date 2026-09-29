@@ -68,3 +68,7 @@ reporting success for it — is a separate, undesigned behaviour.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Confirmed: `onboarding/service.go:48-60` returns `status: success` without writing `timezone`/`notification_time`/`target_goal` when a roadmap is active. Not the first-run happy path, but `timezone` drives `day_number` and the pet sweep, and `POST /settings/notifications` (notify branch, unmerged) will become the second writer of `notification_time`/`timezone` — the plan should update the three profile fields on re-submit (keeping roadmap and CEFR) and pin it with a test, coordinated with notify's `UpdateSettings` so the two writers validate identically.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Not planned today — file conflict.** Needs `onboarding/service.go` + `repo.go`; done-but-unmerged `…59-of-84-roadmap-tasks…`, `…name-your-plant…` and `…a-session-a-learner-wants…` all edit them. Note for the plan: `POST /settings/notifications` (notify) is now live on `main` — the re-submit path should write `target_goal`/`timezone`/`notification_time` in one UPDATE with the same validation, and say that the pending reminder re-slots from the new prefs on its next fire.

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -115,5 +116,38 @@ func TestRequireAcceptsACaseInsensitiveBearerScheme(t *testing.T) {
 		if w := get(t, r, header); w.Code != http.StatusOK {
 			t.Errorf("header %q → status %d, want 200 (RFC 7235: the scheme is case-insensitive)", header[:6], w.Code)
 		}
+	}
+}
+
+func TestRequireAnswers503WhenTheSessionStoreIsDown(t *testing.T) {
+	iss := NewTokenIssuer("secret", time.Now)
+	tok, err := iss.Issue("user-1")
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	sess := &fakeSessions{vals: map[string]string{}, ttls: map[string]time.Duration{}, err: fmt.Errorf("%w: dial", ErrSessionStoreUnavailable)}
+
+	w := get(t, newGuardedRouter(iss, sess), "Bearer "+tok)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503; body = %s", w.Code, w.Body.String())
+	}
+	if want := `"error":"unavailable"`; !strings.Contains(w.Body.String(), want) {
+		t.Errorf("body = %s, want %s", w.Body.String(), want)
+	}
+}
+
+func TestRequireStillAnswers401ForAMissingSession(t *testing.T) {
+	iss := NewTokenIssuer("secret", time.Now)
+	tok, err := iss.Issue("user-1")
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	sess := newFakeSessions() // no entry for user-1: ErrNoSession
+
+	w := get(t, newGuardedRouter(iss, sess), "Bearer "+tok)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401; body = %s", w.Code, w.Body.String())
 	}
 }

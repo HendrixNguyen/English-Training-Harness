@@ -6,10 +6,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -31,13 +33,13 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/store"
 )
 
-// petForOnboarding adapts *pet.Service to onboarding.Pet. onboarding defines
-// its own PetState so it never imports pet (pet imports quests; quests' tests
-// import onboarding — an import here would be a cycle).
+// petForOnboarding adapts *pet.Service.EnsureNamed to onboarding.Pet.
+// onboarding defines its own PetState so it never imports pet (pet imports
+// quests; quests' tests import onboarding — an import here would be a cycle).
 type petForOnboarding struct{ svc *pet.Service }
 
-func (p petForOnboarding) Ensure(ctx context.Context, userID string) (onboarding.PetState, error) {
-	st, err := p.svc.Ensure(ctx, userID)
+func (p petForOnboarding) Ensure(ctx context.Context, userID, plantName string) (onboarding.PetState, error) {
+	st, err := p.svc.EnsureNamed(ctx, userID, plantName)
 	if err != nil {
 		return onboarding.PetState{}, err
 	}
@@ -49,6 +51,11 @@ func main() {
 	// stops on SIGINT/SIGTERM instead of leaking past process shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// signal.NotifyContext keeps the handler installed until stop() runs. Call
+	// it the moment the context is done, so a second SIGINT/SIGTERM during the
+	// drain gets Go's default disposition and ends the process at once
+	// ("press Ctrl-C again to force"). defer stop() stays for the error paths.
+	go func() { <-ctx.Done(); stop() }()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -139,8 +146,9 @@ func main() {
 		time.Now,
 	)
 
+	var workers sync.WaitGroup
 	// Spec §8 hourly cron, in-process (§2.1). Sweeps at every :00 UTC.
-	go pet.RunHourly(ctx, petSvc)
+	workers.Go(func() { pet.RunHourly(ctx, petSvc) })
 
 	// Spec §2.1 reminder worker, in-process, polling the §4 queue:webpush:delay
 	// ZSET every 30 s. It starts only when both VAPID keys (spec §9) are set;
@@ -161,7 +169,7 @@ func main() {
 		time.Now,
 	)
 	if pushSender != nil {
-		go notify.RunWorker(ctx, notifySvc, notify.PollInterval)
+		workers.Go(func() { notify.RunWorker(ctx, notifySvc, notify.PollInterval) })
 	} else {
 		log.Printf("notify: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY unset; reminder settings are stored but no Web Push is sent")
 	}
@@ -196,14 +204,24 @@ func main() {
 	)
 	guarded.GET("/onboarding/quiz", onboarding.QuizHandler())
 	guarded.POST("/onboarding/assessment", onboarding.AssessmentHandler(onboardingSvc))
+	guarded.POST("/roadmaps/regenerate", onboarding.RegenerateHandler(onboardingSvc))
 
 	ln, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
 	log.Printf("listening on %s (GIN_MODE=%s)", ln.Addr(), cfg.GinMode)
-	if err := serve(ctx, newServer(r), ln); err != nil {
-		log.Fatalf("server: %v", err)
+	err = serve(ctx, newServer(r), ln, ShutdownGrace)
+	switch {
+	case errors.Is(err, ErrDrainTimedOut):
+		log.Printf("server: %v", err) // planned stop that ran long: not fatal, exit 0 (see ErrDrainTimedOut)
+	case err != nil:
+		log.Fatalf("server: %v", err) // the listener died: nothing was serving
+	}
+	// Both workers return on ctx.Done(); bound the join so a worker stuck in a
+	// store call cannot hold the process past Railway's kill window.
+	if !waitWithin(&workers, ShutdownGrace) {
+		log.Printf("shutdown: background workers did not stop within %s; closing stores anyway", ShutdownGrace)
 	}
 	log.Printf("shutdown complete") // main returns: deferred pg.Close / rdb.Close run
 }

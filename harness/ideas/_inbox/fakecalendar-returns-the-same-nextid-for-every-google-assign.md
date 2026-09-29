@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: rejected
 source: reviewer
 run: _inbox
 priority: low
+rejected_reason: "Folded into harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md: closed by its Task 2/3/4 on the same google branch"
 ---
 # fakeCalendar returns the same nextID for every Google-assigned insert so a second auto-id insert is a false 409
 
@@ -47,3 +48,5 @@ _Evaluator, 2026-09-24 — daily evaluate (AGENTS.md standing priority: rank on 
 **Select — low. Not planned today; plan with the other google test-double findings (`practiceeventid-is-a-lossy-filter-…`, `the-404-on-patch-fallback-…`) and the 409 mapping — one google branch.**
 
 *Confirmed from the idea's evidence (mutation re-run by the reviewer; not re-run here).* `backend/internal/google/fakes_test.go:65-82` returns one `nextID` for every Google-assigned insert and 409s on a repeat, which the real API never does. *Fix.* A per-insert counter (`nextID` + `-N`) or a `nextIDs` queue, so `known` 409s only on a repeated client-supplied id, and the plan's mutation check then fails on `len(h.cal.inserted) != 1` as predicted. Low: test-double fidelity; the guarded behaviour is correct.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Folded into `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` as Task 2.** Confirmed on `origin/main` `backend/internal/google/fakes_test.go:63-81`: `InsertEvent` returns `f.nextID` for every Google-assigned insert and then 409s on `f.known[id]`, so a second auto-id insert is a false 409 (the real API never repeats an assigned id). Task 2 gives the fake a per-insert counter — the first auto-id insert still returns `nextID`, so `TestAReservedButGoneIDFallsBackToAGoogleAssignedInsert` keeps its `evt_fresh` assertion; the n-th returns `<nextID>-<n>` — pins it with a fake-level test, and re-runs the earlier plan's `ev.ID = ""` mutation so `TestAFailedSaveAfterTheEventInsertDoesNotCreateASecondEvent` fails on `len(h.cal.inserted) != 1`, the symptom it guards. Status becomes `rejected` only as the harness's "closed by another plan" marker.

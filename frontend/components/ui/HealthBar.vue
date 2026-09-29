@@ -11,7 +11,7 @@ const barClass = computed(() => ({ growth: 'bg-growth', streak: 'bg-streak', ale
   <div class="flex items-center gap-3">
     <span class="text-sm text-mute">Máu cây:</span>
     <div class="h-2 flex-1 overflow-hidden rounded-full bg-mute/20" role="meter" :aria-valuenow="clamped" aria-valuemin="0" aria-valuemax="100" aria-label="Máu cây">
-      <div class="h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none" :class="barClass" :style="{ width: `${clamped}%` }" />
+      <div class="h-full rounded-full transition-[width] duration-[400ms] motion-reduce:transition-none" :class="barClass" :style="{ width: `${clamped}%` }" />
     </div>
     <span class="w-10 text-right text-sm font-semibold tabular-nums">{{ clamped }}%</span>
   </div>

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: proposed
+status: selected
 source: reviewer
 run: _inbox
 priority: low
@@ -36,3 +36,8 @@ rejected as overtaken, and its body never mentioned the UUID case — so nothing
 - Reproduced on origin/main `3f4242d` against `postgres:16-alpine`:
   `SELECT 1 FROM e WHERE id='not-a-uuid'` on a `uuid` column →
   `ERROR: invalid input syntax for type uuid: "not-a-uuid"`.
+
+## Evaluation
+_Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Wrong status (500 vs 400) with no data write; `binding:"required,uuid"` + one handler row. Low impact — a client never sends a non-UUID. Next free bug slot.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Select — low, not planned today.** Still true on `main`: `quests/handler.go` binds `ExerciseID` with `required` only. The fix is one tag (`binding:"required,uuid"`) but its test row lives in `quests/handler_test.go`, which three `done`-but-unmerged branches (`…get-quests-daily-still-reads…`, `…a-pet-state-failure…`, `…roadmap-tree-shows-the-real-plan…`) already edit — the 2026-09-26 review run did not produce the daily PR, so planning it against today's `main` would conflict at integration. First quests bug slot after that PR merges.
