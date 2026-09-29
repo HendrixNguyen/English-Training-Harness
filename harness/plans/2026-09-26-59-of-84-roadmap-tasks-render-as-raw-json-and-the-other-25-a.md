@@ -9,7 +9,7 @@ pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Roadmap regeneration: `POST /api/v1/roadmaps/regenerate` replaces the active roadmap (optionally one CEFR step up or down) so a roadmap stored before the typed-content contract can be re-made — Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Team:** Bug team — ticket **B2** of 2026-09-26. **Estimate:** 3.5 h. **Branch:** `harness/2026-09-26-high-59-of-84-roadmap-tasks-render-as-raw-json-and-the-other-25-a`.
 
@@ -67,41 +67,41 @@ The old roadmap's `exercises` rows stay (history); `daily_progress` and the pet 
 
 **Files:** `backend/internal/onboarding/repo.go`, `backend/internal/onboarding/integration_test.go`, `backend/internal/onboarding/fakes_test.go`.
 
-- [ ] **Step 1 (test first):** In `integration_test.go` add `TestIntegrationReplaceRoadmapDeactivatesPreviousAndKeepsHistory`: seed a user + `SaveAssessment` (existing helper pattern), call `ReplaceRoadmap(ctx, userID, "B2", fixtureRoadmap())`; assert `roadmaps` has 2 rows with exactly one `is_active`, the new one active; `exercises` count = 168 (84 old + 84 new); `users.cefr_current = 'B2'`; `target_goal`/`timezone`/`notification_time` unchanged. A second `ReplaceRoadmap` → still exactly one active. `ReplaceRoadmap` for an unknown user → `ErrUnknownUser`.
-- [ ] **Step 2:** `Profile` gains `TargetGoal string`; `profileSQL` becomes `SELECT COALESCE(cefr_current::text, 'A1'), COALESCE(target_goal, '') FROM users WHERE id = $1`; `Profile()` scans both.
-- [ ] **Step 3:** Add to the `Repo` interface: `// ReplaceRoadmap sets cefr_current, deactivates active roadmaps and inserts the new active roadmap with its 84 exercises, atomically. Returns the roadmap id.` `ReplaceRoadmap(ctx, userID, cefrLevel string, roadmap airouter.Roadmap) (string, error)`. Implement it by extracting the deactivate + insert + batch section of `SaveAssessment` into a private `insertActiveRoadmap(ctx, tx, userID, roadmap) (string, error)` used by both; `ReplaceRoadmap` runs `updateLevelSQL = UPDATE users SET cefr_current = $2::cefr_level WHERE id = $1` (0 rows → `ErrUnknownUser`) then `insertActiveRoadmap`, in one tx.
-- [ ] **Step 4:** `fakes_test.go`: the fake repo records `ReplaceRoadmap` calls (`replaceCalls []struct{level string; roadmap airouter.Roadmap}`), returns a fixed id or a scripted error; `Profile` returns a configurable `TargetGoal`.
-- [ ] **Step 5:** `go test -timeout 120s ./internal/onboarding -run 'Integration' -count=1 -p 1` green (with the test stack up). Commit: `onboarding: Repo.ReplaceRoadmap — swap the active roadmap and set cefr_current in one transaction`.
+- [x] **Step 1 (test first):** In `integration_test.go` add `TestIntegrationReplaceRoadmapDeactivatesPreviousAndKeepsHistory`: seed a user + `SaveAssessment` (existing helper pattern), call `ReplaceRoadmap(ctx, userID, "B2", fixtureRoadmap())`; assert `roadmaps` has 2 rows with exactly one `is_active`, the new one active; `exercises` count = 168 (84 old + 84 new); `users.cefr_current = 'B2'`; `target_goal`/`timezone`/`notification_time` unchanged. A second `ReplaceRoadmap` → still exactly one active. `ReplaceRoadmap` for an unknown user → `ErrUnknownUser`.
+- [x] **Step 2:** `Profile` gains `TargetGoal string`; `profileSQL` becomes `SELECT COALESCE(cefr_current::text, 'A1'), COALESCE(target_goal, '') FROM users WHERE id = $1`; `Profile()` scans both.
+- [x] **Step 3:** Add to the `Repo` interface: `// ReplaceRoadmap sets cefr_current, deactivates active roadmaps and inserts the new active roadmap with its 84 exercises, atomically. Returns the roadmap id.` `ReplaceRoadmap(ctx, userID, cefrLevel string, roadmap airouter.Roadmap) (string, error)`. Implement it by extracting the deactivate + insert + batch section of `SaveAssessment` into a private `insertActiveRoadmap(ctx, tx, userID, roadmap) (string, error)` used by both; `ReplaceRoadmap` runs `updateLevelSQL = UPDATE users SET cefr_current = $2::cefr_level WHERE id = $1` (0 rows → `ErrUnknownUser`) then `insertActiveRoadmap`, in one tx.
+- [x] **Step 4:** `fakes_test.go`: the fake repo records `ReplaceRoadmap` calls (`replaceCalls []struct{level string; roadmap airouter.Roadmap}`), returns a fixed id or a scripted error; `Profile` returns a configurable `TargetGoal`.
+- [x] **Step 5:** `go test -timeout 120s ./internal/onboarding -run 'Integration' -count=1 -p 1` green (with the test stack up). Commit: `onboarding: Repo.ReplaceRoadmap — swap the active roadmap and set cefr_current in one transaction`.
 
 ### Task 2: `Service.Regenerate`
 
 **Files:** `backend/internal/onboarding/service.go`, `types.go`, `service_test.go`.
 
-- [ ] **Step 1 (tests first), in `service_test.go` with the existing fakes:**
+- [x] **Step 1 (tests first), in `service_test.go` with the existing fakes:**
   - `TestRegenerateReplacesTheActiveRoadmapAtTheCurrentLevel`: active roadmap present, profile `B1`/goal `"Business English"`, generator scripted with `fixtureRoadmap()` JSON → one `Route` call with `TaskRoadmapGen`, user prompt contains `Current CEFR level: B1` and `Business English`; repo `replaceCalls` has one entry with level `B1`; result `RoadmapID` = fake id, `AssessedLevel` = `B1`; limiter called once.
   - `TestRegenerateAcceptsOneStepAndRejectsTwo`: table over (current, requested, want) — `B1,B2,ok` · `B1,A2,ok` · `B1,C1,ErrInvalidRequest` · `A1,A1,ok` · `C2,B2,ErrInvalidRequest` · `B1,"b2",ErrInvalidRequest` · `B1,"",ok→B1`; on error the limiter and generator are not called.
   - `TestRegenerateWithoutAnActiveRoadmapIs404`: `ActiveRoadmapID` ok=false → `ErrNoActiveRoadmap`; limiter not called.
   - `TestRegenerateAIFailureWritesNothing`: generator returns `airouter.ErrAllProvidersFailed` → error returned, `replaceCalls` empty; a malformed body twice → `ErrBadAIOutput`, `replaceCalls` empty.
-- [ ] **Step 2:** `types.go`: `RegenerateRequest{CEFRLevel string \`json:"cefr_level"\`}` and `RegenerateResult{Status, AssessedLevel, RoadmapID}` (json tags as in the contract).
-- [ ] **Step 3:** `service.go`: `var ErrNoActiveRoadmap = errors.New("onboarding: no active roadmap")`; `var cefrOrder = []string{"A1","A2","B1","B2","C1","C2"}`; `stepAllowed(current, requested string) bool` (index distance ≤ 1); `func (s *Service) Regenerate(ctx, userID string, req RegenerateRequest) (RegenerateResult, error)`: `ActiveRoadmapID` (ok=false → `ErrNoActiveRoadmap`) → `Profile` → level = `req.CEFRLevel` or `profile.CEFRCurrent`; `!cefrLevels[level] || !stepAllowed(...)` → `fmt.Errorf("%w: cefr_level must be within one step of %s", ErrInvalidRequest, current)` → `s.limiter.Allow` → `s.routeJSON(ctx, airouter.TaskRoadmapGen, airouter.RoadmapSystemPrompt, airouter.RoadmapUserPrompt(level, profile.TargetGoal, DailyMinutes), parse)` → `s.repo.ReplaceRoadmap(ctx, userID, level, roadmap)` → result. Log one line `onboarding: regenerated roadmap %s for %s at %s`.
-- [ ] **Step 4:** `go test -timeout 60s ./internal/onboarding -run Regenerate -v` green. Commit: `onboarding: Service.Regenerate — a fresh roadmap at the current level or one step away`.
+- [x] **Step 2:** `types.go`: `RegenerateRequest{CEFRLevel string \`json:"cefr_level"\`}` and `RegenerateResult{Status, AssessedLevel, RoadmapID}` (json tags as in the contract).
+- [x] **Step 3:** `service.go`: `var ErrNoActiveRoadmap = errors.New("onboarding: no active roadmap")`; `var cefrOrder = []string{"A1","A2","B1","B2","C1","C2"}`; `stepAllowed(current, requested string) bool` (index distance ≤ 1); `func (s *Service) Regenerate(ctx, userID string, req RegenerateRequest) (RegenerateResult, error)`: `ActiveRoadmapID` (ok=false → `ErrNoActiveRoadmap`) → `Profile` → level = `req.CEFRLevel` or `profile.CEFRCurrent`; `!cefrLevels[level] || !stepAllowed(...)` → `fmt.Errorf("%w: cefr_level must be within one step of %s", ErrInvalidRequest, current)` → `s.limiter.Allow` → `s.routeJSON(ctx, airouter.TaskRoadmapGen, airouter.RoadmapSystemPrompt, airouter.RoadmapUserPrompt(level, profile.TargetGoal, DailyMinutes), parse)` → `s.repo.ReplaceRoadmap(ctx, userID, level, roadmap)` → result. Log one line `onboarding: regenerated roadmap %s for %s at %s`.
+- [x] **Step 4:** `go test -timeout 60s ./internal/onboarding -run Regenerate -v` green. Commit: `onboarding: Service.Regenerate — a fresh roadmap at the current level or one step away`.
 
 ### Task 3: Handler and route
 
 **Files:** `backend/internal/onboarding/handler.go`, `handler_test.go`, `backend/cmd/api/main.go`.
 
-- [ ] **Step 1 (tests first), `handler_test.go` (same harness as the assessment handler tests):** rows — no body → `201` (level omitted); `{"cefr_level":"B2"}` → `201` with body `{"status":"success","assessed_level":"B2","roadmap_id":…}`; `{"cefr_level":"C1"}` from `B1` → `400 invalid_request`; malformed JSON → `400 invalid_request`; no active roadmap → `404 no_active_roadmap`; `ErrRateLimited` → `429`; `ErrNoProviders` → `503 ai_unavailable`; `ErrBadAIOutput` → `502 ai_bad_output`; `ErrAITimeout` → `504 ai_timeout`; `ErrAllProvidersFailed` → `502 ai_upstream_failed`; no `user_id` in context → `401`.
-- [ ] **Step 2:** `RegenerateHandler(svc *Service) gin.HandlerFunc`: user id from `auth.UserID`; body optional (`if c.Request.ContentLength != 0 { ShouldBindJSON }`); call `svc.Regenerate`; the same `switch` as `AssessmentHandler` plus `case errors.Is(err, ErrNoActiveRoadmap): 404 {"error":"no_active_roadmap"}`; success → `201`.
-- [ ] **Step 3:** `main.go`: after the onboarding routes, `guarded.POST("/roadmaps/regenerate", onboarding.RegenerateHandler(onboardingSvc))`.
-- [ ] **Step 4:** `go build ./... && go vet ./... && go test -timeout 120s ./internal/onboarding ./cmd/... -count=1`. Commit: `api: POST /api/v1/roadmaps/regenerate`.
+- [x] **Step 1 (tests first), `handler_test.go` (same harness as the assessment handler tests):** rows — no body → `201` (level omitted); `{"cefr_level":"B2"}` → `201` with body `{"status":"success","assessed_level":"B2","roadmap_id":…}`; `{"cefr_level":"C1"}` from `B1` → `400 invalid_request`; malformed JSON → `400 invalid_request`; no active roadmap → `404 no_active_roadmap`; `ErrRateLimited` → `429`; `ErrNoProviders` → `503 ai_unavailable`; `ErrBadAIOutput` → `502 ai_bad_output`; `ErrAITimeout` → `504 ai_timeout`; `ErrAllProvidersFailed` → `502 ai_upstream_failed`; no `user_id` in context → `401`.
+- [x] **Step 2:** `RegenerateHandler(svc *Service) gin.HandlerFunc`: user id from `auth.UserID`; body optional (`if c.Request.ContentLength != 0 { ShouldBindJSON }`); call `svc.Regenerate`; the same `switch` as `AssessmentHandler` plus `case errors.Is(err, ErrNoActiveRoadmap): 404 {"error":"no_active_roadmap"}`; success → `201`.
+- [x] **Step 3:** `main.go`: after the onboarding routes, `guarded.POST("/roadmaps/regenerate", onboarding.RegenerateHandler(onboardingSvc))`.
+- [x] **Step 4:** `go build ./... && go vet ./... && go test -timeout 120s ./internal/onboarding ./cmd/... -count=1`. Commit: `api: POST /api/v1/roadmaps/regenerate`.
 
 ### Task 4: Spec and CODEMAP
 
 **Files:** the two spec documents, `harness/CODEMAP.md`.
 
-- [ ] **Step 1:** Backend spec: under §6.1 (search `grep -n 'onboarding/assessment' "project-base/Adaptive English Learning Platform - Backend Technical Specification.md"`), add "6.1.3 `POST /api/v1/roadmaps/regenerate`" with the request/response block above (escape like the surrounding text). §7 endpoint table (if any) and the 1st-thinking §7 list (`grep -n 'Core REST'`) get one row each, marked "(added 2026-09-26)".
-- [ ] **Step 2:** CODEMAP `onboarding` bullet: one sentence on `Regenerate`/`ReplaceRoadmap` (route, step rule, single tx, old exercises kept, `day_number` restarts, Google rebuilds on next sync).
-- [ ] **Step 3:** Commit: `docs: roadmaps/regenerate in the specs and CODEMAP`.
+- [x] **Step 1:** Backend spec: under §6.1 (search `grep -n 'onboarding/assessment' "project-base/Adaptive English Learning Platform - Backend Technical Specification.md"`), add "6.1.3 `POST /api/v1/roadmaps/regenerate`" with the request/response block above (escape like the surrounding text). §7 endpoint table (if any) and the 1st-thinking §7 list (`grep -n 'Core REST'`) get one row each, marked "(added 2026-09-26)".
+- [x] **Step 2:** CODEMAP `onboarding` bullet: one sentence on `Regenerate`/`ReplaceRoadmap` (route, step rule, single tx, old exercises kept, `day_number` restarts, Google rebuilds on next sync).
+- [x] **Step 3:** Commit: `docs: roadmaps/regenerate in the specs and CODEMAP`.
 
 ## Verification
 From `backend/` in the worktree:
