@@ -1,9 +1,10 @@
 ---
 type: bug
-status: selected
+status: planned
 source: reviewer
 run: _inbox
 priority: low
+plan: harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md
 ---
 # CODEMAP does not document the config and health packages and still says three CI jobs
 
@@ -39,3 +40,7 @@ inbox, 2026-09-23.
 _Evaluator, 2026-09-23 — post-MVP inbox triage._
 
 **Select — low.** Documentation debt in the file every role reads first. The cmd/api hardening plan adds a `cmd/api` paragraph and names `GIN_MODE`; this idea adds `config` and `health` and fixes the job count. Ten minutes of executor time; batch with any CODEMAP-touching plan.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Planned — low, auto-approved.** The `health` half has since been done (CODEMAP has a `**health**` bullet). Still open: no `**config**` bullet, and the CI section says "Three" jobs while listing five. CODEMAP-only plan: `harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md`.

@@ -11,12 +11,17 @@ import (
 )
 
 type fakeRepo struct {
-	activeID  string // "" == none
-	profile   Profile
-	saved     []Assessment
-	nextID    string
-	saveErr   error
-	activeErr error
+	activeID     string // "" == none
+	profile      Profile
+	saved        []Assessment
+	nextID       string
+	saveErr      error
+	activeErr    error
+	replaceCalls []struct {
+		level   string
+		roadmap airouter.Roadmap
+	}
+	replaceErr error
 }
 
 func newFakeRepo() *fakeRepo { return &fakeRepo{profile: Profile{CEFRCurrent: "A1"}, nextID: "rm-new"} }
@@ -37,6 +42,19 @@ func (f *fakeRepo) SaveAssessment(_ context.Context, _ string, a Assessment) (st
 	f.saved = append(f.saved, a)
 	f.activeID = f.nextID
 	f.profile.CEFRCurrent = a.CEFRLevel
+	return f.nextID, nil
+}
+
+func (f *fakeRepo) ReplaceRoadmap(_ context.Context, _, level string, roadmap airouter.Roadmap) (string, error) {
+	if f.replaceErr != nil {
+		return "", f.replaceErr
+	}
+	f.replaceCalls = append(f.replaceCalls, struct {
+		level   string
+		roadmap airouter.Roadmap
+	}{level, roadmap})
+	f.activeID = f.nextID
+	f.profile.CEFRCurrent = level
 	return f.nextID, nil
 }
 
@@ -95,12 +113,19 @@ func (f *fakeLimiter) Allow(context.Context, string) error {
 
 type fakePet struct {
 	ensured int
+	names   []string
 	state   PetState
 	err     error
 }
 
-func (f *fakePet) Ensure(context.Context, string) (PetState, error) {
+func (f *fakePet) Ensure(_ context.Context, _ string, plantName string) (PetState, error) {
 	f.ensured++
+	f.names = append(f.names, plantName)
+	if plantName != "" {
+		st := f.state
+		st.PlantName = plantName
+		return st, f.err
+	}
 	return f.state, f.err
 }
 

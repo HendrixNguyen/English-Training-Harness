@@ -2,7 +2,7 @@
 idea: harness/ideas/2026-09-25-run-01/ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo.md
 status: done
 priority: high
-merged: false
+merged: true
 branch: harness/2026-09-25-high-ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo
 worktree: .worktrees/ship-on-merge-a-deploy-workflow-that-builds-the-pwa-and-uplo
 ---

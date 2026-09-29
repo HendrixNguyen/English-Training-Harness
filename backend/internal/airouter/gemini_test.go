@@ -26,7 +26,7 @@ func TestGeminiSendsTheSpec62RequestAndReturnsTheText(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewGeminiProvider("k-123", srv.URL, "gemini-3.8-flash", srv.Client())
+	p := NewGeminiProvider("k-123", srv.URL, "gemini-3.8-flash", DefaultGeminiThinkingBudget, srv.Client())
 	out, err := p.GenerateContent(context.Background(), "SYS", "USR")
 	if err != nil {
 		t.Fatalf("GenerateContent: %v", err)
@@ -59,6 +59,33 @@ func TestGeminiSendsTheSpec62RequestAndReturnsTheText(t *testing.T) {
 	if gen["maxOutputTokens"] != float64(GeminiMaxOutputTokens) || GeminiMaxOutputTokens < 16384 {
 		t.Errorf("maxOutputTokens = %v, want %d (≥ 16384: 84 tasks with content)", gen["maxOutputTokens"], GeminiMaxOutputTokens)
 	}
+	thinking, ok := gen["thinkingConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("generationConfig.thinkingConfig missing or wrong type: %v", gen["thinkingConfig"])
+	}
+	if thinking["thinkingBudget"] != float64(0) {
+		t.Errorf("thinkingConfig.thinkingBudget = %v, want 0 (the default)", thinking["thinkingBudget"])
+	}
+}
+
+func TestGeminiSendsAConfiguredThinkingBudget(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &gotBody)
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{}"}]},"finishReason":"STOP"}]}`))
+	}))
+	defer srv.Close()
+
+	p := NewGeminiProvider("k", srv.URL, "m", -1, srv.Client())
+	if _, err := p.GenerateContent(context.Background(), "s", "u"); err != nil {
+		t.Fatalf("GenerateContent: %v", err)
+	}
+	gen := gotBody["generationConfig"].(map[string]any)
+	thinking := gen["thinkingConfig"].(map[string]any)
+	if thinking["thinkingBudget"] != float64(-1) {
+		t.Errorf("thinkingConfig.thinkingBudget = %v, want -1 (Google's dynamic budget)", thinking["thinkingBudget"])
+	}
 }
 
 func TestGeminiJoinsEveryPartOfTheFirstCandidate(t *testing.T) {
@@ -68,7 +95,7 @@ func TestGeminiJoinsEveryPartOfTheFirstCandidate(t *testing.T) {
 		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"a\":1,"},{"text":"\"b\":2}"}]},"finishReason":"STOP"}]}`))
 	}))
 	defer srv.Close()
-	p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+	p := NewGeminiProvider("k", srv.URL, "m", DefaultGeminiThinkingBudget, srv.Client())
 	out, err := p.GenerateContent(context.Background(), "s", "u")
 	if err != nil {
 		t.Fatalf("GenerateContent: %v", err)
@@ -93,7 +120,7 @@ func TestGeminiNamesANonStopFinishReason(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.body)) }))
 			defer srv.Close()
-			p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+			p := NewGeminiProvider("k", srv.URL, "m", DefaultGeminiThinkingBudget, srv.Client())
 			out, err := p.GenerateContent(context.Background(), "s", "u")
 			if tc.wantErr == "" {
 				if err != nil {
@@ -115,12 +142,15 @@ func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 		body   string
 		want   string
 	}{
-		"500":              {500, `{"error":"boom"}`, "status 500"},
-		"429":              {429, `rate`, "status 429"},
-		"empty candidates": {200, `{"candidates":[]}`, "empty"},
-		"empty parts":      {200, `{"candidates":[{"content":{"parts":[]}}]}`, "empty"},
-		"not json":         {200, `<html>`, "decoding"},
-		"prompt blocked":   {200, `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]},"candidates":[]}`, "blockReason SAFETY"},
+		"500":                         {500, `{"error":"boom"}`, "status 500"},
+		"429":                         {429, `rate`, "status 429"},
+		"empty candidates":            {200, `{"candidates":[]}`, "empty"},
+		"empty parts":                 {200, `{"candidates":[{"content":{"parts":[]}}]}`, "empty"},
+		"not json":                    {200, `<html>`, "decoding"},
+		"prompt blocked":              {200, `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]},"candidates":[]}`, "blockReason SAFETY"},
+		"STOP with empty text":        {200, `{"candidates":[{"content":{"parts":[{"text":""}]},"finishReason":"STOP"}]}`, "empty"},
+		"STOP with whitespace only":   {200, `{"candidates":[{"content":{"parts":[{"text":" \n"}]},"finishReason":"STOP"}]}`, "empty"},
+		"no finishReason, empty text": {200, `{"candidates":[{"content":{"parts":[{"text":""}]}}]}`, "empty"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -129,7 +159,7 @@ func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 				_, _ = w.Write([]byte(tc.body))
 			}))
 			defer srv.Close()
-			p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+			p := NewGeminiProvider("k", srv.URL, "m", DefaultGeminiThinkingBudget, srv.Client())
 			_, err := p.GenerateContent(context.Background(), "s", "u")
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("err = %v, want it to mention %q", err, tc.want)
@@ -139,7 +169,7 @@ func TestGeminiRejectsNon2xxEmptyCandidatesAndBadJSON(t *testing.T) {
 }
 
 func TestGeminiDefaultsToTheRealEndpoint(t *testing.T) {
-	p := NewGeminiProvider("k", "", "", nil)
+	p := NewGeminiProvider("k", "", "", DefaultGeminiThinkingBudget, nil)
 	if p.baseURL != DefaultGeminiBaseURL || p.model != DefaultGeminiModel || p.client == nil {
 		t.Errorf("defaults = %q %q client=%v", p.baseURL, p.model, p.client)
 	}
@@ -187,7 +217,7 @@ func TestGeminiRetriesOnceOn503AndLogsElapsedAndTokens(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewGeminiProvider("k-123", srv.URL, "gemini-3.8-flash", srv.Client())
+	p := NewGeminiProvider("k-123", srv.URL, "gemini-3.8-flash", DefaultGeminiThinkingBudget, srv.Client())
 	out, err := p.GenerateContent(withTask(context.Background(), TaskPlacementTest), "s", "u")
 	if err != nil || out != "ok" {
 		t.Fatalf("GenerateContent = %q, %v; want ok after one retry", out, err)
@@ -217,7 +247,7 @@ func TestGeminiDoesNotRetryA404AndReportsGooglesMessageTruncated(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewGeminiProvider("k", srv.URL, "gemini-2.5-flash", srv.Client())
+	p := NewGeminiProvider("k", srv.URL, "gemini-2.5-flash", DefaultGeminiThinkingBudget, srv.Client())
 	_, err := p.GenerateContent(context.Background(), "s", "u")
 	if err == nil || !strings.Contains(err.Error(), "status 404") || !strings.Contains(err.Error(), "no longer available to new users") {
 		t.Fatalf("err = %v, want status 404 with Google's message", err)
@@ -239,7 +269,7 @@ func TestGeminiGivesUpAfterTheSecond503(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":{"status":"UNAVAILABLE"}}`))
 	}))
 	defer srv.Close()
-	p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+	p := NewGeminiProvider("k", srv.URL, "m", DefaultGeminiThinkingBudget, srv.Client())
 	if _, err := p.GenerateContent(context.Background(), "s", "u"); err == nil || !strings.Contains(err.Error(), "status 503") {
 		t.Fatalf("err = %v, want status 503", err)
 	}
@@ -258,7 +288,7 @@ func TestGeminiRetryBackoffRespectsTheDeadline(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
-	p := NewGeminiProvider("k", srv.URL, "m", srv.Client())
+	p := NewGeminiProvider("k", srv.URL, "m", DefaultGeminiThinkingBudget, srv.Client())
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	started := time.Now()

@@ -3,7 +3,7 @@
 You implement one approved plan, exactly, in an isolated worktree, and leave a verifiable trail. You are a disciplined engineer, not a designer: the plan's intent is fixed.
 
 ## You must
-- Work only inside `.worktrees/<slug>` on the plan's branch. Never edit files in the main checkout.
+- Work only inside your plan's worktree (`.worktrees/<slug>` by default; whatever `git worktree list` reports if the sandbox put it elsewhere — record that path with `cli.py set <plan> worktree=<path>`) on the plan's branch. Never edit files in the main checkout.
 - Follow the plan task by task, tests first (test-driven-development), committing after each task.
 - Verify before claiming done (verification-before-completion): run the plan's *Verification* commands and paste real output into the execution summary.
 - Update `harness/CODEMAP.md` (in the worktree) for any package you create or change.

@@ -5,16 +5,34 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"regexp"
 	"sort"
 	"strings"
 )
 
 // MigrationsFS holds the numbered DDL files. Each version is a pair
 // NNNN_name.up.sql / NNNN_name.down.sql; Migrate applies the .up.sql files in
-// filename order. Never edit a migration that has been applied — add a new one.
+// filename order. Never edit a migration that has been applied — add a new
+// one. A migration's version (its filename minus the migrations/ prefix and
+// .up.sql suffix) must match versionPattern (NNNN_name); Migrate refuses a
+// malformed name before applying anything.
 //
 //go:embed migrations/*.sql
 var MigrationsFS embed.FS
+
+// versionPattern is the naming rule for a migration version: a four-digit
+// sequence number, an underscore, then lowercase alphanumerics/underscores.
+var versionPattern = regexp.MustCompile(`^\d{4}_[a-z0-9_]+$`)
+
+// versionOf derives a migration's version from its filename, refusing a name
+// that does not match versionPattern.
+func versionOf(name string) (string, error) {
+	version := strings.TrimSuffix(strings.TrimPrefix(name, "migrations/"), ".up.sql")
+	if !versionPattern.MatchString(version) {
+		return "", fmt.Errorf("store: malformed migration name %q", name)
+	}
+	return version, nil
+}
 
 // Migrator is the storage side of the migration runner. PgMigrator is the
 // Postgres implementation; tests use a fake.
@@ -69,9 +87,18 @@ func Migrate(ctx context.Context, m Migrator, fsys fs.FS) ([]string, error) {
 	}
 	sort.Strings(names)
 
+	versions := make([]string, len(names))
+	for i, name := range names {
+		v, err := versionOf(name)
+		if err != nil {
+			return nil, err
+		}
+		versions[i] = v
+	}
+
 	var applied []string
-	for _, name := range names {
-		version := strings.TrimSuffix(strings.TrimPrefix(name, "migrations/"), ".up.sql")
+	for i, name := range names {
+		version := versions[i]
 		if done[version] {
 			continue
 		}

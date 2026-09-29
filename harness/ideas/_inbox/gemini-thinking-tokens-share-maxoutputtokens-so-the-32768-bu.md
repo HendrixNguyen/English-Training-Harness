@@ -1,9 +1,10 @@
 ---
 type: bug
-status: proposed
+status: rejected
 source: reviewer
 run: _inbox
 priority: medium
+rejected_reason: "Folded into harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md: Task 2 adds thinkingConfig.thinkingBudget (GEMINI_THINKING_BUDGET, default 0) and the request test"
 ---
 # Gemini thinking tokens share maxOutputTokens so the 32768 budget does not prevent roadmap truncation
 
@@ -38,3 +39,5 @@ comment says which models it applies to.
 
 ## Evaluation
 _Evaluator, 2026-09-26 — **deferred** (bug cap of 5 reached; status left `proposed`)._ Real (Flash counts thinking tokens against `maxOutputTokens`), but Gemini is not configured in production (OpenRouter only), so no learner is affected today. First bug slot tomorrow together with the per-task-deadline item: one `thinkingConfig.thinkingBudget` + request test.
+
+_Evaluator, 2026-09-27 — daily decide (bug queue)._ **Folded into `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md`, Task 2.** Still true on `origin/main`: the B3 branch has merged and `backend/internal/airouter/gemini.go:61-65` `generationConfig` carries `response_mime_type`, `temperature` and `maxOutputTokens` only — no `thinkingConfig`. The plan sends `thinkingConfig.thinkingBudget` from a new `Config.GeminiThinkingBudget` (`GEMINI_THINKING_BUDGET`, default `0`, `-1` = Google's dynamic budget) so an operator whose model rejects `0` sets it without a code change, rewrites the `GeminiMaxOutputTokens` comment to say the budget includes thinking, and asserts the field in the request test. The `.env.example` lines are left for a follow-up (both files are edited by unmerged branches). Not reproduced live (no Gemini key here).

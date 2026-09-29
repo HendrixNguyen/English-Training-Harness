@@ -37,3 +37,43 @@ func TestRequireRedisURLSkipsWithoutTestRedisURL(t *testing.T) {
 		t.Fatal("requireRedisURL must skip when TEST_REDIS_URL is unset")
 	}
 }
+
+// TestRequirePostgresProceedsWithTestDatabaseURL is the other half of the gate —
+// it must let a nominated database through, or every TestIntegration* here
+// silently skips. NewPostgres builds a lazy pool, so the unreachable address is
+// never dialled; the pool is closed by requirePostgres's own t.Cleanup.
+func TestRequirePostgresProceedsWithTestDatabaseURL(t *testing.T) {
+	t.Setenv("TEST_DATABASE_URL", "postgres://u:p@127.0.0.1:59999/db?sslmode=disable&connect_timeout=2")
+
+	var skipped bool
+	var pg *Postgres
+	t.Run("gated", func(t *testing.T) {
+		defer func() { skipped = t.Skipped() }()
+		pg = requirePostgres(t)
+	})
+	if skipped {
+		t.Fatal("requirePostgres must not skip when TEST_DATABASE_URL is set")
+	}
+	if pg == nil || pg.Pool == nil {
+		t.Fatal("requirePostgres must return a Postgres with a pool when TEST_DATABASE_URL is set")
+	}
+}
+
+// TestRequireRedisURLProceedsWithTestRedisURL is the same property for Redis.
+func TestRequireRedisURLProceedsWithTestRedisURL(t *testing.T) {
+	const want = "redis://127.0.0.1:59999/0"
+	t.Setenv("TEST_REDIS_URL", want)
+
+	var skipped bool
+	var got string
+	t.Run("gated", func(t *testing.T) {
+		defer func() { skipped = t.Skipped() }()
+		got = requireRedisURL(t)
+	})
+	if skipped {
+		t.Fatal("requireRedisURL must not skip when TEST_REDIS_URL is set")
+	}
+	if got != want {
+		t.Fatalf("requireRedisURL = %q, want %q", got, want)
+	}
+}

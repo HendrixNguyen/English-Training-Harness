@@ -45,3 +45,7 @@ the same class of finding already filed (`route-has-no-overall-deadline...`).
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** Notify unmerged; plan after it lands. A stuck push endpoint delays every other user's 20:00 reminder — the feature's whole point. Per-pass deadline + small worker pool + 5 s client timeout; combine with the leader lock and subscription cap into one notify-hardening plan.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Not planned today — file conflict.** `notify/*` is held by today's unmerged `…no-per-user-subscription-cap…` branch; plan with the leader-lock bug once it merges.

@@ -53,3 +53,7 @@ rather than only the current `TestRequireRejectsASupersededToken`.
 _Evaluator, 2026-09-23 — post-MVP inbox triage (AGENTS.md: rank on user impact)._
 
 **Select — medium.** A real user with a phone and a laptop hits this on day one and reports it as a login bug. Deliberate design, but taken for revocation, not product reasons. Decision: multi-device via `jti`-keyed sessions (`sess:{user_id}:{jti}`, TTL unchanged; revoke-all deletes the prefix). Plan after the auth error-mapping plan so `auth` is touched in order.
+
+_Evaluator, 2026-09-27 — bugfix retry run (owner: pick up bugs the morning run did not cover)._
+
+**Not planned today — file conflict.** Rewrites `auth/session.go`/`middleware.go`/`service.go`; the done-but-unmerged `…auth-reports-postgres-and-redis-failures…` and `…stay-signed-in-sessions-renew-on-use…` branches both edit those files (and the session semantics). Note for the plan: keep the §4 key `sess:{user_id}:token` (as a ZSET of token hashes scored by exp) so `store/keys.go` need not change, and accept a legacy string value on read during the 24 h cutover.

@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/the-documented-set-a-env-export-also-exports-test-database-u.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-25-medium-the-documented-set-a-env-export-also-exports-test-database-u
 worktree: .worktrees/the-documented-set-a-env-export-also-exports-test-database-u
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Dev loop and CI mirror: `make run` sources `.env` in its own shell, `make check` refuses service variables, `fmt-check` fails on a parse error, integration tests run `-race` — Plan
 
