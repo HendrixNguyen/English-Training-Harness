@@ -38,22 +38,26 @@ func newHarness(t *testing.T) *harness {
 func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 	h := newHarness(t)
 
+	// validRequest() answers every bank item correctly, so GradeFloor is C1 —
+	// higher than the scripted grader's B1 — and the placement floor raises
+	// the assessed level to C1 (a 10/10 learner cannot be graded below what
+	// their own answers prove).
 	out, err := h.svc.Assess(ctx, "u1", validRequest())
 	if err != nil {
 		t.Fatalf("Assess: %v", err)
 	}
-	if !out.Created || out.Status != "success" || out.AssessedLevel != "B1" || out.RoadmapID != "rm-new" {
+	if !out.Created || out.Status != "success" || out.AssessedLevel != "C1" || out.RoadmapID != "rm-new" {
 		t.Errorf("out = %+v", out)
 	}
-	if out.PetState != (PetState{PlantName: "My Green Buddy", HealthPoints: 100, Stage: "sprout"}) {
+	if out.PetState != (PetState{PlantName: "Mầm Non", HealthPoints: 100, Stage: "sprout"}) {
 		t.Errorf("pet_state = %+v", out.PetState)
 	}
 	if len(h.repo.saved) != 1 {
 		t.Fatalf("saved %d assessments, want 1", len(h.repo.saved))
 	}
 	a := h.repo.saved[0]
-	if a.CEFRLevel != "B1" || a.TargetGoal != "IELTS 7.0 Preparation" || a.Timezone != "Asia/Ho_Chi_Minh" || a.NotificationTime != "20:00:00" {
-		t.Errorf("assessment = %+v, want the §6.1 request fields", a)
+	if a.CEFRLevel != "C1" || a.TargetGoal != "IELTS 7.0 Preparation" || a.Timezone != "Asia/Ho_Chi_Minh" || a.NotificationTime != "20:00:00" {
+		t.Errorf("assessment = %+v, want the §6.1 request fields (raised to the floor C1)", a)
 	}
 	if ex := a.Roadmap.Exercises(); len(ex) != 84 || !strings.Contains(string(ex[0].ContentJSON), `"title"`) || !strings.Contains(string(ex[0].ContentJSON), `"duration_minutes":10`) {
 		t.Errorf("exercises = %d rows, first content %s; want 84 with title and duration_minutes", len(ex), ex[0].ContentJSON)
@@ -67,6 +71,9 @@ func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 	if h.pet.ensured != 1 {
 		t.Errorf("pet.Ensure called %d times, want 1", h.pet.ensured)
 	}
+	if got := h.pet.names; len(got) != 1 || got[0] != DefaultPlantName {
+		t.Errorf("pet.Ensure names = %q, want [%q] (blank plant_name → the Vietnamese default)", got, DefaultPlantName)
+	}
 	if h.quiz.lastTTL != store.PlacementQuizTTL {
 		t.Errorf("quiz TTL = %v, want store.PlacementQuizTTL (2h, §4)", h.quiz.lastTTL)
 	}
@@ -79,9 +86,10 @@ func TestAssessHappyPathGradesGeneratesAndPersistsOnce(t *testing.T) {
 	if h.quiz.level["u1"] != "" {
 		t.Error("the staged level must go with the hash on success")
 	}
-	// The generation prompt is the airouter constant and carries the graded level and goal.
+	// The generation prompt is the airouter constant and carries the raised
+	// (floored) level and goal.
 	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
-	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "B1") || !strings.Contains(gen, "IELTS 7.0 Preparation") {
+	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "C1") || !strings.Contains(gen, "IELTS 7.0 Preparation") {
 		t.Errorf("roadmap prompt = %.120s…", gen)
 	}
 }
@@ -91,7 +99,9 @@ func TestAssessIsIdempotentWhileARoadmapIsActive(t *testing.T) {
 	h.repo.activeID = "rm-existing"
 	h.repo.profile.CEFRCurrent = "B2"
 
-	out, err := h.svc.Assess(ctx, "u1", validRequest())
+	req := validRequest()
+	req.PlantName = "Lá Xanh"
+	out, err := h.svc.Assess(ctx, "u1", req)
 	if err != nil {
 		t.Fatalf("Assess: %v", err)
 	}
@@ -103,6 +113,9 @@ func TestAssessIsIdempotentWhileARoadmapIsActive(t *testing.T) {
 	}
 	if h.pet.ensured != 1 {
 		t.Errorf("pet.Ensure called %d times, want 1 (the response still needs pet_state)", h.pet.ensured)
+	}
+	if h.pet.names[0] != "" {
+		t.Errorf("pet.Ensure name on the re-submit path = %q, want \"\" (the re-submit path never renames — deliberate; see the selected inbox bug)", h.pet.names[0])
 	}
 }
 
@@ -187,15 +200,16 @@ func TestAssessIsRateLimitedBeforeAnyAICall(t *testing.T) {
 
 func TestAssessValidatesTheRequestBeforeTouchingAnything(t *testing.T) {
 	cases := map[string]func(r *AssessmentRequest){
-		"empty goal":         func(r *AssessmentRequest) { r.TargetGoal = "   " },
-		"goal too long":      func(r *AssessmentRequest) { r.TargetGoal = strings.Repeat("x", 256) },
-		"bad timezone":       func(r *AssessmentRequest) { r.Timezone = "Mars/Olympus" },
-		"empty timezone":     func(r *AssessmentRequest) { r.Timezone = "" },
-		"bad time":           func(r *AssessmentRequest) { r.NotificationTime = "8pm" },
-		"no answers":         func(r *AssessmentRequest) { r.Answers = nil },
-		"unknown question":   func(r *AssessmentRequest) { r.Answers[0].QuestionID = "q99" },
-		"unknown option":     func(r *AssessmentRequest) { r.Answers[0].SelectedOption = "E" },
-		"duplicate question": func(r *AssessmentRequest) { r.Answers[1].QuestionID = r.Answers[0].QuestionID },
+		"empty goal":          func(r *AssessmentRequest) { r.TargetGoal = "   " },
+		"goal too long":       func(r *AssessmentRequest) { r.TargetGoal = strings.Repeat("x", 256) },
+		"bad timezone":        func(r *AssessmentRequest) { r.Timezone = "Mars/Olympus" },
+		"empty timezone":      func(r *AssessmentRequest) { r.Timezone = "" },
+		"bad time":            func(r *AssessmentRequest) { r.NotificationTime = "8pm" },
+		"no answers":          func(r *AssessmentRequest) { r.Answers = nil },
+		"unknown question":    func(r *AssessmentRequest) { r.Answers[0].QuestionID = "q99" },
+		"unknown option":      func(r *AssessmentRequest) { r.Answers[0].SelectedOption = "E" },
+		"duplicate question":  func(r *AssessmentRequest) { r.Answers[1].QuestionID = r.Answers[0].QuestionID },
+		"plant name too long": func(r *AssessmentRequest) { r.PlantName = strings.Repeat("ă", 31) },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -208,6 +222,30 @@ func TestAssessValidatesTheRequestBeforeTouchingAnything(t *testing.T) {
 			}
 			if len(h.ai.calls) != 0 || h.limiter.calls != 0 || len(h.quiz.staged) != 0 || len(h.repo.saved) != 0 || h.pet.ensured != 0 {
 				t.Error("invalid request had side effects")
+			}
+		})
+	}
+}
+
+func TestAssessNamesThePlant(t *testing.T) {
+	cases := map[string]struct{ in, want string }{
+		"absent":          {"", DefaultPlantName},
+		"whitespace only": {"   ", DefaultPlantName},
+		"trimmed":         {"  Lá Xanh  ", "Lá Xanh"},
+		"one rune":        {"A", "A"},
+		"thirty runes":    {strings.Repeat("ă", 30), strings.Repeat("ă", 30)},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			req := validRequest()
+			req.PlantName = tc.in
+			out, err := h.svc.Assess(ctx, "u1", req)
+			if err != nil {
+				t.Fatalf("Assess: %v", err)
+			}
+			if h.pet.names[0] != tc.want || out.PetState.PlantName != tc.want {
+				t.Errorf("ensured %q, response %q; want %q", h.pet.names[0], out.PetState.PlantName, tc.want)
 			}
 		})
 	}
@@ -277,15 +315,17 @@ func TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry(t *test
 	if _, err := h.svc.Assess(ctx, "u1", validRequest()); !errors.Is(err, airouter.ErrAllProvidersFailed) {
 		t.Fatalf("first Assess: %v, want ErrAllProvidersFailed", err)
 	}
-	if h.quiz.level["u1"] != "B1" || len(h.repo.saved) != 0 || h.quiz.cleared != 0 {
-		t.Fatalf("after the failed roadmap: level=%q saved=%d cleared=%d; want the level staged, nothing written, hash kept", h.quiz.level["u1"], len(h.repo.saved), h.quiz.cleared)
+	// validRequest() answers every bank item correctly, so the placement
+	// floor (C1) raises the graded B1 before it is staged.
+	if h.quiz.level["u1"] != "C1" || len(h.repo.saved) != 0 || h.quiz.cleared != 0 {
+		t.Fatalf("after the failed roadmap: level=%q saved=%d cleared=%d; want the raised level staged, nothing written, hash kept", h.quiz.level["u1"], len(h.repo.saved), h.quiz.cleared)
 	}
 
 	h.ai.replies[airouter.TaskRoadmapGen] = []string{fixtureRoadmapJSON(t)}
 	h.ai.calls[airouter.TaskRoadmapGen] = 0
 	out, err := h.svc.Assess(ctx, "u1", validRequest())
-	if err != nil || !out.Created || out.AssessedLevel != "B1" {
-		t.Fatalf("retry: %+v, %v; want a created roadmap at the staged level", out, err)
+	if err != nil || !out.Created || out.AssessedLevel != "C1" {
+		t.Fatalf("retry: %+v, %v; want a created roadmap at the staged (raised) level", out, err)
 	}
 	if h.ai.calls[airouter.TaskPlacementTest] != 1 {
 		t.Errorf("placement graded %d times, want 1 — the retry must reuse the staged level", h.ai.calls[airouter.TaskPlacementTest])
@@ -293,8 +333,63 @@ func TestAssessKeepsTheGradeWhenTheRoadmapFailsAndSkipsGradingOnTheRetry(t *test
 	if h.limiter.calls != 2 {
 		t.Errorf("limiter calls = %d, want 2 (one slot per assessment call, retry included)", h.limiter.calls)
 	}
-	if len(h.repo.saved) != 1 || h.repo.saved[0].CEFRLevel != "B1" || h.quiz.cleared != 1 || h.quiz.level["u1"] != "" {
+	if len(h.repo.saved) != 1 || h.repo.saved[0].CEFRLevel != "C1" || h.quiz.cleared != 1 || h.quiz.level["u1"] != "" {
 		t.Errorf("after the retry: saved=%d cleared=%d level=%q", len(h.repo.saved), h.quiz.cleared, h.quiz.level["u1"])
+	}
+}
+
+// TestAssessRaisesTheAILevelToTheFloor: the AI grades A2 but the bank
+// answers are all correct (GradeFloor == C1), so the deterministic floor
+// wins — a 10/10 learner cannot be staged, generated for or persisted below
+// what their own answers prove.
+func TestAssessRaisesTheAILevelToTheFloor(t *testing.T) {
+	h := newHarness(t)
+	h.ai.replies[airouter.TaskPlacementTest] = []string{`{"cefr_level":"A2"}`}
+
+	out, err := h.svc.Assess(ctx, "u1", validRequest())
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	if out.AssessedLevel != "C1" {
+		t.Errorf("AssessedLevel = %q, want the floor C1", out.AssessedLevel)
+	}
+	if h.repo.saved[0].CEFRLevel != "C1" {
+		t.Errorf("saved CEFRLevel = %q, want C1", h.repo.saved[0].CEFRLevel)
+	}
+	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
+	if !strings.Contains(gen, "C1") {
+		t.Errorf("roadmap prompt = %.160s…, want the raised level C1", gen)
+	}
+	if h.quiz.level["u1"] != "" {
+		t.Error("the staged level must go with the hash on success")
+	}
+}
+
+// TestAssessKeepsAHigherAILevel: the floor never lowers the AI's own grade.
+func TestAssessKeepsAHigherAILevel(t *testing.T) {
+	h := newHarness(t)
+	h.ai.replies[airouter.TaskPlacementTest] = []string{`{"cefr_level":"B2"}`}
+	req := validRequest()
+	// Only the A1 pair right: GradeFloor stops at A1, well below the AI's B2.
+	for i := range req.Answers {
+		if req.Answers[i].QuestionID == "q1" || req.Answers[i].QuestionID == "q2" {
+			continue
+		}
+		q, _ := Lookup(req.Answers[i].QuestionID)
+		for opt := range q.Options {
+			if opt != q.Correct {
+				req.Answers[i].SelectedOption = opt
+				break
+			}
+		}
+	}
+
+	out, err := h.svc.Assess(ctx, "u1", req)
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	if out.AssessedLevel != "B2" {
+		t.Errorf("AssessedLevel = %q, want the AI's own B2 kept", out.AssessedLevel)
 	}
 }
 
@@ -316,5 +411,108 @@ func TestAssessGradesAgainWhenTheRetryChangesAnAnswer(t *testing.T) {
 	}
 	if h.ai.calls[airouter.TaskPlacementTest] != 2 {
 		t.Errorf("placement graded %d times, want 2", h.ai.calls[airouter.TaskPlacementTest])
+	}
+}
+
+func TestRegenerateReplacesTheActiveRoadmapAtTheCurrentLevel(t *testing.T) {
+	h := newHarness(t)
+	h.repo.activeID = "rm-existing"
+	h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "Business English"}
+
+	out, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{})
+	if err != nil {
+		t.Fatalf("Regenerate: %v", err)
+	}
+	if h.ai.calls[airouter.TaskRoadmapGen] != 1 || h.ai.calls[airouter.TaskPlacementTest] != 0 {
+		t.Errorf("AI calls = %v, want one roadmap call and no placement call", h.ai.calls)
+	}
+	gen := h.ai.prompts[airouter.TaskRoadmapGen][0]
+	if !strings.HasPrefix(gen, airouter.RoadmapSystemPrompt+"|") || !strings.Contains(gen, "Current CEFR level: B1") || !strings.Contains(gen, "Business English") {
+		t.Errorf("roadmap prompt = %.160s…", gen)
+	}
+	if len(h.repo.replaceCalls) != 1 || h.repo.replaceCalls[0].level != "B1" {
+		t.Errorf("replaceCalls = %+v, want one call at B1", h.repo.replaceCalls)
+	}
+	if out.Status != "success" || out.AssessedLevel != "B1" || out.RoadmapID != h.repo.nextID {
+		t.Errorf("out = %+v", out)
+	}
+	if h.limiter.calls != 1 {
+		t.Errorf("limiter calls = %d, want 1", h.limiter.calls)
+	}
+}
+
+func TestRegenerateAcceptsOneStepAndRejectsTwo(t *testing.T) {
+	cases := []struct {
+		current, requested string
+		wantErr            bool
+	}{
+		{"B1", "B2", false},
+		{"B1", "A2", false},
+		{"B1", "C1", true},
+		{"A1", "A1", false},
+		{"C2", "B2", true},
+		{"B1", "b2", true},
+		{"B1", "", false}, // omitted → current level
+	}
+	for _, tc := range cases {
+		t.Run(tc.current+"->"+tc.requested, func(t *testing.T) {
+			h := newHarness(t)
+			h.repo.activeID = "rm-existing"
+			h.repo.profile = Profile{CEFRCurrent: tc.current, TargetGoal: "goal"}
+
+			_, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{CEFRLevel: tc.requested})
+			if tc.wantErr {
+				if !errors.Is(err, ErrInvalidRequest) {
+					t.Fatalf("err = %v, want ErrInvalidRequest", err)
+				}
+				if h.limiter.calls != 0 || h.ai.calls[airouter.TaskRoadmapGen] != 0 {
+					t.Errorf("rejected request had side effects: limiter=%d ai=%v", h.limiter.calls, h.ai.calls)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestRegenerateWithoutAnActiveRoadmapIs404(t *testing.T) {
+	h := newHarness(t)
+	// h.repo.activeID left empty: ActiveRoadmapID returns ok=false.
+
+	_, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{})
+	if !errors.Is(err, ErrNoActiveRoadmap) {
+		t.Fatalf("err = %v, want ErrNoActiveRoadmap", err)
+	}
+	if h.limiter.calls != 0 || len(h.ai.calls) != 0 {
+		t.Errorf("404 path had side effects: limiter=%d ai=%v", h.limiter.calls, h.ai.calls)
+	}
+}
+
+func TestRegenerateAIFailureWritesNothing(t *testing.T) {
+	h := newHarness(t)
+	h.repo.activeID = "rm-existing"
+	h.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+	h.ai.replies[airouter.TaskRoadmapGen] = nil // scripted returns an error → router: all providers failed
+
+	_, err := h.svc.Regenerate(ctx, "u1", RegenerateRequest{})
+	if !errors.Is(err, airouter.ErrAllProvidersFailed) {
+		t.Fatalf("err = %v, want ErrAllProvidersFailed", err)
+	}
+	if len(h.repo.replaceCalls) != 0 {
+		t.Error("provider failure wrote a roadmap")
+	}
+
+	h2 := newHarness(t)
+	h2.repo.activeID = "rm-existing"
+	h2.repo.profile = Profile{CEFRCurrent: "B1", TargetGoal: "goal"}
+	h2.ai.replies[airouter.TaskRoadmapGen] = []string{`{"modules":[]}`, `{"modules":[]}`}
+
+	if _, err := h2.svc.Regenerate(ctx, "u1", RegenerateRequest{}); !errors.Is(err, ErrBadAIOutput) {
+		t.Fatalf("err = %v, want ErrBadAIOutput", err)
+	}
+	if len(h2.repo.replaceCalls) != 0 {
+		t.Error("malformed roadmap wrote something")
 	}
 }

@@ -2,9 +2,10 @@
 idea: harness/ideas/_inbox/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-.md
 status: done
 priority: medium
-merged: false
+merged: true
 branch: harness/2026-09-25-medium-a-pet-state-failure-reports-pet-health-0-which-means-a-dead-
 worktree: .worktrees/a-pet-state-failure-reports-pet-health-0-which-means-a-dead-
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # quests: a failed pet read omits `pet_health`/`streak_count` instead of reporting a dead plant — Plan
 

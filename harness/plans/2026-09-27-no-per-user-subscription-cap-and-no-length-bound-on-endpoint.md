@@ -1,8 +1,11 @@
 ---
 idea: harness/ideas/_inbox/no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md
-status: approved
+status: done
 priority: medium
-merged: false
+merged: true
+branch: harness/2026-09-27-medium-no-per-user-subscription-cap-and-no-length-bound-on-endpoint
+worktree: .worktrees/no-per-user-subscription-cap-and-no-length-bound-on-endpoint
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan
 
@@ -102,3 +105,83 @@ grep -n 'MaxSubscriptionsPerUser\|MaxConsecutiveFailures\|ValidateSubscriptionKe
 grep -n 'PushFailKey\|PushFailTTL' internal/store/keys.go internal/store/keys_test.go internal/notify/queue.go ../harness/CODEMAP.md
 git push -u origin harness/2026-09-27-medium-no-per-user-subscription-cap-and-no-length-bound-on-endpoint
 ```
+
+## Execution summary
+
+Built exactly as planned; no deviations from the plan's decisions, file structure, or constraints. All four tasks landed as separate commits on `harness/2026-09-27-medium-no-per-user-subscription-cap-and-no-length-bound-on-endpoint`:
+
+- `8cb4a5d` notify: refuse push subscriptions whose p256dh/auth cannot encrypt
+- `abb04c6` notify: cap push subscriptions at 10 per user, evicting the oldest
+- `da3fba3` notify: prune a subscription after 3 consecutive send failures (push:fail counter)
+- `273be93` docs: CODEMAP — push key validation, 10-subscription cap, prune after 3 failures
+
+Off-limits files (`cmd/api/*`, `internal/store/migrations/*`, `internal/middleware/*`, `project-base/`) are untouched — `git diff --stat origin/main -- cmd/api internal/store/migrations internal/middleware ../project-base` is empty, and `NewService`'s signature is unchanged (the failure counter rides the existing `Queue` interface as planned).
+
+### Verification output
+
+```
+$ cd backend && go build ./... && gofmt -l . && go vet ./... && go test -timeout 120s ./... -count=1 -race
+ok  backend/cmd/api          2.291s
+ok  backend/internal/airouter 2.283s
+ok  backend/internal/auth     3.225s
+ok  backend/internal/config   3.578s
+ok  backend/internal/google   2.577s
+ok  backend/internal/health   4.134s
+ok  backend/internal/middleware 4.736s
+ok  backend/internal/notify   5.140s
+ok  backend/internal/onboarding 5.883s
+ok  backend/internal/pet      6.487s
+ok  backend/internal/quests   4.642s
+ok  backend/internal/secrets  5.044s
+ok  backend/internal/store    5.289s
+(gofmt -l and go vet: no output; run with a clean shell, no TEST_*/DATABASE_URL/REDIS_URL exported)
+
+$ go test -timeout 60s ./internal/notify -run 'Keys|SettingsHandler|UpdateSettings|AtMostTen|Tick' -count=1 -v
+--- all PASS (TestValidateSubscriptionKeys*, TestSettingsHandlerRejectsMalformedKeysAndOverlongEndpointsWith400,
+    TestUpdateSettingsRejectsBadInputBeforeWriting, TestUpdateSettingsKeepsAtMostTenSubscriptionsPerUser,
+    TestTickPrunesASubscriptionAfterThreeConsecutiveFailures, TestTickResetsTheFailureCountOnSuccess,
+    TestTickKeepsTheRowWhenTheCounterIsUnavailable, plus every pre-existing Tick/UpdateSettings test)
+
+$ go test -timeout 60s ./internal/store -run 'KeyBuilders|TTLs' -count=1 -v
+--- PASS: TestKeyBuilders, TestTTLs (includes the new pushfail row / PushFailTTL row)
+
+$ COMPOSE_PROJECT_NAME=sub-cap POSTGRES_PORT=55442 REDIS_PORT=56392 make up
+$ TEST_DATABASE_URL=postgres://english:english@localhost:55442/english?sslmode=disable \
+  TEST_REDIS_URL=redis://localhost:56392/0 \
+  go test -timeout 300s ./internal/store ./internal/notify -run Integration -p 1 -count=1 -v
+ok  backend/internal/store   (TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent, TestIntegrationConcurrentMigrateDoesNotRace,
+                              TestIntegrationPetStatesRejectsASecondRowForTheSameUser, TestIntegrationRedisRoundTrip)
+ok  backend/internal/notify  (TestIntegrationScheduleAndSubscriptionRoundTrip — now also covers the 11th-endpoint eviction against real
+                              Postgres inside one pgx.BeginFunc transaction, and RecordFailure/ClearFailures/TTL against real Redis)
+$ make down   # containers + network removed; verified with `docker ps -a --filter name=sub-cap` (empty)
+
+$ git diff --stat origin/main -- cmd/api internal/store/migrations internal/middleware ../project-base
+(empty)
+
+$ grep -n 'MaxSubscriptionsPerUser\|MaxConsecutiveFailures\|ValidateSubscriptionKeys' internal/notify/*.go ../harness/CODEMAP.md
+$ grep -n 'PushFailKey\|PushFailTTL' internal/store/keys.go internal/store/keys_test.go internal/notify/queue.go ../harness/CODEMAP.md
+(both present in code and CODEMAP, as pasted into the review focus check)
+```
+
+### Runtime proof
+
+Booted the real API binary (`go run ./cmd/api`) against the same `sub-cap`-project Postgres/Redis (ports 55442/56392), with `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`ENCRYPTION_SECRET_KEY` filled with scratch values so `config.Load` would boot (VAPID unset, as documented — the route works, no Web Push worker starts). `GET /healthz` → `{"postgres":"ok","redis":"ok","status":"ok"}`.
+
+Inserted a real `users` row, minted a session JWT with `auth.NewTokenIssuer` and wrote the matching `sess:{user_id}:token` key in Redis (mirroring what sign-in does), then exercised `POST /api/v1/settings/notifications` for real over HTTP:
+- Placeholder keys (`p256dh":"BNc5T..."`) → `400 {"error":"invalid_request"}`.
+- A 2048+-byte endpoint → `400 {"error":"invalid_request"}`.
+- A real generated P-256 key pair (`crypto/ecdh`) + 16-byte auth, real HTTPS endpoint → `200 {"status":"updated",...}`, row written to `push_subscriptions`.
+- 11 distinct real endpoints (`ep0`..`ep10`) for the same user, each posted individually → `SELECT endpoint FROM push_subscriptions WHERE user_id=... ORDER BY created_at, id` showed exactly 10 rows, `ep1`..`ep10` — `ep0` (the oldest) evicted by the live endpoint against real Postgres, matching the fake-repo and integration-test behaviour.
+
+Cleanup verified: no `go run`/`exe/api` process left (`pgrep -fl` empty), `docker ps -a --filter name=sub-cap` empty after `make down`, scratch `backend/.env` and the throwaway key-generation helper deleted, `git status --short` in the worktree shows only the harness bookkeeping files (`harness/STATE.md`, this plan) uncommitted.
+
+### CI
+
+Branch: `harness/2026-09-27-medium-no-per-user-subscription-cap-and-no-length-bound-on-endpoint`. Pushed as commit `273be93`. CI run [36292338964](https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36292338964) — **all 5 jobs green**: `docker-images`, `harness-tooling`, `backend-integration`, `frontend`, `backend-unit`.
+
+### Follow-ups for the reviewer to file
+
+- Per the plan's Notes: backend spec §4 Redis key table needs `push:fail:{subscription_id}` (String, 7 d), and §6.4 needs the key-validation/cap sentences — `project-base/` was off-limits for this run.
+- Re-saving an already-held endpoint keeps its original `created_at` (documented as theoretical at cap 10; no action needed now).
+
+**Risk noted per the task brief:** another open branch (migrate-lock plan) may also add a `internal/store/migrations` file; this plan added no migration, so no renumbering conflict from this branch's side.

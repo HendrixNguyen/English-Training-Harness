@@ -8,7 +8,7 @@ const glyph = computed(() => ({ completed: '⭐', today: '🌱', locked: '🔒' 
 const text = computed(() => ({ completed: 'Đã hoàn thành', today: 'HÔM NAY - Đang học', locked: 'Chưa mở khóa' })[props.node.state])
 const pill = computed(() => ({
   completed: 'border-streak/40 bg-streak/10 text-ink dark:text-paper',
-  today: 'border-growth bg-growth text-white scale-105',
+  today: 'border-growth bg-growth text-ground-0 scale-105',
   locked: 'border-mute/30 text-mute',
 })[props.node.state])
 </script>

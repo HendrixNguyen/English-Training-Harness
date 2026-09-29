@@ -53,8 +53,11 @@ func (r *Router) Providers() []ProviderType {
 // in FallbackOrder, on absence or error. An unknown task prefers Gemini
 // (§6.2). With no providers it returns ErrNoProviders; when every attempt
 // fails it returns ErrAllProvidersFailed joined with each provider's error.
-// It stops as soon as ctx is done. Every attempt runs under the caller's
-// deadline, or TaskTimeout(task) when the caller set none.
+// It stops as soon as ctx is done. Every attempt runs under its share of what
+// is left of the caller's deadline (or TaskTimeout(task), when the caller set
+// none) — attemptBudget splits it evenly over the providers not yet tried —
+// so a hanging provider cannot starve the fallback, and the caller's deadline
+// is never widened.
 func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPrompt string) (string, error) {
 	if len(r.providers) == 0 {
 		return "", ErrNoProviders
@@ -67,11 +70,19 @@ func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPro
 	ctx, cancel := ensureDeadline(ctx, task)
 	defer cancel()
 	ctx = withTask(ctx, task)
+	deadline, _ := ctx.Deadline()
 
 	order := []ProviderType{preferred}
 	for _, p := range FallbackOrder {
 		if p != preferred {
 			order = append(order, p)
+		}
+	}
+
+	left := 0
+	for _, p := range order {
+		if _, exists := r.providers[p]; exists {
+			left++
 		}
 	}
 
@@ -87,12 +98,16 @@ func (r *Router) Route(ctx context.Context, task TaskType, systemPrompt, userPro
 		if p != preferred {
 			log.Printf("airouter: fallback from %s to %s for task %s", preferred, p, task)
 		}
+		budget := attemptBudget(time.Until(deadline), left)
+		attemptCtx, cancelAttempt := context.WithTimeout(ctx, budget)
 		started := time.Now()
-		out, err := provider.GenerateContent(ctx, systemPrompt, userPrompt)
+		out, err := provider.GenerateContent(attemptCtx, systemPrompt, userPrompt)
+		cancelAttempt()
+		left--
 		if err == nil {
 			return out, nil
 		}
-		log.Printf("airouter: %s failed for task %s after %.1fs: %v", p, task, time.Since(started).Seconds(), err)
+		log.Printf("airouter: %s failed for task %s after %.1fs of a %s attempt budget: %v", p, task, time.Since(started).Seconds(), budget.Round(time.Second), err)
 		errs = append(errs, fmt.Errorf("%s: %w", p, err))
 	}
 	if ctx.Err() != nil {

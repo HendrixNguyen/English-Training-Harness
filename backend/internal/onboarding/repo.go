@@ -15,9 +15,10 @@ import (
 // ErrUnknownUser means the authenticated id has no users row.
 var ErrUnknownUser = errors.New("onboarding: unknown user")
 
-// Profile is the slice of users the idempotent path reports back.
+// Profile is the slice of users the idempotent path and Regenerate report back.
 type Profile struct {
 	CEFRCurrent string
+	TargetGoal  string
 }
 
 // Assessment is everything one successful onboarding writes, in one tx.
@@ -40,17 +41,23 @@ type Repo interface {
 	// the new active roadmap and its 84 exercises, atomically. Returns the
 	// roadmap id.
 	SaveAssessment(ctx context.Context, userID string, a Assessment) (string, error)
+	// ReplaceRoadmap sets cefr_current, deactivates active roadmaps and
+	// inserts the new active roadmap with its 84 exercises, atomically.
+	// Returns the roadmap id.
+	ReplaceRoadmap(ctx context.Context, userID, cefrLevel string, roadmap airouter.Roadmap) (string, error)
 }
 
 const (
 	activeRoadmapSQL = `SELECT id FROM roadmaps WHERE user_id = $1 AND is_active = TRUE ORDER BY created_at DESC LIMIT 1`
 
-	profileSQL = `SELECT COALESCE(cefr_current::text, 'A1') FROM users WHERE id = $1`
+	profileSQL = `SELECT COALESCE(cefr_current::text, 'A1'), COALESCE(target_goal, '') FROM users WHERE id = $1`
 
 	updateUserSQL = `
 UPDATE users
 SET cefr_current = $2::cefr_level, target_goal = $3, timezone = $4, notification_time = $5::time
 WHERE id = $1`
+
+	updateLevelSQL = `UPDATE users SET cefr_current = $2::cefr_level WHERE id = $1`
 
 	deactivateSQL = `UPDATE roadmaps SET is_active = FALSE WHERE user_id = $1 AND is_active = TRUE`
 
@@ -81,7 +88,7 @@ func (r *PgRepo) ActiveRoadmapID(ctx context.Context, userID string) (string, bo
 
 func (r *PgRepo) Profile(ctx context.Context, userID string) (Profile, error) {
 	var p Profile
-	err := r.Pool.QueryRow(ctx, profileSQL, userID).Scan(&p.CEFRCurrent)
+	err := r.Pool.QueryRow(ctx, profileSQL, userID).Scan(&p.CEFRCurrent, &p.TargetGoal)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Profile{}, ErrUnknownUser
 	}
@@ -92,11 +99,6 @@ func (r *PgRepo) Profile(ctx context.Context, userID string) (Profile, error) {
 }
 
 func (r *PgRepo) SaveAssessment(ctx context.Context, userID string, a Assessment) (string, error) {
-	roadmapJSON, err := json.Marshal(a.Roadmap)
-	if err != nil {
-		return "", fmt.Errorf("onboarding: encoding roadmap: %w", err)
-	}
-
 	tx, err := r.Pool.Begin(ctx)
 	if err != nil {
 		return "", fmt.Errorf("onboarding: begin: %w", err)
@@ -110,6 +112,56 @@ func (r *PgRepo) SaveAssessment(ctx context.Context, userID string, a Assessment
 	if tag.RowsAffected() == 0 {
 		return "", ErrUnknownUser
 	}
+
+	roadmapID, err := insertActiveRoadmap(ctx, tx, userID, a.Roadmap)
+	if err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("onboarding: commit: %w", err)
+	}
+	return roadmapID, nil
+}
+
+// ReplaceRoadmap sets cefr_current (row lock — see the plan's Review Focus:
+// two concurrent regenerates serialise here, and the second sees the first's
+// roadmap already deactivated), then deactivates the active roadmap and
+// inserts the new one with its 84 exercises, in the same transaction.
+func (r *PgRepo) ReplaceRoadmap(ctx context.Context, userID, cefrLevel string, roadmap airouter.Roadmap) (string, error) {
+	tx, err := r.Pool.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("onboarding: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, updateLevelSQL, userID, cefrLevel)
+	if err != nil {
+		return "", fmt.Errorf("onboarding: updating cefr_current: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return "", ErrUnknownUser
+	}
+
+	roadmapID, err := insertActiveRoadmap(ctx, tx, userID, roadmap)
+	if err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("onboarding: commit: %w", err)
+	}
+	return roadmapID, nil
+}
+
+// insertActiveRoadmap deactivates any active roadmap for userID and inserts
+// roadmap as the new active one with its 84 exercises, all within tx. Shared
+// by SaveAssessment and ReplaceRoadmap.
+func insertActiveRoadmap(ctx context.Context, tx pgx.Tx, userID string, roadmap airouter.Roadmap) (string, error) {
+	roadmapJSON, err := json.Marshal(roadmap)
+	if err != nil {
+		return "", fmt.Errorf("onboarding: encoding roadmap: %w", err)
+	}
 	if _, err := tx.Exec(ctx, deactivateSQL, userID); err != nil {
 		return "", fmt.Errorf("onboarding: deactivating roadmaps: %w", err)
 	}
@@ -119,7 +171,7 @@ func (r *PgRepo) SaveAssessment(ctx context.Context, userID string, a Assessment
 	}
 
 	batch := &pgx.Batch{}
-	exercises := a.Roadmap.Exercises()
+	exercises := roadmap.Exercises()
 	for _, e := range exercises {
 		batch.Queue(insertExerciseSQL, roadmapID, e.DayNumber, e.TaskType, e.ContentJSON)
 	}
@@ -132,10 +184,6 @@ func (r *PgRepo) SaveAssessment(ctx context.Context, userID string, a Assessment
 	}
 	if err := results.Close(); err != nil {
 		return "", fmt.Errorf("onboarding: closing batch: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("onboarding: commit: %w", err)
 	}
 	return roadmapID, nil
 }

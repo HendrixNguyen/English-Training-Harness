@@ -1,4 +1,4 @@
 # Cloudflare Pages only (the Caddy image has its own try_files rule).
-# `nuxi generate` emits 404.html, which turns off Pages' implicit SPA mode;
-# this rewrite restores it: every unmatched route is the app shell, status 200.
+# Pages ignores this rule while a 404.html exists; the Deploy workflow removes
+# 404.html (`npm run generate:pages`), and this file stays as belt-and-braces.
 /*  /index.html  200

@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-24-run-01/day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md
-status: draft
+status: approved
 priority: medium
 merged: false
 ---

@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/2026-09-22-run-01/spaced-repetition-vocabulary-review-in-the-daily-quest.md
-status: draft
+status: approved
 priority: low
 merged: false
 ---

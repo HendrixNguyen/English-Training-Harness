@@ -1,8 +1,11 @@
 ---
 idea: harness/ideas/_inbox/google-403-accessnotconfigured-api-disabled-still-maps-to-re.md
-status: approved
+status: done
 priority: low
-merged: false
+merged: true
+branch: harness/2026-09-27-low-google-403-accessnotconfigured-api-disabled-still-maps-to-re
+worktree: .worktrees/google-403-accessnotconfigured-api-disabled-still-maps-to-re
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/53"
 ---
 # Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan
 
@@ -110,3 +113,43 @@ git push -u origin harness/2026-09-27-low-google-403-accessnotconfigured-api-dis
 - **Follow-ups outside the safe set — list in the Execution summary, do not edit:** the backend spec's §6.4 error table, if it enumerates the 403 → `reauth_required` mapping (`grep -n 'reauth_required' "../project-base/Adaptive English Learning Platform - Backend Technical Specification.md"`), should say "scope/permission 403 only"; `deploy/README.md`'s Google console checklist could state that the Calendar API and Tasks API must be enabled in the project (an API-disabled deployment now answers 502 with the reason in the log instead of a consent loop).
 - The unmerged `google-refresh-token-…` branch also edits the CODEMAP `google` bullet; Task 1 Step 3 changes one sentence only so the daily integration merge stays trivial.
 - Not reproduced against Google: the owner's project has both APIs enabled. The mapping was confirmed by reading `client.go`; the `apioff` / `svcdisabled` bodies are Google's documented `accessNotConfigured` / `ErrorInfo SERVICE_DISABLED` shapes.
+
+## Execution summary
+
+**Built:** all four tasks completed exactly as scoped; no deviations from the plan's decisions, allow-list, or file structure.
+
+- **Task 1** — `reauthReasons` (an allow-list: `insufficientPermissions`, `forbidden`, `ACCESS_TOKEN_SCOPE_INSUFFICIENT`) replaces `throttleReasons`. `googleErrorReasons(raw []byte) []string` reads both `error.errors[].reason` and `error.details[].reason` (the `google.rpc.ErrorInfo` shape); `isReauth403` is true iff no reason parses at all or any parsed reason is in the allow-list. `client.go:149` now guards on `isReauth403(raw)`. Added the `apioff`, `svcdisabled`, `unknownreason`, `scopedetail`, `forbiddenreason` rows to `TestCalendarMapsStatusesToSentinelErrors` and `TestTasksMapsAnAPIDisabled403ToUpstreamNotReauth` to `tasks_test.go`; all failed as reauth before the fix (RED confirmed), pass after. CODEMAP's `google` bullet Errors sentence updated to describe the allow-list.
+- **Task 2** — `fakeCalendar.autoInserts` counts Google-assigned inserts; the first keeps `nextID`, the n-th (n≥2) gets `"<nextID>-<n>"`, so two auto-id inserts in the same test never collide. `TestFakeCalendarAssignsAFreshIDPerGoogleAssignedInsert` failed before (second auto-id insert 409'd) and passes after. `TestAReservedButGoneIDFallsBackToAGoogleAssignedInsert` (first auto-id insert) is unaffected.
+- **Task 3** — pinned today's already-correct behaviour: `TestSyncHandlerMapsA409OnThePatchAfterA409InsertTo502` (insert 409s → patch of our own id also 409s → handler answers 502, exactly one `InsertEvent`/`PatchEvent`, no Tasks call, no `SaveSyncState`) and a `PATCH .../taken` → `ErrAlreadyExists` row in the client test. Both passed on first run, as the plan expected — this is a regression pin, not a bugfix.
+- **Task 4** — `PracticeEventID` now hashes (`sha256`, first 32 hex chars, prefixed `aelp`) any input that is not a canonical UUID; a canonical UUID (checked by the new unexported `isCanonicalUUID`) keeps the exact legacy mapping (`aelpa0eebc999c0b4ef8bb6d6bb9bd380a11` for the pinned UUID, byte-for-byte). `TestPracticeEventIDHoldsItsBoundsForEveryInput` failed on `""` (3-char id, below Calendar's 5-char floor) before the fix; all inputs now hold the 5–1024 base32hex bound, and results are deterministic and distinct except for the two UUID spellings (which correctly collide).
+
+**Verification (plan's block, `backend/`):**
+```
+go build ./... && gofmt -l internal/google && go vet ./internal/google   # clean
+go test -timeout 120s ./internal/google -count=1 -race -v | grep -E '^(--- (FAIL|SKIP)|ok|FAIL)'
+  --- SKIP: TestIntegrationSyncStateIsOneRowPerUser (0.00s)   # TEST_DATABASE_URL unset, as expected
+  ok      .../internal/google    1.645s
+go test -timeout 300s ./... -count=1   # every package ok, no other failures
+grep -n 'reauthReasons\|isReauth403\|ACCESS_TOKEN_SCOPE_INSUFFICIENT' internal/google/client.go   # present; throttleReasons: zero hits
+grep -n 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' ../harness/CODEMAP.md   # 1 hit
+grep -n 'apioff\|svcdisabled\|unknownreason\|scopedetail\|events/taken' internal/google/calendar_test.go   # present
+grep -n 'func Test(TasksMapsAnAPIDisabled403ToUpstreamNotReauth|FakeCalendarAssignsAFreshIDPerGoogleAssignedInsert|SyncHandlerMapsA409OnThePatchAfterA409InsertTo502|PracticeEventIDHoldsItsBoundsForEveryInput)'   # 4 hits, one per file
+mutation check: ev.ID = "" makes TestAFailedSaveAfterTheEventInsertDoesNotCreateASecondEvent fail with
+  "retry inserted a second event: [...]" — exactly the message the plan named; service.go restored clean after (git diff --quiet)
+git diff --stat origin/main -- . | outside the safe set   # only harness/STATE.md and this plan file (both uncommitted bookkeeping, per instructions)
+git diff --quiet origin/main -- internal/google/token.go internal/google/token_test.go internal/google/integration_test.go   # clean — refresh-token branch's files untouched
+```
+
+**Runtime proof (Definition of done):**
+1. **Builds:** `go build ./...` clean, `go build -o /tmp/api-google403-build ./cmd/api` clean.
+2. **Whole suite:** `go test -timeout 300s ./... -count=1` — every package `ok` (cmd/api, airouter, auth, config, google, health, middleware, notify, onboarding, pet, quests, secrets, store).
+3. **Boots and answers:** started Postgres 16 + Redis 7 via `docker compose -p google-403` (ports 15532/16479, scratch `.env`), built and ran the real `cmd/api` binary against them (`JWT_SECRET`/`ENCRYPTION_SECRET_KEY` generated with `openssl rand -hex 32`, no AI/VAPID keys). Log showed `migrations applied: [0001_init 0002_google_sync 0003_pet_verdict_dates]` and `listening on [::]:18099`. `curl /healthz` → `{"postgres":"ok","redis":"ok","status":"ok"}` (200). `curl -X POST /api/v1/integrations/google/sync` (no auth) → `{"error":"unauthorized"}` (401) — the modified `google` package links into the real binary and the route is live. (No real Google 403 was reproduced — the owner's GCP project has both APIs enabled, as the plan's Notes say; the fix is proven at the unit level with `apioff`/`svcdisabled` bodies matching Google's documented `accessNotConfigured`/`ErrorInfo SERVICE_DISABLED` shapes.)
+4. **Documented commands:** `go build ./...`, `gofmt -l`, `go vet`, `go test` variants above all ran as documented and passed.
+5. **CI green:** pushed `harness/2026-09-27-low-google-403-accessnotconfigured-api-disabled-still-maps-to-re`; run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/36292025148 — `frontend`, `backend-integration`, `harness-tooling`, `backend-unit`, `docker-images` all green, conclusion `success`.
+6. **Cleanup:** killed the API process (`pgrep -fl api-google403` empty afterward), `docker compose -p google-403 down`, removed the named volume and the scratch `backend/.env`; `docker ps` shows nothing of this project.
+
+**Deviations:** none from the plan's scope, file structure, or task order.
+
+**Follow-ups (outside the safe set, not edited here):**
+- Backend spec §6.4's error table, if it enumerates the 403 → `reauth_required` mapping, should be updated to say "scope/permission 403 only" (grep target: `project-base/Adaptive English Learning Platform - Backend Technical Specification.md`).
+- `deploy/README.md`'s Google console checklist could note that the Calendar and Tasks APIs must be enabled in the GCP project — an API-disabled deployment now answers 502 with the reason logged, instead of looping the user through consent.

@@ -32,3 +32,6 @@ Technical (backend `quests`; frontend hub + roadmap):
 - `harness/plans/2026-09-26-day-28-checkpoint-…` — re-grades from a quiz because no performance data exists.
 - Backend spec §6.2 (`user_answers` in the request); 1st-thinking §1 (CEFR progression), §3.2 (`exercises`).
 - Knowledge tracing and answer-level analytics in adaptive language systems: https://www.sciencedirect.com/science/article/pii/S266630742300030X ; option tracing (what was answered, not only whether correct): https://arxiv.org/pdf/2104.09043 ; progress visibility and retention: https://trophy.so/blog/how-to-create-duolingo-style-progress-reports-for-your-app
+
+## Evaluation
+_Evaluator, 2026-09-27 — 14:00 feature run._ **Deferred — left `proposed`.** Real value (the first learning metric), but it needs the typed-content part 2 in-room feedback to be meaningful to the learner, adds a migration while two `0004_*` migrations are pending, and edits `quests/repo.go`/`service.go`, which the swap plan and several unmerged branches also touch. Carry over; plan after the swap plan lands so both `exercises` migrations are sequenced.
