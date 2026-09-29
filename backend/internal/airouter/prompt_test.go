@@ -29,3 +29,18 @@ func TestRoadmapUserPromptCarriesTheLearnerAndTheSchema(t *testing.T) {
 		}
 	}
 }
+
+func TestRoadmapUserPromptCarriesLevelAndGoalGuidance(t *testing.T) {
+	p := RoadmapUserPrompt("B1", "Business English", 30)
+	for _, want := range []string{
+		LevelGuidance("B1"),
+		`Business English`,
+		`never generic greetings, numbers or classroom basics unless the level is A1`,
+		RoadmapSchema,
+		"Daily study time: 30 minutes",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("RoadmapUserPrompt missing %q\ngot: %s", want, p)
+		}
+	}
+}

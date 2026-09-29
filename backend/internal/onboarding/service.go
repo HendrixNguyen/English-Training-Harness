@@ -26,8 +26,10 @@ var ErrAITimeout = errors.New("onboarding: AI call timed out")
 // no_active_roadmap.
 var ErrNoActiveRoadmap = errors.New("onboarding: no active roadmap")
 
-// cefrOrder is the CEFR scale, used by stepAllowed to bound Regenerate's
-// level change to one step either way.
+// cefrOrder is the fixed CEFR ladder used by stepAllowed (bounds Regenerate's
+// level change to one step either way), GradeFloor and maxLevel (grade.go).
+// C2 is reachable only through the AI grader — the placement Bank tops out
+// at C1, so GradeFloor's floor never reaches it.
 var cefrOrder = []string{"A1", "A2", "B1", "B2", "C1", "C2"}
 
 // DailyMinutes is the study commitment the roadmap prompt is built for (§1).
@@ -107,6 +109,15 @@ func (s *Service) Assess(ctx context.Context, userID string, req AssessmentReque
 			return err
 		}); err != nil {
 			return AssessmentResult{}, err
+		}
+		// The bank's own correct answers set a deterministic floor: the AI's
+		// grade can never be lowered, but a learner whose answers prove a
+		// higher level is never graded below it.
+		if floor := GradeFloor(req.Answers); floor != level {
+			if raised := maxLevel(level, floor); raised != level {
+				log.Printf("onboarding: placement %s raised to %s by the answer floor for %s", level, raised, userID)
+				level = raised
+			}
 		}
 		if err := s.quiz.StageLevel(ctx, userID, level, store.PlacementQuizTTL); err != nil {
 			log.Printf("onboarding: staging level for %s: %v", userID, err) // a retry grades again
@@ -193,8 +204,9 @@ func (s *Service) Regenerate(ctx context.Context, userID string, req RegenerateR
 // stepAllowed reports whether requested is current or one CEFR step away
 // (A1..C2). Both must be known levels; an unknown level is never allowed.
 func stepAllowed(current, requested string) bool {
-	ci, ri := indexOf(cefrOrder, current), indexOf(cefrOrder, requested)
-	if ci < 0 || ri < 0 {
+	ci, cok := cefrIndex(current)
+	ri, rok := cefrIndex(requested)
+	if !cok || !rok {
 		return false
 	}
 	d := ci - ri
@@ -202,15 +214,6 @@ func stepAllowed(current, requested string) bool {
 		d = -d
 	}
 	return d <= 1
-}
-
-func indexOf(levels []string, level string) int {
-	for i, l := range levels {
-		if l == level {
-			return i
-		}
-	}
-	return -1
 }
 
 // routeJSON calls the router and parses; a malformed body is retried once,
