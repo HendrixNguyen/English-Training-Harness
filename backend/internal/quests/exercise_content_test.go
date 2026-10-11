@@ -466,3 +466,50 @@ func TestExerciseHandlerMapsEveryCode(t *testing.T) {
 		}
 	})
 }
+
+// contentProviderFunc keeps deadline regressions on the real router's
+// per-provider budgets and joined errors, rather than scripting Route itself.
+type contentProviderFunc func(context.Context, string, string) (string, error)
+
+func (f contentProviderFunc) GenerateContent(ctx context.Context, system, user string) (string, error) {
+	return f(ctx, system, user)
+}
+
+func TestContentServiceProviderShareTimeoutPreservesUpstream(t *testing.T) {
+	for _, mode := range []string{"service", "handler"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Date(2026, time.September, 27, 10, 0, 0, 0, time.UTC)
+			repo := &fakeContentRepo{target: baseTarget(now)}
+			limiter := &fakeContentLimiter{}
+			preferredCalls, fallbackCalls := 0, 0
+			router := airouter.NewRouterWithProviders(map[airouter.ProviderType]airouter.LLMProvider{
+				airouter.ProviderDeepSeek: contentProviderFunc(func(ctx context.Context, _, _ string) (string, error) {
+					preferredCalls++
+					<-ctx.Done()
+					return "", ctx.Err()
+				}),
+				airouter.ProviderGemini: contentProviderFunc(func(_ context.Context, _, _ string) (string, error) {
+					fallbackCalls++
+					return "", errors.New("fallback upstream failure")
+				}),
+			})
+			svc := NewContentService(repo, router, limiter, func() time.Time { return now })
+			svc.timeout = 200 * time.Millisecond
+			if mode == "service" {
+				_, err := svc.Exercise(context.Background(), "u1", "ex-1")
+				if !errors.Is(err, airouter.ErrAllProvidersFailed) || !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrAITimeout) {
+					t.Fatalf("provider-share timeout: %v, want upstream failure containing DeadlineExceeded, without ErrAITimeout", err)
+				}
+			} else {
+				response := httptest.NewRecorder()
+				newContentRouter(svc, "u1").ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/quests/exercises/ex-1", nil))
+				if response.Code != http.StatusBadGateway || !strings.Contains(response.Body.String(), `"error":"ai_upstream_failed"`) {
+					t.Fatalf("response = %d %s, want 502 ai_upstream_failed", response.Code, response.Body)
+				}
+			}
+			if preferredCalls != 1 || fallbackCalls != 1 || limiter.calls != 1 || repo.saveCalls != 0 {
+				t.Errorf("preferred=%d fallback=%d limiter=%d saves=%d, want 1/1/1/0", preferredCalls, fallbackCalls, limiter.calls, repo.saveCalls)
+			}
+		})
+	}
+}

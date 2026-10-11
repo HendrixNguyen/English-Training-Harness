@@ -166,7 +166,7 @@ func (s *ContentService) route(ctx context.Context, brief airouter.ExerciseBrief
 	actx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	raw, err := s.ai.Route(actx, airouter.TaskExerciseGen, airouter.ExerciseSystemPrompt, airouter.ExerciseUserPrompt(brief))
-	if err != nil && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+	if err != nil && ctx.Err() == nil && errors.Is(actx.Err(), context.DeadlineExceeded) {
 		return "", fmt.Errorf("%w: exercise_generation after %s", ErrAITimeout, budget)
 	}
 	return raw, err
