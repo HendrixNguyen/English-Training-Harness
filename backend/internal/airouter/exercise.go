@@ -47,9 +47,10 @@ func ExerciseUserPrompt(b ExerciseBrief) string {
 			MinWords, MaxWords, questionShape, MinVocabQuestions, MaxVocabQuestions)
 	case "reading":
 		lo, hi := PassageWords(b.Level)
-		fmt.Fprintf(&sb, `{"passage":"<%d-%d words>", "questions":[%s] × %d-%d}`,
-			lo, hi, questionShape, MinReadingQuestions, MaxReadingQuestions)
+		fmt.Fprintf(&sb, `{"passage":"<%d-%d words>", "glossary":[{"term":"…","meaning_vi":"…","definition":"…"}] × %d-%d, "questions":[%s] × %d-%d}`,
+			lo, hi, MinGlossary, MaxGlossary, questionShape, MinReadingQuestions, MaxReadingQuestions)
 		sb.WriteString("\nThe questions are about the passage.")
+		sb.WriteString("\nFor the glossary, choose distinct harder terms appropriate to the learner's CEFR level. Each term must use the exact spelling from the passage, with a short Vietnamese meaning and a one-sentence English definition.")
 	case "practice":
 		fmt.Fprintf(&sb, `{"questions":[%s] × %d-%d}`, questionShape, MinPracticeQuestions, MaxPracticeQuestions)
 	}

@@ -36,9 +36,18 @@ type VocabularyContent struct {
 	Questions []Question `json:"questions"`
 }
 
+// Gloss is one passage term with a Vietnamese meaning and English definition.
+// Blank/missing text and cosmetic errors are left for client sanitation.
+type Gloss struct {
+	Term       string `json:"term"`
+	MeaningVI  string `json:"meaning_vi"`
+	Definition string `json:"definition"`
+}
+
 type ReadingContent struct {
 	Passage   string     `json:"passage"`
 	Questions []Question `json:"questions"`
+	Glossary  []Gloss    `json:"glossary,omitempty"`
 }
 
 type PracticeContent struct {
@@ -49,12 +58,13 @@ type PracticeContent struct {
 // these numbers; TestExerciseUserPromptNamesOnlyItsShape keeps them in step.
 const (
 	// MaxContentBytes bounds the complete persisted content, including text
-	// and unknown fields; generous headroom above the ~6 KiB C2 size probe.
+	// and unknown fields; generous headroom above the ~8 KiB C2 size probe.
 	MaxContentBytes = 32 * 1024
 
 	MinWords, MaxWords                         = 5, 8
 	MinVocabQuestions, MaxVocabQuestions       = 3, 5
 	MinReadingQuestions, MaxReadingQuestions   = 3, 5
+	MinGlossary, MaxGlossary                   = 5, 8 // prompt bounds; not validation bounds
 	MinPracticeQuestions, MaxPracticeQuestions = 4, 8
 )
 
@@ -96,7 +106,10 @@ func invalidContent(format string, args ...any) error {
 // ValidateContent decodes content into the shape for taskType and checks
 // counts, option keys, answers, non-blank text and, for reading, the
 // level's passage bounds. content itself is never modified — content_json
-// stores the model's bytes.
+// stores the model's bytes. Optional reading glossaries use typed decoding
+// only: null acts absent, null/missing string fields act blank, and the client
+// filters blank/duplicate/absent terms and caps entries. Cosmetic glossary
+// errors must not discard an otherwise usable passage and question set.
 func ValidateContent(taskType, level string, content json.RawMessage) error {
 	if len(content) > MaxContentBytes {
 		return invalidContent("body exceeds %d bytes", MaxContentBytes)
@@ -194,7 +207,17 @@ func SampleContent(taskType string) json.RawMessage {
 		}
 		v = VocabularyContent{Words: words, Questions: questions(MinVocabQuestions)}
 	case "reading":
-		v = ReadingContent{Passage: strings.Repeat("The learner reads a short passage about daily habits and practises new words in context. ", 6), Questions: questions(MinReadingQuestions)}
+		v = ReadingContent{
+			Passage:   strings.Repeat("The learner reads a short passage about daily habits and practises new words in context. ", 6),
+			Questions: questions(MinReadingQuestions),
+			Glossary: []Gloss{
+				{Term: "learner", MeaningVI: "người học", Definition: "A person who is learning something."},
+				{Term: "passage", MeaningVI: "đoạn văn", Definition: "A short section of written text."},
+				{Term: "habits", MeaningVI: "thói quen", Definition: "Things that someone does regularly."},
+				{Term: "practises", MeaningVI: "luyện tập", Definition: "Repeats an activity to become better at it."},
+				{Term: "context", MeaningVI: "ngữ cảnh", Definition: "The situation that helps explain what a word means."},
+			},
+		}
 	default:
 		v = PracticeContent{Questions: questions(MinPracticeQuestions)}
 	}

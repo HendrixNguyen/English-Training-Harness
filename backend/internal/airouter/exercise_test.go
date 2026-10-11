@@ -128,8 +128,9 @@ func TestParseExerciseContent(t *testing.T) {
 }
 
 // TestExerciseAnswerFitsTheBudget is the size probe the blocker asked for:
-// the largest valid content per type, at C2 (the widest bounds), must still
-// fit comfortably inside ExerciseTimeout.
+// representative generous text sizes per type, at C2 (the widest bounds),
+// should fit comfortably inside ExerciseTimeout. Text fields are not bounded
+// individually, so this is an estimate, not an upper bound on valid content.
 func TestExerciseAnswerFitsTheBudget(t *testing.T) {
 	longQuestion := func(id string) Question {
 		return Question{
@@ -161,10 +162,17 @@ func TestExerciseAnswerFitsTheBudget(t *testing.T) {
 		}
 		return out
 	}
+	longGlossary := func(n int) []Gloss {
+		out := make([]Gloss, 0, n)
+		for i := 1; i <= n; i++ {
+			out = append(out, Gloss{Term: strings.Repeat("t", 20), MeaningVI: strings.Repeat("nghĩa ", 8), Definition: strings.Repeat("d", 100)})
+		}
+		return out
+	}
 
 	cases := map[string]any{
 		"vocabulary": VocabularyContent{Words: longWords(MaxWords), Questions: longQuestions(MaxVocabQuestions)},
-		"reading":    ReadingContent{Passage: strings.Repeat("a", maxRunes), Questions: longQuestions(MaxReadingQuestions)},
+		"reading":    ReadingContent{Passage: strings.Repeat("a", maxRunes), Glossary: longGlossary(MaxGlossary), Questions: longQuestions(MaxReadingQuestions)},
 		"practice":   PracticeContent{Questions: longQuestions(MaxPracticeQuestions)},
 	}
 	for tt, v := range cases {
@@ -177,11 +185,13 @@ func TestExerciseAnswerFitsTheBudget(t *testing.T) {
 			if err != nil {
 				t.Fatalf("largest %s content rejected: %v", tt, err)
 			}
-			// ≤ 6 KB ≈ 1.5k tokens at ~4 bytes/token; at the measured ~42 tok/s
-			// (production, 2026-09-25) that is ≤ ~36 s, well inside the 60 s
-			// ExerciseTimeout.
-			if len(out) > 6144 {
-				t.Errorf("%s: %d bytes, want ≤ 6144", tt, len(out))
+			// ≤ 8 KiB ≈ 2k tokens at ~4 bytes/token; at the measured ~42 tok/s
+			// (production, 2026-09-25) that is ~49 s, inside the 60 s
+			// ExerciseTimeout. This single-exercise estimate includes Vietnamese
+			// glossary bytes; it does not multiply content over a whole roadmap.
+			t.Logf("%s representative content: %d bytes", tt, len(out))
+			if len(out) > 8192 {
+				t.Errorf("%s: %d bytes, want ≤ 8192", tt, len(out))
 			}
 		})
 	}
