@@ -15,6 +15,16 @@ describe('lossless glossary segmentation', () => {
     expect(marked('New\n  York then New York; York.', ['York', 'New York'])).toEqual(['New\n  York', 'York'])
     expect(marked('new york', ['new', 'new york'])).toEqual(['new york'])
   })
+  it('finds an overlapping valid phrase after rejecting a Unicode word-internal occurrence', () => {
+    for (const passage of ['shad had had enough.', 'éhad had had enough.', '2had had had enough.', '𝒔had had had enough.']) {
+      const glossary = [gloss('had had')]
+      const start = passage.indexOf('had had', passage.indexOf('had had') + 1)
+      const segments = segmentPassage(passage, glossary)
+      expect(segments).toEqual([{ text: passage.slice(0, start) }, { text: 'had had', gloss: 0 }, { text: ' enough.' }])
+      expect(segments.map(segment => segment.text).join('')).toBe(passage)
+      expect(sanitizeGlossary(glossary, passage)).toEqual(glossary)
+    }
+  })
   it('drops malformed, blank, duplicate, absent and unplaceable entries and caps eight', () => {
     const passage = 'one two three four five six seven eight nine'
     const entries = [null, gloss('absent'), { ...gloss('one'), definition: ' ' }, gloss(' one '), gloss('ONE'), ...'two three four five six seven eight nine'.split(' ').map(gloss)]

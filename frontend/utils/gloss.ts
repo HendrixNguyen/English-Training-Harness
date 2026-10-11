@@ -9,12 +9,11 @@ export function segmentPassage(passage: string, glossary: Gloss[]): Segment[] {
     const term = entry.term.trim()
     if (!term) return
     const pattern = term.split(/\s+/u).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
-    const regex = new RegExp(`${pattern}[\\p{L}\\p{N}'’-]*`, 'giu')
+    // Reject word-internal starts during the search, before matchAll advances.
+    const regex = new RegExp(`(?<![\\p{L}\\p{N}])${pattern}[\\p{L}\\p{N}'’-]*`, 'giu')
     for (const match of passage.matchAll(regex)) {
       const start = match.index
       const end = start + match[0].length
-      const previous = Array.from(passage.slice(0, start)).at(-1)
-      if (previous && /[\p{L}\p{N}]/u.test(previous)) continue
       if (marks.some(mark => start < mark.end && end > mark.start)) continue
       marks.push({ start, end, gloss })
       break
