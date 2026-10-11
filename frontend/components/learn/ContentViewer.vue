@@ -1,25 +1,41 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
+import ItemPassage from '~/components/learn/ItemPassage.vue'
+import RetroButton from '~/components/retro/RetroButton.vue'
 import type { Classified } from '~/utils/content'
 
 const props = defineProps<{ content: Classified, title: string }>()
 const emit = defineEmits<{ answer: [questionId: string, option: string], finished: [] }>()
 
-const index = ref(0)
+const index = ref(props.content.kind === 'reading' ? -1 : 0)
+const passageOpen = ref(false)
+const passageRef = ref<InstanceType<typeof ItemPassage> | null>(null)
+const sheetRef = ref<InstanceType<typeof ItemPassage> | null>(null)
+const sheetId = useId()
+const passageItem = computed(() => props.content.kind === 'reading' && index.value === -1)
+const questions = computed(() => props.content.kind === 'questions' || props.content.kind === 'reading' ? props.content.questions : [])
 const selected = ref<string | null>(null)
 
-const items = computed(() => props.content.kind === 'words' ? props.content.words : props.content.kind === 'questions' ? props.content.questions : [])
+const items = computed(() => props.content.kind === 'words' ? props.content.words : questions.value)
 const total = computed(() => items.value.length)
 const isLast = computed(() => index.value >= total.value - 1)
 
 const buttonLabel = computed(() => {
-  if (props.content.kind === 'questions' && selected.value !== null) return 'Gửi đáp án'
+  if (passageItem.value) return 'Đọc xong →'
+  if (questions.value.length && selected.value !== null) return 'Gửi đáp án'
   return isLast.value || props.content.kind === 'raw' ? 'Hoàn thành' : 'Tiếp tục'
 })
 
+function togglePassage() {
+  sheetRef.value?.closeGloss()
+  passageOpen.value = !passageOpen.value
+}
+
 function next() {
-  if (props.content.kind === 'questions' && selected.value !== null) {
-    emit('answer', props.content.questions[index.value]!.id, selected.value)
+  passageRef.value?.closeGloss()
+  sheetRef.value?.closeGloss()
+  if (!passageItem.value && questions.value.length && selected.value !== null) {
+    emit('answer', questions.value[index.value]!.id, selected.value)
   }
   selected.value = null
   if (props.content.kind === 'raw' || isLast.value) {
@@ -32,9 +48,14 @@ function next() {
 
 <template>
   <div class="space-y-4">
-    <p v-if="content.kind !== 'raw'" class="text-sm text-mute">
-      Câu {{ index + 1 }} / {{ total }}
-    </p>
+    <div v-if="content.kind !== 'raw' && !passageItem" class="flex h-11 items-center justify-between">
+      <p class="text-sm text-mute">Câu {{ index + 1 }} / {{ total }}</p>
+      <slot name="eyebrow-action" />
+    </div>
+
+    <ItemPassage v-if="passageItem && content.kind === 'reading'" ref="passageRef" :passage="content.passage" :glossary="content.glossary">
+      <template #eyebrow-action><slot name="eyebrow-action" /></template>
+    </ItemPassage>
 
     <template v-if="content.kind === 'words'">
       <p class="font-display text-3xl">
@@ -45,13 +66,19 @@ function next() {
       </p>
     </template>
 
-    <template v-else-if="content.kind === 'questions'">
+    <template v-else-if="!passageItem && (content.kind === 'questions' || content.kind === 'reading')">
+      <template v-if="content.kind === 'reading'">
+        <RetroButton variant="secondary" block :aria-expanded="passageOpen" :aria-controls="sheetId" @click="togglePassage">{{ passageOpen ? 'Ẩn đoạn văn' : 'Xem lại đoạn' }}</RetroButton>
+        <ItemPassage v-if="passageOpen" :id="sheetId" ref="sheetRef" mode="sheet" :passage="content.passage" :glossary="content.glossary">
+          <template #eyebrow-action><slot name="eyebrow-action" /></template>
+        </ItemPassage>
+      </template>
       <p class="text-lg">
-        "{{ content.questions[index]?.prompt }}"
+        "{{ questions[index]?.prompt }}"
       </p>
       <div role="radiogroup" class="space-y-2">
         <button
-          v-for="(text, key) in content.questions[index]?.options"
+          v-for="(text, key) in questions[index]?.options"
           :key="key"
           type="button"
           role="radio"
@@ -65,7 +92,7 @@ function next() {
       </div>
     </template>
 
-    <template v-else>
+    <template v-else-if="content.kind === 'raw'">
       <h2 class="font-display text-2xl">
         {{ title }}
       </h2>

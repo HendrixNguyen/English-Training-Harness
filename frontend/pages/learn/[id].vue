@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useAuthStore } from '~/stores/auth'
 import { usePetStore } from '~/stores/pet'
 import { useQuestStore } from '~/stores/quest'
 import { ApiError } from '~/utils/apiClient'
-import { classifyContent } from '~/utils/content'
+import { classifyContent, hasUsableContent } from '~/utils/content'
 
 const route = useRoute()
 const quest = useQuestStore()
 const pet = usePetStore()
+const auth = useAuthStore()
+const account = computed(() => `${auth.user?.id ?? ''}:${auth.accessToken ?? ''}`)
 
 const id = computed(() => String(route.params.id))
 const task = computed(() => quest.taskById(id.value))
@@ -18,6 +21,9 @@ const answers = ref<Record<string, string>>({})
 const finished = ref(false)
 const posting = ref(false)
 const error = ref<string | null>(null)
+const hydrating = ref(true)
+const hydrationError = ref<string | null>(null)
+const ready = computed(() => !hydrating.value && !hydrationError.value && hasUsableContent(task.value?.content_json))
 const online = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
 
 let interval: ReturnType<typeof setInterval> | null = null
@@ -26,14 +32,52 @@ function sync() {
   quest.tick()
 }
 
-onMounted(async () => {
-  if (!quest.daily && !quest.noRoadmap) await quest.load()
-  if (task.value && !task.value.is_completed) {
-    quest.startTimer(task.value.id, task.value.duration_minutes || 10)
-    quest.tick()
-    interval = setInterval(() => quest.tick(), 1000)
+let generation = 0
+let disposed = false
+
+async function openTask() {
+  const request = ++generation
+  const requestedId = id.value
+  const requestedAccount = account.value
+  const current = () => !disposed && request === generation && id.value === requestedId && account.value === requestedAccount
+  hydrating.value = true
+  hydrationError.value = null
+  quest.resetForAccount()
+  try {
+    if (!quest.daily && !quest.noRoadmap) await quest.load()
+    if (!current()) return
+    const requested = quest.taskById(requestedId)
+    if (requested && !requested.is_completed) {
+      if (!hasUsableContent(requested.content_json) && !online.value) throw new Error('offline')
+      await quest.hydrateTask(requestedId, current)
+      if (!current()) return
+      const hydrated = quest.taskById(requestedId)
+      if (hydrated && !hydrated.is_completed) {
+        if (!hasUsableContent(hydrated.content_json)) throw new ApiError(502, 'ai_bad_output')
+        quest.startTimer(hydrated.id, hydrated.duration_minutes || 10)
+        quest.tick()
+      }
+    }
+  } catch (e) {
+    if (!current()) return
+    hydrationError.value = !online.value ? 'Cần kết nối để tải nội dung. Kết nối rồi thử lại.'
+      : e instanceof ApiError && e.code === 'exercise_not_found' ? 'Nhiệm vụ này không còn khả dụng. Về trang chính để tải lại.'
+        : 'Chưa tải được nội dung học. Thử lại.'
+  } finally {
+    if (current()) hydrating.value = false
   }
-  // a resumed tab or PWA snaps to the wall clock immediately instead of waiting for the next (throttled) tick
+}
+
+onMounted(() => {
+  watch([id, account], () => {
+    answers.value = {}
+    finished.value = false
+    posting.value = false
+    error.value = null
+    void openTask()
+  }, { immediate: true })
+  interval = setInterval(() => quest.tick(), 1000)
+  // A resumed tab snaps to the persisted wall-clock anchor immediately.
   document.addEventListener('visibilitychange', sync)
   window.addEventListener('focus', sync)
   window.addEventListener('online', setOnline)
@@ -41,6 +85,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  generation += 1
   if (interval) clearInterval(interval) // the store keeps the wall-clock anchor (and aelp.timers keeps it across reloads), so re-entry resumes
   document.removeEventListener('visibilitychange', sync)
   window.removeEventListener('focus', sync)
@@ -59,19 +105,25 @@ const buttonLabel = computed(() => {
 })
 
 async function complete() {
-  if (!task.value || posting.value) return
+  if (!task.value || posting.value || !ready.value || !online.value || task.value.is_completed || (!finished.value && (!timer.value || remaining.value !== 0))) return
+  const request = generation
+  const exerciseId = task.value.id
+  const requestedAccount = account.value
+  const current = () => !disposed && generation === request && id.value === exerciseId && account.value === requestedAccount
   posting.value = true
   error.value = null
   try {
-    const res = await quest.complete(task.value.id, quest.elapsedSeconds(task.value.id, Date.now()), answers.value)
+    const res = await quest.complete(exerciseId, quest.elapsedSeconds(exerciseId, Date.now()), { ...answers.value })
+    if (!current()) return
     pet.applyProgress(res)
     await navigateTo('/', { replace: true })
   } catch (e) {
+    if (!current()) return
     error.value = e instanceof ApiError && e.code === 'exercise_not_found'
       ? 'Nhiệm vụ này không còn trong hôm nay. Về trang chính để tải lại.'
       : 'Chưa ghi được tiến độ. Thử lại.'
   } finally {
-    posting.value = false
+    if (current()) posting.value = false
   }
 }
 </script>
@@ -84,11 +136,13 @@ async function complete() {
     </div>
 
     <AppCard class="flex-1">
-      <StateBlock v-if="quest.loading && !quest.daily" state="loading" />
+      <StateBlock v-if="hydrating" state="loading" />
+      <StateBlock v-else-if="hydrationError || (quest.error && !quest.daily)" state="error" :message="hydrationError || 'Chưa tải được nhiệm vụ. Thử lại.'" action="Thử lại" @action="openTask" />
       <StateBlock v-else-if="!task" state="empty" message="Nhiệm vụ này không có trong hôm nay." action="Về trang chính" @action="navigateTo('/')" />
       <template v-else>
         <ContentViewer
-          v-if="!finished && !task.is_completed"
+          v-if="ready && !finished && !task.is_completed"
+          :key="id"
           :content="content"
           :title="task.title"
           @answer="(qid, opt) => { answers[qid] = opt }"
@@ -120,7 +174,7 @@ async function complete() {
       class="mt-4"
       block
       :loading="posting"
-      :disabled="task.is_completed || !online || (!finished && (!timer || remaining !== 0))"
+      :disabled="!ready || task.is_completed || !online || (!finished && (!timer || remaining !== 0))"
       @click="complete"
     >
       {{ buttonLabel }}

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
 import { ApiError } from '~/utils/apiClient'
+import { useAuthStore } from '~/stores/auth'
+import { hasUsableContent } from '~/utils/content'
 import { clampDuration } from '~/utils/progress'
 
 export const TASK_ORDER = ['vocabulary', 'reading', 'practice'] as const
@@ -79,9 +81,34 @@ function rank(type: string): number {
   return i === -1 ? TASK_ORDER.length : i
 }
 
+const contentCacheKey = 'aelp.exercise-content'
+const pendingHydration = new WeakMap<object, Map<string, Promise<QuestTask>>>()
+const pendingDaily = new WeakMap<object, Promise<void>>()
+function sessionScope(): string {
+  const auth = useAuthStore()
+  return `${auth.user?.id ?? ''}:${auth.accessToken ?? ''}`
+}
+function cachedContent(id: string): unknown {
+  try {
+    const cache = JSON.parse(storageOrNull()?.getItem(contentCacheKey) ?? 'null')
+    if (cache?.owner === (useAuthStore().user?.id ?? null)) return cache.tasks?.[id]
+  } catch { /* denied storage or an obsolete cache */ }
+  return undefined
+}
+function cacheContent(id: string, content: unknown) {
+  try {
+    const owner = useAuthStore().user?.id ?? null
+    const stored = JSON.parse(storageOrNull()?.getItem(contentCacheKey) ?? 'null')
+    const tasks = stored?.owner === owner && typeof stored.tasks === 'object' && stored.tasks !== null ? stored.tasks : {}
+    tasks[id] = content
+    storageOrNull()?.setItem(contentCacheKey, JSON.stringify({ owner, tasks }))
+  } catch { /* in-memory content remains usable */ }
+}
+
 export const useQuestStore = defineStore('quest', {
   state: () => ({
     daily: null as DailyQuests | null,
+    accountScope: sessionScope(),
     noRoadmap: false,
     loading: false,
     error: null as string | null,
@@ -97,22 +124,81 @@ export const useQuestStore = defineStore('quest', {
     targetMet: s => s.daily?.is_target_met ?? false,
   },
   actions: {
+    resetForAccount() {
+      if (this.accountScope === sessionScope()) return
+      pendingDaily.delete(this)
+      this.accountScope = sessionScope()
+      this.daily = null
+      this.noRoadmap = false
+      this.error = null
+      this.loading = false
+      this.timers = {}
+      writeTimers(this.timers)
+    },
     async load() {
+      this.resetForAccount()
+      const scope = sessionScope()
+      const existing = pendingDaily.get(this)
+      if (existing) return existing
       this.loading = true
       this.error = null
-      try {
-        this.daily = await useApi().get<DailyQuests>('/api/v1/quests/daily')
-        this.pruneTimers()
-        this.noRoadmap = false
-      } catch (e) {
-        if (e instanceof ApiError && e.code === 'no_active_roadmap') {
-          this.daily = null
-          this.noRoadmap = true
-        } else {
-          this.error = e instanceof ApiError ? e.code : 'network_error'
+      const request = (async () => {
+        try {
+          const response = await useApi().get<DailyQuests>('/api/v1/quests/daily')
+          if (scope !== sessionScope()) return
+          for (const task of response.tasks) {
+            const previous = this.taskById(task.id)
+            if (previous?.is_completed) task.is_completed = true
+            if (!hasUsableContent(task.content_json)) {
+              const cached = previous && hasUsableContent(previous.content_json) ? previous.content_json : cachedContent(task.id)
+              if (hasUsableContent(cached)) task.content_json = cached
+            }
+          }
+          this.daily = response
+          this.pruneTimers()
+          this.noRoadmap = false
+        } catch (e) {
+          if (scope !== sessionScope()) return
+          if (e instanceof ApiError && e.code === 'no_active_roadmap') {
+            this.daily = null
+            this.noRoadmap = true
+          } else {
+            this.error = e instanceof ApiError ? e.code : 'network_error'
+          }
+        } finally {
+          if (scope === sessionScope()) this.loading = false
         }
+      })()
+      pendingDaily.set(this, request)
+      try { await request } finally { if (pendingDaily.get(this) === request) pendingDaily.delete(this) }
+    },
+    /** Fetch only outlines; the caller can invalidate application after a route change. */
+    async hydrateTask(id: string, current: () => boolean = () => true): Promise<QuestTask | null> {
+      this.resetForAccount()
+      const task = this.taskById(id)
+      if (!task || task.is_completed || hasUsableContent(task.content_json)) return task
+      const scope = sessionScope()
+      const daily = this.daily
+      let pending = pendingHydration.get(this)
+      if (!pending) { pending = new Map(); pendingHydration.set(this, pending) }
+      const key = `${scope}:${id}`
+      let request = pending.get(key)
+      if (!request) {
+        request = useApi().get<QuestTask>(`/api/v1/quests/exercises/${encodeURIComponent(id)}`)
+        pending.set(key, request)
+      }
+      try {
+        const response = await request
+        if (scope !== sessionScope() || daily !== this.daily || !current()) return null
+        if (response.id !== id || !hasUsableContent(response.content_json)) throw new ApiError(502, 'ai_bad_output')
+        const existing = this.taskById(id)
+        if (!existing || existing.is_completed) return existing
+        const index = this.daily!.tasks.findIndex(t => t.id === id)
+        this.daily!.tasks[index] = response
+        cacheContent(id, response.content_json)
+        return response
       } finally {
-        this.loading = false
+        if (pending.get(key) === request) pending.delete(key)
       }
     },
     taskById(id: string): QuestTask | null {
@@ -153,8 +239,11 @@ export const useQuestStore = defineStore('quest', {
     async complete(exerciseId: string, durationSeconds: number, userAnswers?: Record<string, string>): Promise<CompleteResult> {
       const body: Record<string, unknown> = { exercise_id: exerciseId, duration_seconds: clampDuration(durationSeconds) }
       if (userAnswers && Object.keys(userAnswers).length > 0) body.user_answers = userAnswers
+      const scope = sessionScope()
+      const daily = this.daily
       const wasMet = this.daily?.is_target_met ?? false
       const res = await useApi().post<ProgressResponse>('/api/v1/quests/progress', body)
+      if (scope !== sessionScope() || daily !== this.daily) return { ...res, targetMetChanged: false }
       if (this.daily) {
         this.daily.accumulated_seconds = res.daily_seconds_spent
         this.daily.is_target_met = res.is_target_met
