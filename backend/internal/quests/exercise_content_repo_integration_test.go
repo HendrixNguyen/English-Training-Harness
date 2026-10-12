@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -235,7 +237,7 @@ func TestIntegrationContentTargetAndSaveContent(t *testing.T) {
 		}
 	})
 
-	t.Run("SaveContent writes once; a second writer sees the first's content; roadmap_json is untouched", func(t *testing.T) {
+	t.Run("SaveContent snapshot CAS writes once and leaves roadmap unchanged", func(t *testing.T) {
 		practiceID := exerciseID(t, roadmapID, 10, "practice")
 
 		var roadmapJSONBefore []byte
@@ -244,7 +246,19 @@ func TestIntegrationContentTargetAndSaveContent(t *testing.T) {
 		}
 
 		contentA := json.RawMessage(`{"marker":"A"}`)
-		out, err := repo.SaveContent(ctx, practiceID, contentA)
+		before, err := repo.ContentTarget(ctx, userID, practiceID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, won, err := repo.SaveContent(ctx, userID, practiceID, before.Exercise.ContentJSON, contentA, "B1")
+		if !won {
+			t.Fatal("first CAS lost")
+		}
+		saved, readErr := repo.ContentTarget(ctx, userID, practiceID)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		out := saved.Exercise.ContentJSON
 		if err != nil {
 			t.Fatalf("SaveContent(A): %v", err)
 		}
@@ -268,7 +282,15 @@ func TestIntegrationContentTargetAndSaveContent(t *testing.T) {
 		}
 
 		contentB := json.RawMessage(`{"marker":"B"}`)
-		out2, err := repo.SaveContent(ctx, practiceID, contentB)
+		_, won, err = repo.SaveContent(ctx, userID, practiceID, before.Exercise.ContentJSON, contentB, "B1")
+		if won {
+			t.Fatal("stale second CAS won")
+		}
+		saved, readErr = repo.ContentTarget(ctx, userID, practiceID)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		out2 := saved.Exercise.ContentJSON
 		if err != nil {
 			t.Fatalf("SaveContent(B): %v", err)
 		}
@@ -291,11 +313,15 @@ func TestIntegrationContentTargetAndSaveContent(t *testing.T) {
 		}
 	})
 
-	t.Run("concurrent saves all return the winner bytes", func(t *testing.T) {
+	t.Run("concurrent initial saves elect exactly one winner", func(t *testing.T) {
 		id := exerciseID(t, roadmapID, 11, "practice")
 		const writers = 8
 		start := make(chan struct{})
-		outputs := make([]json.RawMessage, writers)
+		outputs := make([]bool, writers)
+		before, err := repo.ContentTarget(ctx, userID, id)
+		if err != nil {
+			t.Fatal(err)
+		}
 		errs := make([]error, writers)
 		var wg sync.WaitGroup
 		for i := 0; i < writers; i++ {
@@ -303,7 +329,7 @@ func TestIntegrationContentTargetAndSaveContent(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				<-start
-				outputs[i], errs[i] = repo.SaveContent(ctx, id, json.RawMessage(fmt.Sprintf(`{"writer":%d}`, i)))
+				_, outputs[i], errs[i] = repo.SaveContent(ctx, userID, id, before.Exercise.ContentJSON, json.RawMessage(fmt.Sprintf(`{"writer":%d}`, i)), "B1")
 			}(i)
 		}
 		close(start)
@@ -312,19 +338,259 @@ func TestIntegrationContentTargetAndSaveContent(t *testing.T) {
 		if err := pg.Pool.QueryRow(ctx, `SELECT content_json FROM exercises WHERE id = $1`, id).Scan(&stored); err != nil {
 			t.Fatal(err)
 		}
+		winners := 0
 		for i := 0; i < writers; i++ {
 			if errs[i] != nil {
 				t.Fatalf("writer %d: %v", i, errs[i])
 			}
-			if string(outputs[i]) != string(stored) {
-				t.Errorf("writer %d returned a different body than the winner", i)
+			if outputs[i] {
+				winners++
+				if !strings.Contains(string(stored), fmt.Sprintf(`"writer": %d`, i)) {
+					t.Errorf("winner %d not stored: %s", i, stored)
+				}
 			}
+		}
+		if winners != 1 {
+			t.Fatalf("winners=%d want1", winners)
 		}
 	})
 
-	t.Run("SaveContent for an unknown id is not found", func(t *testing.T) {
-		if _, err := repo.SaveContent(ctx, "00000000-0000-0000-0000-000000000000", json.RawMessage(`{}`)); !errors.Is(err, ErrExerciseNotFound) {
-			t.Errorf("err = %v, want ErrExerciseNotFound", err)
+	t.Run("old missing focus falls back to module title", func(t *testing.T) {
+		if _, err := pg.Pool.Exec(ctx, `UPDATE roadmaps SET roadmap_json=jsonb_set(roadmap_json,'{modules,1,focus}','"   "') WHERE id=$1`, roadmapID); err != nil {
+			t.Fatal(err)
+		}
+		target, err := repo.ContentTarget(ctx, userID, day9ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if target.ModuleFocus != "Week 2" || target.DayTitle != "Day 9 title" {
+			t.Fatalf("focus=%q day=%q", target.ModuleFocus, target.DayTitle)
 		}
 	})
+	t.Run("CAS refuses foreign completed inactive and changed rows", func(t *testing.T) {
+		id := exerciseID(t, roadmapID, 1, "practice")
+		before, err := repo.ContentTarget(ctx, userID, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := seedUser(t, "google-content-cas-other", "cas-other@example.com")
+		testNoWrite := func(owner string, snapshot json.RawMessage) {
+			t.Helper()
+			var beforeBytes, afterBytes json.RawMessage
+			if err := pg.Pool.QueryRow(ctx, `SELECT content_json FROM exercises WHERE id=$1`, id).Scan(&beforeBytes); err != nil {
+				t.Fatal(err)
+			}
+			_, won, err := repo.SaveContent(ctx, owner, id, snapshot, airouter.SampleContent("practice"), "B1")
+			if err != nil || won {
+				t.Fatalf("CAS won%t err%v", won, err)
+			}
+			if err := pg.Pool.QueryRow(ctx, `SELECT content_json FROM exercises WHERE id=$1`, id).Scan(&afterBytes); err != nil {
+				t.Fatal(err)
+			}
+			if string(beforeBytes) != string(afterBytes) {
+				t.Fatal("refused CAS mutated stored bytes")
+			}
+		}
+		testNoWrite(other, before.Exercise.ContentJSON)
+		if _, err := pg.Pool.Exec(ctx, `UPDATE exercises SET is_completed=true WHERE id=$1`, id); err != nil {
+			t.Fatal(err)
+		}
+		testNoWrite(userID, before.Exercise.ContentJSON)
+		if _, err := pg.Pool.Exec(ctx, `UPDATE exercises SET is_completed=false WHERE id=$1`, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pg.Pool.Exec(ctx, `UPDATE roadmaps SET is_active=false WHERE id=$1`, roadmapID); err != nil {
+			t.Fatal(err)
+		}
+		testNoWrite(userID, before.Exercise.ContentJSON)
+		if _, err := pg.Pool.Exec(ctx, `UPDATE roadmaps SET is_active=true WHERE id=$1`, roadmapID); err != nil {
+			t.Fatal(err)
+		}
+		testNoWrite(userID, json.RawMessage(`{}`))
+	})
+	t.Run("invalid cache and failed repair preserve bytes and scope", func(t *testing.T) {
+		other := seedUser(t, "google-content-repair-foreign", "repair-foreign@example.com")
+		for _, mode := range []string{"ordinary", "malformed repair", "completed", "foreign", "inactive", "future"} {
+			t.Run(mode, func(t *testing.T) {
+				day := 1
+				if mode == "future" {
+					day = 2
+				}
+				id := exerciseID(t, roadmapID, day, "vocabulary")
+				invalid := contentJSON("Invalid vocabulary", `{"words":[]}`, true)
+				if _, err := pg.Pool.Exec(ctx, `UPDATE exercises SET content_json=$2::jsonb,is_completed=false WHERE id=$1`, id, invalid); err != nil {
+					t.Fatal(err)
+				}
+				target, err := repo.ContentTarget(ctx, userID, id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var before json.RawMessage
+				if err := pg.Pool.QueryRow(ctx, `SELECT content_json FROM exercises WHERE id=$1`, id).Scan(&before); err != nil {
+					t.Fatal(err)
+				}
+				owner := userID
+				path := "/api/v1/quests/exercises/" + id + "?repair=true"
+				wantStatus := 409
+				wantError := "exercise_content_invalid"
+				wantAI := 0
+				switch mode {
+				case "ordinary":
+					path = "/api/v1/quests/exercises/" + id
+				case "malformed repair":
+					wantStatus = 502
+					wantError = "ai_bad_output"
+					wantAI = 2
+				case "completed":
+					if _, err := pg.Pool.Exec(ctx, `UPDATE exercises SET is_completed=true WHERE id=$1`, id); err != nil {
+						t.Fatal(err)
+					}
+				case "foreign":
+					owner = other
+					wantStatus = 404
+					wantError = "exercise_not_found"
+				case "inactive":
+					wantStatus = 404
+					wantError = "exercise_not_found"
+					if _, err := pg.Pool.Exec(ctx, `UPDATE roadmaps SET is_active=false WHERE id=$1`, roadmapID); err != nil {
+						t.Fatal(err)
+					}
+					defer func() {
+						if _, err := pg.Pool.Exec(ctx, `UPDATE roadmaps SET is_active=true WHERE id=$1`, roadmapID); err != nil {
+							t.Error(err)
+						}
+					}()
+				case "future":
+					wantStatus = 404
+					wantError = "exercise_not_found"
+				}
+				ai := &fakeContentAI{answers: []string{"bad", "still bad", string(airouter.SampleContent("vocabulary"))}}
+				lim := &fakeContentLimiter{}
+				svc := NewContentService(repo, ai, lim, func() time.Time { return target.RoadmapCreatedAt.Add(time.Minute) })
+				response := httptest.NewRecorder()
+				newContentRouter(svc, owner).ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+				if response.Code != wantStatus || !strings.Contains(response.Body.String(), `"error":"`+wantError+`"`) || ai.calls != wantAI {
+					t.Fatalf("status%d body%s calls%d", response.Code, response.Body, ai.calls)
+				}
+				wantLimiter := 0
+				if wantAI > 0 {
+					wantLimiter = 1
+				}
+				if lim.calls != wantLimiter {
+					t.Fatalf("limiter calls%d want%d", lim.calls, wantLimiter)
+				}
+				var after json.RawMessage
+				if err := pg.Pool.QueryRow(ctx, `SELECT content_json FROM exercises WHERE id=$1`, id).Scan(&after); err != nil {
+					t.Fatal(err)
+				}
+				if string(before) != string(after) {
+					t.Fatal("failed/ineligible repair changed stored bytes")
+				}
+			})
+		}
+	})
+
+	t.Run("concurrent explicit repairs reread valid winner once", func(t *testing.T) {
+		id := exerciseID(t, roadmapID, 1, "reading")
+		invalid := contentJSON("Repair reading", `{"passage":"tiny","questions":[]}`, true)
+		if _, err := pg.Pool.Exec(ctx, `UPDATE exercises SET content_json=$2::jsonb WHERE id=$1`, id, invalid); err != nil {
+			t.Fatal(err)
+		}
+		initial, err := repo.ContentTarget(ctx, userID, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		const writers = 8
+		recording := &countingContentRepo{PgRepo: repo}
+		provider := &barrierContentProvider{ready: make(chan struct{}), writers: writers}
+		router := airouter.NewRouterWithProviders(map[airouter.ProviderType]airouter.LLMProvider{airouter.ProviderDeepSeek: provider})
+		limiter := &countingContentLimiter{}
+		svc := NewContentService(recording, router, limiter, func() time.Time { return initial.RoadmapCreatedAt.Add(time.Minute) })
+		tasks := make([]Task, writers)
+		errs := make([]error, writers)
+		var wg sync.WaitGroup
+		for i := 0; i < writers; i++ {
+			wg.Add(1)
+			go func(i int) { defer wg.Done(); tasks[i], errs[i] = svc.exercise(ctx, userID, id, true) }(i)
+		}
+		wg.Wait()
+		winner, err := repo.ContentTarget(ctx, userID, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected := toTask(winner.Exercise)
+		for i := 0; i < writers; i++ {
+			if errs[i] != nil {
+				t.Fatalf("repair%d: %v", i, errs[i])
+			}
+			if tasks[i].ContentRevision == nil || *tasks[i].ContentRevision != *expected.ContentRevision || !jsonEqual(t, tasks[i].ContentJSON, winner.Exercise.ContentJSON) {
+				t.Fatalf("repair%d returned loser", i)
+			}
+		}
+		if recording.wins.Load() != 1 || recording.reads.Load() != 2*writers-1 || recording.saves.Load() != writers || provider.calls.Load() != writers || limiter.calls.Load() != writers {
+			t.Fatalf("wins%d reads%d saves%d provider%d limiter%d", recording.wins.Load(), recording.reads.Load(), recording.saves.Load(), provider.calls.Load(), limiter.calls.Load())
+		}
+		// Ordinary cached access after repair/profile change neither generates nor
+		// revalidates against the changed learner level.
+		if _, err := pg.Pool.Exec(ctx, `UPDATE users SET cefr_current='C2' WHERE id=$1`, userID); err != nil {
+			t.Fatal(err)
+		}
+		task, err := svc.Exercise(ctx, userID, id)
+		if err != nil || task.ContentRevision == nil || *task.ContentRevision != *expected.ContentRevision || provider.calls.Load() != writers {
+			t.Fatalf("cached err=%v task=%+v calls%d", err, task, provider.calls.Load())
+		}
+	})
+
+	t.Run("SaveContent for an unknown id loses CAS", func(t *testing.T) {
+		if _, won, err := repo.SaveContent(ctx, userID, "00000000-0000-0000-0000-000000000000", json.RawMessage(`{}`), json.RawMessage(`{}`), "B1"); err != nil || won {
+			t.Fatalf("unknown CAS=%t err=%v", won, err)
+		}
+	})
+}
+
+// These counters prove the real-service repair race has one persistence winner
+// and precisely one additional owned read per loser, without a generation loop.
+type countingContentRepo struct {
+	*PgRepo
+	reads, saves, wins atomic.Int32
+}
+
+func (r *countingContentRepo) ContentTarget(ctx context.Context, user, id string) (ContentTarget, error) {
+	r.reads.Add(1)
+	return r.PgRepo.ContentTarget(ctx, user, id)
+}
+func (r *countingContentRepo) SaveContent(ctx context.Context, user, id string, original, content json.RawMessage, level string) (json.RawMessage, bool, error) {
+	r.saves.Add(1)
+	saved, won, err := r.PgRepo.SaveContent(ctx, user, id, original, content, level)
+	if won {
+		r.wins.Add(1)
+	}
+	return saved, won, err
+}
+
+type countingContentLimiter struct{ calls atomic.Int32 }
+
+func (l *countingContentLimiter) Allow(context.Context, string) error { l.calls.Add(1); return nil }
+
+type barrierContentProvider struct {
+	calls   atomic.Int32
+	ready   chan struct{}
+	writers int
+}
+
+func (p *barrierContentProvider) GenerateContent(ctx context.Context, _, _ string) (string, error) {
+	i := p.calls.Add(1)
+	if i == int32(p.writers) {
+		close(p.ready)
+	}
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case <-p.ready:
+	}
+	var c airouter.ReadingContent
+	_ = json.Unmarshal(airouter.SampleContent("reading"), &c)
+	c.Glossary[0].Definition = fmt.Sprintf("The definition from writer %d.", i)
+	body, _ := json.Marshal(c)
+	return string(body), nil
 }

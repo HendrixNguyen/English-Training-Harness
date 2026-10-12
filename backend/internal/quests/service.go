@@ -174,6 +174,9 @@ type Task struct {
 	DurationMinutes int             `json:"duration_minutes"`
 	IsCompleted     bool            `json:"is_completed"`
 	ContentJSON     json.RawMessage `json:"content_json"`
+	ContentOrigin   string          `json:"content_origin"`
+	ContentRevision *string         `json:"content_revision"`
+	QuizResult      json.RawMessage `json:"quiz_result"`
 }
 
 // DailySuite is the GET /api/v1/quests/daily 200 body — backend spec §6.2,
@@ -200,7 +203,10 @@ func toTask(e Exercise) Task {
 	if meta.DurationMinutes <= 0 {
 		meta.DurationMinutes = DefaultTaskMinutes
 	}
+	origin, revision, _, _ := ContentContract(e)
 	return Task{
+		ContentOrigin:   origin,
+		ContentRevision: revision,
 		ID:              e.ID,
 		TaskType:        e.TaskType,
 		Title:           meta.Title,

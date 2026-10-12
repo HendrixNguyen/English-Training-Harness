@@ -16,6 +16,10 @@ import (
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/auth"
 )
 
+// ErrExerciseContentInvalid marks a stored generated body that failed the
+// current contract; ordinary reads and ineligible repairs return 409.
+var ErrExerciseContentInvalid = errors.New("quests: invalid stored exercise content")
+
 // ErrBadAIOutput means two attempts at TaskExerciseGen both returned a body
 // ParseExerciseContent rejected. The handler maps it to 502 ai_bad_output.
 var ErrBadAIOutput = errors.New("quests: AI output did not match the exercise schema")
@@ -68,11 +72,17 @@ type exerciseMeta struct {
 	DurationMinutes int             `json:"duration_minutes"`
 	Content         json.RawMessage `json:"content"`
 	ContentSchema   int             `json:"content_schema"`
+	ContentLevel    string          `json:"content_level"`
+	ContentOrigin   string          `json:"content_origin"`
 }
 
 // Exercise returns exerciseID's typed content, generating it on the first
 // open. See the plan's Task 4 for the numbered steps this follows.
 func (s *ContentService) Exercise(ctx context.Context, userID, exerciseID string) (Task, error) {
+	return s.exercise(ctx, userID, exerciseID, false)
+}
+
+func (s *ContentService) exercise(ctx context.Context, userID, exerciseID string, repair bool) (Task, error) {
 	target, err := s.repo.ContentTarget(ctx, userID, exerciseID)
 	if err != nil {
 		return Task{}, err
@@ -85,8 +95,19 @@ func (s *ContentService) Exercise(ctx context.Context, userID, exerciseID string
 
 	var meta exerciseMeta
 	_ = json.Unmarshal(target.Exercise.ContentJSON, &meta)
-	if meta.ContentSchema == 1 {
+	origin, _, _, validationErr := ContentContract(target.Exercise)
+	if origin == "generated" {
+		if validationErr == nil {
+			return toTask(target.Exercise), nil
+		}
+		if !repair || target.Exercise.IsCompleted {
+			return Task{}, validationErr
+		}
+	} else if origin == "legacy" {
 		return toTask(target.Exercise), nil
+	}
+	if target.Exercise.IsCompleted {
+		return Task{}, ErrExerciseContentInvalid
 	}
 
 	if err := s.limiter.Allow(ctx, userID); err != nil {
@@ -108,14 +129,31 @@ func (s *ContentService) Exercise(ctx context.Context, userID, exerciseID string
 		return Task{}, err
 	}
 
-	saved, err := s.repo.SaveContent(ctx, exerciseID, content)
+	saved, won, err := s.repo.SaveContent(ctx, userID, exerciseID, target.Exercise.ContentJSON, content, target.Level)
 	if err != nil {
 		return Task{}, err
 	}
-	log.Printf("quests: generated content for exercise %s (%s, %s)", exerciseID, target.Exercise.TaskType, target.Level)
-
+	if !won {
+		// Exactly one owned/active reread; never regenerate after losing a CAS.
+		winner, err := s.repo.ContentTarget(ctx, userID, exerciseID)
+		if err != nil {
+			return Task{}, err
+		}
+		if winner.Exercise.DayNumber > DayNumber(winner.RoadmapCreatedAt, s.now(), Location(winner.Timezone)) {
+			return Task{}, ErrExerciseNotFound
+		}
+		origin, _, _, err := ContentContract(winner.Exercise)
+		if err != nil {
+			return Task{}, err
+		}
+		if origin == "outline" {
+			return Task{}, ErrExerciseContentInvalid
+		}
+		return toTask(winner.Exercise), nil
+	}
 	out := target.Exercise
 	out.ContentJSON = saved
+	log.Printf("quests: generated content for exercise %s (%s, %s)", exerciseID, target.Exercise.TaskType, target.Level)
 	return toTask(out), nil
 }
 
@@ -182,8 +220,10 @@ func ExerciseHandler(svc *ContentService) gin.HandlerFunc {
 			return
 		}
 
-		task, err := svc.Exercise(c.Request.Context(), userID, c.Param("id"))
+		task, err := svc.exercise(c.Request.Context(), userID, c.Param("id"), c.Query("repair") == "true")
 		switch {
+		case errors.Is(err, ErrExerciseContentInvalid):
+			c.JSON(http.StatusConflict, gin.H{"error": "exercise_content_invalid"})
 		case errors.Is(err, ErrExerciseNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "exercise_not_found"})
 		case errors.Is(err, airouter.ErrRateLimited):

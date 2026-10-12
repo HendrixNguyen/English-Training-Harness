@@ -33,11 +33,12 @@ type ContentRepo interface {
 	// is not a UUID) is ErrExerciseNotFound. The cases are deliberately
 	// indistinguishable to the caller, same as CheckExercise.
 	ContentTarget(ctx context.Context, userID, exerciseID string) (ContentTarget, error)
-	// SaveContent writes content + content_schema=1 only if the row is not yet
-	// typed (a conditional UPDATE), and returns the row's content_json either
-	// way: on a lost race, the first writer's bytes come back, not this
-	// caller's own content.
-	SaveContent(ctx context.Context, exerciseID string, content json.RawMessage) (json.RawMessage, error)
+	// SaveContent stores generated content and its actual level when the original
+	// snapshot still matches an owned, active, incomplete exercise. False is a
+	// CAS loss, including deleted/inactive/foreign/completed rows; callers reread
+	// once through ContentTarget. A winner receives the persisted PostgreSQL
+	// bytes; a loser receives nil content and never overwrites a winner.
+	SaveContent(ctx context.Context, userID, exerciseID string, original, content json.RawMessage, level string) (json.RawMessage, bool, error)
 }
 
 const (
@@ -47,21 +48,20 @@ const (
 	contentTargetSQL = `
 SELECT e.id, e.day_number, e.task_type, e.content_json, e.is_completed, r.created_at,
        COALESCE(u.timezone, 'UTC'), COALESCE(u.cefr_current::text, 'B1'), u.target_goal,
-       COALESCE(r.roadmap_json->'modules'->((e.day_number-1)/7)->>'focus', ''),
+       COALESCE(NULLIF(btrim(r.roadmap_json->'modules'->((e.day_number-1)/7)->>'focus'), ''), r.roadmap_json->'modules'->((e.day_number-1)/7)->>'title', ''),
        COALESCE(r.roadmap_json->'modules'->((e.day_number-1)/7)->'days'->((e.day_number-1)%7)->>'title', '')
 FROM exercises e JOIN roadmaps r ON r.id = e.roadmap_id JOIN users u ON u.id = r.user_id
 WHERE e.id::text = $2 AND r.user_id = $1 AND r.is_active`
 
-	// saveContentSQL writes only when the row is not yet typed. Zero rows
-	// affected means either the id does not exist or another writer already
-	// won; saveContentByIDSQL tells the two apart.
+	// CAS includes ownership and active/incomplete status at the write, including
+	// first generation. A loser is reread by the service through ContentTarget.
 	saveContentSQL = `
-UPDATE exercises
-SET content_json = content_json || jsonb_build_object('content', $2::jsonb, 'content_schema', 1)
-WHERE id::text = $1 AND COALESCE(content_json->>'content_schema', '') <> '1'
-RETURNING content_json`
-
-	saveContentByIDSQL = `SELECT content_json FROM exercises WHERE id::text = $1`
+UPDATE exercises e
+SET content_json = e.content_json || jsonb_build_object('content', $4::jsonb, 'content_schema', 1, 'content_level', $5::text)
+FROM roadmaps r
+WHERE e.id::text = $2 AND r.id = e.roadmap_id AND r.user_id = $1 AND r.is_active
+  AND NOT e.is_completed AND e.content_json = $3::jsonb
+RETURNING e.content_json`
 )
 
 func (r *PgRepo) ContentTarget(ctx context.Context, userID, exerciseID string) (ContentTarget, error) {
@@ -79,26 +79,16 @@ func (r *PgRepo) ContentTarget(ctx context.Context, userID, exerciseID string) (
 	return t, nil
 }
 
-func (r *PgRepo) SaveContent(ctx context.Context, exerciseID string, content json.RawMessage) (json.RawMessage, error) {
-	var out json.RawMessage
-	err := r.Pool.QueryRow(ctx, saveContentSQL, exerciseID, content).Scan(&out)
+func (r *PgRepo) SaveContent(ctx context.Context, userID, exerciseID string, original, content json.RawMessage, level string) (json.RawMessage, bool, error) {
+	var saved json.RawMessage
+	err := r.Pool.QueryRow(ctx, saveContentSQL, userID, exerciseID, original, content, level).Scan(&saved)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Zero rows: either another writer already won this race, or the id
-		// does not exist at all. Re-read decides which — the first writer's
-		// content_json either way, ErrExerciseNotFound if there is none.
-		err2 := r.Pool.QueryRow(ctx, saveContentByIDSQL, exerciseID).Scan(&out)
-		if errors.Is(err2, pgx.ErrNoRows) {
-			return nil, ErrExerciseNotFound
-		}
-		if err2 != nil {
-			return nil, fmt.Errorf("quests: re-reading content after a lost race: %w", err2)
-		}
-		return out, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("quests: saving content: %w", err)
+		return nil, false, fmt.Errorf("quests: saving content: %w", err)
 	}
-	return out, nil
+	return saved, true, nil
 }
 
 var _ ContentRepo = (*PgRepo)(nil)

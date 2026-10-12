@@ -24,6 +24,9 @@ type fakeContentRepo struct {
 	target        ContentTarget
 	targetErr     error
 	saveContentFn func(exerciseID string, content json.RawMessage) (json.RawMessage, error)
+	loseCAS       bool
+	winner        json.RawMessage
+	savedLevel    string
 	targetCalls   int
 	saveCalls     int
 	savedContent  json.RawMessage
@@ -34,22 +37,21 @@ func (f *fakeContentRepo) ContentTarget(ctx context.Context, userID, exerciseID 
 	return f.target, f.targetErr
 }
 
-func (f *fakeContentRepo) SaveContent(ctx context.Context, exerciseID string, content json.RawMessage) (json.RawMessage, error) {
+func (f *fakeContentRepo) SaveContent(ctx context.Context, userID, exerciseID string, original, content json.RawMessage, level string) (json.RawMessage, bool, error) {
 	f.saveCalls++
 	f.savedContent = content
+	f.savedLevel = level
+	if f.loseCAS {
+		f.target.Exercise.ContentJSON = f.winner
+		return nil, false, nil
+	}
 	if f.saveContentFn != nil {
-		return f.saveContentFn(exerciseID, content)
+		out, err := f.saveContentFn(exerciseID, content)
+		f.target.Exercise.ContentJSON = out
+		return nil, false, err
 	}
-	// Default: merge into the target's original content_json, the way the
-	// real conditional UPDATE does (content_schema=1 wins).
-	var m map[string]json.RawMessage
-	_ = json.Unmarshal(f.target.Exercise.ContentJSON, &m)
-	if m == nil {
-		m = map[string]json.RawMessage{}
-	}
-	m["content"] = content
-	m["content_schema"] = json.RawMessage("1")
-	return json.Marshal(m)
+	f.target.Exercise.ContentJSON = generatedSnapshot(original, content, level)
+	return f.target.Exercise.ContentJSON, true, nil
 }
 
 var _ ContentRepo = (*fakeContentRepo)(nil)
@@ -175,7 +177,7 @@ func TestContentServiceExercise(t *testing.T) {
 
 	t.Run("cached: no limiter call, no AI call", func(t *testing.T) {
 		target := baseTarget(now)
-		target.Exercise.ContentJSON = contentJSON("Vocabulary warm-up", `{"words":[]}`, true)
+		target.Exercise.ContentJSON = contentJSON("Vocabulary warm-up", string(airouter.SampleContent("vocabulary")), true)
 		repo := &fakeContentRepo{target: target}
 		ai := &fakeContentAI{}
 		lim := &fakeContentLimiter{}
@@ -355,7 +357,7 @@ func TestContentServiceExercise(t *testing.T) {
 
 	t.Run("race lost: the first writer's content comes back", func(t *testing.T) {
 		target := baseTarget(now)
-		firstWriter := contentJSON("Vocabulary warm-up", `{"marker":"first-writer"}`, true)
+		firstWriter := contentJSON("Vocabulary warm-up", string(airouter.SampleContent("vocabulary")), true)
 		repo := &fakeContentRepo{target: target, saveContentFn: func(exerciseID string, content json.RawMessage) (json.RawMessage, error) {
 			return firstWriter, nil
 		}}
@@ -367,7 +369,7 @@ func TestContentServiceExercise(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Exercise: %v", err)
 		}
-		if !strings.Contains(string(task.ContentJSON), "first-writer") {
+		if string(task.ContentJSON) != string(firstWriter) {
 			t.Errorf("ContentJSON = %s, want the first writer's content", task.ContentJSON)
 		}
 	})
@@ -470,7 +472,7 @@ func TestExerciseHandlerMapsEveryCode(t *testing.T) {
 			userID: "u1",
 			repo: &fakeContentRepo{target: func() ContentTarget {
 				t := baseTarget(now)
-				t.Exercise.ContentJSON = contentJSON("Vocabulary warm-up", `{}`, true)
+				t.Exercise.ContentJSON = contentJSON("Vocabulary warm-up", string(airouter.SampleContent("vocabulary")), true)
 				return t
 			}()},
 			ai:         &fakeContentAI{},
@@ -556,4 +558,17 @@ func TestContentServiceProviderShareTimeoutPreservesUpstream(t *testing.T) {
 			}
 		})
 	}
+}
+
+func generatedSnapshot(original, content json.RawMessage, level string) json.RawMessage {
+	var m map[string]json.RawMessage
+	_ = json.Unmarshal(original, &m)
+	if m == nil {
+		m = map[string]json.RawMessage{}
+	}
+	m["content"] = content
+	m["content_schema"] = json.RawMessage("1")
+	m["content_level"], _ = json.Marshal(level)
+	out, _ := json.Marshal(m)
+	return out
 }
