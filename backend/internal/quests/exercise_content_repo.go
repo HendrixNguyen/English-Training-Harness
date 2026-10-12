@@ -31,7 +31,7 @@ type ContentRepo interface {
 	// ContentTarget finds exerciseID on userID's ACTIVE roadmap; anything else
 	// (unknown id, another user's exercise, an inactive roadmap, or an id that
 	// is not a UUID) is ErrExerciseNotFound. The cases are deliberately
-	// indistinguishable to the caller, same as CheckExercise.
+	// indistinguishable to the caller, same as ProgressExercise.
 	ContentTarget(ctx context.Context, userID, exerciseID string) (ContentTarget, error)
 	// SaveContent stores generated content and its actual level when the original
 	// snapshot still matches an owned, active, incomplete exercise. False is a
@@ -46,7 +46,7 @@ const (
 	// means a non-UUID string matches nothing (ErrExerciseNotFound) instead of
 	// erroring Postgres 22P02 (invalid input syntax for type uuid).
 	contentTargetSQL = `
-SELECT e.id, e.day_number, e.task_type, e.content_json, e.is_completed, r.created_at,
+SELECT e.id, e.day_number, e.task_type, e.content_json, e.is_completed, e.quiz_result, r.created_at,
        COALESCE(u.timezone, 'UTC'), COALESCE(u.cefr_current::text, 'B1'), u.target_goal,
        COALESCE(NULLIF(btrim(r.roadmap_json->'modules'->((e.day_number-1)/7)->>'focus'), ''), r.roadmap_json->'modules'->((e.day_number-1)/7)->>'title', ''),
        COALESCE(r.roadmap_json->'modules'->((e.day_number-1)/7)->'days'->((e.day_number-1)%7)->>'title', '')
@@ -67,7 +67,7 @@ RETURNING e.content_json`
 func (r *PgRepo) ContentTarget(ctx context.Context, userID, exerciseID string) (ContentTarget, error) {
 	var t ContentTarget
 	err := r.Pool.QueryRow(ctx, contentTargetSQL, userID, exerciseID).Scan(
-		&t.Exercise.ID, &t.Exercise.DayNumber, &t.Exercise.TaskType, &t.Exercise.ContentJSON, &t.Exercise.IsCompleted,
+		&t.Exercise.ID, &t.Exercise.DayNumber, &t.Exercise.TaskType, &t.Exercise.ContentJSON, &t.Exercise.IsCompleted, &t.Exercise.QuizResult,
 		&t.RoadmapCreatedAt, &t.Timezone, &t.Level, &t.Goal, &t.ModuleFocus, &t.DayTitle,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
