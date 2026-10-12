@@ -677,7 +677,13 @@ return parsedResp.Choices\[0\].Message.Content, nil
 
 \* \*\*GET /api/v1/quests/daily\*\*: Fetches current day's 30-minute exercise suite (3x 10-min tasks).
 
+* **GET /api/v1/quests/exercises/:id** (added 2026-10-11): Authenticated lazy content endpoint; returns the daily task DTO `{id,task_type,title,duration_minutes,is_completed,content_json}`. Only the caller's active-roadmap exercises on today or earlier days are accessible; unknown, invalid, other-user, inactive and future IDs return 404 `exercise_not_found`. Outlines generate one exercise at the user's current CEFR level, then conditionally save `content` and `content_schema:1` while preserving outline title/duration and roadmap JSON. Cached content bypasses AI and the limiter. Concurrent first opens can generate more than once, but all saves return the persisted winner. The route has a 60-second budget, one malformed-output retry and a 32-KiB content cap; errors include 429 `rate_limited`, 503 `ai_unavailable`, 502 `ai_bad_output`/`ai_upstream_failed`, and 504 `ai_timeout` for the exercise deadline. Full DTO/error details are in backend spec §6.2.
+
+Reading content is `{passage,questions[3..5],glossary?:[{term,meaning_vi,definition}]}`; questions carry `{id,prompt,options:{A,B,C,D},answer,explanation}`. Generation requests 5..8 Vietnamese glosses with brief English definitions. Absent/null glossary remains valid; field types must decode as strings. The client removes blank/duplicate/unplaceable entries, caps marks at eight and renders text only. Vocabulary/practice have their own typed word/question shapes (backend spec §6.2). The roadmap remains an outline; content is generated when a learner opens an exercise.
+
 \* \*\*POST /api/v1/quests/progress\*\*: Records completed task minutes, updates Redis counter and daily progress.
+
+`user_answers` is accepted in the progress payload but currently neither stored nor graded. Durable completion is `exercises.is_completed` and `daily_progress.minutes_spent`; Redis retains accumulated seconds. No study-log or answer-history table is implemented.
 
 \* \*\*GET /api/v1/pet/status\*\*: Retrieves current plant stage, health percentage, and active streak.
 

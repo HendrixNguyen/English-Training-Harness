@@ -343,6 +343,14 @@ func NewRouter() (*Router, error) {
 {"date": "2026-09-22", "day_number": 1, "total_minutes_required": 30, "accumulated_seconds": 600, "is_target_met": false, "tasks": [{"id": "ex-01", "task_type": "vocabulary", "title": "10 Key Business Email Phrasings", "duration_minutes": 10, "is_completed": true, "content_json": { "words": [{ "term": "Inquire", "definition": "To ask for information" }] }}]}
 ```
 
+* GET /api/v1/quests/exercises/:id (added 2026-10-11)
+  * Request Headers: Authorization: Bearer \<JWT\>. Returns the same task DTO as `tasks[]` in the daily response.
+  * The daily response may carry an outline task `{type, title, duration_minutes, content:{}}`. Opening an outline generates only that exercise at the user's current CEFR level and saves `content` plus `content_schema: 1` into the existing task object. Cached typed content returns without another provider call or limiter slot. Roadmap generation remains outline-based; placement behavior is unchanged.
+  * Only an exercise on the caller's active roadmap, on today or an earlier day, is accessible. Unknown, invalid, other-user, inactive-roadmap and future-day IDs return 404 `exercise_not_found`. Authorization precedes generation and cache lookup.
+  * Typed vocabulary content has `words[5..8]{term,definition,example?}` and `questions[3..5]`; reading has `passage`, `questions[3..5]`, and optional `glossary[]{term,meaning_vi,definition}`; practice has `questions[4..8]`. Every question has `{id,prompt,options:{A,B,C,D},answer,explanation}`. The reading prompt requests 5..8 glossary entries with Vietnamese meanings and brief English definitions. Missing/null glossary is valid legacy content; malformed field types fail decoding. The client trims, removes blank/duplicate/unplaceable entries and retains at most eight marks. Glossary use never changes the progress payload.
+  * Exercise generation has a 60-second per-route budget and retries malformed JSON once. Content is bounded to 32 KiB; reading passage bounds follow the CEFR table. Conditional SQL save returns the persisted winner on concurrent writes; concurrent first opens can still generate more than once.
+  * Errors: 401 unauthenticated, 404 `exercise_not_found`, 429 `rate_limited`, 503 `ai_unavailable`, 502 `ai_bad_output` / `ai_upstream_failed`, 504 `ai_timeout` (the exercise deadline, rather than a smaller provider-share timeout), 500 `internal_error`.
+
 * POST /api/v1/quests/progress  
   * Description: Incrementing Redis counter (INCRBY). When 1,800s (30 mins) is reached, sets is\_target\_met \= true, increases plant health (+20%), and increments streak.  
   * Request Headers: Authorization: Bearer \<JWT\>, Content-Type: application/json  
@@ -351,6 +359,8 @@ func NewRouter() (*Router, error) {
 ```json
 {"exercise_id": "ex-02", "duration_seconds": 600, "user_answers": { "q1": "A" }}
 ```
+
+  * `user_answers` is accepted but currently neither persisted nor scored. Completion sets `exercises.is_completed`; minutes live in `daily_progress`, seconds in Redis. No study-log or answer-history table is implemented.
 
   * Response (200 OK):
 
