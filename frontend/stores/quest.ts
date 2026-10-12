@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
-import { ApiError } from '~/utils/apiClient'
+import { ApiError, isCachedApiResponse } from '~/utils/apiClient'
 import { useAuthStore } from '~/stores/auth'
-import { hasTrustedContent, questionsOf, classifyContent } from '~/utils/content'
+import { hasTrustedContent, questionsOf, classifyContent, isRecord } from '~/utils/content'
 import { clearOwnerDrafts } from '~/utils/learningSession'
 import { clampDuration } from '~/utils/progress'
 
@@ -90,12 +90,27 @@ function rank(type: string): number {
 }
 
 const contentCacheKey = 'aelp.exercise-content'
+const acceptedCacheKey = 'aelp.accepted-daily.v1'
+function readAccepted(): DailyQuests | null {
+  try {
+    const stored = JSON.parse(storageOrNull()?.getItem(acceptedCacheKey) ?? 'null')
+    const daily = stored?.daily
+    if (stored?.owner && stored.owner === useAuthStore().user?.id && isRecord(daily) && typeof daily.date === 'string' && Number.isInteger(daily.day_number) && typeof daily.is_target_met === 'boolean' && Number.isFinite(daily.accumulated_seconds) && Array.isArray(daily.tasks) && daily.tasks.every(t => isRecord(t) && typeof t.id === 'string' && typeof t.task_type === 'string' && typeof t.is_completed === 'boolean')) return daily as unknown as DailyQuests
+  } catch { /* denied or obsolete cache */ }
+  return null
+}
+function writeAccepted(daily: DailyQuests | null) {
+  try {
+    if (daily) storageOrNull()?.setItem(acceptedCacheKey, JSON.stringify({ owner: useAuthStore().user?.id ?? null, daily }))
+    else storageOrNull()?.removeItem(acceptedCacheKey)
+  } catch { /* accepted in-memory state remains usable */ }
+}
 const pendingHydration = new WeakMap<object, Map<string, Promise<QuestTask>>>()
 const pendingDaily = new WeakMap<object, Promise<boolean>>()
 const pendingCompletion = new WeakMap<object, Map<string, Promise<CompleteResult>>>()
 function sessionScope(): string {
   const auth = useAuthStore()
-  return auth.user?.id ? `owner:${auth.user.id}` : `anonymous:${auth.accessToken ?? ''}`
+  return `${auth.user?.id ? `owner:${auth.user.id}` : `anonymous:${auth.accessToken ?? ''}`}|${auth.sessionEpoch}`
 }
 function cachedContent(id: string): QuestTask | undefined {
   try {
@@ -118,6 +133,8 @@ export const useQuestStore = defineStore('quest', {
   state: () => ({
     daily: null as DailyQuests | null,
     accountScope: sessionScope(),
+    accountOwner: useAuthStore().user?.id ?? null,
+    acceptedDaily: readAccepted(),
     dailyMutation: 0,
     noRoadmap: false,
     loading: false,
@@ -137,8 +154,11 @@ export const useQuestStore = defineStore('quest', {
     resetForAccount() {
       if (this.accountScope === sessionScope()) return
       pendingDaily.delete(this)
-      if (this.accountScope.startsWith('owner:')) clearOwnerDrafts(this.accountScope.slice(6))
+      if (this.accountOwner) clearOwnerDrafts(this.accountOwner)
       this.accountScope = sessionScope()
+      this.accountOwner = useAuthStore().user?.id ?? null
+      this.acceptedDaily = null
+      writeAccepted(null)
       this.dailyMutation += 1
       this.daily = null
       this.noRoadmap = false
@@ -165,12 +185,34 @@ export const useQuestStore = defineStore('quest', {
           const response = await useApi().get<DailyQuests>(`/api/v1/quests/daily${fresh ? '?fresh=true' : ''}`)
           // A read started before accepted progress cannot undo that save.
           if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
+          const accepted = this.acceptedDaily
+          const offline = typeof navigator !== 'undefined' && !navigator.onLine
+          const fallback = isCachedApiResponse(response) || offline
+          let retained = false
+          if (!fresh && accepted?.date === response.date && accepted.day_number === response.day_number) {
+            response.tasks = response.tasks.map(task => {
+              const saved = accepted.tasks.find(t => t.id === task.id && t.task_type === task.task_type && t.is_completed && t.content_revision && hasTrustedContent(t))
+              if (!saved || (task.content_revision !== saved.content_revision && !(fallback && task.content_origin === 'outline' && !task.content_revision))) return task
+              retained = true
+              return { ...saved }
+            })
+            if (retained) {
+              response.accumulated_seconds = Math.max(response.accumulated_seconds, accepted.accumulated_seconds)
+              response.is_target_met ||= accepted.is_target_met
+            }
+          }
+          // A real day/task/content replacement or a network-only read retires
+          // obsolete checkpoints so old content cannot reappear on a later load.
+          const completed = response.tasks.some(t => t.is_completed && t.content_revision && hasTrustedContent(t))
+          if (accepted || completed) {
+            this.acceptedDaily = retained || completed ? JSON.parse(JSON.stringify(response)) : null
+            writeAccepted(this.acceptedDaily)
+          }
           for (const task of response.tasks) {
             if (hasTrustedContent(task)) cacheContent(task.id, task)
             else if (!task.is_completed && task.content_origin !== 'generated') {
               const previous = this.taskById(task.id)
               const cached = previous && hasTrustedContent(previous) ? previous : cachedContent(task.id)
-              const offline = typeof navigator !== 'undefined' && !navigator.onLine
               if (cached && hasTrustedContent(cached) && cached.id === task.id && cached.task_type === task.task_type && (task.content_revision === cached.content_revision || (offline && task.content_origin === 'outline' && !task.content_revision))) {
                 task.content_json = cached.content_json
                 task.content_origin = cached.content_origin
@@ -186,6 +228,8 @@ export const useQuestStore = defineStore('quest', {
           if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
           if (e instanceof ApiError && e.code === 'no_active_roadmap') {
             this.daily = null
+            this.acceptedDaily = null
+            writeAccepted(null)
             this.noRoadmap = true
           } else {
             this.error = e instanceof ApiError ? e.code : 'network_error'
@@ -295,7 +339,12 @@ export const useQuestStore = defineStore('quest', {
           this.daily.accumulated_seconds = res.daily_seconds_spent
           this.daily.is_target_met = res.is_target_met
           const t = this.daily.tasks.find(x => x.id === exerciseId)
-          if (t && (revision === undefined || res.quiz_result)) { t.is_completed = true; t.quiz_result = res.quiz_result ?? null }
+          if (t && (revision === undefined || res.quiz_result)) {
+            t.is_completed = true; t.quiz_result = res.quiz_result ?? null
+            cacheContent(t.id, t)
+            this.acceptedDaily = JSON.parse(JSON.stringify(this.daily))
+            writeAccepted(this.acceptedDaily)
+          }
         }
         if (revision === undefined || res.quiz_result) {
           Reflect.deleteProperty(this.timers, exerciseId)

@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 180_000,
   workers: 1,
   retries: 0,
-  outputDir: '/workspace/cloud-setup/reading-flow/task-5-logs/playwright',
+  outputDir: `${process.env.LEARNING_PROOF_LOGS || '/workspace/cloud-setup/reading-flow/task-5-logs'}/playwright`,
   use: {
     baseURL: 'http://127.0.0.1:3100',
     viewport: { width: 390, height: 844 },

@@ -11,12 +11,26 @@ precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
 // §3 "User Progress & Pet Status: NetworkFirst" — synchronised state when
-// online, last-known state when not. Cache name must match utils/session.ts.
+// online, last-known state when not. The stable owner query binds both reads
+// and late writes to that account, even if sign-out already deleted the cache.
+// Unowned old URLs bypass this route; tokens never enter cache identity.
 // Save reconciliation uses fresh=true: it must fail on a network error rather
 // than treating a cached incomplete task as permission to credit time again.
 registerRoute(
-  ({ url, request }) => request.method === 'GET' && url.searchParams.get('fresh') !== 'true' && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname),
-  new NetworkFirst({ cacheName: 'api-state', networkTimeoutSeconds: 5 }),
+  ({ url, request }) => request.method === 'GET' && !!url.searchParams.get('aelp_owner') && url.searchParams.get('fresh') !== 'true' && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname),
+  new NetworkFirst({
+    cacheName: 'api-state', networkTimeoutSeconds: 5,
+    plugins: [{
+      // Distinguish a stale pre-hydration outline fallback from authoritative
+      // replacement content. Do not persist this marker in the API DTO.
+      async cachedResponseWillBeUsed({ cachedResponse }) {
+        if (!cachedResponse) return undefined
+        const headers = new Headers(cachedResponse.headers)
+        headers.set('X-Aelp-Cached', 'true')
+        return new Response(await cachedResponse.clone().arrayBuffer(), { status: cachedResponse.status, statusText: cachedResponse.statusText, headers })
+      },
+    }],
+  }),
 )
 
 // §3 "Static Assets & Exercises: StaleWhileRevalidate" for anything the

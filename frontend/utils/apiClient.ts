@@ -17,6 +17,8 @@ export class ApiError extends Error {
 export interface ApiClientOptions {
   baseURL: string
   getToken: () => string | null
+  /** Stable account ID used only to namespace private worker cache entries. */
+  getOwner?: () => string | null
   /** Called once per 401 before the ApiError is thrown (sign out + redirect). */
   onUnauthorized: () => void
   fetch?: typeof globalThis.fetch
@@ -26,6 +28,10 @@ export interface ApiClient {
   get<T>(path: string): Promise<T>
   post<T>(path: string, body?: unknown): Promise<T>
 }
+
+const cachedResponses = new WeakSet<object>()
+/** Transport provenance, separate from the server's learning DTO contract. */
+export function isCachedApiResponse(value: object): boolean { return cachedResponses.has(value) }
 
 async function errorCode(res: Response): Promise<string> {
   try {
@@ -45,18 +51,26 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     if (token) headers.Authorization = `Bearer ${token}`
     if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-    const res = await doFetch(`${opts.baseURL}${path}`, {
+    const url = new URL(`${opts.baseURL}${path}`)
+    const owner = opts.getOwner?.()
+    if (method === 'GET' && token && owner && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname)) url.searchParams.set('aelp_owner', owner)
+    const res = await doFetch(url.toString(), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     })
+
+    if (opts.getOwner && owner !== opts.getOwner()) throw new ApiError(409, 'session_changed')
 
     if (res.status === 401) {
       opts.onUnauthorized()
       throw new ApiError(401, 'unauthorized')
     }
     if (!res.ok) throw new ApiError(res.status, await errorCode(res))
-    return (await res.json()) as T
+    const value = await res.json() as T
+    if (opts.getOwner && owner !== opts.getOwner()) throw new ApiError(409, 'session_changed')
+    if (res.headers.get('X-Aelp-Cached') === 'true' && typeof value === 'object' && value !== null) cachedResponses.add(value)
+    return value
   }
 
   return {

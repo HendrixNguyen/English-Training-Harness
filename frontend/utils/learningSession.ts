@@ -11,6 +11,9 @@ export interface LearningSession {
 }
 const prefix = 'aelp.learning-draft.v1:'
 const memory = new Map<string, LearningSession>()
+// A denied removeItem must not resurrect a former session later in this page
+// lifetime. New drafts remain readable from memory and are persisted normally.
+const clearedOwners = new Set<string>()
 const keyOf = (s: DraftScope) => prefix + JSON.stringify([s.owner, s.task, s.revision])
 const clone = (s: LearningSession): LearningSession => ({ ...s, answers: { ...s.answers } })
 export function initialSession(content: Classified): LearningSession {
@@ -37,7 +40,7 @@ export function validateSession(value: unknown, content: Classified): LearningSe
 export function readDraft(scope: DraftScope, content: Classified): LearningSession | null {
   const key = keyOf(scope)
   let value: unknown = memory.get(key)
-  try { const raw = value === undefined ? localStorage.getItem(key) : null; if (raw) { const body = JSON.parse(raw); value = isRecord(body) && body.owner === scope.owner && body.task === scope.task && body.revision === scope.revision ? body.session : null } } catch { /* memory fallback */ }
+  try { const raw = value === undefined && !clearedOwners.has(scope.owner) ? localStorage.getItem(key) : null; if (raw) { const body = JSON.parse(raw); value = isRecord(body) && body.owner === scope.owner && body.task === scope.task && body.revision === scope.revision ? body.session : null } } catch { /* memory fallback */ }
   const valid = validateSession(value, content)
   if (!valid) { clearDraft(scope); return null }
   return valid
@@ -53,7 +56,10 @@ export function clearDraft(scope: DraftScope) {
 export function clearOwnerDrafts(owner: string, except?: DraftScope) {
   const matches = (key: string) => { try { return key.startsWith(prefix) && JSON.parse(key.slice(prefix.length))[0] === owner && (!except || key !== keyOf(except)) } catch { return false } }
   for (const key of memory.keys()) if (matches(key)) memory.delete(key)
-  try { for (let i = localStorage.length - 1; i >= 0; i--) { const key = localStorage.key(i); if (key && matches(key)) localStorage.removeItem(key) } } catch { /* denied */ }
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) { const key = localStorage.key(i); if (key && matches(key)) localStorage.removeItem(key) }
+    if (!except) clearedOwners.delete(owner)
+  } catch { if (!except) clearedOwners.add(owner) }
 }
 export function clearTaskDrafts(scope: DraftScope) {
   const matches = (key: string) => { try { const [owner, task] = JSON.parse(key.slice(prefix.length)); return key.startsWith(prefix) && owner === scope.owner && task === scope.task && key !== keyOf(scope) } catch { return false } }

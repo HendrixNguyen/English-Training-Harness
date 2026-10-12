@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 const infra = 'http://127.0.0.1:3299';
 const api = 'http://127.0.0.1:3199/api/v1/quests';
-const logs = '/workspace/cloud-setup/reading-flow/task-5-logs';
+const logs = process.env.LEARNING_PROOF_LOGS || '/workspace/cloud-setup/reading-flow/task-5-logs';
 const live = process.env.LEARNING_GENUINE === '1';
 interface Q {
     id: string;
@@ -365,4 +365,89 @@ test('denied draft storage keeps study and server saving usable', async ({ page,
     await page.getByRole('button', { name: 'Hoàn thành', exact: true }).click();
     await expect(page.getByText('Đã lưu kết quả', { exact: true })).toBeVisible();
     expect((await evidence(request, f)).result.score_percent).toBe(100);
+});
+
+// These regressions use the production worker and real auth/store actions. The
+// gateway only delays actual upstream bytes; it does not fabricate API DTOs.
+async function worker(p: Page) {
+    await p.evaluate(async () => { await navigator.serviceWorker.ready; });
+    if (!await p.evaluate(() => !!navigator.serviceWorker.controller)) await p.reload();
+    expect(await p.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+}
+async function replaceSession(p: Page, f: Fixture) {
+    await p.evaluate(async a => {
+        const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { signOut(): Promise<void>; signIn(r: unknown): Promise<void> }> } } } } }).__vue_app__.config.globalProperties.$pinia;
+        const auth = pinia._s.get('auth')!;
+        await auth.signOut(); await auth.signIn({ access_token: a.accessToken, expires_in: 86400, user: a.user });
+    }, f.auth);
+}
+async function loadStore(p: Page, wait = true) {
+    return p.evaluate(wait => {
+        const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { load(): Promise<boolean> }> } } } } }).__vue_app__.config.globalProperties.$pinia;
+        const promise = pinia._s.get('quest')!.load();
+        if (wait) return promise; void promise; return true;
+    }, wait);
+}
+test('saved result survives initial outline worker fallback, offline hub/reopen and a re-created store', async ({ page, context, request }) => {
+    test.setTimeout(45_000);
+    const f = await seed(page, request); await page.goto('/'); await expect(page.getByRole('link', { name: /Học: Community library/ })).toBeVisible(); await worker(page); await loadStore(page);
+    await page.getByRole('link', { name: /Học: Community library/ }).click(); await expect(passage(page)).toBeVisible();
+    // Prime the real initial outline response before hydration in a fresh store.
+    // The first navigation daily already contains that outline; wait for cachePut.
+    await expect.poll(() => page.evaluate(async id => { const cache = await caches.open('api-state'); for (const key of await cache.keys()) { if (key.url.includes('/quests/daily')) { const body = await (await cache.match(key))!.json(); if (body.tasks.some((t: { id: string; content_origin: string }) => t.id === id && t.content_origin === 'outline')) return true; } } return false; }, f.exercise)).toBe(true);
+    const task = await dto(request, f); await study(page, task.content_json.content);
+    for (const q of task.content_json.content.questions as Q[]) { await page.getByRole('radio').filter({ hasText: `(${q.answer})` }).click(); await page.getByRole('button', { name: 'Trả lời', exact: true }).click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click(); }
+    await page.getByRole('button', { name: 'Hoàn thành', exact: true }).click(); await expect(page.getByText('Đã lưu kết quả', { exact: true })).toBeVisible();
+    const saved = await evidence(request, f); expect(saved.result.score_percent).toBe(100); expect(saved.progressPosts).toBe(1);
+    await context.setOffline(true); await page.getByRole('button', { name: 'Về trang chính', exact: true }).click(); await page.waitForURL('/'); expect(await loadStore(page)).toBe(true);
+    await expect(page.getByText('Xong', { exact: true })).toBeVisible();
+    await page.evaluate(id => { const app = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $router: { push(path: string): Promise<void> } } } } }).__vue_app__; return app.config.globalProperties.$router.push(`/learn/${id}`); }, f.exercise); await expect(page.getByText('Đã lưu kết quả', { exact: true })).toBeVisible();
+    // Reload document online while blocking only daily transport. Re-created
+    // Pinia must read the durable checkpoint + real worker fallback.
+    await context.setOffline(false); await request.post(`${infra}/control?fault=unknown`); await page.reload();
+    await expect(page.getByText('Đã lưu kết quả', { exact: true })).toBeVisible(); await expect(page.getByText('Đúng 3 / 3 · 100%', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hoàn thành', exact: true })).toHaveCount(0);
+    await request.post(`${infra}/control`); const final = await evidence(request, f); expect(final.result).toEqual(saved.result); expect(final.seconds).toBe(saved.seconds); expect(final.progressPosts).toBe(1);
+    await writeFile(`${logs}/saved-worker-fallback.json`, JSON.stringify({ saved, final }, null, 2));
+});
+for (const path of ['/api/v1/quests/daily', '/api/v1/pet/status']) test(`late prior-owner worker cache write cannot serve B fallback: ${path}`, async ({ page, context, request }) => {
+    test.setTimeout(45_000);
+    const a = await seed(page, request, 'type=practice&keyless=1'); const privateTask = await dto(request, a); expect((await request.post(`${api}/progress`, { headers: auth(a), data: { exercise_id: a.exercise, duration_seconds: 65, content_revision: privateTask.content_revision, user_answers: { q1: 'B' } } })).ok()).toBe(true); const b = await (await request.post(`${infra}/fixture?legacy=1`)).json() as Fixture;
+    await page.goto('/'); await expect(page.getByText('Xong', { exact: true })).toBeVisible(); await worker(page); expect(await loadStore(page)).toBe(true);
+    await request.post(`${infra}/control?defer=${a.auth.user.id}&path=${encodeURIComponent(path)}`);
+    if (path.endsWith('/daily')) await loadStore(page, false);
+    else await page.evaluate(() => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { load(): Promise<void> }> } } } } }).__vue_app__.config.globalProperties.$pinia; void pinia._s.get('pet')!.load(); });
+    await expect.poll(async () => (await (await request.get(`${infra}/deferred`)).json()).count).toBe(1);
+    await replaceSession(page, b); await request.post(`${infra}/release`);
+    await expect.poll(() => page.evaluate(async path => { const c = await caches.open('api-state'); return (await c.keys()).some(k => new URL(k.url).pathname === path); }, path)).toBe(true);
+    if (path.endsWith('/daily')) {
+        const leakedCandidate = await page.evaluate(async ({ owner, exercise }) => { const cache = await caches.open('api-state'); for (const key of await cache.keys()) if (new URL(key.url).searchParams.get('aelp_owner') === owner && new URL(key.url).pathname.endsWith('/daily')) { const dto = await (await cache.match(key))!.json(); return dto.tasks.find((t: { id: string }) => t.id === exercise)?.quiz_result; } return null; }, { owner: a.auth.user.id, exercise: a.exercise });
+        expect(leakedCandidate.answers[0].selected_option).toBe('B');
+    }
+    await context.setOffline(true);
+    if (path.endsWith('/daily')) { expect(await loadStore(page)).toBe(false); await expect(page.getByRole('link', { name: /Học: Community library/ })).toHaveCount(0); }
+    else {
+        const response = await page.evaluate(async () => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { $reset(): void; load(): Promise<void>; status: unknown; error: string | null }> } } } } }).__vue_app__.config.globalProperties.$pinia; const pet = pinia._s.get('pet')!; pet.$reset(); await pet.load(); return { status: pet.status, error: pet.error }; }); expect(response.status).toBeNull(); expect(response.error).toBe('network_error');
+    }
+    await context.setOffline(false); expect(await loadStore(page)).toBe(true);
+    await expect.poll(() => page.evaluate(async owner => { const c = await caches.open('api-state'); return (await c.keys()).some(k => new URL(k.url).searchParams.get('aelp_owner') === owner && new URL(k.url).pathname.endsWith('/daily')); }, b.auth.user.id)).toBe(true);
+    const ids = await page.evaluate(async owner => { const c = await caches.open('api-state'); const entries = []; for (const k of await c.keys()) entries.push({ owner: new URL(k.url).searchParams.get('aelp_owner'), path: new URL(k.url).pathname }); return { owner, entries }; }, b.auth.user.id);
+    expect(ids.entries.some(e => e.owner === b.auth.user.id && e.path.endsWith('/daily'))).toBe(true);
+    const renewed = await (await request.post(`${infra}/renew?exercise=${b.exercise}`)).json() as { access_token: string };
+    expect(renewed.access_token).not.toBe(b.auth.accessToken);
+    await page.evaluate(async ({ token, user }) => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { signIn(r: unknown): Promise<void> }> } } } } }).__vue_app__.config.globalProperties.$pinia; await pinia._s.get('auth')!.signIn({ access_token: token, expires_in: 86400, user }); }, { token: renewed.access_token, user: b.auth.user });
+    await context.setOffline(true); expect(await loadStore(page)).toBe(true); await context.setOffline(false);
+    expect((await evidence(request, a)).progressPosts).toBe(1); expect((await evidence(request, b)).progressPosts).toBe(1);
+    await writeFile(`${logs}/late-owner-${path.endsWith('/daily') ? 'daily' : 'pet'}.json`, JSON.stringify({ a: a.auth.user.id, b: b.auth.user.id, cache: ids, renewed_token_offline_reuse: true }, null, 2));
+});
+for (const route of ['/', '/settings']) test(`central signout from ${route} clears draft before same-owner relogin`, async ({ page, request }) => {
+    const f = await seed(page, request); await page.goto(`/learn/${f.exercise}`); await expect(passage(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Đọc xong →' }).click(); await page.getByRole('radio').first().click();
+    expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')).length)).toBe(1);
+    await page.getByRole('link', { name: '‹ Quay lại' }).click(); await page.waitForURL('/');
+    if (route === '/settings') { await page.getByRole('button', { name: 'Tài khoản', exact: true }).click(); await page.getByRole('menuitem', { name: 'Cài đặt', exact: true }).click(); await page.waitForURL('/settings'); }
+    await page.getByRole('button', { name: 'Tài khoản', exact: true }).click(); await page.getByRole('menuitem', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('/login');
+    expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')))).toEqual([]);
+    await replaceSession(page, f); await page.evaluate(id => { const app = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $router: { push(path: string): Promise<void> } } } } }).__vue_app__; return app.config.globalProperties.$router.push(`/learn/${id}`); }, f.exercise);
+    await expect(passage(page)).toBeVisible(); await page.getByRole('button', { name: 'Đọc xong →' }).click(); await expect(page.getByRole('radio').first()).toHaveAttribute('aria-checked', 'false'); expect((await evidence(request, f)).progressPosts).toBe(0);
 });

@@ -136,7 +136,7 @@ describe('/learn/:id learning sessions', () => {
     q.daily = daily(outline()); await flushPromises(); const pending = deferred<QuestTask>(); api.get.mockReturnValue(pending.promise)
     await action(w, 'Thử lại').trigger('click'); await flushPromises(); route.params.id = 'other'; await flushPromises(); pending.resolve(reading()); await flushPromises()
     expect(w.findComponent(ContentViewer).exists()).toBe(false)
-    useAuthStore().user = { ...useAuthStore().user!, id: 'other' }; api.get.mockResolvedValue(daily()); await flushPromises(); expect(q.accountScope).toBe('owner:other')
+    useAuthStore().user = { ...useAuthStore().user!, id: 'other' }; api.get.mockResolvedValue(daily()); await flushPromises(); expect(q.accountScope).toBe('owner:other|0')
   })
 })
 

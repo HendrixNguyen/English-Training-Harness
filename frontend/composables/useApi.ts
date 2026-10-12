@@ -12,6 +12,7 @@ export function useApi(): ApiClient {
   client = createApiClient({
     baseURL: config.public.apiBase,
     getToken: () => auth.accessToken,
+    getOwner: () => auth.user?.id ?? null,
     onUnauthorized: () => {
       void auth.signOut()
       void navigateTo('/login')

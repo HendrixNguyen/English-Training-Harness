@@ -56,6 +56,9 @@ let failures = 0;
 let malformed = 0;
 let fault = '';
 let progressPosts = 0;
+let deferredOwner = '';
+let deferredPath = '/api/v1/quests/daily';
+const deferredResponses = [];
 const gateway = createServer((req, res) => {
     const progress = req.url === '/api/v1/quests/progress' && req.method === 'POST';
     if (progress)
@@ -88,6 +91,15 @@ const gateway = createServer((req, res) => {
             } });
             response.on('end', () => setTimeout(() => res.destroy(), 25));
             return;
+        }
+        if (req.url.startsWith(deferredPath) && deferredOwner && req.headers.authorization) {
+            const owner = JSON.parse(Buffer.from(req.headers.authorization.split('.')[1], 'base64url').toString()).sub;
+            if (owner === deferredOwner) {
+                const chunks = [];
+                response.on('data', chunk => chunks.push(chunk));
+                response.on('end', () => deferredResponses.push(() => { res.writeHead(response.statusCode, response.headers); res.end(Buffer.concat(chunks)); }));
+                return;
+            }
         }
         res.writeHead(response.statusCode, response.headers);
         response.pipe(res);
@@ -152,7 +164,22 @@ const server = createServer(async (req, res) => {
             fixtures.set(exercise, user);
             return send(res, 200, { exercise, passage, questions: type === 'vocabulary' ? vocabQuestions : type === 'practice' ? practiceQuestions : questions, words, auth: { accessToken: token, expiresAt: (now + 86400) * 1000, user: { id: user, email: `${user}@fixture.invalid`, full_name: 'Reading Fixture', cefr_current: 'B1' } } });
         }
+        if (url.pathname === '/renew' && req.method === 'POST') {
+            const user = fixtures.get(url.searchParams.get('exercise'));
+            if (!user) return send(res, 404, { error: 'unknown_fixture' });
+            const now = Math.floor(Date.now() / 1000);
+            const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+            const unsigned = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: user, iat: now, exp: now + 86400, jti: randomUUID() })}`;
+            const token = `${unsigned}.${createHmac('sha256', secret).update(unsigned).digest('base64url')}`;
+            execFileSync('docker', [...compose, 'exec', '-T', 'redis', 'redis-cli', '-x', 'SET', `sess:${user}:token`], { input: token, stdio: ['pipe', 'ignore', 'pipe'] });
+            redis('EXPIRE', `sess:${user}:token`, '86400');
+            return send(res, 200, { access_token: token });
+        }
+        if (url.pathname === '/deferred') return send(res, 200, { count: deferredResponses.length });
+        if (url.pathname === '/release' && req.method === 'POST') { deferredOwner = ''; for (const release of deferredResponses.splice(0)) release(); return send(res, 200, { released: true }); }
         if (url.pathname === '/control' && req.method === 'POST') {
+            deferredOwner = url.searchParams.get('defer') || '';
+            deferredPath = url.searchParams.get('path') || '/api/v1/quests/daily';
             failures = Number(url.searchParams.get('failures') || 0);
             malformed = Number(url.searchParams.get('malformed') || 0);
             fault = url.searchParams.get('fault') || '';
