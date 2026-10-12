@@ -2,9 +2,12 @@ package airouter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -222,6 +225,46 @@ func TestExercisePromptsRequestDistinctGroundedQuestions(t *testing.T) {
 		}
 		if strings.Contains(prompt, "…") || strings.Contains(prompt, `"explanation":"<explanation>"`) {
 			t.Errorf("%s prompt still uses meaningless template text", taskType)
+		}
+	}
+}
+
+// Exercise questions disappear on Continue, so practice cannot depend on a
+// passage displayed only by an earlier question. Inspect the actual outbound
+// provider messages, including a curriculum draft that suggests this trap.
+func TestPracticeProviderMessagesRequireIndependentQuestionContext(t *testing.T) {
+	var got struct {
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("decode prepared messages: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": string(SampleContent("practice"))}}}})
+	}))
+	defer srv.Close()
+	brief := ExerciseBrief{TaskType: "practice", Level: "B1", Goal: "Read together", ModuleFocus: "Community services", DayTitle: "Library", TaskTitle: "Community library", Draft: `{"topic":"Tell a library story in q1, then ask about it in q2"}`}
+	provider := NewOpenAICompatibleProvider(srv.URL, "fixture-only", "fixture-model", srv.Client())
+	if _, err := provider.GenerateContent(context.Background(), ExerciseSystemPrompt, ExerciseUserPrompt(brief)); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Messages) != 2 || got.Messages[1].Role != "user" {
+		t.Fatalf("prepared messages: %+v", got.Messages)
+	}
+	prompt := got.Messages[1].Content
+	for _, want := range []string{"independently answerable", "all context needed", "Do not put a shared story or passage only in q1", "do not refer back to earlier questions", "Shared passages belong to reading tasks", brief.Goal, brief.ModuleFocus, brief.DayTitle, brief.TaskTitle, brief.Draft} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("prepared practice message missing %q", want)
+		}
+	}
+	for _, kind := range []string{"reading", "vocabulary"} {
+		other := brief
+		other.TaskType = kind
+		if strings.Contains(ExerciseUserPrompt(other), "independently answerable") {
+			t.Errorf("practice constraint leaked into %s", kind)
 		}
 	}
 }

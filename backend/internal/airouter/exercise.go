@@ -55,6 +55,7 @@ func ExerciseUserPrompt(b ExerciseBrief) string {
 	case "practice":
 		fmt.Fprintf(&sb, `{"questions":[%s] × %d-%d}`, questionShape, MinPracticeQuestions, MaxPracticeQuestions)
 		sb.WriteString("\nUse the actual module focus and learner's target goal to write varied practice situations. Ground each answer and explanation in its situation and relevant language rule.")
+		sb.WriteString("\nEach practice question must be independently answerable: include all context needed in that question's own prompt. Do not put a shared story or passage only in q1, and do not refer back to earlier questions. Shared passages belong to reading tasks; practice must use self-contained situations even when the curriculum draft suggests a shared passage.")
 	}
 	if draft := cutRunes(strings.TrimSpace(b.Draft), exerciseDraftRunes); draft != "" && draft != "{}" {
 		fmt.Fprintf(&sb, "\n\nThe curriculum's draft for this task (use it as the topic; rewrite it into the schema): %s", draft)

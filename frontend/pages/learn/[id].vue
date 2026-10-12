@@ -88,7 +88,7 @@ async function openTask(repair = false) {
     invalid.value = e instanceof ApiError && e.code === 'exercise_content_invalid'
     hydrationError.value = !online.value ? 'Cần kết nối để tải nội dung. Kết nối rồi thử lại.'
       : invalid.value ? 'Nội dung này cần được tạo lại.'
-        : repair ? 'Chưa tạo lại được nội dung. Thử lại.'
+        : repair ? e instanceof ApiError && e.code === 'ai_bad_output' ? 'Chưa tạo được nội dung phù hợp. Quay lại sau.' : 'Chưa tạo lại được nội dung. Thử lại.'
           : e instanceof ApiError && e.code === 'exercise_not_found' ? 'Nhiệm vụ này không còn khả dụng.' : 'Chưa tải được nội dung học. Thử lại.'
     // Repair is always an explicit action, including subsequent failures.
     if (repair) invalid.value = true

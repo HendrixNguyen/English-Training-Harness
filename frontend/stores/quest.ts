@@ -155,14 +155,14 @@ export const useQuestStore = defineStore('quest', {
         if (!fresh) return existing
         await existing
         if (scope !== sessionScope()) return false
-        return this.load()
+        return this.load(true)
       }
       this.loading = true
       this.error = null
       const mutation = this.dailyMutation
       const request = (async () => {
         try {
-          const response = await useApi().get<DailyQuests>('/api/v1/quests/daily')
+          const response = await useApi().get<DailyQuests>(`/api/v1/quests/daily${fresh ? '?fresh=true' : ''}`)
           // A read started before accepted progress cannot undo that save.
           if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
           for (const task of response.tasks) {

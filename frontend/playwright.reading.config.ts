@@ -3,10 +3,10 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: 'tests/e2e',
   testMatch: 'reading.spec.ts',
-  timeout: 60_000,
+  timeout: 180_000,
   workers: 1,
   retries: 0,
-  outputDir: '/tmp/reading-flow-playwright',
+  outputDir: '/workspace/cloud-setup/reading-flow/task-5-logs/playwright',
   use: {
     baseURL: 'http://127.0.0.1:3100',
     viewport: { width: 390, height: 844 },

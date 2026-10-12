@@ -92,7 +92,7 @@ describe('/learn/:id learning sessions', () => {
     const w = mountPage(); await flushPromises(); expect(w.text()).toContain('Nội dung này cần được tạo lại.'); expect(api.get).not.toHaveBeenCalled()
     api.get.mockRejectedValueOnce(new ApiError(502, 'ai_bad_output')).mockResolvedValueOnce(reading())
     await action(w, 'Tạo lại nội dung').trigger('click'); await flushPromises(); expect(api.get).toHaveBeenCalledWith('/api/v1/quests/exercises/ex-2?repair=true')
-    expect(w.text()).toContain('Chưa tạo lại được nội dung'); expect(api.get).toHaveBeenCalledTimes(1)
+    expect(w.text()).toContain('Chưa tạo được nội dung phù hợp. Quay lại sau.'); expect(api.get).toHaveBeenCalledTimes(1)
     await action(w, 'Tạo lại nội dung').trigger('click'); await flushPromises(); expect(w.findComponent(ItemPassage).exists()).toBe(true)
   })
   it('restores pending selection and locked feedback/lookback across back/reload and token refresh', async () => {
@@ -150,7 +150,7 @@ describe('save response lifetime', () => {
     api.get.mockResolvedValueOnce(daily({ ...reading(), is_completed: true, quiz_result: grade() }))
     pending.resolve(progress()); await flushPromises()
     expect(w.text()).toContain('Đã lưu kết quả')
-    expect(api.get).toHaveBeenCalledWith('/api/v1/quests/daily')
+    expect(api.get).toHaveBeenCalledWith('/api/v1/quests/daily?fresh=true')
     expect(api.post).toHaveBeenCalledTimes(1)
   })
 })
@@ -195,7 +195,7 @@ describe('fresh reconciliation reads', () => {
     const startedBeforeSave = q.load()
     api.post.mockRejectedValueOnce(new TypeError('lost response'))
     await action(w, 'Hoàn thành').trigger('click'); await flushPromises(); old.resolve(daily()); await startedBeforeSave; await flushPromises()
-    expect(w.text()).toContain('Đã lưu kết quả'); expect(api.get).toHaveBeenCalledTimes(2); expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.get).toHaveBeenLastCalledWith('/api/v1/quests/daily?fresh=true'); expect(w.text()).toContain('Đã lưu kết quả'); expect(api.get).toHaveBeenCalledTimes(2); expect(api.post).toHaveBeenCalledTimes(1)
   })
 })
 

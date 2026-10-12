@@ -12,8 +12,10 @@ cleanupOutdatedCaches()
 
 // §3 "User Progress & Pet Status: NetworkFirst" — synchronised state when
 // online, last-known state when not. Cache name must match utils/session.ts.
+// Save reconciliation uses fresh=true: it must fail on a network error rather
+// than treating a cached incomplete task as permission to credit time again.
 registerRoute(
-  ({ url, request }) => request.method === 'GET' && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname),
+  ({ url, request }) => request.method === 'GET' && url.searchParams.get('fresh') !== 'true' && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname),
   new NetworkFirst({ cacheName: 'api-state', networkTimeoutSeconds: 5 }),
 )
 
