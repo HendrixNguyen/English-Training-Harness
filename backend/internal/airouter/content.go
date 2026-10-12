@@ -168,10 +168,10 @@ func validateQuestions(qs []Question, min, max int) error {
 		if strings.TrimSpace(q.Prompt) == "" {
 			return invalidContent("question %s has no prompt", id)
 		}
-		if placeholderQuestionText(q.Prompt) {
+		if PlaceholderQuestionText(q.Prompt) {
 			return invalidContent("question %s has placeholder prompt", id)
 		}
-		prompt := normalizeQuestionText(q.Prompt)
+		prompt := NormalizeQuestionText(q.Prompt)
 		if previous, ok := seenPrompts[prompt]; ok {
 			return invalidContent("question %s repeats prompt of question %s", id, previous)
 		}
@@ -184,7 +184,7 @@ func validateQuestions(qs []Question, min, max int) error {
 			if strings.TrimSpace(q.Options[k]) == "" {
 				return invalidContent("question %s is missing option %s", id, k)
 			}
-			text := normalizeQuestionText(q.Options[k])
+			text := NormalizeQuestionText(q.Options[k])
 			if previous, ok := seenOptions[text]; ok {
 				return invalidContent("question %s option %s repeats option %s", id, k, previous)
 			}
@@ -196,23 +196,24 @@ func validateQuestions(qs []Question, min, max int) error {
 		if strings.TrimSpace(q.Explanation) == "" {
 			return invalidContent("question %s has no explanation", id)
 		}
-		if placeholderQuestionText(q.Explanation) {
+		if PlaceholderQuestionText(q.Explanation) {
 			return invalidContent("question %s has placeholder explanation", id)
 		}
 	}
 	return nil
 }
 
-// Content has already passed the 32-KiB limit. Compare only case and Unicode
-// whitespace, preserving punctuation and wording; this is not semantic scoring.
-func normalizeQuestionText(text string) string {
+// NormalizeQuestionText compares case and Unicode whitespace while preserving
+// punctuation and wording. It is not semantic scoring; callers bound content size.
+func NormalizeQuestionText(text string) string {
 	return strings.ToLower(strings.Join(strings.Fields(text), " "))
 }
 
-// Only prompts/explanations use this check. Punctuation and abbreviations can
-// be legitimate option texts, and sentences that discuss TODO/TBD are valid.
-func placeholderQuestionText(text string) bool {
-	text = normalizeQuestionText(text)
+// PlaceholderQuestionText recognizes narrow whole-text prompt/explanation
+// placeholders. It does not apply to options: punctuation and abbreviations
+// can be legitimate choices, and sentences discussing TODO/TBD remain valid.
+func PlaceholderQuestionText(text string) bool {
+	text = NormalizeQuestionText(text)
 	if !strings.ContainsFunc(text, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsNumber(r) }) {
 		return true
 	}

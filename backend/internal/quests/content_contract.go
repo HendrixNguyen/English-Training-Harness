@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/HendrixNguyen/English-Training-Harness/backend/internal/airouter"
@@ -151,8 +150,8 @@ func validLegacy(body json.RawMessage, studyOnly bool) bool {
 	seenPrompts := map[string]bool{}
 	for _, q := range c.Questions {
 		id := strings.TrimSpace(q.ID)
-		prompt := normalizeLegacyText(q.Prompt)
-		if id == "" || seenIDs[id] || placeholderLegacyText(q.Prompt) || seenPrompts[prompt] {
+		prompt := airouter.NormalizeQuestionText(q.Prompt)
+		if id == "" || seenIDs[id] || airouter.PlaceholderQuestionText(q.Prompt) || seenPrompts[prompt] {
 			return false
 		}
 		seenIDs[id] = true
@@ -162,7 +161,7 @@ func validLegacy(body json.RawMessage, studyOnly bool) bool {
 		}
 		seenOptions := map[string]bool{}
 		for key, text := range q.Options {
-			normalized := normalizeLegacyText(text)
+			normalized := airouter.NormalizeQuestionText(text)
 			if (key != "A" && key != "B" && key != "C" && key != "D") || normalized == "" || seenOptions[normalized] {
 				return false
 			}
@@ -175,33 +174,9 @@ func validLegacy(body json.RawMessage, studyOnly bool) bool {
 				return false
 			}
 		}
-		if q.Explanation != "" && (q.Answer == "" || placeholderLegacyText(q.Explanation)) {
+		if q.Explanation != "" && (q.Answer == "" || airouter.PlaceholderQuestionText(q.Explanation)) {
 			return false
 		}
 	}
 	return true
-}
-
-func normalizeLegacyText(s string) string {
-	return strings.ToLower(strings.Join(strings.Fields(s), " "))
-}
-func placeholderLegacyText(s string) bool {
-	s = normalizeLegacyText(s)
-	if !strings.ContainsFunc(s, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsNumber(r) }) {
-		return true
-	}
-	switch strings.TrimRight(s, ".:!?…") {
-	case "todo", "tbd":
-		return true
-	}
-	switch s {
-	case "<a complete distinct question>", "<a meaningful sentence explaining the correct answer in context>":
-		return true
-	}
-	for _, label := range []string{"prompt", "question", "question prompt", "explanation"} {
-		if s == "<"+label+">" || s == "["+label+"]" || s == "{{"+label+"}}" || s == "[insert "+label+" here]" || s == "insert "+label+" here" || s == label+" goes here" {
-			return true
-		}
-	}
-	return false
 }
