@@ -13,6 +13,7 @@ export function useApi(): ApiClient {
     baseURL: config.public.apiBase,
     getToken: () => auth.accessToken,
     getOwner: () => auth.user?.id ?? null,
+    getSessionEpoch: () => auth.sessionEpoch,
     onUnauthorized: () => {
       void auth.signOut()
       void navigateTo('/login')

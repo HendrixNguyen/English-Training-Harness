@@ -19,7 +19,9 @@ export interface ApiClientOptions {
   getToken: () => string | null
   /** Stable account ID used only to namespace private worker cache entries. */
   getOwner?: () => string | null
-  /** Called once per 401 before the ApiError is thrown (sign out + redirect). */
+  /** Request lifetime boundary; changes on logout/relogin, stays stable on renewal. */
+  getSessionEpoch?: () => number
+  /** Called for a current-session, current-token 401 (sign out + redirect). */
   onUnauthorized: () => void
   fetch?: typeof globalThis.fetch
 }
@@ -53,22 +55,29 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     const url = new URL(`${opts.baseURL}${path}`)
     const owner = opts.getOwner?.()
+    const epoch = opts.getSessionEpoch?.()
+    const assertSession = () => {
+      if ((opts.getOwner && owner !== opts.getOwner()) || (opts.getSessionEpoch && epoch !== opts.getSessionEpoch())) throw new ApiError(409, 'session_changed')
+    }
+    async function inSession<R>(run: () => Promise<R>): Promise<R> {
+      try { return await run() } finally { assertSession() }
+    }
     if (method === 'GET' && token && owner && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname)) url.searchParams.set('aelp_owner', owner)
-    const res = await doFetch(url.toString(), {
+    const res = await inSession(() => doFetch(url.toString(), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-    })
-
-    if (opts.getOwner && owner !== opts.getOwner()) throw new ApiError(409, 'session_changed')
+    }))
 
     if (res.status === 401) {
+      // Renewal keeps the session epoch. An old token's rejection must not
+      // discard the renewed session; successful same-session reads still work.
+      if (token !== opts.getToken()) throw new ApiError(409, 'session_changed')
       opts.onUnauthorized()
       throw new ApiError(401, 'unauthorized')
     }
-    if (!res.ok) throw new ApiError(res.status, await errorCode(res))
-    const value = await res.json() as T
-    if (opts.getOwner && owner !== opts.getOwner()) throw new ApiError(409, 'session_changed')
+    if (!res.ok) throw new ApiError(res.status, await inSession(() => errorCode(res)))
+    const value = await inSession(() => res.json()) as T
     if (res.headers.get('X-Aelp-Cached') === 'true' && typeof value === 'object' && value !== null) cachedResponses.add(value)
     return value
   }

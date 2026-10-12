@@ -451,3 +451,47 @@ for (const route of ['/', '/settings']) test(`central signout from ${route} clea
     await replaceSession(page, f); await page.evaluate(id => { const app = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $router: { push(path: string): Promise<void> } } } } }).__vue_app__; return app.config.globalProperties.$router.push(`/learn/${id}`); }, f.exercise);
     await expect(passage(page)).toBeVisible(); await page.getByRole('button', { name: 'Đọc xong →' }).click(); await expect(page.getByRole('radio').first()).toHaveAttribute('aria-checked', 'false'); expect((await evidence(request, f)).progressPosts).toBe(0);
 });
+
+test('API session lifetime protects same-owner replacement and renewal from deferred real responses', async ({ page, request }) => {
+    const f = await seed(page, request); await page.goto(`/learn/${f.exercise}`); await expect(passage(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Đọc xong →' }).click(); await page.getByRole('radio').first().click();
+    await page.getByRole('link', { name: '‹ Quay lại' }).click(); await page.waitForURL('/'); expect(await loadStore(page)).toBe(true);
+    await expect.poll(() => page.evaluate(() => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { loading: boolean }> } } } } }).__vue_app__.config.globalProperties.$pinia; return pinia._s.get('pet')!.loading; })).toBe(false);
+    const outcomes = [];
+    for (const scenario of ['relogin200', 'relogin401', 'renewal401', 'renewal200']) {
+        const rejected = scenario.endsWith('401'); const replacement = scenario.startsWith('relogin');
+        let token = '';
+        if (rejected) token = ((await (await request.post(`${infra}/renew?exercise=${f.exercise}`)).json()) as { access_token: string }).access_token;
+        await request.post(`${infra}/control?defer=${f.auth.user.id}&path=${encodeURIComponent('/api/v1/pet/status')}`);
+        const epoch = await page.evaluate(() => {
+            const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { $reset(): void; load(): Promise<void>; sessionEpoch: number }> } } } } }).__vue_app__.config.globalProperties.$pinia;
+            const pet = pinia._s.get('pet')!; pet.$reset(); void pet.load(); return pinia._s.get('auth')!.sessionEpoch;
+        });
+        await expect.poll(async () => (await (await request.get(`${infra}/deferred`)).json()).count).toBe(1);
+        if (!rejected) token = ((await (await request.post(`${infra}/renew?exercise=${f.exercise}`)).json()) as { access_token: string }).access_token;
+        const nextEpoch = await page.evaluate(async ({ token, user, replacement }) => {
+            const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { signOut(): Promise<void>; signIn(r: unknown): Promise<void>; sessionEpoch: number }> } } } } }).__vue_app__.config.globalProperties.$pinia;
+            const auth = pinia._s.get('auth')!; if (replacement) await auth.signOut(); await auth.signIn({ access_token: token, expires_in: 86400, user }); return auth.sessionEpoch;
+        }, { token, user: f.auth.user, replacement });
+        expect(nextEpoch).toBe(epoch + (replacement ? 2 : 0));
+        // Create/retain a real controlled learning draft in the current session
+        // before the old response is released; unauthorized cleanup must not erase it.
+        await page.evaluate(id => { const app = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $router: { push(path: string): Promise<void> } } } } }).__vue_app__; return app.config.globalProperties.$router.push(`/learn/${id}`); }, f.exercise);
+        const studied = page.getByRole('button', { name: 'Đọc xong →' });
+        await expect(page.getByRole('button', { name: /Đọc xong|Trả lời/ }).first()).toBeVisible();
+        if (await studied.count()) await studied.click(); await page.getByRole('radio').first().click();
+        expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')).length)).toBe(1);
+        await request.post(`${infra}/release`);
+        await expect.poll(() => page.evaluate(() => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { loading: boolean }> } } } } }).__vue_app__.config.globalProperties.$pinia; return pinia._s.get('pet')!.loading; })).toBe(false);
+        const outcome = await page.evaluate(() => {
+            const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { status: unknown; error: string | null; isAuthenticated: boolean; sessionEpoch: number }> } } } } }).__vue_app__.config.globalProperties.$pinia;
+            const pet = pinia._s.get('pet')!, auth = pinia._s.get('auth')!; return { authenticated: auth.isAuthenticated, epoch: auth.sessionEpoch, pet: pet.status, error: pet.error, drafts: Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')).length };
+        });
+        expect(outcome.authenticated).toBe(true); expect(outcome.epoch).toBe(nextEpoch); expect(outcome.drafts).toBe(1); await expect(page.getByRole('radio').first()).toHaveAttribute('aria-checked', 'true');
+        if (scenario === 'renewal200') { expect(outcome.pet).not.toBeNull(); expect(outcome.error).toBeNull(); }
+        else { expect(outcome.pet).toBeNull(); expect(outcome.error).toBe('session_changed'); }
+        outcomes.push({ scenario, ...outcome });
+    }
+    expect((await evidence(request, f)).progressPosts).toBe(0);
+    await writeFile(`${logs}/api-session-lifetime.json`, JSON.stringify(outcomes, null, 2));
+});
