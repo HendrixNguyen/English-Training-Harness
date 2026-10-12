@@ -119,9 +119,9 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', sync); window.removeEventListener('focus', sync)
   window.removeEventListener('online', setOnline); window.removeEventListener('offline', setOnline)
 })
-function requestGuard() {
+function requestGuard(matchRevision = true) {
   const request = generation; const key = scope.value && { ...scope.value }; const requestedAccount = account.value
-  return () => !disposed && generation === request && account.value === requestedAccount && id.value === key?.task && task.value?.content_revision === key?.revision
+  return () => !disposed && generation === request && account.value === requestedAccount && id.value === key?.task && (!matchRevision || task.value?.content_revision === key?.revision)
 }
 async function reconcile() {
   if (checking.value || posting.value || !scope.value || !session.value.uncertain || !online.value) return
@@ -156,8 +156,12 @@ async function complete() {
   } catch (e) {
     if (!current()) return
     if (e instanceof ApiError && ['exercise_content_changed', 'exercise_content_invalid'].includes(e.code)) {
+      // Recovery expects a new revision but must stay within this page lifetime.
+      const recoveryCurrent = requestGuard(false)
       clearDraft(key); scope.value = null; posting.value = false; notice.value = 'Nội dung đã thay đổi. Học lại từ đầu.'
-      if (await quest.load(true)) await openTask()
+      const refreshed = await quest.load(true)
+      if (!recoveryCurrent()) return
+      if (refreshed) await openTask()
       else { hydrationError.value = 'Chưa tải được nội dung học. Thử lại.'; session.value = initialSession(content.value) }
     } else if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
       session.value.uncertain = false; error.value = e.code === 'exercise_not_found' ? 'Nhiệm vụ này không còn khả dụng.' : 'Chưa ghi được tiến độ. Thử lại.'; persist()

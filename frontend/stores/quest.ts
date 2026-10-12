@@ -118,6 +118,7 @@ export const useQuestStore = defineStore('quest', {
   state: () => ({
     daily: null as DailyQuests | null,
     accountScope: sessionScope(),
+    dailyMutation: 0,
     noRoadmap: false,
     loading: false,
     error: null as string | null,
@@ -138,6 +139,7 @@ export const useQuestStore = defineStore('quest', {
       pendingDaily.delete(this)
       if (this.accountScope.startsWith('owner:')) clearOwnerDrafts(this.accountScope.slice(6))
       this.accountScope = sessionScope()
+      this.dailyMutation += 1
       this.daily = null
       this.noRoadmap = false
       this.error = null
@@ -157,10 +159,12 @@ export const useQuestStore = defineStore('quest', {
       }
       this.loading = true
       this.error = null
+      const mutation = this.dailyMutation
       const request = (async () => {
         try {
           const response = await useApi().get<DailyQuests>('/api/v1/quests/daily')
-          if (scope !== sessionScope()) return false
+          // A read started before accepted progress cannot undo that save.
+          if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
           for (const task of response.tasks) {
             if (hasTrustedContent(task)) cacheContent(task.id, task)
             else if (!task.is_completed && task.content_origin !== 'generated') {
@@ -179,7 +183,7 @@ export const useQuestStore = defineStore('quest', {
           this.noRoadmap = false
           return true
         } catch (e) {
-          if (scope !== sessionScope()) return false
+          if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
           if (e instanceof ApiError && e.code === 'no_active_roadmap') {
             this.daily = null
             this.noRoadmap = true
@@ -287,6 +291,7 @@ export const useQuestStore = defineStore('quest', {
         const res = await useApi().post<ProgressResponse>('/api/v1/quests/progress', body)
         if (scope !== sessionScope() || daily !== this.daily || !current() || (revision !== undefined && this.taskById(exerciseId)?.content_revision !== revision)) return { ...res, targetMetChanged: false }
         if (this.daily) {
+          this.dailyMutation += 1
           this.daily.accumulated_seconds = res.daily_seconds_spent
           this.daily.is_target_met = res.is_target_met
           const t = this.daily.tasks.find(x => x.id === exerciseId)
