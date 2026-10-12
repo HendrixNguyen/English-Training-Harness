@@ -3,9 +3,124 @@ package airouter
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
+
+func changeQuestions(t *testing.T, taskType string, change func([]Question)) json.RawMessage {
+	t.Helper()
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal(SampleContent(taskType), &body); err != nil {
+		t.Fatal(err)
+	}
+	var questions []Question
+	if err := json.Unmarshal(body["questions"], &questions); err != nil {
+		t.Fatal(err)
+	}
+	change(questions)
+	body["questions"], _ = json.Marshal(questions)
+	out, _ := json.Marshal(body)
+	return out
+}
+
+// Assert the exact rule through both entry points: a generic rejection would
+// otherwise hide a broken duplicate or placeholder check.
+func TestContentQuestionQualityRejections(t *testing.T) {
+	cases := []struct {
+		name, reason string
+		change       func([]Question)
+	}{
+		{"same prompt", "question q2 repeats prompt of question q1", func(q []Question) { q[1].Prompt = q[0].Prompt }},
+		{"normalized prompt", "question q2 repeats prompt of question q1", func(q []Question) {
+			q[0].Prompt = "Which word fits the sentence?"
+			q[1].Prompt = " \tWHICH  word\nfits\u00a0the sentence? "
+		}},
+		{"same visible choices", "question q1 option C repeats option A", func(q []Question) { q[0].Options["C"] = q[0].Options["A"] }},
+		{"normalized visible choices", "question q1 option B repeats option A", func(q []Question) {
+			q[0].Options["A"] = "A new library"
+			q[0].Options["B"] = " \tA NEW\n library\u00a0 "
+		}},
+		{"copied prompt schema", "question q1 has placeholder prompt", func(q []Question) { q[0].Prompt = "<a complete distinct question>" }},
+		{"copied explanation schema", "question q1 has placeholder explanation", func(q []Question) {
+			q[0].Explanation = "<a meaningful sentence explaining the correct answer in context>"
+		}},
+	}
+	for _, field := range []string{"prompt", "explanation"} {
+		for _, placeholder := range []string{"TODO", " tBd. ", "…", " _?! — ", "<" + field + ">", "[insert " + field + " here]", "{{" + field + "}}"} {
+			field, placeholder := field, placeholder
+			cases = append(cases, struct {
+				name, reason string
+				change       func([]Question)
+			}{field + " " + placeholder, "question q1 has placeholder " + field, func(q []Question) {
+				if field == "prompt" {
+					q[0].Prompt = placeholder
+				} else {
+					q[0].Explanation = placeholder
+				}
+			}})
+		}
+	}
+	for _, taskType := range TaskTypes {
+		for _, c := range cases {
+			t.Run(taskType+"/"+c.name, func(t *testing.T) {
+				body := changeQuestions(t, taskType, c.change)
+				want := "content: " + c.reason + ": " + ErrInvalidContent.Error()
+				for name, check := range map[string]func() error{
+					"validator": func() error { return ValidateContent(taskType, "B1", body) },
+					"parser":    func() error { _, err := ParseExerciseContent(taskType, "B1", string(body)); return err },
+				} {
+					err := check()
+					if !errors.Is(err, ErrInvalidContent) || err.Error() != want {
+						t.Errorf("%s: err = %v, want %q", name, err, want)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestContentQuestionQualityPreservesLegitimateChoices(t *testing.T) {
+	body := changeQuestions(t, "practice", func(q []Question) {
+		q[0].Prompt = "Which punctuation mark ends a question?"
+		q[0].Options = map[string]string{"A": ".", "B": "?", "C": "!", "D": ";"}
+		q[1].Prompt = "Which abbreviation means to be determined (TBD)?"
+		q[1].Options = map[string]string{"A": "ETA", "B": "TBD", "C": "NASA", "D": "UK"}
+		q[1].Explanation = "TBD means to be determined, so the date is not yet decided."
+		// The remaining distinct grammar prompts can reuse am/is/are/be and B.
+	})
+	if _, err := ParseExerciseContent("practice", "B1", string(body)); err != nil {
+		t.Fatalf("valid punctuation, acronym, short and cross-question repeated choices rejected: %v", err)
+	}
+}
+
+func TestContentAcceptsSavedGenuineB1Reading(t *testing.T) {
+	// Existing genuine 9Router English-bot-free sample, saved 2026-10-12.
+	// This regression preserves compatible content; it is not fresh model proof.
+	body, err := os.ReadFile("testdata/genuine_b1_reading.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseExerciseContent("reading", "B1", string(body)); err != nil {
+		t.Fatalf("saved genuine B1 reading rejected: %v", err)
+	}
+}
+
+func TestContentQuestionQualityDoesNotUseFuzzyMatching(t *testing.T) {
+	body := changeQuestions(t, "practice", func(q []Question) {
+		q[0].Prompt = "Which verb fits: I ___ at the library?"
+		q[1].Prompt = "Which verb fits: She ___ at the library?"
+		for i := 0; i < 2; i++ {
+			q[i].Options = map[string]string{"A": "work", "B": "works", "C": "working", "D": "worked"}
+		}
+		q[0].Answer = "A"
+		q[0].Explanation = "Use the base form work with I in the present simple."
+		q[1].Explanation = "Use works with the third-person singular subject she in the present simple."
+	})
+	if err := ValidateContent("practice", "B1", body); err != nil {
+		t.Fatalf("distinct prompts and closely related grammar choices rejected: %v", err)
+	}
+}
 
 func TestValidateContentAcceptsEachTypeAndTheSamples(t *testing.T) {
 	for _, tt := range TaskTypes {

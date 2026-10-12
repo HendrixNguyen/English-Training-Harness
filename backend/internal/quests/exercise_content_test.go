@@ -125,6 +125,50 @@ func baseTarget(now time.Time) ContentTarget {
 	}
 }
 
+func TestContentServiceQuestionQualityRetry(t *testing.T) {
+	now := time.Date(2026, time.October, 12, 10, 0, 0, 0, time.UTC)
+	valid := string(airouter.SampleContent("vocabulary"))
+	cases := []struct {
+		name, reason string
+		change       func([]airouter.Question)
+	}{
+		{"duplicate prompts", "question q2 repeats prompt of question q1", func(q []airouter.Question) { q[1].Prompt = q[0].Prompt }},
+		{"duplicate choices", "question q1 option B repeats option A", func(q []airouter.Question) { q[0].Options["B"] = q[0].Options["A"] }},
+		{"placeholder", "question q1 has placeholder explanation", func(q []airouter.Question) { q[0].Explanation = "TODO" }},
+	}
+	for _, c := range cases {
+		var content airouter.VocabularyContent
+		if err := json.Unmarshal([]byte(valid), &content); err != nil {
+			t.Fatal(err)
+		}
+		c.change(content.Questions)
+		invalid, _ := json.Marshal(content)
+		for _, recover := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/recover=%t", c.name, recover), func(t *testing.T) {
+				second := string(invalid)
+				if recover {
+					second = valid
+				}
+				repo := &fakeContentRepo{target: baseTarget(now)}
+				ai := &fakeContentAI{answers: []string{string(invalid), second, valid}}
+				lim := &fakeContentLimiter{}
+				svc := NewContentService(repo, ai, lim, func() time.Time { return now })
+				_, err := svc.Exercise(context.Background(), "u1", "ex-1")
+				if ai.calls != 2 || lim.calls != 1 {
+					t.Errorf("AI calls=%d, limiter calls=%d, want 2/1", ai.calls, lim.calls)
+				}
+				if recover {
+					if err != nil || repo.saveCalls != 1 || string(repo.savedContent) != valid {
+						t.Errorf("valid second response: err=%v, saves=%d, saved=%s", err, repo.saveCalls, repo.savedContent)
+					}
+				} else if !errors.Is(err, ErrBadAIOutput) || !strings.Contains(err.Error(), c.reason) || repo.saveCalls != 0 {
+					t.Errorf("two invalid responses: err=%v, saves=%d, want ErrBadAIOutput with %q and no save", err, repo.saveCalls, c.reason)
+				}
+			})
+		}
+	}
+}
+
 func TestContentServiceExercise(t *testing.T) {
 	now := time.Date(2026, time.September, 27, 10, 0, 0, 0, time.UTC)
 	nowFn := func() time.Time { return now }

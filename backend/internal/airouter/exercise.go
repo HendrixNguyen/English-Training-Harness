@@ -11,7 +11,7 @@ import (
 
 // ExerciseSystemPrompt is the system turn for TaskExerciseGen: one task's
 // typed content, not the whole roadmap.
-const ExerciseSystemPrompt = `You are an English exercise writer for a 10-minute task inside a learner's daily quest. Output ONLY one JSON object matching the requested schema: no markdown, no code fences, no commentary. Write at the learner's CEFR level. Every multiple-choice question has exactly the options A, B, C and D, exactly one correct "answer", and a one-sentence "explanation" of why that answer is right.`
+const ExerciseSystemPrompt = `You are an English exercise writer for a 10-minute task inside a learner's daily quest. Output ONLY one JSON object matching the requested schema: no markdown, no code fences, no commentary. Write at the learner's CEFR level. Each question must test a distinct learning point with a distinct prompt. Every multiple-choice question has exactly the options A, B, C and D with distinct option texts, exactly one correct "answer", and plausible distractors that are wrong for the given context. Write each "explanation" as a meaningful sentence explaining why the answer fits that context and teaching the relevant point. Correct answer letters may repeat across questions. Replace every schema description with actual learning content; never emit TODO, TBD, ellipses or template placeholders as prompts or explanations.`
 
 // exerciseDraftRunes bounds how much of the roadmap's free-form draft rides
 // into the prompt: enough to carry the topic, never enough to dominate the
@@ -29,7 +29,7 @@ type ExerciseBrief struct {
 	Draft string
 }
 
-const questionShape = `{"id":"q1","prompt":"…","options":{"A":"…","B":"…","C":"…","D":"…"},"answer":"A|B|C|D","explanation":"…"}`
+const questionShape = `{"id":"q1","prompt":"<a complete distinct question>","options":{"A":"<choice A>","B":"<choice B>","C":"<choice C>","D":"<choice D>"},"answer":"<one option key: A, B, C or D>","explanation":"<a meaningful sentence explaining the correct answer in context>"}`
 
 // ExerciseUserPrompt names the learner (level, goal), where the task sits in
 // the curriculum (module focus, day title, task title), then the one JSON
@@ -43,16 +43,18 @@ func ExerciseUserPrompt(b ExerciseBrief) string {
 	sb.WriteString("Produce ONE JSON object with exactly this schema:\n")
 	switch b.TaskType {
 	case "vocabulary":
-		fmt.Fprintf(&sb, `{"words":[{"term":"…","definition":"…","example":"…"}] × %d-%d, "questions":[%s] × %d-%d}`,
+		fmt.Fprintf(&sb, `{"words":[{"term":"<a word to study>","definition":"<the word's meaning>","example":"<a sentence using the word in context>"}] × %d-%d, "questions":[%s] × %d-%d}`,
 			MinWords, MaxWords, questionShape, MinVocabQuestions, MaxVocabQuestions)
+		sb.WriteString("\nGround the questions, answers and explanations in the studied words and their examples. Test different word meanings or uses, with plausible distractors.")
 	case "reading":
 		lo, hi := PassageWords(b.Level)
-		fmt.Fprintf(&sb, `{"passage":"<%d-%d words>", "glossary":[{"term":"…","meaning_vi":"…","definition":"…"}] × %d-%d, "questions":[%s] × %d-%d}`,
+		fmt.Fprintf(&sb, `{"passage":"<%d-%d words>", "glossary":[{"term":"<exact passage term>","meaning_vi":"<short Vietnamese meaning>","definition":"<one-sentence English definition>"}] × %d-%d, "questions":[%s] × %d-%d}`,
 			lo, hi, MinGlossary, MaxGlossary, questionShape, MinReadingQuestions, MaxReadingQuestions)
-		sb.WriteString("\nThe questions are about the passage.")
+		sb.WriteString("\nGround the questions, answers and explanations in the actual passage. Cover distinct details, meanings or inferences supported by the text, with plausible distractors that the passage does not support.")
 		sb.WriteString("\nFor the glossary, choose distinct harder terms appropriate to the learner's CEFR level. Each term must use the exact spelling from the passage, with a short Vietnamese meaning and a one-sentence English definition.")
 	case "practice":
 		fmt.Fprintf(&sb, `{"questions":[%s] × %d-%d}`, questionShape, MinPracticeQuestions, MaxPracticeQuestions)
+		sb.WriteString("\nUse the actual module focus and learner's target goal to write varied practice situations. Ground each answer and explanation in its situation and relevant language rule.")
 	}
 	if draft := cutRunes(strings.TrimSpace(b.Draft), exerciseDraftRunes); draft != "" && draft != "{}" {
 		fmt.Fprintf(&sb, "\n\nThe curriculum's draft for this task (use it as the topic; rewrite it into the schema): %s", draft)

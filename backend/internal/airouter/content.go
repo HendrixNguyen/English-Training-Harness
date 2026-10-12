@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -157,6 +158,7 @@ func validateQuestions(qs []Question, min, max int) error {
 		return invalidContent("has %d questions, want %d..%d", n, min, max)
 	}
 	seen := map[string]bool{}
+	seenPrompts := map[string]string{}
 	for i, q := range qs {
 		id := strings.TrimSpace(q.ID)
 		if id == "" || seen[id] {
@@ -166,13 +168,27 @@ func validateQuestions(qs []Question, min, max int) error {
 		if strings.TrimSpace(q.Prompt) == "" {
 			return invalidContent("question %s has no prompt", id)
 		}
+		if placeholderQuestionText(q.Prompt) {
+			return invalidContent("question %s has placeholder prompt", id)
+		}
+		prompt := normalizeQuestionText(q.Prompt)
+		if previous, ok := seenPrompts[prompt]; ok {
+			return invalidContent("question %s repeats prompt of question %s", id, previous)
+		}
+		seenPrompts[prompt] = id
 		if len(q.Options) != len(optionKeys) {
 			return invalidContent("question %s has %d options, want %s", id, len(q.Options), strings.Join(optionKeys, ""))
 		}
+		seenOptions := map[string]string{}
 		for _, k := range optionKeys {
 			if strings.TrimSpace(q.Options[k]) == "" {
 				return invalidContent("question %s is missing option %s", id, k)
 			}
+			text := normalizeQuestionText(q.Options[k])
+			if previous, ok := seenOptions[text]; ok {
+				return invalidContent("question %s option %s repeats option %s", id, k, previous)
+			}
+			seenOptions[text] = k
 		}
 		if _, ok := q.Options[q.Answer]; !ok {
 			return invalidContent("question %s answer %q is not one of its options", id, q.Answer)
@@ -180,21 +196,55 @@ func validateQuestions(qs []Question, min, max int) error {
 		if strings.TrimSpace(q.Explanation) == "" {
 			return invalidContent("question %s has no explanation", id)
 		}
+		if placeholderQuestionText(q.Explanation) {
+			return invalidContent("question %s has placeholder explanation", id)
+		}
 	}
 	return nil
+}
+
+// Content has already passed the 32-KiB limit. Compare only case and Unicode
+// whitespace, preserving punctuation and wording; this is not semantic scoring.
+func normalizeQuestionText(text string) string {
+	return strings.ToLower(strings.Join(strings.Fields(text), " "))
+}
+
+// Only prompts/explanations use this check. Punctuation and abbreviations can
+// be legitimate option texts, and sentences that discuss TODO/TBD are valid.
+func placeholderQuestionText(text string) bool {
+	text = normalizeQuestionText(text)
+	if !strings.ContainsFunc(text, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsNumber(r) }) {
+		return true
+	}
+	switch strings.TrimRight(text, ".:!?…") {
+	case "todo", "tbd":
+		return true
+	}
+	switch text {
+	case "<a complete distinct question>", "<a meaningful sentence explaining the correct answer in context>":
+		return true
+	}
+	for _, label := range []string{"prompt", "question", "question prompt", "explanation"} {
+		if text == "<"+label+">" || text == "["+label+"]" || text == "{{"+label+"}}" ||
+			text == "[insert "+label+" here]" || text == "insert "+label+" here" || text == label+" goes here" {
+			return true
+		}
+	}
+	return false
 }
 
 // SampleContent is a minimal valid content object per task type, for test
 // fixtures here and in onboarding. It is not a prompt example. Its reading
 // passage is sized for B1 (520..1440 runes).
 func SampleContent(taskType string) json.RawMessage {
-	q := func(id string) Question {
-		return Question{ID: id, Prompt: "Choose the correct form: She ___ a teacher.", Options: map[string]string{"A": "am", "B": "is", "C": "are", "D": "be"}, Answer: "B", Explanation: "Third person singular takes 'is'."}
+	q := func(id, sentence string) Question {
+		return Question{ID: id, Prompt: "Choose the correct form: " + sentence, Options: map[string]string{"A": "am", "B": "is", "C": "are", "D": "be"}, Answer: "B", Explanation: "Third person singular takes 'is'."}
 	}
 	questions := func(n int) []Question {
+		sentences := []string{"She ___ a teacher.", "He ___ at work.", "The library ___ open.", "My brother ___ a student.", "This book ___ new.", "The meeting ___ today.", "Our town ___ small.", "The shop ___ busy."}
 		out := make([]Question, 0, n)
 		for i := 1; i <= n; i++ {
-			out = append(out, q(fmt.Sprintf("q%d", i)))
+			out = append(out, q(fmt.Sprintf("q%d", i), sentences[i-1]))
 		}
 		return out
 	}

@@ -135,7 +135,7 @@ func TestExerciseAnswerFitsTheBudget(t *testing.T) {
 	longQuestion := func(id string) Question {
 		return Question{
 			ID:     id,
-			Prompt: strings.Repeat("p", 120),
+			Prompt: id + " " + strings.Repeat("p", 120),
 			Options: map[string]string{
 				"A": strings.Repeat("a", 40),
 				"B": strings.Repeat("b", 40),
@@ -201,6 +201,27 @@ func TestExerciseUserPromptPreservesLevelGuidance(t *testing.T) {
 	for _, level := range []string{"A1", "A2", "B1", "B2", "C1", "C2"} {
 		if got := ExerciseUserPrompt(ExerciseBrief{TaskType: "reading", Level: level}); !strings.Contains(got, LevelGuidance(level)) {
 			t.Errorf("%s exercise prompt omits current level guidance", level)
+		}
+	}
+}
+
+func TestExercisePromptsRequestDistinctGroundedQuestions(t *testing.T) {
+	for _, want := range []string{"distinct learning point", "distinct prompt", "plausible", "distinct option texts", "meaningful sentence", "answer letters may repeat"} {
+		if !strings.Contains(ExerciseSystemPrompt, want) {
+			t.Errorf("system prompt omits %q", want)
+		}
+	}
+	for taskType, grounding := range map[string]string{
+		"reading":    "answers and explanations in the actual passage",
+		"vocabulary": "studied words and their examples",
+		"practice":   "actual module focus and learner's target goal",
+	} {
+		prompt := ExerciseUserPrompt(ExerciseBrief{TaskType: taskType, Level: "B1"})
+		if !strings.Contains(prompt, grounding) {
+			t.Errorf("%s prompt omits grounding %q", taskType, grounding)
+		}
+		if strings.Contains(prompt, "…") || strings.Contains(prompt, `"explanation":"<explanation>"`) {
+			t.Errorf("%s prompt still uses meaningless template text", taskType)
 		}
 	}
 }
