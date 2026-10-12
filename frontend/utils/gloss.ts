@@ -9,11 +9,12 @@ export function segmentPassage(passage: string, glossary: Gloss[]): Segment[] {
     const term = entry.term.trim()
     if (!term) return
     const pattern = term.split(/\s+/u).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
-    // Reject word-internal starts during the search, before matchAll advances.
-    const regex = new RegExp(`(?<![\\p{L}\\p{N}])${pattern}[\\p{L}\\p{N}'’-]*`, 'giu')
+    // A zero-width candidate preserves overlapping starts after a collision.
+    // The capture includes inflections; Unicode mode advances by code point.
+    const regex = new RegExp(`(?<![\\p{L}\\p{N}])(?=(${pattern}[\\p{L}\\p{N}'’-]*))`, 'giu')
     for (const match of passage.matchAll(regex)) {
       const start = match.index
-      const end = start + match[0].length
+      const end = start + match[1]!.length
       if (marks.some(mark => start < mark.end && end > mark.start)) continue
       marks.push({ start, end, gloss })
       break

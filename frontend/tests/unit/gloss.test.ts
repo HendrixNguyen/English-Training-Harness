@@ -25,6 +25,22 @@ describe('lossless glossary segmentation', () => {
       expect(sanitizeGlossary(glossary, passage)).toEqual(glossary)
     }
   })
+  it('tries overlapping candidates until finding the first occurrence free of a longer mark', () => {
+    const passage = 'They had had had enough.'
+    const glossary = ['They had', 'had had'].map(gloss)
+    const segments = segmentPassage(passage, glossary)
+    expect(segments).toEqual([{ text: 'They had', gloss: 0 }, { text: ' ' }, { text: 'had had', gloss: 1 }, { text: ' enough.' }])
+    expect(segments.map(segment => segment.text).join('')).toBe(passage)
+    expect(sanitizeGlossary(glossary, passage)).toEqual(glossary)
+  })
+  it('keeps Unicode offsets and full inflections while resolving overlapping phrase collisions longest first', () => {
+    const passage = '𝒜 PEOPLE CAFÉ café cafés’ enough.'
+    const glossary = ['café café', 'People café'].map(gloss)
+    const segments = segmentPassage(passage, glossary)
+    expect(segments).toEqual([{ text: '𝒜 ' }, { text: 'PEOPLE CAFÉ', gloss: 1 }, { text: ' ' }, { text: 'café cafés’', gloss: 0 }, { text: ' enough.' }])
+    expect(segments.map(segment => segment.text).join('')).toBe(passage)
+    expect(sanitizeGlossary(glossary, passage)).toEqual(glossary)
+  })
   it('drops malformed, blank, duplicate, absent and unplaceable entries and caps eight', () => {
     const passage = 'one two three four five six seven eight nine'
     const entries = [null, gloss('absent'), { ...gloss('one'), definition: ' ' }, gloss(' one '), gloss('ONE'), ...'two three four five six seven eight nine'.split(' ').map(gloss)]
