@@ -21,7 +21,7 @@ const api = useOnboardingApi()
 const quest = useQuestStore()
 
 const step = ref<'goal' | 'quiz' | 'waiting' | 'result'>('goal')
-const retryAction = ref<'assessment' | 'quests' | 'calibration'>('assessment')
+const retryAction = ref<'assessment' | 'quests' | 'calibration' | 'navigation'>('assessment')
 const calibrationUsed = ref(false)
 const calibrationLevel = ref<string | null>(null)
 const hatch = ref(false)
@@ -135,6 +135,7 @@ async function retry() {
   if (loading.value) return
   if (retryAction.value === 'assessment') return next()
   if (retryAction.value === 'calibration') return regenerate()
+  if (retryAction.value === 'navigation') return finish()
   loading.value = true
   error.value = null
   try { await loadReady() } finally { loading.value = false }
@@ -142,6 +143,8 @@ async function retry() {
 
 async function finish() {
   if (loading.value) return
+  retryAction.value = 'navigation' // Keeping a journey changes retries to reads, never regeneration.
+  step.value = 'waiting'
   loading.value = true
   error.value = null
   try {
@@ -190,7 +193,7 @@ async function finish() {
 
     <RetroPanel v-else-if="step === 'waiting'" :announce="false" :speaker="plantNameTrimmed || 'Mầm Non'">
       <CompanionSprite stage="seed" :health="100" />
-      <p role="status" class="mt-4 font-body text-[17px]">{{ retryAction === 'calibration' ? 'Tớ đang vẽ lại bản đồ cho cậu…' : result ? 'Tớ đang chuẩn bị nhiệm vụ cho cậu…' : 'Tớ đang chấm bài và vẽ bản đồ cho cậu…' }} Thời gian tạo hành trình có thể kéo dài. Giữ trang mở cho đến khi có kết quả.</p>
+      <p v-if="loading" role="status" class="mt-4 font-body text-[17px]">{{ retryAction === 'calibration' ? 'Tớ đang vẽ lại bản đồ cho cậu…' : result ? 'Tớ đang chuẩn bị nhiệm vụ cho cậu…' : 'Tớ đang chấm bài và vẽ bản đồ cho cậu…' }} Thời gian tạo hành trình có thể kéo dài. Giữ trang mở cho đến khi có kết quả.</p>
       <p v-if="loading" aria-hidden="true" class="retro-dots mt-4 font-display text-[28px]">…</p>
     </RetroPanel>
 
