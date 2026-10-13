@@ -27,7 +27,7 @@ func TestIntegrationSettingsReadReloadOwnedPreferences(t *testing.T) {
 	for i, p := range []*string{&owner, &other} {
 		gid := []string{"settings-read-owner", "settings-read-other"}[i]
 		_, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id=$1`, gid)
-		if err = pg.Pool.QueryRow(ctx, `INSERT INTO users(email,google_id) VALUES($1,$2) RETURNING id`, gid+"@example.com", gid).Scan(p); err != nil {
+		if err = pg.Pool.QueryRow(ctx, `INSERT INTO users(email,google_id,target_goal) VALUES($1,$2,'integration') RETURNING id`, gid+"@example.com", gid).Scan(p); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _, _ = pg.Pool.Exec(ctx, `DELETE FROM users WHERE google_id=$1`, gid) })
