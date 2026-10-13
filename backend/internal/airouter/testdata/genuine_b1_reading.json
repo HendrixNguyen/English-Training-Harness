@@ -1,0 +1,73 @@
+{
+  "passage": "In May, residents of a small town turned an empty shop into a community library. At first, they had only two tables and a box of donated books. Some neighbors doubted the plan would last because nobody had money to hire a librarian. However, retired teacher Mr. Lewis offered to organize the books, and teenagers painted the walls. Local families brought shelves, chairs, and lamps.\n\nThe library opened three months later. Volunteers take turns welcoming visitors and keeping records of borrowed books. Children come after school to read or do homework, while adults share newspapers and advice. One visitor, who had moved to town recently, said library helped her meet people and feel she belonged.\n\nThe project still faces problems. Donations do not always include books people want, and volunteers sometimes have little time. To solve this, residents ask visitors what they would like to read. Library is not only place to borrow books; it gives neighbors reason to work together. If more people volunteer, it may become reliable part of town life.",
+  "glossary": [
+    {
+      "term": "residents",
+      "definition": "Residents are people who live in a particular place.",
+      "meaning_vi": "cư dân"
+    },
+    {
+      "term": "doubted",
+      "definition": "Doubted means felt unsure that something was true or would happen.",
+      "meaning_vi": "nghi ngờ"
+    },
+    {
+      "term": "organize",
+      "definition": "To organize things is to arrange them in a useful order.",
+      "meaning_vi": "sắp xếp"
+    },
+    {
+      "term": "volunteers",
+      "definition": "Volunteers are people who work without being paid.",
+      "meaning_vi": "tình nguyện viên"
+    },
+    {
+      "term": "belonged",
+      "definition": "Belonged means felt accepted as part of a group or place.",
+      "meaning_vi": "cảm thấy mình thuộc về"
+    },
+    {
+      "term": "reliable",
+      "definition": "Something reliable can be trusted to work well or continue.",
+      "meaning_vi": "đáng tin cậy"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "answer": "B",
+      "prompt": "Why did some neighbors doubt the library plan?",
+      "options": {
+        "A": "They thought residents would not read books.",
+        "B": "They worried the project could not pay for a librarian.",
+        "C": "They wanted teenagers to leave town.",
+        "D": "They believed the shop was too large."
+      },
+      "explanation": "They doubted the plan because nobody had money to hire a librarian."
+    },
+    {
+      "id": "q2",
+      "answer": "A",
+      "prompt": "What does the new visitor's story suggest about the library?",
+      "options": {
+        "A": "It helps newcomers connect with others.",
+        "B": "It gives visitors jobs in the town.",
+        "C": "It replaces school for local children.",
+        "D": "It offers free advice from teachers."
+      },
+      "explanation": "The visitor met people there and began to feel part of the town."
+    },
+    {
+      "id": "q3",
+      "answer": "C",
+      "prompt": "What is the writer's main point?",
+      "options": {
+        "A": "A library needs a paid librarian to succeed.",
+        "B": "Teenagers should be responsible for public spaces.",
+        "C": "A community library can bring neighbors together, though it needs ongoing help.",
+        "D": "Residents should donate only new books."
+      },
+      "explanation": "The story shows how shared work built the library and how continued support can help it last."
+    }
+  ]
+}

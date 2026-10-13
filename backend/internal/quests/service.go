@@ -16,9 +16,10 @@ var ErrInvalidDuration = errors.New("quests: invalid duration_seconds")
 // ProgressResult is the POST /api/v1/quests/progress 200 body — backend spec
 // §6.2, field for field.
 type ProgressResult struct {
-	DailySecondsSpent int64 `json:"daily_seconds_spent"`
-	DailyMinutesSpent int   `json:"daily_minutes_spent"`
-	IsTargetMet       bool  `json:"is_target_met"`
+	QuizResult        json.RawMessage `json:"quiz_result"`
+	DailySecondsSpent int64           `json:"daily_seconds_spent"`
+	DailyMinutesSpent int             `json:"daily_minutes_spent"`
+	IsTargetMet       bool            `json:"is_target_met"`
 	// §6.2's two pet fields. Pointers so a failed read is *omitted* (decision
 	// below), never reported as 0 — health 0 is a dead plant in spec §8.
 	PetHealth   *int `json:"pet_health,omitempty"`
@@ -54,7 +55,7 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pe
 
 // RecordProgress validates, then implements §5.2 steps 2-4 in that order:
 //
-//  0. Reads only — resolve the profile and active roadmap, then CheckExercise:
+//  0. Reads only — resolve the profile and active roadmap, then ProgressExercise:
 //     the exercise must be on the caller's active roadmap and on today's
 //     day_number, or the call is rejected with ErrExerciseNotFound before a
 //     single write. A rejected request leaves Redis and daily_progress
@@ -76,7 +77,7 @@ func NewService(counter Counter, quests QuestRepo, progress ProgressRepo, pet Pe
 //
 // The ordering is a contract, not an implementation detail: see the call-log
 // test in service_test.go.
-func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string, seconds int64) (ProgressResult, error) {
+func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string, seconds int64, submissions ...ProgressSubmission) (ProgressResult, error) {
 	if seconds <= 0 || seconds > MaxDurationSeconds {
 		return ProgressResult{}, fmt.Errorf("%w: must be in 1..%d, got %d", ErrInvalidDuration, MaxDurationSeconds, seconds)
 	}
@@ -95,7 +96,20 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 	date := LocalDate(now, loc)
 	day := DayNumber(roadmap.CreatedAt, now, loc)
 
-	if err := s.quests.CheckExercise(ctx, roadmap.ID, exerciseID, day); err != nil {
+	exercise, err := s.quests.ProgressExercise(ctx, userID, roadmap.ID, exerciseID, day)
+	if err != nil {
+		return ProgressResult{}, err
+	}
+
+	in := ProgressSubmission{}
+	if len(submissions) > 1 {
+		return ProgressResult{}, ErrInvalidAnswers
+	}
+	if len(submissions) == 1 {
+		in = submissions[0]
+	}
+	quizResult, err := gradeSubmission(exercise, seconds, in)
+	if err != nil {
 		return ProgressResult{}, err
 	}
 
@@ -135,10 +149,12 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 	}
 
 	// MarkComplete keeps its own ErrExerciseNotFound for the race where the
-	// row vanished between CheckExercise and here; the handler still maps it
+	// row vanished between ProgressExercise and here; the handler still maps it
 	// to 404. It runs after the hook so a vanished exercise cannot cost the
-	// user the day's +20.
-	if err := s.quests.MarkComplete(ctx, roadmap.ID, exerciseID); err != nil {
+	// user the day's +20. A content CAS conflict can also occur after tracking
+	// writes; callers reconcile with a read before an ambiguous retry.
+	savedResult, err := s.quests.MarkComplete(ctx, userID, roadmap.ID, exercise, quizResult)
+	if err != nil {
 		return ProgressResult{}, err
 	}
 
@@ -147,6 +163,7 @@ func (s *Service) RecordProgress(ctx context.Context, userID, exerciseID string,
 	// the wire — so the client keeps the last state it knew; GET /pet/status
 	// (pet slice) is the authoritative read.
 	res := ProgressResult{
+		QuizResult:        savedResult,
 		DailySecondsSpent: total,
 		DailyMinutesSpent: int(total / 60),
 		IsTargetMet:       targetMet,
@@ -174,6 +191,9 @@ type Task struct {
 	DurationMinutes int             `json:"duration_minutes"`
 	IsCompleted     bool            `json:"is_completed"`
 	ContentJSON     json.RawMessage `json:"content_json"`
+	ContentOrigin   string          `json:"content_origin"`
+	ContentRevision *string         `json:"content_revision"`
+	QuizResult      json.RawMessage `json:"quiz_result"`
 }
 
 // DailySuite is the GET /api/v1/quests/daily 200 body — backend spec §6.2,
@@ -200,7 +220,11 @@ func toTask(e Exercise) Task {
 	if meta.DurationMinutes <= 0 {
 		meta.DurationMinutes = DefaultTaskMinutes
 	}
+	origin, revision, _, _ := ContentContract(e)
 	return Task{
+		QuizResult:      e.QuizResult,
+		ContentOrigin:   origin,
+		ContentRevision: revision,
 		ID:              e.ID,
 		TaskType:        e.TaskType,
 		Title:           meta.Title,

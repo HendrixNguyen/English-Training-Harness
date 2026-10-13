@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { clearApiCache } from '~/utils/session'
+import { clearOwnerDrafts } from '~/utils/learningSession'
 
 /** Backend spec §6.1 `user`. */
 export interface AuthUser {
@@ -35,6 +36,7 @@ export const useAuthStore = defineStore('auth', {
     expiresAt: null as number | null,
     user: null as AuthUser | null,
     hydrated: false,
+    sessionEpoch: 0,
   }),
   getters: {
     isAuthenticated: s => s.accessToken !== null && s.expiresAt !== null && s.expiresAt > Date.now(),
@@ -56,28 +58,30 @@ export const useAuthStore = defineStore('auth', {
         storageOrNull()?.removeItem(AUTH_STORAGE_KEY)
       }
     },
-    /**
-     * Stores the new session, then drops any previous account's cached API
-     * responses — the mirror of signOut(). State and storage are written
-     * synchronously; the returned promise is the cache clear, and /login
-     * awaits it before navigating so the hub never reads a stale entry.
-     */
+    /** Clear the former owner's drafts before identity replacement; renewal keeps offline state. */
     signIn(res: SignInResponse, now: number = Date.now()): Promise<void> {
       if (typeof res.access_token !== 'string' || typeof res.expires_in !== 'number') return Promise.resolve()
+      const sameOwner = !!this.user?.id && this.user.id === res.user.id
+      if (!sameOwner) {
+        if (this.user?.id) clearOwnerDrafts(this.user.id)
+        this.sessionEpoch += 1
+      }
       this.accessToken = res.access_token
       this.expiresAt = now + res.expires_in * 1000
       this.user = res.user
       this.hydrated = true
       const p: Persisted = { accessToken: this.accessToken, expiresAt: this.expiresAt, user: res.user }
-      storageOrNull()?.setItem(AUTH_STORAGE_KEY, JSON.stringify(p))
-      return clearApiCache()
+      try { storageOrNull()?.setItem(AUTH_STORAGE_KEY, JSON.stringify(p)) } catch { /* memory session remains usable */ }
+      return sameOwner ? Promise.resolve() : clearApiCache()
     },
     /** Drops the session, then the per-user service worker cache — every sign-out path goes through here. */
     signOut(): Promise<void> {
+      if (this.user?.id) clearOwnerDrafts(this.user.id)
+      this.sessionEpoch += 1
       this.accessToken = null
       this.expiresAt = null
       this.user = null
-      storageOrNull()?.removeItem(AUTH_STORAGE_KEY)
+      try { storageOrNull()?.removeItem(AUTH_STORAGE_KEY) } catch { /* identity is still discarded in memory */ }
       return clearApiCache()
     },
   },

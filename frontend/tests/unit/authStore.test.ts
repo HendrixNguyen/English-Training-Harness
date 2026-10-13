@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AUTH_STORAGE_KEY, useAuthStore, type SignInResponse } from '~/stores/auth'
 import { API_STATE_CACHE } from '~/utils/session'
 import { installSeededCaches } from './fakeCaches'
+import { initialSession, readDraft, writeDraft } from '~/utils/learningSession'
+import { classifyContent } from '~/utils/content'
 
 const spec61: SignInResponse = {
   access_token: 'eyJ.test',
@@ -73,6 +75,40 @@ describe('useAuthStore', () => {
     expect(auth.accessToken).toBeNull()
     expect(auth.user).toBeNull()
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull()
+  })
+
+  it.each(['signOut', 'replacement'])('clears persisted and memory drafts at central %s without a mounted learn page', async boundary => {
+    const auth = useAuthStore(); await auth.signIn(spec61)
+    const content = classifyContent({ questions: [{ id: 'q', prompt: 'Choose.', options: { A: 'One', B: 'Two' } }] })
+    const scope = { owner: 'u1', task: 'reading', revision: 'rev' }
+    writeDraft(scope, { ...initialSession(content), pending: 'A' })
+    if (boundary === 'signOut') await auth.signOut()
+    else await auth.signIn({ ...spec61, user: { ...spec61.user, id: 'u2' } })
+    expect(readDraft(scope, content)).toBeNull()
+    expect(Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft'))).toEqual([])
+    await auth.signIn(spec61); expect(readDraft(scope, content)).toBeNull()
+  })
+
+  it('same-owner token renewal preserves drafts and cached offline state', async () => {
+    const auth = useAuthStore(); await auth.signIn(spec61)
+    const content = classifyContent({ questions: [{ id: 'q', prompt: 'Choose.', options: { A: 'One', B: 'Two' } }] })
+    const scope = { owner: 'u1', task: 'reading', revision: 'rev' }
+    writeDraft(scope, { ...initialSession(content), pending: 'A' })
+    const caches = await installSeededCaches(API_STATE_CACHE)
+    await auth.signIn({ ...spec61, access_token: 'renewed' })
+    expect(readDraft(scope, content)?.pending).toBe('A'); expect(await caches.has(API_STATE_CACHE)).toBe(true)
+  })
+
+  it('denied storage still clears memory drafts and discards identity on signOut', async () => {
+    const auth = useAuthStore(); await auth.signIn(spec61)
+    const content = classifyContent({ questions: [{ id: 'q', prompt: 'Choose.', options: { A: 'One', B: 'Two' } }] })
+    const scope = { owner: 'u1', task: 'reading', revision: 'rev' }
+    writeDraft(scope, { ...initialSession(content), pending: 'B' })
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('denied') })
+    writeDraft(scope, { ...initialSession(content), pending: 'A' })
+    vi.spyOn(localStorage, 'removeItem').mockImplementation(() => { throw new Error('denied') })
+    await expect(auth.signOut()).resolves.toBeUndefined()
+    expect(auth.user).toBeNull(); expect(readDraft(scope, content)).toBeNull()
   })
 
   it('signOut deletes the service worker api-state cache and nothing else', async () => {

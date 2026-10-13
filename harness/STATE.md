@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-09-28 16:00. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-10-13 01:36. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -137,6 +137,8 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-10-12-learning-sessions-discard-answers-and-hide-feedback-while-un.md` — Learning sessions save graded answers and explain each question — Plan [high] (review: pass)
+- `harness/plans/2026-10-11-reading-flow.md` — Complete one reading task with Vietnamese glossary and saved progress — Plan [high] (review: pass)
 - `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (review: pass-with-bugs)
 - `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high] (review: pass) (merged)
 - `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high] (review: pass) (merged)
@@ -145,8 +147,6 @@ _none_
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped — Plan [low] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-executor-worktree-nested-under-claude-worktrees-while-plan-f.md` — `stale-worktrees` reads `git worktree list`, the executor records the real worktree path, and amend re-reviews count for the amended plan — Plan [low] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-codemap-does-not-document-the-config-and-health-packages-and.md` — CODEMAP does not document the config and health packages and still says three CI jobs — Plan [low] (review: pass) (merged)
 
 ## Failed
 

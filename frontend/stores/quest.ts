@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
-import { ApiError } from '~/utils/apiClient'
+import { ApiError, isCachedApiResponse } from '~/utils/apiClient'
+import { useAuthStore } from '~/stores/auth'
+import { hasTrustedContent, questionsOf, classifyContent, isRecord } from '~/utils/content'
+import { clearOwnerDrafts } from '~/utils/learningSession'
 import { clampDuration } from '~/utils/progress'
 
 export const TASK_ORDER = ['vocabulary', 'reading', 'practice'] as const
@@ -14,7 +17,13 @@ export interface QuestTask {
   duration_minutes: number
   is_completed: boolean
   content_json: unknown
+  content_origin?: 'generated' | 'legacy' | 'outline'
+  content_revision?: string | null
+  quiz_result?: QuizResult | null
 }
+
+export interface QuizAnswer { question_id: string, selected_option: string, correct_option: string | null, is_correct: boolean | null, explanation: string | null }
+export interface QuizResult { status: 'graded' | 'ungraded', answered_count: number, question_count: number, correct_count: number | null, score_percent: number | null, duration_seconds: number, answers: QuizAnswer[] }
 
 export interface DailyQuests {
   date: string
@@ -27,6 +36,7 @@ export interface DailyQuests {
 
 /** Backend spec §6.2 POST /quests/progress 200 body. */
 export interface ProgressResponse {
+  quiz_result?: QuizResult | null
   daily_seconds_spent: number
   daily_minutes_spent: number
   is_target_met: boolean
@@ -79,9 +89,53 @@ function rank(type: string): number {
   return i === -1 ? TASK_ORDER.length : i
 }
 
+const contentCacheKey = 'aelp.exercise-content'
+const acceptedCacheKey = 'aelp.accepted-daily.v1'
+function readAccepted(): DailyQuests | null {
+  try {
+    const stored = JSON.parse(storageOrNull()?.getItem(acceptedCacheKey) ?? 'null')
+    const daily = stored?.daily
+    if (stored?.owner && stored.owner === useAuthStore().user?.id && isRecord(daily) && typeof daily.date === 'string' && Number.isInteger(daily.day_number) && typeof daily.is_target_met === 'boolean' && Number.isFinite(daily.accumulated_seconds) && Array.isArray(daily.tasks) && daily.tasks.every(t => isRecord(t) && typeof t.id === 'string' && typeof t.task_type === 'string' && typeof t.is_completed === 'boolean')) return daily as unknown as DailyQuests
+  } catch { /* denied or obsolete cache */ }
+  return null
+}
+function writeAccepted(daily: DailyQuests | null) {
+  try {
+    if (daily) storageOrNull()?.setItem(acceptedCacheKey, JSON.stringify({ owner: useAuthStore().user?.id ?? null, daily }))
+    else storageOrNull()?.removeItem(acceptedCacheKey)
+  } catch { /* accepted in-memory state remains usable */ }
+}
+const pendingHydration = new WeakMap<object, Map<string, Promise<QuestTask>>>()
+const pendingDaily = new WeakMap<object, Promise<boolean>>()
+const pendingCompletion = new WeakMap<object, Map<string, Promise<CompleteResult>>>()
+function sessionScope(): string {
+  const auth = useAuthStore()
+  return `${auth.user?.id ? `owner:${auth.user.id}` : `anonymous:${auth.accessToken ?? ''}`}|${auth.sessionEpoch}`
+}
+function cachedContent(id: string): QuestTask | undefined {
+  try {
+    const cache = JSON.parse(storageOrNull()?.getItem(contentCacheKey) ?? 'null')
+    if (cache?.owner === (useAuthStore().user?.id ?? null)) return cache.tasks?.[id]
+  } catch { /* denied storage or an obsolete cache */ }
+  return undefined
+}
+function cacheContent(id: string, content: QuestTask) {
+  try {
+    const owner = useAuthStore().user?.id ?? null
+    const stored = JSON.parse(storageOrNull()?.getItem(contentCacheKey) ?? 'null')
+    const tasks = stored?.owner === owner && typeof stored.tasks === 'object' && stored.tasks !== null ? stored.tasks : {}
+    tasks[id] = content
+    storageOrNull()?.setItem(contentCacheKey, JSON.stringify({ owner, tasks }))
+  } catch { /* in-memory content remains usable */ }
+}
+
 export const useQuestStore = defineStore('quest', {
   state: () => ({
     daily: null as DailyQuests | null,
+    accountScope: sessionScope(),
+    accountOwner: useAuthStore().user?.id ?? null,
+    acceptedDaily: readAccepted(),
+    dailyMutation: 0,
     noRoadmap: false,
     loading: false,
     error: null as string | null,
@@ -97,22 +151,127 @@ export const useQuestStore = defineStore('quest', {
     targetMet: s => s.daily?.is_target_met ?? false,
   },
   actions: {
-    async load() {
+    resetForAccount() {
+      if (this.accountScope === sessionScope()) return
+      pendingDaily.delete(this)
+      if (this.accountOwner) clearOwnerDrafts(this.accountOwner)
+      this.accountScope = sessionScope()
+      this.accountOwner = useAuthStore().user?.id ?? null
+      this.acceptedDaily = null
+      writeAccepted(null)
+      this.dailyMutation += 1
+      this.daily = null
+      this.noRoadmap = false
+      this.error = null
+      this.loading = false
+      this.timers = {}
+      writeTimers(this.timers)
+    },
+    async load(fresh = false): Promise<boolean> {
+      this.resetForAccount()
+      const scope = sessionScope()
+      const existing = pendingDaily.get(this)
+      if (existing) {
+        if (!fresh) return existing
+        await existing
+        if (scope !== sessionScope()) return false
+        return this.load(true)
+      }
       this.loading = true
       this.error = null
-      try {
-        this.daily = await useApi().get<DailyQuests>('/api/v1/quests/daily')
-        this.pruneTimers()
-        this.noRoadmap = false
-      } catch (e) {
-        if (e instanceof ApiError && e.code === 'no_active_roadmap') {
-          this.daily = null
-          this.noRoadmap = true
-        } else {
-          this.error = e instanceof ApiError ? e.code : 'network_error'
+      const mutation = this.dailyMutation
+      const request = (async () => {
+        try {
+          const response = await useApi().get<DailyQuests>(`/api/v1/quests/daily${fresh ? '?fresh=true' : ''}`)
+          // A read started before accepted progress cannot undo that save.
+          if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
+          const accepted = this.acceptedDaily
+          const offline = typeof navigator !== 'undefined' && !navigator.onLine
+          const fallback = isCachedApiResponse(response) || offline
+          let retained = false
+          if (!fresh && accepted?.date === response.date && accepted.day_number === response.day_number) {
+            response.tasks = response.tasks.map(task => {
+              const saved = accepted.tasks.find(t => t.id === task.id && t.task_type === task.task_type && t.is_completed && t.content_revision && hasTrustedContent(t))
+              if (!saved || (task.content_revision !== saved.content_revision && !(fallback && task.content_origin === 'outline' && !task.content_revision))) return task
+              retained = true
+              return { ...saved }
+            })
+            if (retained) {
+              response.accumulated_seconds = Math.max(response.accumulated_seconds, accepted.accumulated_seconds)
+              response.is_target_met ||= accepted.is_target_met
+            }
+          }
+          // A real day/task/content replacement or a network-only read retires
+          // obsolete checkpoints so old content cannot reappear on a later load.
+          const completed = response.tasks.some(t => t.is_completed && t.content_revision && hasTrustedContent(t))
+          if (accepted || completed) {
+            this.acceptedDaily = retained || completed ? JSON.parse(JSON.stringify(response)) : null
+            writeAccepted(this.acceptedDaily)
+          }
+          for (const task of response.tasks) {
+            if (hasTrustedContent(task)) cacheContent(task.id, task)
+            else if (!task.is_completed && task.content_origin !== 'generated') {
+              const previous = this.taskById(task.id)
+              const cached = previous && hasTrustedContent(previous) ? previous : cachedContent(task.id)
+              if (cached && hasTrustedContent(cached) && cached.id === task.id && cached.task_type === task.task_type && (task.content_revision === cached.content_revision || (offline && task.content_origin === 'outline' && !task.content_revision))) {
+                task.content_json = cached.content_json
+                task.content_origin = cached.content_origin
+                task.content_revision = cached.content_revision
+              }
+            }
+          }
+          this.daily = response
+          this.pruneTimers()
+          this.noRoadmap = false
+          return true
+        } catch (e) {
+          if (scope !== sessionScope() || mutation !== this.dailyMutation) return false
+          if (e instanceof ApiError && e.code === 'no_active_roadmap') {
+            this.daily = null
+            this.acceptedDaily = null
+            writeAccepted(null)
+            this.noRoadmap = true
+          } else {
+            this.error = e instanceof ApiError ? e.code : 'network_error'
+          }
+          return false
+        } finally {
+          if (scope === sessionScope()) this.loading = false
         }
+      })()
+      pendingDaily.set(this, request)
+      try { return await request } finally { if (pendingDaily.get(this) === request) pendingDaily.delete(this) }
+    },
+    /** Fetch only outlines; the caller can invalidate application after a route change. */
+    async hydrateTask(id: string, current: () => boolean = () => true, repair = false): Promise<QuestTask | null> {
+      this.resetForAccount()
+      const task = this.taskById(id)
+      if (!task || task.is_completed || hasTrustedContent(task)) return task
+      if (!repair && task.content_origin === 'generated' && !task.content_revision) throw new ApiError(409, 'exercise_content_invalid')
+      const scope = sessionScope()
+      const daily = this.daily
+      const original = task.content_json
+      const revision = task.content_revision
+      let pending = pendingHydration.get(this)
+      if (!pending) { pending = new Map(); pendingHydration.set(this, pending) }
+      const key = `${scope}:${id}:${repair}`
+      let request = pending.get(key)
+      if (!request) {
+        request = useApi().get<QuestTask>(`/api/v1/quests/exercises/${encodeURIComponent(id)}${repair ? '?repair=true' : ''}`)
+        pending.set(key, request)
+      }
+      try {
+        const response = await request
+        if (scope !== sessionScope() || daily !== this.daily || !current() || this.taskById(id)?.content_json !== original || this.taskById(id)?.content_revision !== revision) return null
+        if (response.id !== id || !hasTrustedContent(response)) throw new ApiError(502, 'ai_bad_output')
+        const existing = this.taskById(id)
+        if (!existing || existing.is_completed) return existing
+        const index = this.daily!.tasks.findIndex(t => t.id === id)
+        this.daily!.tasks[index] = response
+        cacheContent(id, response)
+        return response
       } finally {
-        this.loading = false
+        if (pending.get(key) === request) pending.delete(key)
       }
     },
     taskById(id: string): QuestTask | null {
@@ -150,20 +309,51 @@ export const useQuestStore = defineStore('quest', {
       }
       writeTimers(this.timers)
     },
-    async complete(exerciseId: string, durationSeconds: number, userAnswers?: Record<string, string>): Promise<CompleteResult> {
-      const body: Record<string, unknown> = { exercise_id: exerciseId, duration_seconds: clampDuration(durationSeconds) }
-      if (userAnswers && Object.keys(userAnswers).length > 0) body.user_answers = userAnswers
-      const wasMet = this.daily?.is_target_met ?? false
-      const res = await useApi().post<ProgressResponse>('/api/v1/quests/progress', body)
-      if (this.daily) {
-        this.daily.accumulated_seconds = res.daily_seconds_spent
-        this.daily.is_target_met = res.is_target_met
-        const t = this.daily.tasks.find(x => x.id === exerciseId)
-        if (t) t.is_completed = true
+    async complete(exerciseId: string, durationSeconds: number, userAnswers?: Record<string, string>, revision?: string, current: () => boolean = () => true): Promise<CompleteResult> {
+      this.resetForAccount()
+      const task = this.taskById(exerciseId)
+      if (revision !== undefined) {
+        if (!task || !hasTrustedContent(task) || task.content_revision !== revision) throw new ApiError(409, 'exercise_content_changed')
+        if (task.is_completed) {
+          return { daily_seconds_spent: this.accumulatedSeconds, daily_minutes_spent: Math.floor(this.accumulatedSeconds / 60), is_target_met: this.targetMet, quiz_result: task.quiz_result ?? null, targetMetChanged: false }
+        }
+        const qs = questionsOf(classifyContent(task.content_json, task.task_type))
+        if (!userAnswers || Object.keys(userAnswers).length !== qs.length || qs.some(q => !Object.hasOwn(q.options, userAnswers[q.id] ?? ''))) throw new ApiError(400, 'invalid_request')
       }
-      Reflect.deleteProperty(this.timers, exerciseId)
-      writeTimers(this.timers)
-      return { ...res, targetMetChanged: res.is_target_met && !wasMet }
+      const scope = sessionScope()
+      const key = `${scope}:${exerciseId}:${revision ?? ''}`
+      let pending = pendingCompletion.get(this)
+      if (!pending) { pending = new Map(); pendingCompletion.set(this, pending) }
+      const existing = pending.get(key)
+      if (existing) return existing
+      const body: Record<string, unknown> = { exercise_id: exerciseId, duration_seconds: clampDuration(durationSeconds) }
+      if (revision !== undefined) { body.content_revision = revision; body.user_answers = { ...userAnswers } }
+      else if (userAnswers && Object.keys(userAnswers).length) body.user_answers = { ...userAnswers }
+      const daily = this.daily
+      const wasMet = this.daily?.is_target_met ?? false
+      const request = (async () => {
+        const res = await useApi().post<ProgressResponse>('/api/v1/quests/progress', body)
+        if (scope !== sessionScope() || daily !== this.daily || !current() || (revision !== undefined && this.taskById(exerciseId)?.content_revision !== revision)) return { ...res, targetMetChanged: false }
+        if (this.daily) {
+          this.dailyMutation += 1
+          this.daily.accumulated_seconds = res.daily_seconds_spent
+          this.daily.is_target_met = res.is_target_met
+          const t = this.daily.tasks.find(x => x.id === exerciseId)
+          if (t && (revision === undefined || res.quiz_result)) {
+            t.is_completed = true; t.quiz_result = res.quiz_result ?? null
+            cacheContent(t.id, t)
+            this.acceptedDaily = JSON.parse(JSON.stringify(this.daily))
+            writeAccepted(this.acceptedDaily)
+          }
+        }
+        if (revision === undefined || res.quiz_result) {
+          Reflect.deleteProperty(this.timers, exerciseId)
+          writeTimers(this.timers)
+        }
+        return { ...res, targetMetChanged: res.is_target_met && !wasMet }
+      })()
+      pending.set(key, request)
+      try { return await request } finally { if (pending.get(key) === request) pending.delete(key) }
     },
   },
 })

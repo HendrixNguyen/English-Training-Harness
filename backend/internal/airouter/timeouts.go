@@ -17,6 +17,10 @@ const (
 	// providers not yet tried (attemptBudget), so room for the fallback is
 	// enforced per attempt rather than assumed.
 	RoadmapTimeout = 180 * time.Second
+	// ExerciseTimeout bounds one Route call for TaskExerciseGen: one task's
+	// typed content is ≤ ~1.5k output tokens (TestExerciseAnswerFitsTheBudget),
+	// and 30 s left no headroom at production's ~42 tok/s (2026-09-25).
+	ExerciseTimeout = 60 * time.Second
 	// DefaultTaskTimeout is §6.2's 30 s for every other task.
 	DefaultTaskTimeout = 30 * time.Second
 )
@@ -35,10 +39,14 @@ func attemptBudget(remaining time.Duration, providersLeft int) time.Duration {
 
 // TaskTimeout is the budget for one Route call of task.
 func TaskTimeout(task TaskType) time.Duration {
-	if task == TaskRoadmapGen {
+	switch task {
+	case TaskRoadmapGen:
 		return RoadmapTimeout
+	case TaskExerciseGen:
+		return ExerciseTimeout
+	default:
+		return DefaultTaskTimeout
 	}
-	return DefaultTaskTimeout
 }
 
 // ensureDeadline returns ctx as is when it already has a deadline, else a

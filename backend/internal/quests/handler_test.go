@@ -99,7 +99,8 @@ func TestProgressHandlerReturnsTheSpec62Body(t *testing.T) {
 	now := time.Date(2026, time.September, 22, 10, 0, 0, 0, time.UTC)
 	h := newHarness(t, now)
 
-	// The full §6.2 request, user_answers included.
+	// The full §6.2 request validates selections against stored questions.
+	h.quests.exercises[2] = []Exercise{gradingExercise()}
 	w := postJSON(newQuestRouter(h.svc, "u1"), "/api/v1/quests/progress",
 		`{"exercise_id":"ex-2-reading","duration_seconds":1800,"user_answers":{"q1":"A"}}`)
 
