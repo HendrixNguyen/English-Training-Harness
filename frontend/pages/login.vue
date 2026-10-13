@@ -16,7 +16,9 @@ const error = ref<string | null>(null)
 const redirectUri = computed(() => `${window.location.origin}/login`)
 
 function startSignIn() {
+  if (busy.value) return
   error.value = null
+  busy.value = true
   const state = randomState()
   sessionStorage.setItem(STATE_KEY, state)
   window.location.assign(googleAuthUrl(config.public.googleClientId, redirectUri.value, state))
@@ -58,29 +60,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
-    <PlantSvg stage="sprout" :health="100" :size="96" />
-    <h1 class="font-display text-3xl">
-      Chào mừng bạn! 🌱
-    </h1>
-    <p class="text-mute">
-      Học 30 phút mỗi ngày, nuôi một cái cây.
-    </p>
-
-    <div v-if="busy" class="flex items-center gap-2 text-mute" role="status">
-      <span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
-      Đang đăng nhập…
+  <main class="retro-screen mx-auto max-w-md px-4 flex min-h-screen flex-col items-center justify-center gap-6 text-center">
+    <CompanionSprite stage="seed" :health="100" :size="128" />
+    <h1 class="font-display text-[34px] leading-9">Học 30 phút</h1>
+    <p class="font-body text-[17px] text-ink-1">Mỗi ngày một phòng. Một người bạn.</p>
+    <p v-if="busy" role="status" class="text-sm text-ink-1">Đang đăng nhập…</p>
+    <RetroPanel v-if="error" :announce="false" tone="ember" class="w-full text-left">
+      <p role="alert" class="font-body text-[17px]">{{ error }}</p>
+    </RetroPanel>
+    <p class="font-body text-sm text-ink-2">Bằng cách tiếp tục, cậu cho phép ứng dụng đọc lịch và nhiệm vụ Google để lên lịch học.</p>
+    <div class="retro-bottom-bar">
+      <RetroButton block :loading="busy" @click="startSignIn">Đăng nhập bằng Google</RetroButton>
     </div>
-    <AppButton v-else block @click="startSignIn">
-      Đăng nhập bằng Google
-    </AppButton>
-
-    <p v-if="error" class="w-full rounded-card border border-alert/40 bg-alert/10 px-4 py-3 text-sm text-alert" role="alert">
-      {{ error }}
-    </p>
-
-    <p class="text-xs text-mute">
-      Bằng cách tiếp tục, bạn cho phép ứng dụng đọc lịch và nhiệm vụ Google của bạn để lên lịch học.
-    </p>
   </main>
 </template>
