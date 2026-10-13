@@ -79,7 +79,7 @@ func TestIntegrationMigrateAppliesToAnEmptyDatabaseAndIsIdempotent(t *testing.T)
 	if err != nil {
 		t.Fatalf("first Migrate: %v", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls"}; !reflect.DeepEqual(first, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls", "0005_exercise_quiz_results"}; !reflect.DeepEqual(first, want) {
 		t.Fatalf("first run applied %v, want %v", first, want)
 	}
 
@@ -202,7 +202,7 @@ func TestIntegrationConcurrentMigrateDoesNotRace(t *testing.T) {
 		}
 		total += len(<-applied)
 	}
-	const versions = 4 // 0001_init, 0002_google_sync, 0003_pet_verdict_dates, 0004_rls
+	const versions = 5 // 0001_init, 0002_google_sync, 0003_pet_verdict_dates, 0004_rls, 0005_exercise_quiz_results
 	if total != versions {
 		t.Errorf("migrations were applied %d times across %d concurrent callers, want exactly %d", total, n, versions)
 	}
@@ -259,5 +259,61 @@ func TestIntegrationRedisRoundTrip(t *testing.T) {
 	}
 	if ttl <= 0 || ttl > SessionTTL {
 		t.Errorf("TTL = %v, want (0, %v]", ttl, SessionTTL)
+	}
+}
+
+// A nullable additive column must preserve historical rows and existing RLS.
+func TestIntegrationQuizResultMigrationUpDownUp(t *testing.T) {
+	pg := requirePostgres(t)
+	reset(t, pg)
+	t.Cleanup(func() { reset(t, pg) })
+	ctx := context.Background()
+	if err := pg.Migrator().EnsureVersionTable(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls"} {
+		if _, err := pg.Pool.Exec(ctx, readMigration(t, name+".up.sql")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var user, roadmap, exercise string
+	if err := pg.Pool.QueryRow(ctx, `INSERT INTO users(email,google_id,target_goal) VALUES('migration-quiz@example.com','migration-quiz','') RETURNING id`).Scan(&user); err != nil {
+		t.Fatal(err)
+	}
+	if err := pg.Pool.QueryRow(ctx, `INSERT INTO roadmaps(user_id,roadmap_json) VALUES($1,'{}') RETURNING id`, user).Scan(&roadmap); err != nil {
+		t.Fatal(err)
+	}
+	if err := pg.Pool.QueryRow(ctx, `INSERT INTO exercises(roadmap_id,day_number,task_type,content_json,is_completed) VALUES($1,1,'reading','{}',true) RETURNING id`, roadmap).Scan(&exercise); err != nil {
+		t.Fatal(err)
+	}
+	for step, name := range []string{"0005_exercise_quiz_results.up.sql", "0005_exercise_quiz_results.down.sql", "0005_exercise_quiz_results.up.sql"} {
+		if _, err := pg.Pool.Exec(ctx, readMigration(t, name)); err != nil {
+			t.Fatal(err)
+		}
+		var exists bool
+		if err := pg.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='exercises' AND column_name='quiz_result' AND is_nullable='YES' AND data_type='jsonb')`).Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if exists != (step != 1) {
+			t.Fatalf("step %d exists %v", step, exists)
+		}
+		var rls bool
+		if err := pg.Pool.QueryRow(ctx, `SELECT relrowsecurity FROM pg_class WHERE oid='exercises'::regclass`).Scan(&rls); err != nil || !rls {
+			t.Fatal("RLS lost", err)
+		}
+
+		var publicGrant bool
+		if err := pg.Pool.QueryRow(ctx, `SELECT EXISTS(
+   SELECT 1 FROM pg_class c CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl,acldefault('r',c.relowner))) a
+   WHERE c.oid='exercises'::regclass AND (a.grantee=0 OR EXISTS(SELECT 1 FROM pg_roles r WHERE r.oid=a.grantee AND r.rolname IN ('anon','authenticated')))
+  )`).Scan(&publicGrant); err != nil || publicGrant {
+			t.Fatal("public REST grants appeared", err)
+		}
+		if step != 1 {
+			var unknown, done bool
+			if err := pg.Pool.QueryRow(ctx, `SELECT quiz_result IS NULL,is_completed FROM exercises WHERE id=$1`, exercise).Scan(&unknown, &done); err != nil || !unknown || !done {
+				t.Fatal("historical row changed", err)
+			}
+		}
 	}
 }

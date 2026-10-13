@@ -185,6 +185,9 @@ BEGIN
         REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM authenticated;
     END IF;
 END $$;
+
+-- Added by migration 0005: historical results and per-task durations stay unknown (NULL).
+ALTER TABLE exercises ADD COLUMN quiz_result JSONB;
 ```
 
 RLS is enabled with no policies: the API's own role bypasses RLS on both deployment targets
@@ -340,8 +343,17 @@ func NewRouter() (*Router, error) {
   * Response (200 OK):
 
 ```json
-{"date": "2026-09-22", "day_number": 1, "total_minutes_required": 30, "accumulated_seconds": 600, "is_target_met": false, "tasks": [{"id": "ex-01", "task_type": "vocabulary", "title": "10 Key Business Email Phrasings", "duration_minutes": 10, "is_completed": true, "content_json": { "words": [{ "term": "Inquire", "definition": "To ask for information" }] }}]}
+{"date": "2026-09-22", "day_number": 1, "total_minutes_required": 30, "accumulated_seconds": 600, "is_target_met": false, "tasks": [{"id": "ex-01", "task_type": "vocabulary", "title": "10 Key Business Email Phrasings", "duration_minutes": 10, "is_completed": true, "content_json": { "words": [{ "term": "Inquire", "definition": "To ask for information" }] }, "content_origin":"legacy", "content_revision":"<opaque server revision>", "quiz_result":null}]}
 ```
+
+* GET /api/v1/quests/exercises/:id (added 2026-10-11)
+  * Request Headers: Authorization: Bearer \<JWT\>. Returns the same task DTO as `tasks[]` in the daily response, including `content_origin` (`generated`, `legacy`, `outline`), nullable opaque `content_revision` and nullable stored `quiz_result`. Completion/result/title/duration do not change the content revision.
+  * The daily response may carry an outline task `{type, title, duration_minutes, content:{}}`. Opening an outline generates only that exercise at the user's current CEFR level and saves `content` plus `content_schema: 1` into the existing task object. Cached typed content returns without another provider call or limiter slot. Roadmap generation remains outline-based; placement behavior is unchanged.
+  * Only an exercise on the caller's active roadmap, on today or an earlier day, is accessible. Unknown, invalid, other-user, inactive-roadmap and future-day IDs return 404 `exercise_not_found`. Authorization precedes generation and cache lookup.
+  * Typed vocabulary content has `words[5..8]{term,definition,example?}` and `questions[3..5]`; reading has `passage`, `questions[3..5]`, and optional `glossary[]{term,meaning_vi,definition}`; practice has `questions[4..8]`. Every question has `{id,prompt,options:{A,B,C,D},answer,explanation}`. The reading prompt requests 5..8 glossary entries with Vietnamese meanings and brief English definitions. Missing/null glossary is valid legacy content; malformed field types fail decoding. The client trims, removes blank/duplicate/unplaceable entries and retains at most eight marks. Glossary use never changes the progress payload.
+  * Practice prompts require independently answerable questions with all needed context in each question's own prompt; no shared passage hidden only in q1 or references to earlier questions. Shared passages belong to reading tasks. This generation instruction is not a semantic validator.
+  * Exercise generation has a 60-second per-route budget and retries malformed JSON once. Content is bounded to 32 KiB; reading passage bounds follow the CEFR table. Conditional SQL save returns the persisted winner on concurrent writes; concurrent first opens can still generate more than once.
+  * Errors: 401 unauthenticated, 404 `exercise_not_found`, 429 `rate_limited`, 503 `ai_unavailable`, 502 `ai_bad_output` / `ai_upstream_failed`, 504 `ai_timeout` (the exercise deadline, rather than a smaller provider-share timeout), 500 `internal_error`.
 
 * POST /api/v1/quests/progress  
   * Description: Incrementing Redis counter (INCRBY). When 1,800s (30 mins) is reached, sets is\_target\_met \= true, increases plant health (+20%), and increments streak.  
@@ -352,10 +364,17 @@ func NewRouter() (*Router, error) {
 {"exercise_id": "ex-02", "duration_seconds": 600, "user_answers": { "q1": "A" }}
 ```
 
+  * Decode exactly one JSON object of at most 64 KiB. Only `exercise_id` (nonblank string), `duration_seconds` (integer 1..3600), optional `content_revision` (nonempty string) and optional `user_answers` (object mapping question IDs to string option keys) are accepted. Duplicate object keys, unknown fields including client scores/keys/correctness, null supplied fields, wrong types, trailing JSON, unknown question IDs and nonexistent options return 400 `invalid_request` before tracking writes. Duration and daily caps remain unchanged.
+  * The new learning UI always supplies the current server revision and one choice per question; zero-question study content permits missing/empty answers. A stale revision returns 409 `exercise_content_changed`; unusable outline or invalid saved generated content returns 409 `exercise_content_invalid`, with no generation or writes. Foreign, inactive, future, invalid and non-current-day IDs return indistinguishable 404 `exercise_not_found` (no active roadmap retains 404 `no_active_roadmap`). Ownership, content, completeness and choices are checked before Redis/daily/pet writes.
+  * Absent revision retains old callers' time/completion compatibility. Missing or partial valid selections are stored explicitly ungraded, even when stored keys exist; every answer's `correct_option`, `is_correct` and `explanation` is null. Supplied malformed selections still fail. Old outline time-only calls remain usable without repair. Revisionless selections validate recognizable unique IDs and 2..4 distinct nonblank A–D options structurally, so unrelated invalid generated passage/glossary fields do not break compatibility; malformed/ambiguous question structure still fails 400. Historical completed rows keep null results until an actual completion attempt is recorded; no history is invented.
+  * `quiz_result` is `{status:'graded'|'ungraded',answered_count,question_count,correct_count:number|null,score_percent:number|null,duration_seconds,answers:[{question_id,selected_option,correct_option:string|null,is_correct:boolean|null,explanation:string|null}]}`. Answer entries contain supplied selections in stored question order. Matching revision, Q>0 and every stored key produce `graded`, using only persisted keys/explanations and `round(100*correct_count/Q)`. Matching legacy content with missing keys or zero questions has ungraded/null aggregates; each unknown per-answer field stays null. Zero questions return `answers:[]`. Score has no mastery/reward effect.
+  * `duration_seconds` in the result is the server-bounded duration of the saved completion attempt, never a task target or daily total. Historical null result means unknown per-task duration. Completion and nullable JSONB result are saved atomically on the owned active roadmap using the validated content/type snapshot; captured answers cannot attach to changed content. Existing completed non-null results are returned unchanged. POST, daily and exercise GET expose the same stored result.
+  * Tracking retains Redis increment → daily upsert → pet hook/target flag → atomic completion/result ordering. These stores are separate: failure or a content replacement after tracking writes can leave time credited without completion. Before an ambiguous retry, refetch daily; a matching completed result ends reconciliation without another POST. A confirmed incomplete task permits explicit retry, but previously credited time can require manual reconciliation. This endpoint is not globally exactly once.
+
   * Response (200 OK):
 
 ```json
-{"daily_seconds_spent": 1200, "daily_minutes_spent": 20, "is_target_met": false, "pet_health": 100, "streak_count": 5}
+{"daily_seconds_spent": 1200, "daily_minutes_spent": 20, "is_target_met": false, "pet_health": 100, "streak_count": 5, "quiz_result": {"status":"ungraded","answered_count":1,"question_count":3,"correct_count":null,"score_percent":null,"duration_seconds":600,"answers":[{"question_id":"q1","selected_option":"A","correct_option":null,"is_correct":null,"explanation":null}]}}
 ```
 
 ## **6.3 Pet State & Revival Endpoints**

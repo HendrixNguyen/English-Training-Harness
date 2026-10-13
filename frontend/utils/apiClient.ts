@@ -17,7 +17,11 @@ export class ApiError extends Error {
 export interface ApiClientOptions {
   baseURL: string
   getToken: () => string | null
-  /** Called once per 401 before the ApiError is thrown (sign out + redirect). */
+  /** Stable account ID used only to namespace private worker cache entries. */
+  getOwner?: () => string | null
+  /** Request lifetime boundary; changes on logout/relogin, stays stable on renewal. */
+  getSessionEpoch?: () => number
+  /** Called for a current-session, current-token 401 (sign out + redirect). */
   onUnauthorized: () => void
   fetch?: typeof globalThis.fetch
 }
@@ -26,6 +30,10 @@ export interface ApiClient {
   get<T>(path: string): Promise<T>
   post<T>(path: string, body?: unknown): Promise<T>
 }
+
+const cachedResponses = new WeakSet<object>()
+/** Transport provenance, separate from the server's learning DTO contract. */
+export function isCachedApiResponse(value: object): boolean { return cachedResponses.has(value) }
 
 async function errorCode(res: Response): Promise<string> {
   try {
@@ -45,18 +53,53 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     if (token) headers.Authorization = `Bearer ${token}`
     if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-    const res = await doFetch(`${opts.baseURL}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    const url = new URL(`${opts.baseURL}${path}`)
+    const owner = opts.getOwner?.()
+    const epoch = opts.getSessionEpoch?.()
+    const assertSession = () => {
+      if ((opts.getOwner && owner !== opts.getOwner()) || (opts.getSessionEpoch && epoch !== opts.getSessionEpoch())) throw new ApiError(409, 'session_changed')
+    }
+    async function inSession<R>(run: () => Promise<R>): Promise<R> {
+      try { return await run() } finally { assertSession() }
+    }
+    if (method === 'GET' && token && owner && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname)) url.searchParams.set('aelp_owner', owner)
+    let res: Response
+    try {
+      res = await inSession(() => doFetch(url.toString(), {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }))
+    } catch (error) {
+      assertSession()
+      throw error
+    }
+    // The helper's guard precedes this continuation by a microtask. Check in
+    // this frame before handling credentials or adopting a returned payload.
+    assertSession()
 
     if (res.status === 401) {
+      // Renewal keeps the session epoch. An old token's rejection must not
+      // discard the renewed session; successful same-session reads still work.
+      if (token !== opts.getToken()) throw new ApiError(409, 'session_changed')
       opts.onUnauthorized()
       throw new ApiError(401, 'unauthorized')
     }
-    if (!res.ok) throw new ApiError(res.status, await errorCode(res))
-    return (await res.json()) as T
+    if (!res.ok) {
+      const code = await inSession(() => errorCode(res))
+      assertSession()
+      throw new ApiError(res.status, code)
+    }
+    let value: T
+    try {
+      value = await inSession(() => res.json()) as T
+    } catch (error) {
+      assertSession()
+      throw error
+    }
+    assertSession()
+    if (res.headers.get('X-Aelp-Cached') === 'true' && typeof value === 'object' && value !== null) cachedResponses.add(value)
+    return value
   }
 
   return {
