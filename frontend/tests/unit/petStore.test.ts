@@ -1,11 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '~/utils/apiClient'
+import { useAuthStore } from '~/stores/auth'
 
 const api = { get: vi.fn(), post: vi.fn() }
 vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
 
-const { REVIVE_SECONDS, REVIVE_STORAGE_KEY, usePetStore } = await import('~/stores/pet')
+const { REVIVE_SECONDS, reviveStorageKey, usePetStore } = await import('~/stores/pet')
 
 const status = { plant_name: 'My Green Buddy', health_points: 80, stage: 'sprout', current_streak: 5, last_practiced_at: '2026-09-21T20:15:00Z' }
 
@@ -133,13 +134,13 @@ describe('usePetStore', () => {
     expect(api.post).toHaveBeenCalledWith('/api/v1/pet/revive', { answers: {} })
     expect(res?.revival_passed).toBe(false)
     expect(pet.challenge).toEqual({ date: '2026-09-23', startSeconds: 120 })
-    expect(JSON.parse(localStorage.getItem(REVIVE_STORAGE_KEY) ?? 'null')).toEqual({ date: '2026-09-23', startSeconds: 120 })
+    expect(JSON.parse(localStorage.getItem(reviveStorageKey()) ?? 'null')).toEqual({ date: '2026-09-23', startSeconds: 120 })
     expect(pet.challengeProgress(120 + 450)).toBe(450)
     expect(REVIVE_SECONDS).toBe(900)
   })
 
   it('revive: a pass applies pet_state and clears the challenge', async () => {
-    localStorage.setItem(REVIVE_STORAGE_KEY, JSON.stringify({ date: '2026-09-23', startSeconds: 0 }))
+    localStorage.setItem(reviveStorageKey(), JSON.stringify({ date: '2026-09-23', startSeconds: 0 }))
     api.get.mockResolvedValue({ ...status, health_points: 0, stage: 'wilted' })
     api.post.mockResolvedValue({ revival_passed: true, pet_state: { health_points: 50, stage: 'sprout', current_streak: 0 } })
     const pet = usePetStore()
@@ -149,7 +150,7 @@ describe('usePetStore', () => {
     expect(res?.revival_passed).toBe(true)
     expect(pet.status).toMatchObject({ health_points: 50, stage: 'sprout', current_streak: 0 })
     expect(pet.challenge).toBeNull()
-    expect(localStorage.getItem(REVIVE_STORAGE_KEY)).toBeNull()
+    expect(localStorage.getItem(reviveStorageKey())).toBeNull()
   })
 
   it('revive: 409 pet_not_wilted sets notWilted and returns null', async () => {
@@ -158,4 +159,20 @@ describe('usePetStore', () => {
     await expect(pet.revive('2026-09-23', 0)).resolves.toBeNull()
     expect(pet.notWilted).toBe(true)
   })
+})
+
+describe('private revive ownership and late responses', () => {
+ beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); api.get.mockReset(); api.post.mockReset() })
+ it('account B cannot hydrate account A challenge; same owner reload can resume', async () => {
+  const auth = useAuthStore()
+  const login = (id: string) => auth.signIn({ access_token: `token-${id}`, token_type: 'Bearer', expires_in: 3600, user: { id, email: `${id}@test`, full_name: id, cefr_current: null } })
+  await login('A'); api.post.mockResolvedValue({ revival_passed: false, pet_state: { health_points: 0, stage: 'wilted', current_streak: 0 } }); const pet = usePetStore(); await pet.revive('2026-10-13', 120)
+  pet.challenge = null; pet.hydrateChallenge(); expect(pet.challenge).toEqual({ date: '2026-10-13', startSeconds: 120 })
+  await login('B'); expect(auth.user?.id).toBe('B'); expect(localStorage.getItem(reviveStorageKey())).toBeNull(); expect(pet.challenge).toBeNull(); pet.hydrateChallenge(); expect(pet.challenge).toBeNull(); expect(pet.status).toBeNull()
+ })
+ it('logout/relogin cannot adopt pending pet GET or revive POST', async () => {
+  const auth = useAuthStore(); const pet = usePetStore()
+  let read!: (value: unknown) => void; api.get.mockImplementation(() => new Promise(resolve => { read = resolve })); const loading = pet.load(); await auth.signOut(); read(status); await loading; expect(pet.status).toBeNull()
+  let write!: (value: unknown) => void; api.post.mockImplementation(() => new Promise(resolve => { write = resolve })); const reviving = pet.revive('2026-10-13', 0); await auth.signOut(); write({ revival_passed: true, pet_state: { health_points: 50, stage: 'sprout', current_streak: 0 } }); expect(await reviving).toBeNull(); expect(pet.status).toBeNull(); expect(pet.challenge).toBeNull()
+ })
 })

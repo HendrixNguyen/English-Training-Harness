@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { useApi } from '~/composables/useApi'
 import { ApiError } from '~/utils/apiClient'
+import { useAuthStore } from '~/stores/auth'
+import { registerPrivateMemory } from '~/utils/session'
 import { stageForStreak } from '~/utils/plant'
 
 /** Backend spec §6.3 GET /pet/status. */
@@ -38,12 +40,17 @@ export interface GrowthDelta {
   targetMetNow: boolean
 }
 
+function scope() { const auth = useAuthStore(); return `${auth.user?.id ?? ''}:${auth.sessionEpoch}` }
+export function reviveStorageKey() { return `${REVIVE_STORAGE_KEY}:${useAuthStore().user?.id ?? 'anonymous'}` }
+
 function storageOrNull(): Storage | null {
   return typeof localStorage === 'undefined' ? null : localStorage
 }
 
 export const usePetStore = defineStore('pet', {
   state: () => ({
+    ownerScope: scope(),
+    serial: 0,
     status: null as PetStatus | null,
     loading: false,
     error: null as string | null,
@@ -55,15 +62,22 @@ export const usePetStore = defineStore('pet', {
     isWilted: s => s.status !== null && (s.status.health_points <= 0 || s.status.stage === 'wilted'),
   },
   actions: {
+    invalidate() {
+      this.serial++; this.ownerScope = scope(); this.status = null; this.challenge = null; this.notWilted = false; this.lastDelta = null; this.loading = false; this.error = null
+    },
+    prepare() { registerPrivateMemory(this); if (this.ownerScope !== scope()) this.invalidate(); return { owner: scope(), serial: this.serial } },
+    current(ticket: { owner: string; serial: number }) { return ticket.owner === scope() && ticket.serial === this.serial },
     async load() {
+      const ticket = this.prepare()
       this.loading = true
       this.error = null
       try {
-        this.status = await useApi().get<PetStatus>('/api/v1/pet/status')
+        const status = await useApi().get<PetStatus>('/api/v1/pet/status')
+        if (this.current(ticket)) this.status = status
       } catch (e) {
-        this.error = e instanceof ApiError ? e.code : 'network_error'
+        if (this.current(ticket)) this.error = e instanceof ApiError ? e.code : 'network_error'
       } finally {
-        this.loading = false
+        if (this.current(ticket)) this.loading = false
       }
     },
     /**
@@ -96,13 +110,14 @@ export const usePetStore = defineStore('pet', {
       return d
     },
     hydrateChallenge() {
-      const raw = storageOrNull()?.getItem(REVIVE_STORAGE_KEY)
+      this.prepare()
+      const raw = storageOrNull()?.getItem(reviveStorageKey())
       if (!raw) return
       try {
         const c = JSON.parse(raw) as Partial<Challenge>
-        if (typeof c.date === 'string' && typeof c.startSeconds === 'number') this.challenge = { date: c.date, startSeconds: c.startSeconds }
+        if (typeof c.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.date) && typeof c.startSeconds === 'number' && Number.isFinite(c.startSeconds) && c.startSeconds >= 0) this.challenge = { date: c.date, startSeconds: c.startSeconds }
       } catch {
-        storageOrNull()?.removeItem(REVIVE_STORAGE_KEY)
+        storageOrNull()?.removeItem(reviveStorageKey())
       }
     },
     /**
@@ -111,20 +126,24 @@ export const usePetStore = defineStore('pet', {
      * (the response carries no progress; pet plan Notes).
      */
     async revive(today: string, accumulatedSecondsNow: number): Promise<ReviveResponse | null> {
+      const ticket = this.prepare()
+      const storageKey = reviveStorageKey()
       this.error = null
       this.notWilted = false
       try {
         const res = await useApi().post<ReviveResponse>('/api/v1/pet/revive', { answers: {} })
+        if (!this.current(ticket)) return null
         if (res.revival_passed) {
           if (this.status) Object.assign(this.status, res.pet_state)
           this.challenge = null
-          storageOrNull()?.removeItem(REVIVE_STORAGE_KEY)
+          storageOrNull()?.removeItem(storageKey)
         } else if (!this.challenge || this.challenge.date !== today) {
           this.challenge = { date: today, startSeconds: accumulatedSecondsNow }
-          storageOrNull()?.setItem(REVIVE_STORAGE_KEY, JSON.stringify(this.challenge))
+          storageOrNull()?.setItem(storageKey, JSON.stringify(this.challenge))
         }
         return res
       } catch (e) {
+        if (!this.current(ticket)) return null
         if (e instanceof ApiError && e.code === 'pet_not_wilted') {
           this.notWilted = true
           return null
