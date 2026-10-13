@@ -32,7 +32,10 @@ describe('real retro world map', () => {
   })
   it('rereads entry, focus, visibility and server-date polling; replacement changes expanded day', async () => {
     render(); await flushPromises(); expect(api.get).toHaveBeenCalledWith('/api/v1/roadmap')
+    await w.get('button[aria-label^="Ngày 2:"]').trigger('click')
+    expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('true')
     window.dispatchEvent(new Event('focus')); await flushPromises()
+    expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('true')
     document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
     vi.advanceTimersByTime(60000); await flushPromises(); expect(api.get.mock.calls.filter(([path]) => path === '/api/v1/roadmap').length).toBeGreaterThanOrEqual(4)
     api.get.mockResolvedValue({ ...data, roadmap_id: 'r2', today: '2026-10-29', day_number: 29 }); window.dispatchEvent(new Event('focus')); await flushPromises()

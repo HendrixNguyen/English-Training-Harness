@@ -177,6 +177,7 @@ async function finish() {
     </RetroPanel>
 
     <template v-else-if="step === 'quiz'">
+      <button type="button" class="inline-flex min-h-12 items-center font-display text-[22px] text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-torch" @click="step = 'goal'">‹ Sửa thông tin</button>
       <SpeechBox v-if="index === 0" :announce="false" :name="plantNameTrimmed || 'Mầm Non'" stage="seed" line="Tớ đang xem cậu đánh… cứ chọn theo cảm giác." />
       <RetroPanel :announce="false" :speaker="plantNameTrimmed || 'Mầm Non'">
         <StateBlock v-if="questions.length === 0" state="empty" message="Chưa có trận đầu tiên. Quay lại sau." action="Về trang chính" @action="navigateTo('/')" />

@@ -74,7 +74,7 @@ async function signOut() {
       <StateBlock v-else-if="!settings.preferences" state="error" message="Chưa đọc được giờ nhắc đã lưu." action="Thử lại" @action="load" />
       <form v-else class="flex flex-col gap-4" @submit.prevent="settings.save(time)">
         <label for="reminder-time" class="text-ink-1">Giờ nhắc</label>
-        <input id="reminder-time" v-model="time" type="time" required class="min-h-12 w-full rounded-[2px] border-2 border-line-lit bg-ground-2 px-3 font-display text-[20px] text-ink-0 focus:outline focus:outline-2 focus:outline-torch">
+        <input id="reminder-time" v-model="time" type="time" required class="min-h-12 w-full rounded-[2px] border-2 border-line-lit bg-ground-2 px-3 font-display text-[20px] text-ink-0 [color-scheme:dark] focus:outline focus:outline-2 focus:outline-torch">
         <p class="text-sm text-ink-1">Giờ đã lưu: {{ settings.preferences.notification_time.slice(0, 5) }} · {{ settings.preferences.timezone }}. Lần tới: {{ new Date(settings.preferences.next_reminder_at).toLocaleString('vi-VN', { timeZone: settings.preferences.timezone }) }}.</p>
         <p role="status" class="text-sm text-ink-1">{{ pushLine }}</p>
         <p v-if="settings.error" role="alert" class="text-sm text-ember">{{ settings.error === 'invalid_request' ? 'Giờ nhắc không hợp lệ.' : 'Chưa lưu được giờ nhắc. Thử lại.' }}</p>

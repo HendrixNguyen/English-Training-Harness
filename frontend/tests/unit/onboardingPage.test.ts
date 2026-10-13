@@ -83,6 +83,22 @@ describe('/onboarding against the real endpoints (backend spec §6.1)', () => {
     expect(w.text()).not.toContain('Bản thử')
   })
 
+  it('returns to profile and resumes the same placement turn with its answer', async () => {
+    const w = mountPage()
+    await flushPromises()
+    await click(w, 'IELTS 7.0')
+    await click(w, 'Bắt đầu trận đầu tiên')
+    await w.find('[role="radio"]').trigger('click')
+    await click(w, 'Chọn')
+    await w.find('[role="radio"]').trigger('click')
+    await click(w, '‹ Sửa thông tin')
+    expect(w.text()).toContain('Chọn hành trình')
+    await click(w, 'Bắt đầu trận đầu tiên')
+    expect(w.text()).toContain('Lượt 2 / 10')
+    expect(w.find('[role="radio"]').attributes('aria-checked')).toBe('true')
+    expect(api.get.mock.calls.filter(([path]) => path === '/api/v1/onboarding/quiz')).toHaveLength(1)
+  })
+
   it('posts the §6.1 assessment body and renders the assessed level and pet from the response', async () => {
     api.post.mockResolvedValue(ASSESSED)
     const w = mountPage()

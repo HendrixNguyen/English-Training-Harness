@@ -17,7 +17,7 @@ export const useRoadmapStore = defineStore('roadmap', {
   },
   actions: {
     cancelPending() { this.serial++; this.loading = false },
-    invalidate() {
+    ['invalidate']() {
       this.serial++; this.ownerScope = scope(); this.data = null; this.loading = false; this.error = null; this.noRoadmap = false
     },
     async load() {

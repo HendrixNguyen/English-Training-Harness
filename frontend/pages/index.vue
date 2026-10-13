@@ -69,7 +69,10 @@ function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navig
   <main class="retro-screen mx-auto max-w-md px-4">
     <AppHeader :streak="pet.status?.current_streak ?? null" :pulse="pulse" />
     <RetroPanel class="mb-6" :announce="false" :speaker="pet.status ? name : undefined" :tone="pet.isWilted ? 'ember' : 'plain'">
-      <StateBlock v-if="pet.loading && !pet.status" state="loading" />
+      <div v-if="pet.loading && !pet.status" class="flex items-center gap-4 text-ink-2">
+        <CompanionSprite stage="seed" :health="0" :size="64" :reduced="true" class="opacity-50" />
+        <StateBlock state="loading" />
+      </div>
       <StateBlock v-else-if="pet.error && !pet.status" state="error" message="Không tải được bạn đồng hành. Thử lại." action="Thử lại" @action="pet.load()" />
       <template v-else-if="pet.status">
         <div class="mb-3 flex flex-wrap items-center justify-center gap-3">
@@ -86,12 +89,20 @@ function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navig
     <span data-hub-announcement class="sr-only" aria-live="polite" aria-atomic="true">{{ announcement }}</span>
     <StateBlock v-if="quest.noRoadmap" state="empty" message="Cậu chưa có hành trình." action="Bắt đầu hành trình 28 ngày" @action="navigateTo('/onboarding')" />
     <template v-else>
-      <StateBlock v-if="quest.loading && !quest.daily" state="loading" />
+      <div v-if="quest.loading && !quest.daily" aria-busy="true">
+        <StateBlock state="loading" />
+        <div data-loading-quests class="mt-4 space-y-3" aria-hidden="true">
+          <div v-for="i in 3" :key="i" data-loading-tile class="flex min-h-14 items-center gap-3 border-2 border-line-dim bg-ground-2 px-3">
+            <span class="h-8 w-8 shrink-0 bg-line-dim" />
+            <span class="h-3 w-2/3 bg-line-dim" />
+          </div>
+        </div>
+      </div>
       <StateBlock v-else-if="quest.error && !quest.daily" state="error" message="Không tải được nhiệm vụ. Thử lại." action="Thử lại" @action="quest.load()" />
       <template v-else-if="quest.daily">
         <h2 class="font-display text-xl text-ink-1">Phòng hôm nay</h2>
         <DayBar :value-seconds="quest.accumulatedSeconds" :segment-seconds="quest.daily.total_minutes_required * 60 / 3" :met="quest.targetMet" />
-        <ul class="mt-4" aria-label="Nhiệm vụ hôm nay">
+        <ul class="mt-4 [container-type:inline-size]" aria-label="Nhiệm vụ hôm nay">
           <QuestNode v-for="(task, i) in quest.sortedTasks" :key="task.id" :class="{ 'return-connector': i === earnedConnector }" :task="task" :index="i" :state="rowState(task.id, task.is_completed)" :connector="i === quest.sortedTasks.length - 1 ? 'none' : (task.is_completed || quest.targetMet ? 'lit' : 'dim')" @enter="enter" />
         </ul>
       </template>

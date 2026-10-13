@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import RetroButton from '~/components/retro/RetroButton.vue'
 
 describe('RetroButton (design §5)', () => {
-  it('is 48px tall', () => {
+  it('is at least 48px tall and allows a long label to wrap', () => {
     const w = mount(RetroButton, { slots: { default: 'Vào' } })
-    expect(w.classes()).toContain('h-12')
+    expect(w.classes()).toContain('min-h-12')
+    expect(w.classes()).toContain('py-2')
   })
 
   it.each(['primary', 'secondary', 'danger'] as const)('has a distinct class set for variant=%s', (variant) => {

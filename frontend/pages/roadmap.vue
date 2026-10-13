@@ -41,8 +41,9 @@ watch(() => [auth.user?.id, auth.sessionEpoch], () => {
   expanded.value = null; companion.value = null; companionRequest++
   if (active) { refresh(); void loadCompanion() }
 }, { flush: 'sync' })
-watch(() => [roadmap.outline?.roadmap_id, roadmap.outline?.today], async () => {
-  expanded.value = today.value?.date ?? null
+watch(() => [roadmap.outline?.roadmap_id, roadmap.outline?.today], async ([roadmapId, serverToday], [previousRoadmapId, previousToday]) => {
+  const available = roadmap.outline?.modules.some(module => module.days.some(day => day.date === expanded.value))
+  if (roadmapId !== previousRoadmapId || serverToday !== previousToday || !available) expanded.value = today.value?.date ?? null
   await nextTick()
   if (active && today.value) document.getElementById(`region-day-${today.value.day_number}`)?.scrollIntoView?.({ block: 'center' })
 })
@@ -114,7 +115,7 @@ onBeforeUnmount(() => {
                 <p class="text-ink-1">{{ task.duration_minutes }} phút · {{ task.is_completed === true ? 'Đã xong' : task.is_completed === null ? 'Chưa có dữ liệu hoàn thành' : 'Chưa hoàn thành' }}</p>
               </li>
             </ul>
-            <p class="my-3 text-sm">{{ day.minutes_spent }}/30 phút · {{ dayStatus(day, roadmap.outline.today) }}</p>
+            <p class="my-3 text-sm">{{ day.minutes_spent }}/30 phút · {{ day.is_target_met ? 'Đã đạt mục tiêu' : day.date === roadmap.outline.today ? 'Đang học' : day.minutes_spent > 0 ? 'Học dở' : 'Bỏ lỡ' }}</p>
             <RetroButton v-if="day.date === roadmap.outline.today" @click="navigateTo('/')">Vào</RetroButton>
           </section>
         </template>

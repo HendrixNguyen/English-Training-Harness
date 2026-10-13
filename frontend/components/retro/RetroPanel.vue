@@ -36,7 +36,7 @@ const ringStyle = computed(() => ({
     <h2
       v-if="speaker"
       :id="headingId"
-      class="absolute -top-3 left-3 bg-ground-1 px-2 font-display text-[22px] leading-6 text-ink-0"
+      class="relative -mt-7 mb-3 w-fit max-w-full break-words bg-ground-1 px-2 font-display text-[22px] leading-6 text-ink-0"
     >
       {{ speaker }}
     </h2>
