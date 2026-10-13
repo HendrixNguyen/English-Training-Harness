@@ -10,16 +10,20 @@ import QuestNode from '~/components/retro/QuestNode.vue'
 import SpeechBox from '~/components/retro/SpeechBox.vue'
 import RetroToast from '~/components/retro/RetroToast.vue'
 import StateBlock from '~/components/ui/StateBlock.vue'
+import { useReducedMotion } from '~/composables/useReducedMotion'
 import { useRetroToast } from '~/composables/useRetroToast'
-import { useGrowthMoment } from '~/composables/useGrowthMoment'
+import { chipsFor, useGrowthMoment } from '~/composables/useGrowthMoment'
 import { usePetStore } from '~/stores/pet'
 import { useQuestStore } from '~/stores/quest'
 
 const quest = useQuestStore()
 const pet = usePetStore()
-const { start, chips, reaction, pulse, displayHealth, displayStage } = useGrowthMoment()
+const reduced = useReducedMotion()
+const { start, active, chips, reaction, pulse, displayHealth, displayStage } = useGrowthMoment()
 // Consume before first paint: the store already holds the saved after-values.
-start(pet.consumeDelta())
+const savedDelta = pet.consumeDelta()
+start(savedDelta)
+const earnedWords = savedDelta ? chipsFor(savedDelta).map(chip => chip.text) : []
 const toast = useRetroToast()
 const offlineNotified = ref(false)
 function notifyOffline() {
@@ -49,6 +53,13 @@ function rowState(taskId: string, completed: boolean): 'done' | 'current' | 'loc
   return taskId === quest.nextTaskId ? 'current' : 'locked'
 }
 const nextIndex = computed(() => quest.sortedTasks.findIndex(task => task.id === quest.nextTaskId) + 1)
+const earnedConnector = computed(() => {
+  if (!active.value || reduced.value) return -1
+  const next = quest.sortedTasks.findIndex(task => task.id === quest.nextTaskId)
+  const index = next < 0 ? quest.sortedTasks.length - 2 : next - 1
+  return index >= 0 && quest.sortedTasks[index]?.is_completed ? index : -1
+})
+const announcement = computed(() => [bubble.value, ...earnedWords].filter(Boolean).join(' '))
 const canNavigate = computed(() => !!quest.daily && !quest.loading && !quest.noRoadmap && quest.sortedTasks.length > 0)
 function enter(id: string) { void navigateTo(`/learn/${id}`) }
 function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navigateTo('/roadmap') }
@@ -57,7 +68,7 @@ function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navig
 <template>
   <main class="retro-screen mx-auto max-w-md px-4">
     <AppHeader :streak="pet.status?.current_streak ?? null" :pulse="pulse" />
-    <RetroPanel class="mb-6" :speaker="pet.status ? name : undefined" :tone="pet.isWilted ? 'ember' : 'plain'">
+    <RetroPanel class="mb-6" :announce="false" :speaker="pet.status ? name : undefined" :tone="pet.isWilted ? 'ember' : 'plain'">
       <StateBlock v-if="pet.loading && !pet.status" state="loading" />
       <StateBlock v-else-if="pet.error && !pet.status" state="error" message="Không tải được bạn đồng hành. Thử lại." action="Thử lại" @action="pet.load()" />
       <template v-else-if="pet.status">
@@ -65,13 +76,14 @@ function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navig
           <CompanionSprite :name="name" :stage="displayStage(pet.status.stage)" :health="displayHealth(pet.status.health_points)" :react="pet.isWilted ? 'down' : reaction" />
           <HpBar :value="displayHealth(pet.status.health_points)" />
         </div>
-        <div class="mb-3 flex flex-wrap gap-2" aria-live="polite">
-          <span v-for="chip in chips" :key="chip.tone" :data-growth-chip="chip.tone" class="border-2 border-line-lit bg-ground-2 px-2 py-1 text-sm" :class="chip.tone === 'growth' ? 'text-growth' : 'text-torch'">{{ chip.text }}</span>
+        <div class="mb-3 flex flex-wrap gap-2">
+          <span v-for="chip in chips" :key="chip.tone" :data-growth-chip="chip.tone" class="border-2 border-line-lit bg-ground-2 px-2 py-1 text-sm" :class="[chip.tone === 'growth' ? 'text-growth' : 'text-torch', !reduced ? 'return-chip' : '']">{{ chip.text }}</span>
         </div>
         <RetroButton v-if="pet.isWilted" variant="danger" block @click="navigateTo('/revive')">Hồi sinh {{ name }}</RetroButton>
-        <SpeechBox v-else :line="bubble" :name="name" :stage="pet.status.stage" :health="pet.status.health_points" />
+        <SpeechBox v-else :announce="false" :line="bubble" :name="name" :stage="pet.status.stage" :health="pet.status.health_points" />
       </template>
     </RetroPanel>
+    <span data-hub-announcement class="sr-only" aria-live="polite" aria-atomic="true">{{ announcement }}</span>
     <StateBlock v-if="quest.noRoadmap" state="empty" message="Cậu chưa có hành trình." action="Bắt đầu hành trình 28 ngày" @action="navigateTo('/onboarding')" />
     <template v-else>
       <StateBlock v-if="quest.loading && !quest.daily" state="loading" />
@@ -80,7 +92,7 @@ function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navig
         <h2 class="font-display text-xl text-ink-1">Phòng hôm nay</h2>
         <DayBar :value-seconds="quest.accumulatedSeconds" :segment-seconds="quest.daily.total_minutes_required * 60 / 3" :met="quest.targetMet" />
         <ul class="mt-4" aria-label="Nhiệm vụ hôm nay">
-          <QuestNode v-for="(task, i) in quest.sortedTasks" :key="task.id" :task="task" :index="i" :state="rowState(task.id, task.is_completed)" :connector="i === quest.sortedTasks.length - 1 ? 'none' : (task.is_completed || quest.targetMet ? 'lit' : 'dim')" @enter="enter" />
+          <QuestNode v-for="(task, i) in quest.sortedTasks" :key="task.id" :class="{ 'return-connector': i === earnedConnector }" :task="task" :index="i" :state="rowState(task.id, task.is_completed)" :connector="i === quest.sortedTasks.length - 1 ? 'none' : (task.is_completed || quest.targetMet ? 'lit' : 'dim')" @enter="enter" />
         </ul>
       </template>
     </template>
@@ -90,3 +102,21 @@ function next() { if (quest.nextTaskId) enter(quest.nextTaskId); else void navig
     <RetroToast />
   </main>
 </template>
+
+<style scoped>
+@media (prefers-reduced-motion: no-preference) {
+  .return-chip { animation: earned-rise 150ms steps(1, end) both; }
+  .return-connector :deep([data-connector]) {
+    transform-origin: top;
+    animation: earned-path 300ms steps(4, end) both;
+  }
+}
+@keyframes earned-rise {
+  from { transform: translateY(8px); }
+  to { transform: translateY(0); }
+}
+@keyframes earned-path {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0); }
+}
+</style>

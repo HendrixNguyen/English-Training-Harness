@@ -52,4 +52,11 @@ describe('RetroPanel (design §5)', () => {
     expect(section.classes()).not.toContain('p-4')
     expect(section.attributes('style') ?? '').toContain('box-shadow')
   })
+  it('keeps a named visual panel non-live when its owner announces separately', () => {
+    const w = mount(RetroPanel, { props: { speaker: 'Mầm', announce: false } })
+    expect(w.find('h2').text()).toBe('Mầm')
+    expect(w.attributes('aria-labelledby')).toBe(w.find('h2').attributes('id'))
+    expect(w.attributes('aria-live')).toBeUndefined()
+  })
+
 })

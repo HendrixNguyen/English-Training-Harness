@@ -10,11 +10,12 @@ import { tokens } from '~/tailwind.config'
  * 4-6) use them.
  */
 const props = withDefaults(defineProps<{
+  announce?: boolean
   speaker?: string
   tone?: 'plain' | 'growth' | 'torch' | 'ember'
   band?: boolean
   fog?: boolean
-}>(), { speaker: undefined, tone: 'plain', band: false, fog: false })
+}>(), { announce: true, speaker: undefined, tone: 'plain', band: false, fog: false })
 
 const headingId = useId()
 
@@ -30,7 +31,7 @@ const ringStyle = computed(() => ({
     :class="[band ? 'p-2 w-full' : 'p-4', speaker ? 'mt-3' : '']"
     :style="ringStyle"
     :aria-labelledby="speaker ? headingId : undefined"
-    :aria-live="speaker ? 'polite' : undefined"
+    :aria-live="speaker && announce ? 'polite' : undefined"
   >
     <h2
       v-if="speaker"

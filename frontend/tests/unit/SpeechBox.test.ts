@@ -7,6 +7,15 @@ describe('SpeechBox (design §5)', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
+
+  it('lets the parent own announcements while retaining accessible full text', () => {
+    const w = mount(SpeechBox, { props: { line: 'Tớ khát rồi', name: 'Mầm', announce: false } })
+    expect(w.findAll('[aria-live]').length).toBe(0)
+    expect(w.find('[data-live-line]').text()).toBe('Tớ khát rồi')
+    expect(w.find('h2').text()).toBe('Mầm')
+    w.unmount()
+  })
+
   it('types the line in over time at 30ms/char', async () => {
     const w = mount(SpeechBox, { props: { line: 'Tớ khát rồi', name: 'Mầm', stage: 'sprout', health: 80 } })
     const typed = w.find('[data-typed]')
