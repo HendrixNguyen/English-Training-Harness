@@ -62,6 +62,7 @@ function onClick() {
         type="button"
         class="relative flex h-14 w-14 shrink-0 items-center justify-center border-2 bg-ground-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch focus-visible:ring-0 focus-visible:ring-offset-0"
         :class="[border, ink, pressed]"
+        :aria-label="`${index + 1}. ${task.title}, ${actionWord}`"
         :aria-current="state === 'current' ? 'step' : undefined"
         :aria-disabled="disabled ? 'true' : undefined"
         @click="onClick"

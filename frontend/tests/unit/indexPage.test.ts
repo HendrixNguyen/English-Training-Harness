@@ -1,19 +1,23 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import AppButton from '~/components/ui/AppButton.vue'
-import AppCard from '~/components/ui/AppCard.vue'
 import AppHeader from '~/components/AppHeader.vue'
-import GrowthChip from '~/components/plant/GrowthChip.vue'
-import PlantSvg from '~/components/plant/PlantSvg.vue'
-import SpeechBubble from '~/components/plant/SpeechBubble.vue'
-import QuestRow from '~/components/quest/QuestRow.vue'
-import HealthBar from '~/components/ui/HealthBar.vue'
-import SegmentedProgress from '~/components/ui/SegmentedProgress.vue'
 import StateBlock from '~/components/ui/StateBlock.vue'
 import { usePetStore } from '~/stores/pet'
 import { useQuestStore } from '~/stores/quest'
+
+import RetroPanel from '~/components/retro/RetroPanel.vue'
+import RetroButton from '~/components/retro/RetroButton.vue'
+import CompanionSprite from '~/components/retro/CompanionSprite.vue'
+import HpBar from '~/components/retro/HpBar.vue'
+import DayBar from '~/components/retro/DayBar.vue'
+import QuestNode from '~/components/retro/QuestNode.vue'
+import SpeechBox from '~/components/retro/SpeechBox.vue'
+import { useRetroToast } from '~/composables/useRetroToast'
+
+const reduced = ref(false)
+vi.mock('~/composables/useReducedMotion', () => ({ useReducedMotion: () => reduced }))
 
 const api = { get: vi.fn(), post: vi.fn() }
 vi.mock('~/composables/useApi', () => ({ useApi: () => api }))
@@ -40,26 +44,34 @@ function routeGet(status: unknown, daily: unknown) {
   api.get.mockImplementation((path: string) => (path.endsWith('/pet/status') ? Promise.resolve(status) : Promise.resolve(daily)))
 }
 
+const navigate = vi.fn()
+const mounted: ReturnType<typeof mount>[] = []
 function mountPage() {
-  return mount(IndexPage, {
+  const wrapper = mount(IndexPage, {
     global: {
-      components: { AppHeader, AppCard, StateBlock, PlantSvg, HealthBar, SpeechBubble, SegmentedProgress, QuestRow, GrowthChip, AppButton },
+      components: { AppHeader, StateBlock, RetroPanel, RetroButton, CompanionSprite, HpBar, DayBar, QuestNode, SpeechBox },
       stubs: { NuxtLink: { template: '<a><slot /></a>' } },
-      mocks: { navigateTo: vi.fn() },
+      mocks: { navigateTo: navigate },
     },
   })
+  mounted.push(wrapper)
+  return wrapper
 }
 
 describe('/ (wireframe 7.2) growth moment', () => {
   beforeEach(() => {
+    reduced.value = false
     setActivePinia(createPinia())
     api.get.mockReset()
     api.post.mockReset()
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    navigate.mockReset()
+    vi.stubGlobal('navigateTo', navigate)
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
   })
 
   afterEach(() => {
+    mounted.splice(0).forEach(wrapper => wrapper.unmount())
     vi.useRealTimers()
     vi.unstubAllGlobals()
   })
@@ -84,7 +96,7 @@ describe('/ (wireframe 7.2) growth moment', () => {
 
     vi.advanceTimersByTime(300) // t = 500
     await nextTick()
-    expect(w.find('[data-plant]').classes()).not.toContain('plant-grow')
+    expect(w.find('[data-react]').attributes('data-react')).toBe('levelup')
 
     vi.advanceTimersByTime(1500)
     await nextTick()
@@ -103,11 +115,11 @@ describe('/ (wireframe 7.2) growth moment', () => {
     await flushPromises()
     vi.advanceTimersByTime(500)
     await nextTick()
-    expect(w.find('[data-plant]').classes()).toContain('plant-grow')
+    expect(w.find('[data-react]').attributes('data-react')).toBe('hit')
 
     vi.advanceTimersByTime(1500)
     await nextTick()
-    expect(w.find('[data-plant]').classes()).not.toContain('plant-grow')
+    expect(w.find('[data-react]').attributes('data-react')).toBe('idle')
   })
 
   it('renders the final values after the flip — what a reduced-motion user sees', async () => {
@@ -123,7 +135,7 @@ describe('/ (wireframe 7.2) growth moment', () => {
 
     expect(w.find('[role="meter"]').attributes('aria-valuenow')).toBe('100')
     expect(w.find('[data-stage="sapling"]').exists()).toBe(true)
-    expect(w.text()).toContain('Streak: 6 ngày')
+    expect(w.text()).toContain('Chuỗi ngày')
     expect(w.text()).toContain('đủ nước')
   })
 
@@ -138,9 +150,9 @@ describe('/ (wireframe 7.2) growth moment', () => {
     await nextTick()
 
     expect(w.find('[data-growth-chip]').exists()).toBe(false)
-    expect(w.find('[data-plant]').classes()).not.toContain('plant-grow')
+    expect(w.find('[data-react]').attributes('data-react')).toBe('idle')
     expect(w.find('[data-streak-chip]').classes()).not.toContain('streak-pulse')
-    expect(w.text()).toContain('Còn 20 phút nữa thôi!')
+    expect(w.text()).toContain('Tưới cho tớ')
   })
 
   it('a task that did not meet the target celebrates nothing', async () => {
@@ -157,9 +169,9 @@ describe('/ (wireframe 7.2) growth moment', () => {
     await nextTick()
 
     expect(w.find('[data-growth-chip]').exists()).toBe(false)
-    expect(w.find('[data-plant]').classes()).not.toContain('plant-grow')
+    expect(w.find('[data-react]').attributes('data-react')).toBe('idle')
     expect(w.find('[data-streak-chip]').classes()).not.toContain('streak-pulse')
-    expect(w.text()).toContain('Còn 20 phút nữa thôi!')
+    expect(w.text()).toContain('Tưới cho tớ')
   })
 
   it('the moment is consumed once', async () => {
@@ -180,4 +192,121 @@ describe('/ (wireframe 7.2) growth moment', () => {
     await nextTick()
     expect(w2.find('[data-growth-chip]').exists()).toBe(false)
   })
+  it('opens current task, keeps locked tiles inert and permits extra study', async () => {
+    routeGet(STATUS_BEFORE, DAILY_PARTWAY)
+    const w = mountPage()
+    await flushPromises()
+    const tiles = w.findAllComponents(QuestNode)
+    expect(tiles.map(t => t.props('state'))).toEqual(['done', 'current', 'locked'])
+    await tiles[2]!.find('button').trigger('click')
+    expect(navigateTo).not.toHaveBeenCalled()
+    await w.find('[data-next-task] button').trigger('click')
+    expect(navigateTo).toHaveBeenCalledWith('/learn/ex-2')
+    useQuestStore().daily = { ...DAILY_PARTWAY, is_target_met: true }
+    await nextTick()
+    expect(w.findAllComponents(QuestNode)[2]!.props('state')).toBe('open')
+    await w.findAllComponents(QuestNode)[2]!.find('button').trigger('click')
+    expect(navigateTo).toHaveBeenCalledWith('/learn/ex-3')
+    w.unmount()
+  })
+  it('hides unknown navigation and sends all-done to roadmap', async () => {
+    api.get.mockImplementation(() => new Promise(() => {}))
+    const w = mountPage()
+    expect(w.find('[data-next-task]').exists()).toBe(false)
+    useQuestStore().daily = DAILY_MET
+    useQuestStore().loading = false
+    await nextTick()
+    expect(w.find('[data-next-task]').text()).toContain('Xem hành trình')
+    await w.find('[data-next-task] button').trigger('click')
+    expect(navigateTo).toHaveBeenCalledWith('/roadmap')
+    w.unmount()
+  })
+  it('keeps quests usable with wilted companion and names recovery', async () => {
+    routeGet({ ...STATUS_BEFORE, health_points: 0, stage: 'wilted' }, DAILY_PARTWAY)
+    const w = mountPage()
+    await flushPromises()
+    expect(w.find('[data-react="down"]').exists()).toBe(true)
+    expect(w.text()).toContain('Hồi sinh My Green Buddy')
+    await w.find('[data-next-task] button').trigger('click')
+    expect(navigateTo).toHaveBeenCalledWith('/learn/ex-2')
+    w.unmount()
+  })
+  it('invites onboarding without inventing progress for a missing roadmap', async () => {
+    routeGet(STATUS_BEFORE, DAILY_PARTWAY)
+    const w = mountPage()
+    await flushPromises()
+    useQuestStore().daily = null
+    useQuestStore().noRoadmap = true
+    await nextTick()
+    expect(w.text()).toContain('Cậu chưa có hành trình')
+    expect(w.findComponent(DayBar).exists()).toBe(false)
+    await w.findAll('button').find(b => b.text().includes('Bắt đầu hành trình'))!.trigger('click')
+    expect(navigateTo).toHaveBeenCalledWith('/onboarding')
+    w.unmount()
+  })
+
+  it('retries only the failed region and leaves companion visible', async () => {
+    api.get.mockImplementation((path: string) => path.endsWith('/pet/status') ? Promise.resolve(STATUS_BEFORE) : Promise.reject(new Error('unavailable')))
+    const w = mountPage()
+    await flushPromises()
+    expect(w.find('[role="meter"]').exists()).toBe(true)
+    expect(w.find('[data-next-task]').exists()).toBe(false)
+    expect(w.text()).toContain('Không tải được nhiệm vụ')
+    api.get.mockClear()
+    await w.findAll('button').find(b => b.text() === 'Thử lại')!.trigger('click')
+    await flushPromises()
+    expect(api.get).toHaveBeenCalledTimes(1)
+    expect(api.get.mock.calls[0]![0]).toContain('/quests/daily')
+    w.unmount()
+  })
+  it('greets day one with the actual companion name and actual target minutes', async () => {
+    routeGet(STATUS_BEFORE, { ...DAILY_PARTWAY, day_number: 1, accumulated_seconds: 0, total_minutes_required: 45, tasks: DAILY_MET.tasks.map(t => ({ ...t, is_completed: false })) })
+    const w = mountPage()
+    await flushPromises()
+    expect(w.text()).toContain('Tớ là My Green Buddy')
+    expect(w.findComponent(DayBar).text()).toContain('0/45')
+    expect(w.findAllComponents(QuestNode)[0]!.props('state')).toBe('current')
+    w.unmount()
+  })
+
+  it('keeps cached truth offline and queues only one notice', async () => {
+    const toast = useRetroToast()
+    while (toast.queue.value.length) toast.dismiss()
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+    usePetStore().status = STATUS_BEFORE
+    useQuestStore().daily = DAILY_PARTWAY
+    api.get.mockRejectedValue(new Error('offline'))
+    const w = mountPage()
+    await flushPromises()
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('offline'))
+    expect(toast.queue.value).toHaveLength(1)
+    expect(w.findComponent(DayBar).text()).toContain('10/30')
+    await w.find('[data-next-task] button').trigger('click')
+    expect(navigateTo).toHaveBeenCalledWith('/learn/ex-2')
+    w.unmount()
+    toast.dismiss()
+  })
+
+  it('shows final HP and a static earned reward for two seconds with reduced motion', async () => {
+    reduced.value = true
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    const pet = usePetStore()
+    pet.status = { ...STATUS_BEFORE }
+    pet.applyProgress({ pet_health: 100, streak_count: 6, targetMetChanged: true })
+    routeGet(STATUS_AFTER, DAILY_MET)
+    const w = mountPage()
+    expect(w.find('[role="meter"]').attributes('aria-valuenow')).toBe('100')
+    expect(w.find('[data-stage="sapling"]').exists()).toBe(true)
+    expect(w.find('[data-growth-chip="growth"]').text()).toBe('+20 máu')
+    expect(w.find('[data-react]').classes().some(c => c.startsWith('retro-'))).toBe(false)
+    vi.advanceTimersByTime(1999)
+    await nextTick()
+    expect(w.find('[data-growth-chip]').exists()).toBe(true)
+    vi.advanceTimersByTime(1)
+    await nextTick()
+    expect(w.find('[data-growth-chip]').exists()).toBe(false)
+    w.unmount()
+  })
+
 })
