@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/complete-the-remaining-retro-screens-while-preserving-graded.md
-status: executing
+status: done
 priority: high
 merged: false
 design: harness/designs/retro-screens-compatibility.md
@@ -64,3 +64,21 @@ Files: `frontend/tests/e2e/` retro flow browser suite/config if needed, CODEMAP,
 
 ## Verification
 The per-screen acceptance lists in all six retro designs, as amended by compatibility doc, are the checklist. Full frontend suite + production build, backend unit/race and actual integration, actual learning browser flow, mobile/desktop visual and reduced-motion review, exact-head CI, harness validate and plan blockers. A skipped check is not a pass.
+
+## Execution summary
+
+All seven tasks implemented and independently task-reviewed. New owned GET roadmap/settings contracts supply real data; all six retro screens preserve explicit graded saving, drafts, resume, unknown historical results, and account isolation. Narrow responsive fixes support 375 px and CSS layout zoom 200% at DPR 1. Runtime interfaces and repeatable browser fixtures are documented in CODEMAP and the compatibility design.
+
+Validation at app head `2317cc7`: frontend lint/typecheck/build and 466 unit tests in 51 files; backend build/format/vet/race; 25 real-service integration tests, zero skips; 19 real-API browser cases with a deterministic provider; 45 production-bundle visual/state captures, seven zoom cases. CI run https://github.com/HendrixNguyen/English-Training-Harness/actions/runs/38416252258 passed all five jobs at that exact head. The final whole-branch review and final metadata-head CI are separate remaining gates.
+
+### Runtime proof
+
+Use Go 1.25 from `/workspace/toolchains/go/bin`, GOCACHE `/workspace/.cache/go-build`, GOPATH `/workspace/.cache/go`, installed frontend dependencies and Chromium `/usr/bin/chromium`. Only controller-owned disposable Compose project `retro-screens` at PostgreSQL 55432 and Redis 56379 is nominated; integration fixtures are destructive and must never point at production. Run integration before browser fixtures, never concurrently.
+
+- Backend: with DATABASE_URL/REDIS_URL/TEST_DATABASE_URL/TEST_REDIS_URL unset, `make check`; then with test-only URLs `postgres://english:english@localhost:55432/english?sslmode=disable` and `redis://localhost:56379/0`, `go test ./... -count=1 -v -run Integration -p 1 -race`. Check execution and zero skips.
+- Frontend: `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run build`.
+- Actual services: create a proof log directory, build backend `cmd/api` to `$LEARNING_PROOF_LOGS/api`; from frontend run `LEARNING_COMPOSE_PROJECT=retro-screens PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test --config playwright.reading.config.ts`. Use a separate log directory to avoid replacing earlier evidence.
+- Visual/edge fixtures: `node tests/e2e/retro-visual.mjs` from frontend with LEARNING_PROOF_LOGS pointing to that log directory. The tracked runner starts/stops its own production web process, checks headings, focus, dialog, viewport retention, control bounds and state messages. Manual screenshot inspection is additional evidence, not implied by width checks.
+- Harness: `python3 -m unittest discover -s tools/harness/tests` and `python3 tools/harness/cli.py validate`; blockers for this plan must be empty.
+
+Original logs, screenshot manifest and images: `/workspace/cloud-setup/retro-screens/task7/`. Route fixtures are explicitly visual evidence; the learning suite uses actual Go routes, PostgreSQL, Redis, signed disposable sessions and a deterministic provider. It does not prove genuine English generation quality. External Google consent and push delivery were not sent or claimed. Existing NuxtLink unit warnings and NO_COLOR/FORCE_COLOR browser warnings are disclosed. No new UI deployment or main/production write occurred.

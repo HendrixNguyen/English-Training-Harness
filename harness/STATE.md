@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-10-13 07:22. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-10-13 14:49. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -133,10 +133,11 @@ _none_
 
 ## Executing
 
-- `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md` — Complete the remaining retro screens — Plan [high]
+_none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md` — Complete the remaining retro screens — Plan [high] (unreviewed)
 - `harness/plans/2026-10-12-learning-sessions-discard-answers-and-hide-feedback-while-un.md` — Learning sessions save graded answers and explain each question — Plan [high] (review: pass)
 - `harness/plans/2026-10-11-reading-flow.md` — Complete one reading task with Vietnamese glossary and saved progress — Plan [high] (review: pass)
 - `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (review: pass-with-bugs)
@@ -146,7 +147,6 @@ _none_
 - `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (review: pass-with-bugs) (merged)
 - `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped — Plan [low] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (review: pass-with-bugs) (merged)
 
 ## Failed
 
