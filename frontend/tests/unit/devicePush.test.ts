@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { pushCapability, subscribeDevice } from '~/utils/devicePush'
+import { hasExistingDeviceSubscription, pushCapability, subscribeDevice } from '~/utils/devicePush'
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 function browser(permission = 'default') {
  const requestPermission = vi.fn().mockResolvedValue(permission)
@@ -31,4 +31,14 @@ it('an account switch while reading an existing subscription does not create one
 })
 it('worker readiness is bounded and failed subscription is recoverable', async () => {
  vi.useFakeTimers(); browser('granted'); vi.stubGlobal('navigator', { serviceWorker: { ready: new Promise(() => {}) } }); const p = subscribeDevice('YWJj', () => true); const check = expect(p).rejects.toThrow('worker_timeout'); await vi.advanceTimersByTimeAsync(5001); await check
+})
+it('existing-subscription read has the same bounded readiness and never prompts or subscribes', async () => {
+ vi.useFakeTimers()
+ const b = browser('granted')
+ vi.stubGlobal('navigator', { serviceWorker: { ready: new Promise(() => {}) } })
+ const pending = expect(hasExistingDeviceSubscription(() => true)).rejects.toThrow('worker_timeout')
+ await vi.advanceTimersByTimeAsync(5001)
+ await pending
+ expect(b.requestPermission).not.toHaveBeenCalled()
+ expect(b.subscribe).not.toHaveBeenCalled()
 })

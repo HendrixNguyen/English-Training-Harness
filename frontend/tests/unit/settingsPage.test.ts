@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { useAuthStore } from '~/stores/auth'
 import { useSettingsStore } from '~/stores/settings'
+import { usePetStore } from '~/stores/pet'
 import RetroPanel from '~/components/retro/RetroPanel.vue'
 import RetroButton from '~/components/retro/RetroButton.vue'
 import ConfirmSheet from '~/components/retro/ConfirmSheet.vue'
@@ -29,6 +30,46 @@ afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.unstubAllGlob
 it('loads server time on reload without prompting permission or claiming Google sync', async () => {
  const b = browser(); let w = page(); await flushPromises(); expect(w.find('input').element.value).toBe('07:30'); expect(b.requestPermission).not.toHaveBeenCalled(); expect(w.text()).not.toContain('Đã đồng bộ'); w.unmount(); w = page(); await flushPromises(); expect(w.find('input').element.value).toBe('07:30')
 })
+it('reports an existing browser subscription on reload without claiming server delivery or writing', async () => {
+ const b = browser('granted')
+ const registration = await navigator.serviceWorker.ready
+ const existing = { toJSON: () => ({ endpoint: 'https://push.test/old', keys: { p256dh: 'old', auth: 'old' } }) }
+ const getSubscription = vi.spyOn(registration.pushManager, 'getSubscription').mockResolvedValue(existing as unknown as PushSubscription)
+ let w = page(); await flushPromises()
+ expect(w.text()).toContain('Trình duyệt đã có đăng ký thông báo')
+ expect(w.text()).toContain('Chưa xác nhận máy chủ')
+ expect(w.text()).not.toContain('Đã đăng ký nhắc trên thiết bị này')
+ expect(b.requestPermission).not.toHaveBeenCalled()
+ expect(api.post).not.toHaveBeenCalled()
+ w.unmount(); w = page(); await flushPromises()
+ expect(getSubscription).toHaveBeenCalledTimes(2)
+ expect(w.text()).toContain('Trình duyệt đã có đăng ký thông báo')
+ await button(w, 'Đăng ký lại với máy chủ').trigger('click')
+ await flushPromises()
+ expect(api.post.mock.calls.at(-1)?.[1]).toHaveProperty('push_subscription', { endpoint: 'https://push.test/old', p256dh: 'old', auth: 'old' })
+ expect(w.text()).toContain('Đã đăng ký nhắc trên thiết bị này')
+})
+it('does not adopt a late prior-owner or unmounted subscription read', async () => {
+ browser('granted')
+ let finish!: (value: PushSubscription | null) => void
+ const subscription = { toJSON: () => ({ endpoint: 'https://push.test/old', keys: { p256dh: 'old', auth: 'old' } }) } as unknown as PushSubscription
+ const registration = await navigator.serviceWorker.ready
+ vi.spyOn(registration.pushManager, 'getSubscription').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+ const w = page()
+ await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+ await useAuthStore().signOut()
+ finish(subscription)
+ await flushPromises()
+ expect(w.text()).not.toContain('Trình duyệt đã có đăng ký thông báo')
+ expect(api.post).not.toHaveBeenCalled()
+ w.unmount()
+ const next = page()
+ await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+ next.unmount()
+ finish(subscription)
+ await flushPromises()
+ expect(api.post).not.toHaveBeenCalled()
+})
 it.each(['unsupported', 'no-key', 'denied'])('time saving preserves %s capability and does not invent fallback', async state => {
  if (state === 'unsupported') vi.stubGlobal('PushManager', undefined)
  if (state === 'no-key') config.public.vapidPublicKey = ''
@@ -50,7 +91,9 @@ it('Google 409 leads to existing safe login flow; 502 retries real sync and repo
  useSettingsStore().googleError = 'google_unavailable'; await flushPromises(); api.post.mockResolvedValueOnce({ status: 'synced', tasks_created_count: 12 }); await button(w, 'Thử lại').trigger('click'); await flushPromises(); expect(w.text()).toContain('Đã đồng bộ · 12 nhiệm vụ')
 })
 it('confirmation traps focus, Escape restores opener, and central signout clears preferences', async () => {
+ usePetStore().status = { plant_name: 'Mầm Non', health_points: 80, stage: 'sprout', current_streak: 2, last_practiced_at: null }
  const w = page(); await flushPromises(); const opener = button(w, 'Rời quán'); (opener.element as HTMLElement).focus(); await opener.trigger('click'); await flushPromises(); const dialog = w.find('[role="dialog"]'); const controls = dialog.findAll('button'); expect(document.activeElement).toBe(controls[0]!.element)
+ expect(dialog.text()).toContain('Mầm Non')
  await controls[0]!.trigger('keydown', { key: 'Tab', shiftKey: true }); expect(document.activeElement).toBe(controls[1]!.element); await controls[1]!.trigger('keydown', { key: 'Tab' }); expect(document.activeElement).toBe(controls[0]!.element)
  await dialog.trigger('keydown', { key: 'Escape' }); await flushPromises(); expect(w.find('[role="dialog"]').exists()).toBe(false); expect(document.activeElement).toBe(opener.element)
  await opener.trigger('click'); await flushPromises(); await w.find('[role="dialog"]').findAll('button')[1]!.trigger('click'); await flushPromises(); expect(useSettingsStore().preferences).toBeNull(); expect(navigate).toHaveBeenCalledWith('/login')
