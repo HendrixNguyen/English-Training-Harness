@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/learning-sessions-discard-answers-and-hide-feedback-while-un.md
-status: executing
+status: done
 priority: high
 merged: false
 amends: harness/plans/2026-10-11-reading-flow.md
@@ -76,15 +76,15 @@ Files: `frontend/utils/content.ts`, `frontend/components/learn/ContentViewer.vue
 Files: `frontend/tests/e2e/reading.spec.ts`, focused learning-session e2e/helper files as needed, `frontend/tests/e2e/READING.md`, canonical frontend spec API mapping/wireframe, backend spec, `harness/CODEMAP.md` and UI-KIT component contract notes only; retain historical evidence.
 
 - [x] Disposable PostgreSQL/Redis and actual authenticated API/web; unique Compose project/ports; no production DB, auth bypass or intercepted daily/exercise/progress responses. Extend deterministic provider only for repeatable transport/negative cases, explicitly label it. Real browser proves vocab study+quiz, reading lookback, practice quiz; known correct/wrong choices produce exact stored answers/server score; tampered/partial body rejected before writes; reload returns matching grade/completion without another POST; interrupted draft resumes; expiry cannot bypass unanswered quiz; repair failure/success/cached reuse; failed and lost-response saves retain/reconcile. Verify DB result+completion, Redis seconds, daily minutes, provider call count. Save mobile390×844 and desktop feedback/summary/word screenshots and concise assertions.
-- [ ] Fresh genuine9Router model `English-bot-free` via existing secure environment binding/base `https://9router.huyndg.io.vn/v1`, never print/write key. Generate representative vocabulary and reading/practice content through actual content service. Inspect real prompt/options/key/explanations for grounding, distinctness and usable words/examples; browser submits one correct and one wrong choice, confirms durable results and cached reuse. Record duration/provider usage and limitations. Existing B1 B/A/C sample is useful baseline but does not fulfill fresh amended-flow proof. If provider is unavailable, complete deterministic proof and report the genuine gate unpassed; never substitute fake choices as quality evidence.
+- [x] Fresh genuine9Router model `English-bot-free` via existing secure environment binding/base `https://9router.huyndg.io.vn/v1`, never print/write key. Generate representative vocabulary and reading/practice content through actual content service. Inspect real prompt/options/key/explanations for grounding, distinctness and usable words/examples; browser submits one correct and one wrong choice, confirms durable results and cached reuse. Record duration/provider usage and limitations. Existing B1 B/A/C sample is useful baseline but does not fulfill fresh amended-flow proof. If provider is unavailable, complete deterministic proof and report the genuine gate unpassed; never substitute fake choices as quality evidence.
 - [x] Document exact reproducible commands, revision/provenance/legacy/request/error/null contracts, migration DDL, repair policy, draft/saved distinction and cross-store retry limitation. Commit `test(learning): prove saved grades and meaningful session flow`.
 
 
 ### Task 6: checks, branch CI and fresh reviews
 
-- [ ] Run required verification below on final HEAD, push only authorized existing harness branch when controller reaches this task, and await all five branch CI jobs at that exact HEAD. Missing/red/cancelled job remains a blocker; do not loosen checks.
-- [ ] Fresh reviewer(s) read binding design and final diff/evidence, repeat critical data/UX checks and inspect genuine samples. Create reviews via CLI; preserve old verdicts as history and mark new review coverage for this amendment/root plan. Same-day review filenames must sort chronologically for latest-review selection: inspect tooling before assigning suffix and verify dashboard shows the actual latest review, with no tooling source change merely to reorder artifacts.
-- [ ] Only after implementation/evidence/green CI/fresh accepted review does executor set amendment done through CLI; unresolved findings remain blockers. Historical root done status is not evidence that this amendment was implemented. Stop before PR/merge/deploy; controller presents concrete publishable result for separate final gate.
+- [x] Run required verification below on final HEAD, push only authorized existing harness branch when controller reaches this task, and await all five branch CI jobs at that exact HEAD. Missing/red/cancelled job remains a blocker; do not loosen checks.
+- [x] Fresh reviewer(s) read binding design and final diff/evidence, repeat critical data/UX checks and inspect genuine samples. Create reviews via CLI; preserve old verdicts as history and mark new review coverage for this amendment/root plan. Same-day review filenames must sort chronologically for latest-review selection: inspect tooling before assigning suffix and verify dashboard shows the actual latest review, with no tooling source change merely to reorder artifacts.
+- [x] Only after implementation/evidence/green CI/fresh accepted review does executor set amendment done through CLI; unresolved findings remain blockers. Historical root done status is not evidence that this amendment was implemented. Stop before PR/merge/deploy; controller presents concrete publishable result for separate final gate.
 
 ## Verification
 
@@ -100,6 +100,10 @@ Reviewer repeats design Acceptance1–10: (1) vocabulary examples before associa
 
 - Persist server-clamped per-completion duration_seconds with quiz_result so saved/reloaded summary reports real stored study time; old null result displays unknown time. If wrong, users see misleading0 after timer cleanup or daily totals attributed to one task.
 
-## Current validation limit
+## Final acceptance evidence
 
-Application changes pass 366 frontend tests, 12 actual API/browser scenarios, 23 serialized race-enabled integration tests and backend checks. Fresh 9Router reading and context-corrected practice pass saved grading/reload/cache proof. Fresh vocabulary remains unvalidated: English-bot-free returns HTTP400 INVALID_MODEL_ID despite appearing in the authenticated model catalog and two owner-confirmed router corrections. No vocabulary result/time is persisted from these failed requests. Keep the genuine vocabulary checkbox open; no complete feature or production deployment claim.
+Completed application source815c9bed9371840dabf24a3ba6468c1caadae2e1 passes393 frontend tests/45 files, lint/typecheck/fresh build,17 complete actual API/browser scenarios plus the targeted four-response request-lifetime scenario,23 serialized race-enabled backend integration tests, backend build/fmt/vet/race checks and50 harness tests. Exact-source CI38332659347 passes all five jobs. Whole-branch findings I1–I3, CODEMAP M1 and request-lifetime N1 are fixed and independently re-reviewed; no Important/Critical finding remains.
+
+Fresh genuine English-bot-free reading, context-corrected practice and vocabulary pass authenticated content generation, manual sample inspection, correct/wrong answer grading, durable SQL/Redis duration/results, cached reload and one-POST proof. Vocabulary passed after the newer managed configuration revision11; earlier INVALID_MODEL_ID failures remain historical evidence. Its six words/examples and four questions produce3/4=75%,66seconds and1 daily minute. Minor missing articles and the disclosed practice causal-option precision remain bounded sample-quality limitations; structural checks do not certify all future meaning or CEFR difficulty.
+
+Accepted limits: existing Redis/PostgreSQL/pet ordering is not globally exactly-once; partial credit before a failed completion can require manual reconciliation. Browser-denied persistence/deletion supports bounded in-memory continuity rather than physical erasure or durable offline promises. Full-document offline app-shell reload remains outside scope. No private production question payload was retrieved and no production deployment is claimed.
