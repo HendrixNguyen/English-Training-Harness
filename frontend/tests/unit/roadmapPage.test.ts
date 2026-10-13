@@ -13,9 +13,9 @@ const navigate = vi.fn()
 const tasks = ['vocabulary', 'reading', 'practice'].map((task_type, i) => ({ id: `t${i}`, task_type, title: `Actual ${task_type}`, duration_minutes: 10, is_completed: i === 0 ? true : i === 1 ? false : null }))
 const data = { roadmap_id: 'r1', title: 'Real meetings journey', cefr_level: 'B1', today: '2026-10-04', day_number: 4, modules: Array.from({ length: 4 }, (_, week) => ({ week: week + 1, title: `Real region ${week + 1}`, focus: `Focus ${week + 1}`, days: Array.from({ length: 7 }, (_, i) => { const n = week * 7 + i + 1; return { day_number: n, date: `2026-10-${String(n).padStart(2, '0')}`, title: `Actual day ${n}`, tasks, minutes_spent: n === 2 ? 12 : n === 3 ? 30 : 0, is_target_met: n === 3 } }) })) }
 let w: ReturnType<typeof mount>
-function render() { w = mount(RoadmapPage, { global: { components: { AppHeader, StateBlock }, stubs: { NuxtLink: { template: '<a><slot /></a>' } }, mocks: { navigateTo: navigate } } }); return w }
+function render() { w = mount(RoadmapPage, { attachTo: document.body, global: { components: { AppHeader, StateBlock }, stubs: { NuxtLink: { template: '<a><slot /></a>' } }, mocks: { navigateTo: navigate } } }); return w }
 beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); api.get.mockReset(); navigate.mockReset(); vi.stubGlobal('navigateTo', navigate); vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }); api.get.mockImplementation((path: string) => Promise.resolve(path.endsWith('/pet/status') ? { plant_name: 'Mầm', health_points: 80, stage: 'sprout', current_streak: 1, last_practiced_at: null } : data)) })
-afterEach(() => { w?.unmount(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { w?.unmount(); document.body.innerHTML = ''; vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 describe('real retro world map', () => {
   it('renders actual regions, truthful states and today tasks, with inert future nodes', async () => {
     render(); await flushPromises()
@@ -31,16 +31,26 @@ describe('real retro world map', () => {
     await w.get('button[aria-label^="Ngày 2:"]').trigger('click'); expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('true'); expect(w.text()).toContain('Actual day 2')
   })
   it('rereads entry, focus, visibility and server-date polling; replacement changes expanded day', async () => {
+    const scroll = vi.fn()
+    const originalScroll = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scroll
+    try {
     render(); await flushPromises(); expect(api.get).toHaveBeenCalledWith('/api/v1/roadmap')
+    expect(scroll).toHaveBeenCalledTimes(1)
     await w.get('button[aria-label^="Ngày 2:"]').trigger('click')
     expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('true')
     window.dispatchEvent(new Event('focus')); await flushPromises()
     expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('true')
     document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
     vi.advanceTimersByTime(60000); await flushPromises(); expect(api.get.mock.calls.filter(([path]) => path === '/api/v1/roadmap').length).toBeGreaterThanOrEqual(4)
+    expect(scroll).toHaveBeenCalledTimes(1)
+    api.get.mockResolvedValue({ ...data, today: '2026-10-05', day_number: 5 }); window.dispatchEvent(new Event('focus')); await flushPromises()
+    expect(scroll).toHaveBeenCalledTimes(2)
+    expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('false')
     api.get.mockResolvedValue({ ...data, roadmap_id: 'r2', today: '2026-10-29', day_number: 29 }); window.dispatchEvent(new Event('focus')); await flushPromises()
     expect(w.find('[aria-current="step"]').exists()).toBe(false); expect(w.find('[aria-label^="Nhiệm vụ ngày"]').exists()).toBe(false)
     w.unmount(); render(); await flushPromises(); expect(useRoadmapStore().outline?.roadmap_id).toBe('r2')
+    } finally { HTMLElement.prototype.scrollIntoView = originalScroll }
   })
   it('retains same-owner memory under offline failure with an honest offline notice', async () => {
     render(); await flushPromises()

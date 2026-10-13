@@ -23,27 +23,54 @@ try {
   const page=await context.newPage();
   if(!mode.startsWith('login')) await page.addInitScript(()=>localStorage.setItem('aelp.auth',JSON.stringify({accessToken:'fixture-token',expiresAt:Date.now()+86400000,user:{id:'fixture-owner',full_name:'Nguyễn Hoàng Anh Minh',email:'fixture@example.invalid',cefr_current:'B1'}})));
   const routePath=route;
-  if(!mode.startsWith('login')) await page.route('**/api/v1/**',async route=>{const path=new URL(route.request().url()).pathname;if(mode==='loading'&&(path.endsWith('/pet/status')||path.endsWith('/quests/daily')))return new Promise(()=>{});if(mode==='error'&&(path.endsWith('/pet/status')||path.endsWith('/quests/daily')))return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'unavailable'})});const body=path.endsWith('/pet/status')?(routePath==='/revive'?{...pet,health_points:0,stage:'wilted'}:pet):path.endsWith('/roadmap')?map:path.endsWith('/settings')?settings:path.endsWith('/onboarding/quiz')?quiz:daily;const absent=routePath==='/onboarding'&&path.endsWith('/quests/daily');return route.fulfill({status:absent?404:200,contentType:'application/json',body:JSON.stringify(absent?{error:'no_active_roadmap'}:body)})});
+  if(!mode.startsWith('login')) await page.route('**/api/v1/**',async route=>{const path=new URL(route.request().url()).pathname;const target={'/':'/quests/daily','/onboarding':'/onboarding/quiz','/roadmap':'/roadmap','/revive':'/pet/status','/settings':'/settings'}[routePath];if(mode==='offline'&&routePath==='/onboarding'&&path.endsWith(target))return route.abort('internetdisconnected');if(mode==='loading'&&path.endsWith(target))return new Promise(()=>{});if(mode==='error'&&path.endsWith(target))return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'unavailable'})});if(mode==='google-error'&&path.endsWith('/integrations/google/sync'))return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'google_unavailable'})});const body=path.endsWith('/pet/status')?(routePath==='/revive'?{...pet,health_points:0,stage:'wilted'}:pet):path.endsWith('/roadmap')?map:path.endsWith('/settings')?settings:path.endsWith('/onboarding/quiz')?quiz:daily;const absent=routePath==='/onboarding'&&path.endsWith('/quests/daily');return route.fulfill({status:absent?404:200,contentType:'application/json',body:JSON.stringify(absent?{error:'no_active_roadmap'}:body)})});
   return {page,context};
  }
  async function shot(route,width,mode='normal'){
+  console.log(`Checking ${route} ${width} ${mode}`);
   const {page,context}=await makePage(width,mode,route);
-  try {await page.goto(origin+route,{waitUntil:'domcontentloaded'});await page.waitForTimeout(700);
+  try {await page.goto(origin+route+(mode==='login-error'?'?code=fixture&state=wrong':''),{waitUntil:'domcontentloaded'});await page.waitForTimeout(700);
    const heading={'/login':/Học 30 phút/,'/onboarding':/Chọn hành trình/,'/':/Phòng hôm nay/,'/roadmap':/English for work and daily life/,'/revive':/Hồi sinh/,'/settings':/Cài đặt/}[route];
-   if(heading&&mode!=='loading'&&mode!=='error')await page.getByRole('heading',{name:heading}).first().waitFor({timeout:7000});
+   if(heading&&!['loading','error'].includes(mode))await page.getByRole('heading',{name:heading}).first().waitFor({timeout:7000});
    if(route==='/onboarding'&&mode==='quiz'){await page.getByRole('radio',{name:'IELTS 7.0'}).click();await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).click();await page.getByText('Lượt 1 / 10').waitFor()}
+   if(route==='/onboarding'&&['loading','error'].includes(mode)){await page.getByRole('radio',{name:'IELTS 7.0'}).click();await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).click()}
    if(route==='/settings'&&mode.startsWith('confirm')){await page.getByRole('button',{name:'Rời quán · Đăng xuất'}).click();await page.getByRole('dialog').waitFor()}
-   if(mode==='keyboard'){
-    await page.keyboard.press('Tab');await page.keyboard.press('Tab');
+   if(route==='/settings'&&mode==='google-error'){await page.getByRole('button',{name:'Đồng bộ với Google'}).click();await page.getByText('Google chưa phản hồi. Thử lại sau ít phút.').waitFor()}
+   if(mode.endsWith('keyboard')){
+    await page.keyboard.press('Tab');
     if(!await page.evaluate(()=>document.activeElement?.matches(':focus-visible')))throw Error('keyboard focus is not visibly marked');
    }
    if(mode.includes('zoom200'))await page.evaluate(()=>{document.documentElement.style.zoom='200%'});
    if(mode==='loading'){
-    await page.getByLabel('Đang tải').first().waitFor();
-    if(await page.locator('[data-loading-tile]').count()!==3||await page.locator('[data-next-task]').count())throw Error('hub loading must show three inert tiles without navigation');
+    if(route==='/onboarding'){await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).waitFor();if(!await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).isDisabled())throw Error('onboarding quiz loading must disable start')}
+    else {await page.getByLabel('Đang tải').first().waitFor();if(route==='/'&&(await page.locator('[data-loading-tile]').count()!==3||await page.locator('[data-next-task]').count()))throw Error('hub loading must show three inert tiles without navigation')}
    }
-   if(mode==='error')await page.getByText('Không tải được nhiệm vụ. Thử lại.').waitFor();
-   if(mode==='offline'){await context.setOffline(true);await page.evaluate(()=>window.dispatchEvent(new Event('offline')));await page.waitForTimeout(200)}
+   if(mode==='error'){
+    const message={'/':'Không tải được nhiệm vụ. Thử lại.','/onboarding':'Không tải được bài kiểm tra. Thử lại.','/roadmap':'Không tải được hành trình. Thử lại.','/revive':'Không tải được trạng thái cây. Chưa thể biết cây có héo hay không.','/settings':'Chưa đọc được giờ nhắc đã lưu.'}[route];
+    await page.getByText(message).waitFor();
+    if(route==='/onboarding')await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).waitFor();
+    else await page.getByRole('button',{name:'Thử lại'}).first().waitFor();
+   }
+   if(mode==='login-error')await page.getByRole('alert').getByText('Phiên đăng nhập không hợp lệ. Thử lại.').waitFor();
+   if(mode==='offline'){
+    await context.setOffline(true);await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
+    if(route==='/roadmap')await page.getByText('Đang ngoại tuyến — bản đồ là bản đã lưu.').waitFor();
+    if(route==='/revive'){await page.getByText('Cần mạng để hồi sinh. Tiến độ đã lưu vẫn còn.').waitFor();if(!await page.getByRole('button',{name:'Hồi sinh (15 phút)'}).isDisabled())throw Error('offline revive action must be disabled')}
+    if(route==='/settings'){await page.getByText('Cần mạng để lưu cài đặt.').waitFor();if(!await page.getByRole('button',{name:'Lưu giờ nhắc'}).isDisabled())throw Error('offline settings save must be disabled')}
+    if(route==='/onboarding'){await page.getByRole('radio',{name:'IELTS 7.0'}).click();await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).click();await page.getByText('Cần mạng để bắt đầu trận đầu tiên. Kết nối lại rồi thử lại.').waitFor()}
+    if(route==='/')await page.getByRole('button',{name:/Đọc hiểu thông báo/}).waitFor();
+   }
+   if(route==='/roadmap'&&mode==='history-refresh'){
+    const historical=page.getByRole('button',{name:/Ngày 2:/});
+    await historical.click();await page.getByRole('region',{name:'Nhiệm vụ ngày 2'}).waitFor();
+    await historical.evaluate(el=>el.scrollIntoView({block:'center'}));
+    const before=await page.evaluate(()=>scrollY);
+    const response=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/v1/roadmap');
+    await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await response;
+    await page.waitForTimeout(100);
+    const after=await page.evaluate(()=>scrollY);
+    if(Math.abs(after-before)>1||await historical.getAttribute('aria-expanded')!=='true')throw Error(`unchanged roadmap refresh moved historical view ${before} -> ${after}`);
+   }
    const slug=route==='/'?'hub':route.slice(1);const filename=`${slug}-${width}-${mode}.png`;
    await page.screenshot({path:`${shots}/${filename}`,fullPage:true});
    const metrics=await page.evaluate(()=>({
@@ -77,7 +104,9 @@ try {
   }finally{await context.close()}
  }
  for(const width of [375,1280]) for(const route of ['/login','/onboarding','/','/roadmap','/revive','/settings']) await shot(route,width,route==='/login'?'login':'normal');
- for(const [route,mode] of [['/onboarding','quiz'],['/settings','confirm'],['/','keyboard'],['/','offline'],['/','loading'],['/','error']]) await shot(route,375,mode);
+ for(const [route,mode] of [['/onboarding','quiz'],['/settings','confirm'],['/settings','google-error'],['/roadmap','history-refresh'],['/login','login-error']]) await shot(route,375,mode);
+ for(const route of ['/login','/onboarding','/','/roadmap','/revive','/settings']) await shot(route,375,route==='/login'?'login-keyboard':'keyboard');
+ for(const route of ['/onboarding','/','/roadmap','/revive','/settings']) for(const mode of ['loading','error','offline']) await shot(route,375,mode);
  for(const route of ['/login','/onboarding','/','/roadmap','/revive','/settings']) await shot(route,375,route==='/login'?'login-zoom200':'zoom200');
  await shot('/settings',375,'confirm-zoom200');
  writeFileSync(`${root}/visual-manifest.json`,JSON.stringify(manifest,null,2));console.log(JSON.stringify({screenshots:manifest.length,zoomScreens:manifest.filter(entry=>entry.metrics.zoom==='2').length,overflow:false}));

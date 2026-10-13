@@ -43,7 +43,9 @@ watch(() => [auth.user?.id, auth.sessionEpoch], () => {
 }, { flush: 'sync' })
 watch(() => [roadmap.outline?.roadmap_id, roadmap.outline?.today], async ([roadmapId, serverToday], [previousRoadmapId, previousToday]) => {
   const available = roadmap.outline?.modules.some(module => module.days.some(day => day.date === expanded.value))
-  if (roadmapId !== previousRoadmapId || serverToday !== previousToday || !available) expanded.value = today.value?.date ?? null
+  const changed = roadmapId !== previousRoadmapId || serverToday !== previousToday
+  if (changed || !available) expanded.value = today.value?.date ?? null
+  if (!changed || !roadmapId) return
   await nextTick()
   if (active && today.value) document.getElementById(`region-day-${today.value.day_number}`)?.scrollIntoView?.({ block: 'center' })
 })

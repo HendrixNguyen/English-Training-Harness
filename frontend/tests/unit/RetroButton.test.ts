@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import RetroButton from '~/components/retro/RetroButton.vue'
 
 describe('RetroButton (design §5)', () => {
-  it('is at least 48px tall and allows a long label to wrap', () => {
+  it('uses minimum height and vertical padding for labels', () => {
     const w = mount(RetroButton, { slots: { default: 'Vào' } })
     expect(w.classes()).toContain('min-h-12')
     expect(w.classes()).toContain('py-2')
