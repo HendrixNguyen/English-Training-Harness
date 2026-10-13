@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/complete-the-remaining-retro-screens-while-preserving-graded.md
-status: approved
+status: executing
 priority: high
 merged: false
 design: harness/designs/retro-screens-compatibility.md
