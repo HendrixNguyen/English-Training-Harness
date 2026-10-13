@@ -78,22 +78,36 @@ func (f *fakeQuestRepo) ExercisesForDay(_ context.Context, _ string, day int) ([
 	return f.exercises[day], nil
 }
 
-func (f *fakeQuestRepo) CheckExercise(_ context.Context, _, exerciseID string, day int) error {
+func (f *fakeQuestRepo) ProgressExercise(_ context.Context, _, _, exerciseID string, day int) (Exercise, error) {
 	for _, e := range f.exercises[day] {
 		if e.ID == exerciseID {
-			return nil
+			e.DayNumber = day
+			return e, nil
 		}
 	}
-	return ErrExerciseNotFound
+	return Exercise{}, ErrExerciseNotFound
 }
-
-func (f *fakeQuestRepo) MarkComplete(_ context.Context, _, exerciseID string) error {
+func (f *fakeQuestRepo) MarkComplete(_ context.Context, _, _ string, expected Exercise, result json.RawMessage) (json.RawMessage, error) {
 	if f.markCompleteErr != nil {
-		return f.markCompleteErr
+		return nil, f.markCompleteErr
 	}
-	f.log.add("MARK COMPLETE %s", exerciseID)
-	f.completed[exerciseID] = true
-	return nil
+	for i, e := range f.exercises[expected.DayNumber] {
+		if e.ID != expected.ID {
+			continue
+		}
+		if string(e.ContentJSON) != string(expected.ContentJSON) || e.TaskType != expected.TaskType {
+			return nil, ErrExerciseContentChanged
+		}
+		f.log.add("MARK COMPLETE %s", expected.ID)
+		f.completed[expected.ID] = true
+		if !e.IsCompleted || len(e.QuizResult) == 0 {
+			e.QuizResult = result
+		}
+		e.IsCompleted = true
+		f.exercises[expected.DayNumber][i] = e
+		return e.QuizResult, nil
+	}
+	return nil, ErrExerciseNotFound
 }
 
 type fakeProgressRepo struct {

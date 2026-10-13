@@ -1,7 +1,6 @@
 package quests
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -33,17 +32,6 @@ func DailyHandler(svc *Service) gin.HandlerFunc {
 	}
 }
 
-// progressRequest is the backend spec §6.2 POST /api/v1/quests/progress body.
-type progressRequest struct {
-	ExerciseID      string `json:"exercise_id" binding:"required"`
-	DurationSeconds int64  `json:"duration_seconds" binding:"required,gt=0"`
-	// UserAnswers is part of the §6.2 request and is accepted so a
-	// spec-conformant client is never rejected, but it is not persisted: no
-	// §3.2 table stores answers and §6.2 does not say what becomes of them.
-	// See the plan's Reconciliation section.
-	UserAnswers json.RawMessage `json:"user_answers"`
-}
-
 // ProgressHandler serves POST /api/v1/quests/progress. It must be mounted
 // behind auth.Require().
 func ProgressHandler(svc *Service) gin.HandlerFunc {
@@ -54,15 +42,19 @@ func ProgressHandler(svc *Service) gin.HandlerFunc {
 			return
 		}
 
-		var req progressRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
+		req, err := decodeProgressRequest(c.Request.Body)
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
 			return
 		}
 
-		out, err := svc.RecordProgress(c.Request.Context(), userID, req.ExerciseID, req.DurationSeconds)
+		out, err := svc.RecordProgress(c.Request.Context(), userID, req.ExerciseID, req.DurationSeconds, req.Submission)
 		switch {
-		case errors.Is(err, ErrInvalidDuration):
+		case errors.Is(err, ErrExerciseContentChanged):
+			c.JSON(http.StatusConflict, gin.H{"error": "exercise_content_changed"})
+		case errors.Is(err, ErrExerciseContentInvalid):
+			c.JSON(http.StatusConflict, gin.H{"error": "exercise_content_invalid"})
+		case errors.Is(err, ErrInvalidDuration), errors.Is(err, ErrInvalidAnswers):
 			// Same code as a binding failure: the request is malformed, not
 			// the state. Wire shape per §6.2 is unchanged.
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})

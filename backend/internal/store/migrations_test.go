@@ -122,7 +122,7 @@ func TestMigrateAppliesPendingVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Migrate() = %v, want nil error", err)
 	}
-	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"0001_init", "0002_google_sync", "0003_pet_verdict_dates", "0004_rls", "0005_exercise_quiz_results"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("applied = %v, want %v", got, want)
 	}
 	if m.ensured != 1 {
@@ -346,5 +346,15 @@ func TestEveryTableCreatedByAMigrationHasRLS(t *testing.T) {
 				"every CREATE TABLE in a migration needs ENABLE ROW LEVEL SECURITY in the same or a later up-migration — "+
 				"Supabase exposes public through PostgREST", table, table)
 		}
+	}
+}
+
+func TestMigration0005AddsOnlyNullableQuizResult(t *testing.T) {
+	up := stripSQLComments(readMigration(t, "0005_exercise_quiz_results.up.sql"))
+	if !strings.Contains(up, "ALTER TABLE exercises ADD COLUMN quiz_result JSONB;") || strings.Contains(up, "NOT NULL") || strings.Contains(up, "DEFAULT") {
+		t.Fatal(up)
+	}
+	if !strings.Contains(readMigration(t, "0005_exercise_quiz_results.down.sql"), "ALTER TABLE exercises DROP COLUMN IF EXISTS quiz_result;") {
+		t.Fatal("missing rollback")
 	}
 }
