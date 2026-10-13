@@ -6,3 +6,19 @@ export async function clearApiCache(): Promise<void> {
   if (typeof caches === 'undefined') return
   await caches.delete(API_STATE_CACHE)
 }
+
+/** Central auth cleanup without importing API-backed stores into authentication. */
+const registered = new WeakSet<object>()
+const privateMemory = new Set<WeakRef<{ invalidate(): void }>>()
+export function registerPrivateMemory(store: { invalidate(): void }) {
+  if (registered.has(store)) return
+  registered.add(store)
+  privateMemory.add(new WeakRef(store))
+}
+export function invalidatePrivateMemory() {
+  for (const reference of privateMemory) {
+    const store = reference.deref()
+    if (store) store.invalidate()
+    else privateMemory.delete(reference)
+  }
+}

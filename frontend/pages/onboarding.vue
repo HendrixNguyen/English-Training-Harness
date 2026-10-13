@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoadmapStore } from '~/stores/roadmap'
 import { computed, onMounted, ref } from 'vue'
 import { useOnboardingApi, type AssessmentResponse, type QuizQuestion } from '~/composables/useOnboardingApi'
 import { useQuestStore } from '~/stores/quest'
@@ -123,6 +124,7 @@ async function regenerate() {
   retryAction.value = 'calibration'
   try {
     const response = await api.regenerate(calibrationLevel.value)
+    useRoadmapStore().invalidate()
     if (result.value) result.value = { ...result.value, assessed_level: response.assessed_level, roadmap_id: response.roadmap_id }
     calibrationUsed.value = true
     await loadReady()
