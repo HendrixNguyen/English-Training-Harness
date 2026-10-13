@@ -58,6 +58,7 @@ Files: `frontend/pages/revive.vue`, `pages/settings.vue`, reminder/push/Google c
 ### Task 7: Prove all screens and document final behavior
 Files: `frontend/tests/e2e/` retro flow browser suite/config if needed, CODEMAP, compatibility/design acceptance evidence.
 - Full frontend lint/typecheck/unit/build; backend build/vet/race and real service integration. Browser walk all screens at 375px and desktop, reduced motion, keyboard, loading/error/offline. Use actual services to rerun released reading/vocabulary/practice lifecycle, and route fixtures only for edge states clearly labelled.
+- Complete recorded small acceptance gaps during proof: normal placement Back to profile retains answers/cursor; unchanged roadmap refresh retains a selected historical day; hub loading follows its muted companion/three-placeholder design. Remove duplicate progress copy if demonstrated. Verify actual 200% layout zoom, not only device pixel ratio; fix demonstrated overflow without hiding controls or reducing body text. Preserve readable future map nodes while evaluating fog intent.
 - Capture screenshots for all primary screens and state evidence. No overlap/overflow, invisible text, blocked controls, unsupported fields or lost answers. Verify documented commands run; stop only processes/containers started here.
 - Commit evidence docs, push harness branch, prove all five exact-head CI jobs green, then final independent whole-branch review and scoped fixes. No direct main/production write or deploy. Controller prepares single integration PR after pass/blocker-free.
 
