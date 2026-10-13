@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-10-13 01:36. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-10-13 03:54. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -121,6 +121,7 @@ _none_
 ## Approved
 
 - `harness/plans/2026-09-27-tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md` — The reading passage finally renders — with tap-a-word Vietnamese glosses — Plan [high]
+- `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md` — Complete the remaining retro screens — Plan [high]
 - `harness/plans/2026-09-27-kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md` — Khó quá / Dễ quá — swap one task for a level-fitted replacement — Plan [medium]
 - `harness/plans/2026-09-27-level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — Level result in 30 seconds: grade first, write the roadmap in the background (`202 generating`, `roadmap:gen:{user_id}`, `404 roadmap_generating`, the onboarding result step and the hub drawing state) — Plan [medium]
 - `harness/plans/2026-09-27-hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — Hear it — read-aloud for passages, questions and flashcards (`useSpeech`, `SpeakButton`) on `/learn/:id` — Plan [medium]
