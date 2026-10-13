@@ -63,11 +63,20 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       try { return await run() } finally { assertSession() }
     }
     if (method === 'GET' && token && owner && /\/api\/v1\/(quests\/daily|pet\/status)$/.test(url.pathname)) url.searchParams.set('aelp_owner', owner)
-    const res = await inSession(() => doFetch(url.toString(), {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    }))
+    let res: Response
+    try {
+      res = await inSession(() => doFetch(url.toString(), {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }))
+    } catch (error) {
+      assertSession()
+      throw error
+    }
+    // The helper's guard precedes this continuation by a microtask. Check in
+    // this frame before handling credentials or adopting a returned payload.
+    assertSession()
 
     if (res.status === 401) {
       // Renewal keeps the session epoch. An old token's rejection must not
@@ -76,8 +85,19 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
       opts.onUnauthorized()
       throw new ApiError(401, 'unauthorized')
     }
-    if (!res.ok) throw new ApiError(res.status, await inSession(() => errorCode(res)))
-    const value = await inSession(() => res.json()) as T
+    if (!res.ok) {
+      const code = await inSession(() => errorCode(res))
+      assertSession()
+      throw new ApiError(res.status, code)
+    }
+    let value: T
+    try {
+      value = await inSession(() => res.json()) as T
+    } catch (error) {
+      assertSession()
+      throw error
+    }
+    assertSession()
     if (res.headers.get('X-Aelp-Cached') === 'true' && typeof value === 'object' && value !== null) cachedResponses.add(value)
     return value
   }

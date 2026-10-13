@@ -28,6 +28,27 @@ beforeEach(() => { localStorage.clear(); setActivePinia(createPinia()) })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('API session lifetime with actual auth and Pinia', () => {
+  it('checks the caller lifetime after settled fetch when same-token relogin is queued before 401 cleanup', async () => {
+    const { auth, transport, api, onUnauthorized } = await setup()
+    const pending = api.get('/api/v1/pet/status'); transport.resolve(response(401))
+    queueMicrotask(() => { void auth.signOut(); void auth.signIn(session); writeDraft(scope, { ...initialSession(content), pending: 'B' }) })
+    await expect(pending).rejects.toMatchObject({ code: 'session_changed' })
+    expect(auth.sessionEpoch).toBe(3); expect(auth.isAuthenticated).toBe(true); expect(onUnauthorized).not.toHaveBeenCalled(); expect(readDraft(scope, content)?.pending).toBe('B')
+  })
+
+  it.each([200, 503])('checks the caller lifetime after settled %s body when replacement is queued between helper and caller', async status => {
+    const { auth, transport, api, onUnauthorized } = await setup()
+    const body = deferred<unknown>(); const started = deferred<boolean>(); const res = response(status)
+    vi.spyOn(res, 'json').mockImplementation(() => { started.resolve(true); return body.promise })
+    const pending = api.get('/api/v1/pet/status'); transport.resolve(res); await started.promise
+    const boundary = () => { void auth.signOut(); void auth.signIn({ ...session, access_token: 'replacement-session-token' }); writeDraft(scope, { ...initialSession(content), pending: 'B' }) }
+    body.resolve(status === 200 ? { plant_name: 'OLD SESSION' } : { error: 'old_session_error' })
+    if (status === 200) queueMicrotask(boundary)
+    else queueMicrotask(() => queueMicrotask(boundary)) // errorCode adds its own body await
+    await expect(pending).rejects.toMatchObject({ code: 'session_changed' })
+    expect(auth.sessionEpoch).toBe(3); expect(auth.isAuthenticated).toBe(true); expect(onUnauthorized).not.toHaveBeenCalled(); expect(readDraft(scope, content)?.pending).toBe('B')
+  })
+
   it.each([401, 200])('rejects old %s after same-owner logout/relogin without clearing the replacement draft/session', async status => {
     const { auth, transport, api, onUnauthorized } = await setup()
     const epoch = auth.sessionEpoch; const pending = api.get('/api/v1/pet/status')
