@@ -5,7 +5,7 @@ source: ideator
 run: 2026-09-27-run-01
 order: 4
 priority: high
-plan: harness/plans/2026-09-27-tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md
+plan: harness/plans/2026-10-11-reading-flow.md
 ---
 # Tap a hard word: Vietnamese glosses on every reading passage so the learner never leaves the room to translate
 

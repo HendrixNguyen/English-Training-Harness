@@ -60,9 +60,15 @@ VT323 is monospaced, so timers and counters never jitter. Body text is never bel
 | `RetroToast` (new) | 1-line `RetroPanel` sliding 8 px up from the bottom bar, 2 s, one at a time; `tone` sets the outer line | `line`, `tone` | — |
 | `StateBlock` (kept) | `loading` = three `…` cells stepping; `empty`/`error` = one sentence + one `RetroButton` | as v1 | error uses `tone=ember`, never a red wall |
 | `CountdownTimer` (kept) | VT323 20 `mm:ss`; measures, never gates | as v1 | — |
+| `ItemPassage` (`components/learn/`) | `RetroPanel` with Nunito 18/30 plain text, preserved line breaks, keyboard-scrollable frame; item height ≤50vh, look-back sheet ≤40vh | `passage`, `glossary`, `mode: item\|sheet`; `eyebrow-action` slot; exposes `closeGloss()` | passage first; optional caption; no-gloss plain text; question look-back is an inline toggle; no animation |
+| `ContentViewer` (`components/learn/`, existing) | Vocabulary words/examples or passage precede associated quiz. Separate selection → submitted feedback → Continue; no early answer disclosure. English body17/26, options ≥56px, torch focus, one polite announcement, static reduced motion | `content`, `title`, controlled `session`; `answer`, `session-change`, `finished` events | No timer/save ownership. Parent renders explicit unsaved/saved summary and authoritative result/time; keyless feedback is ungraded. Existing panels/buttons only. |
+| `GlossTerm` (`components/learn/`) | Inline native button, dotted `line-lit` underline, inherited text rhythm; active `ground-2`/solid underline | `text`, `active`, `controls`; emits `toggle` | accessible name contains marked text; `aria-expanded`/`aria-controls`; torch focus outline |
+| `GlossCard` (`components/learn/`) | Below scroll frame, `ground-2` inset/2-px `line-lit` border, Vietnamese meaning and English definition as text; 44×44 close control | `gloss`, `id`; emits `close` | one polite live region; switching/toggling is immediate; close/Escape returns focus to opener |
 
 ## Interaction states
 Every control: rest → **pressed within 100 ms** (button drop, tile inset, option cursor jump) → result. Focus: 2-px `torch` outline, 2-px offset, on everything focusable. Selected option: `ground-2` fill + `▶` cursor in `line-lit` + `aria-checked`. Disabled: 50 % opacity and `aria-disabled`, never removed from the DOM. Hit/miss feedback: the option row's outer line turns `growth`/`ember` **and** a text label ("Trúng!" / "Trượt…") and an icon appear — never colour alone.
+
+**Inline target exception:** `GlossTerm` sits in running passage text and inherits its 30-px line height without padding. It is below the usual 44-px kit floor under WCAG 2.2 SC 2.5.8's inline-target exception. At most eight sparse marks are shown; all standalone controls, including the gloss close button, retain the normal target floor. See the binding reading design `harness/designs/tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md`.
 
 ## Motion budget
 - One place per screen spends motion: the companion (hub, revive), the answer feedback (learning room), the chest (task done), the map cursor (roadmap).

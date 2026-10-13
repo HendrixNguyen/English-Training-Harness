@@ -39,6 +39,7 @@ type Exercise struct {
 	TaskType    string // vocabulary | reading | practice
 	ContentJSON json.RawMessage
 	IsCompleted bool
+	QuizResult  json.RawMessage
 }
 
 // Profile is the slice of `users` quests needs: the timezone decides which day
@@ -52,14 +53,11 @@ type QuestRepo interface {
 	Profile(ctx context.Context, userID string) (Profile, error)
 	ActiveRoadmap(ctx context.Context, userID string) (Roadmap, error)
 	ExercisesForDay(ctx context.Context, roadmapID string, day int) ([]Exercise, error)
-	// CheckExercise is the read-only ownership check RecordProgress runs
-	// before it writes anything: nil when exerciseID is on roadmapID for
-	// day, ErrExerciseNotFound otherwise. Unknown ids and other users' ids
-	// are deliberately indistinguishable.
-	CheckExercise(ctx context.Context, roadmapID, exerciseID string, day int) error
-	// MarkComplete sets is_completed and returns ErrExerciseNotFound when the
-	// exercise is not on roadmapID.
-	MarkComplete(ctx context.Context, roadmapID, exerciseID string) error
+	// ProgressExercise reads an owned active current-day snapshot before writes.
+	ProgressExercise(ctx context.Context, userID, roadmapID, exerciseID string, day int) (Exercise, error)
+	// MarkComplete atomically saves completion and result if the owned active
+	// snapshot still matches. Existing completed results are returned unchanged.
+	MarkComplete(ctx context.Context, userID, roadmapID string, expected Exercise, result json.RawMessage) (json.RawMessage, error)
 }
 
 // ProgressRepo owns daily_progress. The row is monotonic: minutes_spent never
@@ -91,20 +89,24 @@ ORDER BY created_at DESC
 LIMIT 1`
 
 	exercisesForDaySQL = `
-SELECT id, day_number, task_type, content_json, is_completed
+SELECT id, day_number, task_type, content_json, is_completed, quiz_result
 FROM exercises
 WHERE roadmap_id = $1 AND day_number = $2
 ORDER BY task_type`
 
-	checkExerciseSQL = `
-SELECT 1
-FROM exercises
-WHERE id = $1 AND roadmap_id = $2 AND day_number = $3`
+	progressExerciseSQL = `
+SELECT e.id, e.day_number, e.task_type, e.content_json, e.is_completed, e.quiz_result
+FROM exercises e JOIN roadmaps r ON r.id = e.roadmap_id
+WHERE e.id::text = $3 AND r.id = $2 AND r.user_id = $1 AND r.is_active AND e.day_number = $4`
 
 	markCompleteSQL = `
-UPDATE exercises
-SET is_completed = TRUE
-WHERE id = $1 AND roadmap_id = $2`
+UPDATE exercises e
+SET is_completed = TRUE,
+    quiz_result = CASE WHEN e.is_completed AND e.quiz_result IS NOT NULL THEN e.quiz_result ELSE $6::jsonb END
+FROM roadmaps r
+WHERE e.id::text = $3 AND r.id = e.roadmap_id AND r.id = $2 AND r.user_id = $1 AND r.is_active
+  AND e.day_number = $4 AND e.content_json = $5::jsonb AND e.task_type::text = $7
+RETURNING e.quiz_result`
 
 	// daily_progress.date defaults to CURRENT_DATE, which is the *server's*
 	// date — always pass the user's local date explicitly. A new row starts
@@ -164,7 +166,7 @@ func (r *PgRepo) ExercisesForDay(ctx context.Context, roadmapID string, day int)
 	var out []Exercise
 	for rows.Next() {
 		var e Exercise
-		if err := rows.Scan(&e.ID, &e.DayNumber, &e.TaskType, &e.ContentJSON, &e.IsCompleted); err != nil {
+		if err := rows.Scan(&e.ID, &e.DayNumber, &e.TaskType, &e.ContentJSON, &e.IsCompleted, &e.QuizResult); err != nil {
 			return nil, fmt.Errorf("quests: scanning exercise: %w", err)
 		}
 		out = append(out, e)
@@ -172,27 +174,31 @@ func (r *PgRepo) ExercisesForDay(ctx context.Context, roadmapID string, day int)
 	return out, rows.Err()
 }
 
-func (r *PgRepo) CheckExercise(ctx context.Context, roadmapID, exerciseID string, day int) error {
-	var one int
-	err := r.Pool.QueryRow(ctx, checkExerciseSQL, exerciseID, roadmapID, day).Scan(&one)
+func (r *PgRepo) ProgressExercise(ctx context.Context, userID, roadmapID, exerciseID string, day int) (Exercise, error) {
+	var e Exercise
+	err := r.Pool.QueryRow(ctx, progressExerciseSQL, userID, roadmapID, exerciseID, day).Scan(&e.ID, &e.DayNumber, &e.TaskType, &e.ContentJSON, &e.IsCompleted, &e.QuizResult)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrExerciseNotFound
+		return Exercise{}, ErrExerciseNotFound
 	}
 	if err != nil {
-		return fmt.Errorf("quests: checking exercise: %w", err)
+		return Exercise{}, fmt.Errorf("quests: reading progress exercise: %w", err)
 	}
-	return nil
+	return e, nil
 }
 
-func (r *PgRepo) MarkComplete(ctx context.Context, roadmapID, exerciseID string) error {
-	tag, err := r.Pool.Exec(ctx, markCompleteSQL, exerciseID, roadmapID)
+func (r *PgRepo) MarkComplete(ctx context.Context, userID, roadmapID string, expected Exercise, result json.RawMessage) (json.RawMessage, error) {
+	var saved json.RawMessage
+	err := r.Pool.QueryRow(ctx, markCompleteSQL, userID, roadmapID, expected.ID, expected.DayNumber, expected.ContentJSON, result, expected.TaskType).Scan(&saved)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, readErr := r.ProgressExercise(ctx, userID, roadmapID, expected.ID, expected.DayNumber); readErr != nil {
+			return nil, readErr
+		}
+		return nil, ErrExerciseContentChanged
+	}
 	if err != nil {
-		return fmt.Errorf("quests: marking exercise complete: %w", err)
+		return nil, fmt.Errorf("quests: marking exercise complete: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrExerciseNotFound
-	}
-	return nil
+	return saved, nil
 }
 
 func (r *PgRepo) Upsert(ctx context.Context, userID, localDate string, minutes int) (bool, error) {

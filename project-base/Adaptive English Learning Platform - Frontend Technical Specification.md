@@ -287,6 +287,8 @@ CREATE TABLE exercises (
 | **Virtual Plant Widget** | `GET /api/v1/pet/status` | Dynamic SVG plant stage (Seed \-\> Sprout \-\> Sapling \-\> Flowering \-\> Fruitful / Wilted), Health Bar %, Streak Count. |
 | **Daily Progress Tracker** | `GET /api/v1/quests/daily` | Real-time minute accumulator (*20 / 30 mins completed*), daily goal completion progress bar. |
 | **Today's Quest List** | `GET /api/v1/quests/daily` | 3 Exercise cards (10m Vocabulary, 10m Reading, 10m Practice) with completed/pending indicators. |
+| **Learning content / repair** | `GET /api/v1/quests/exercises/:id` (`?repair=true` explicit invalid-content repair) | Owner-checked generated/legacy/outline provenance, opaque content revision, typed study/quiz content and nullable saved result. |
+| **Learning saved summary** | `POST /api/v1/quests/progress`; authoritative reconciliation `GET /api/v1/quests/daily?fresh=true` | Full revision-bound answers, server grade/nulls and saved per-attempt duration; network-only reconciliation never trusts cached incomplete data. |
 | **Curriculum Roadmap Tree** | `GET /api/v1/quests/daily` | 4-Week (28-Day) interactive timeline map showing completed, active, and locked milestones. |
 | **Settings & Integration Modal** | `POST /api/v1/settings/notificationsPOST /api/v1/integrations/google/sync` | Google Calendar & Tasks sync status toggle, Web Push notification permissions, daily reminder time selector. |
 
@@ -352,24 +354,24 @@ CREATE TABLE exercises (
 
 ## **7.3 Wireframe Prototype 3: Distraction-Free Learning Room**
 
+```text
+Quay lại                                      Timer holds at 00:00
+Study: reading passage + glossary OR Từ n / W, definition, example
+Quiz: Câu n / Q                                Đã trả lời a / Q
+English prompt / A–D options (selection required)
+[Trả lời] → locked selected/correct rows, explanation → [Tiếp tục]
+Final Continue → Chưa lưu kết quả; count + elapsed time → [Hoàn thành]
+Saved: Đã lưu kết quả; Đúng c / Q · s% OR Không chấm điểm
+Saved per-task time + returned answer feedback → [Về trang chính]
 ```
-+---------------------------------------------------+
-|  < Quay lại                 ⏱️ Thời gian: 09:42   |
-+---------------------------------------------------+
-|  Câu 2 / 10                                       |
-|                                                   |
-|  "Choose the correct formal phrasing for requesting|
-|   a price quotation:"                             |
-|                                                   |
-|  (A) Give me the cost details right now.          |
-|  (B) Could you please provide a price quotation?  |
-|  (C) Send me how much this thing costs.           |
-|                                                   |
-|  +---------------------------------------------+  |
-|  |           [ Gửi đáp án / Tiếp tục ]         |  |
-|  +---------------------------------------------+  |
-+---------------------------------------------------+
-```
+
+The detailed binding learning-room contract is `harness/designs/learning-sessions-discard-answers-and-hide-feedback-while-un.md`. Vocabulary study never increments answered count. Timer expiry cannot skip questions; no grade/key/explanation is in the DOM before submission. Local feedback/drafts are previews, not durable results. New UI always sends revision and every required answer; zero-question legacy sends an empty map. Saved time comes from `quiz_result.duration_seconds` after timer cleanup/reload; historical `quiz_result:null` shows unknown time, never zero. Grade fields and per-answer unknowns remain null for ungraded results.
+
+Drafts use stable owner/task/server-revision identity and retain cursor, pending selection, submitted choices, feedback/lookback and failed-save duration. Saved completion clears the matching draft. Content/account/task changes discard incompatible drafts; storage denial permits memory-only study/save. Completed tasks reopen the server summary without POST. Invalid stored generated content requires explicit bounded repair and cannot bypass the quiz. Trusted cached content supports offline study with disabled save; incomplete outline caches require connectivity.
+
+An ambiguous save calls `load(true)` and `/quests/daily?fresh=true`, excluded from service-worker NetworkFirst: only a network-authoritative matching completion ends without another POST, confirmed incomplete allows explicit retry, and unknown outcome permits read-only checking. Existing Redis/Postgres/pet write order remains cross-store and does not guarantee global exactly-once time credit.
+
+Changed regions reuse existing RetroPanel/RetroButton/StateBlock/CountdownTimer; English is body17/26, answers ≥56px, feedback one polite live region, keyboard focus moves to feedback/next heading, no new animation under reduced motion. Desktop keeps the same max-width column. Actual API/browser reproduction and provider limitations: `frontend/tests/e2e/READING.md`.
 
 ## **7.4 Wireframe Prototype 4: Visual Curriculum Roadmap Tree (28 Days)**
 
