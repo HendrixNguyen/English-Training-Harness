@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-10-13 14:49. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-10-14 13:35. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -15,6 +15,8 @@ _none_
 - `harness/ideas/_inbox/onboarding-declares-cefrorder-in-both-the-regenerate-and-the.md` — onboarding declares cefrOrder in both the regenerate and the level-floor branches so the daily merge does not compile — blocks `harness/plans/2026-09-26-a-session-a-learner-wants-to-finish-level-true-content-do-to.md`
 - `harness/ideas/_inbox/session-renewal-signs-the-learner-out-when-a-non-2xx-or-a-pa.md` — Session renewal signs the learner out when a non-2xx or a parallel request races the rotated token — blocks `harness/plans/2026-09-26-stay-signed-in-sessions-renew-on-use-so-a-daily-learner-neve.md`
 - `harness/ideas/_inbox/orphan-window-test-fails-once-the-google-403-branch-is-merge.md` — Orphan-window test fails once the google 403 branch is merged: the fake now names the second Google-assigned insert evt_second-2 — blocks `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md`
+- `harness/ideas/_inbox/retro-roadmap-loses-centered-column-and-mobile-gutters.md` — Retro roadmap loses centered column and mobile gutters — blocks `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md`
+- `harness/ideas/_inbox/retro-settings-late-read-overwrites-a-confirmed-reminder-sav.md` — Retro settings late read overwrites a confirmed reminder save — blocks `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md`
 
 ## Inbox (reviewer bugs awaiting evaluation)
 
@@ -121,6 +123,8 @@ _none_
 ## Approved
 
 - `harness/plans/2026-09-27-tap-a-hard-word-vietnamese-glosses-on-every-reading-passage-.md` — The reading passage finally renders — with tap-a-word Vietnamese glosses — Plan [high]
+- `harness/plans/2026-10-14-retro-roadmap-loses-centered-column-and-mobile-gutters.md` — Retro roadmap loses centered column and mobile gutters — Plan [high]
+- `harness/plans/2026-10-14-retro-settings-late-read-overwrites-a-confirmed-reminder-sav.md` — Retro settings late read overwrites a confirmed reminder save — Plan [high]
 - `harness/plans/2026-09-27-kho-qua-de-qua-swap-one-task-for-a-level-fitted-replacement-.md` — Khó quá / Dễ quá — swap one task for a level-fitted replacement — Plan [medium]
 - `harness/plans/2026-09-27-level-result-in-30-seconds-grade-first-write-the-roadmap-in-.md` — Level result in 30 seconds: grade first, write the roadmap in the background (`202 generating`, `roadmap:gen:{user_id}`, `404 roadmap_generating`, the onboarding result step and the hub drawing state) — Plan [medium]
 - `harness/plans/2026-09-27-hear-it-read-aloud-for-passages-questions-and-vocabulary-wit.md` — Hear it — read-aloud for passages, questions and flashcards (`useSpeech`, `SpeakButton`) on `/learn/:id` — Plan [medium]
@@ -130,6 +134,9 @@ _none_
 - `harness/plans/2026-09-26-day-28-checkpoint-cefr-re-assessment-and-the-next-roadmap.md` — Day-28 checkpoint (backend): `POST /api/v1/roadmaps/next` re-grades the level and replaces the roadmap; `GET /quests/daily` says `roadmap_complete` — Plan [medium]
 - `harness/plans/2026-09-27-ai-graded-writing-practice-through-the-essay-grading-route.md` — AI-graded writing practice (backend): `writing` practice tasks in the roadmap and `POST /api/v1/quests/writing/grade` through the `essay_grading` route — Plan [medium]
 - `harness/plans/2026-09-27-spaced-repetition-vocabulary-review-in-the-daily-quest.md` — Spaced-repetition vocabulary review (backend): `vocab_reviews`, `reviews[]` on `GET /quests/daily`, `review_grades[]` on `POST /quests/progress` — Plan [low]
+- `harness/plans/2026-10-14-cached-retro-roadmap-reentry-omits-current-region-initializa.md` — Cached retro roadmap reentry omits current region initialization — Plan [low]
+- `harness/plans/2026-10-14-retro-hub-offline-browser-proof-does-not-assert-its-notice.md` — Retro hub offline browser proof does not assert its notice — Plan [low]
+- `harness/plans/2026-10-14-retro-shell-codemap-retains-obsolete-ui-and-roadmap-descript.md` — Retro shell CODEMAP retains obsolete UI and roadmap description — Plan [low]
 
 ## Executing
 
@@ -137,7 +144,7 @@ _none_
 
 ## Done (last 10)
 
-- `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md` — Complete the remaining retro screens — Plan [high] (unreviewed)
+- `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md` — Complete the remaining retro screens — Plan [high] (review: fail)
 - `harness/plans/2026-10-12-learning-sessions-discard-answers-and-hide-feedback-while-un.md` — Learning sessions save graded answers and explain each question — Plan [high] (review: pass)
 - `harness/plans/2026-10-11-reading-flow.md` — Complete one reading task with Vietnamese glossary and saved progress — Plan [high] (review: pass)
 - `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (review: pass-with-bugs)
