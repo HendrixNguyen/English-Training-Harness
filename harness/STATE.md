@@ -1,6 +1,6 @@
 # Harness state
 
-_Generated 2026-10-13 01:36. Do not edit — run `python3 tools/harness/cli.py state`._
+_Generated 2026-10-14 13:54. Do not edit — run `python3 tools/harness/cli.py state`._
 
 
 ## Invalid
@@ -137,16 +137,16 @@ _none_
 
 ## Done (last 10)
 
+- `harness/plans/2026-10-14-retro-shell-codemap-retains-obsolete-ui-and-roadmap-descript.md` — Retro shell CODEMAP retains obsolete UI and roadmap description — Plan [low] (review: pass)
+- `harness/plans/2026-10-14-retro-settings-late-read-overwrites-a-confirmed-reminder-sav.md` — Retro settings late read overwrites a confirmed reminder save — Plan [high] (review: pass)
+- `harness/plans/2026-10-14-retro-roadmap-loses-centered-column-and-mobile-gutters.md` — Retro roadmap loses centered column and mobile gutters — Plan [high] (review: pass)
+- `harness/plans/2026-10-14-retro-hub-offline-browser-proof-does-not-assert-its-notice.md` — Retro hub offline browser proof does not assert its notice — Plan [low] (review: pass)
+- `harness/plans/2026-10-14-cached-retro-roadmap-reentry-omits-current-region-initializa.md` — Cached retro roadmap reentry omits current region initialization — Plan [low] (review: pass)
+- `harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md` — Complete the remaining retro screens — Plan [high] (review: fail)
 - `harness/plans/2026-10-12-learning-sessions-discard-answers-and-hide-feedback-while-un.md` — Learning sessions save graded answers and explain each question — Plan [high] (review: pass)
 - `harness/plans/2026-10-11-reading-flow.md` — Complete one reading task with Vietnamese glossary and saved progress — Plan [high] (review: pass)
 - `harness/plans/2026-09-27-the-404-on-patch-fallback-re-opens-the-orphan-window-and-syn.md` — The 404-on-patch fallback re-opens the orphan window and Sync's new doc says the Calendar half is covered — Plan [low] (review: pass-with-bugs)
 - `harness/plans/2026-09-27-retro-v1-aliases-re-hue-growth-alert-and-mute-so-white-on-gr.md` — Retro kit amend 2: pin the v1 aliases, ground-0 ink on growth/alert fills, scheme-split v1 green text, and SpeechBox mid-line reduced flip — Plan [high] (review: pass) (merged)
-- `harness/plans/2026-09-27-restyled-stateblock-and-countdowntimer-put-near-white-ink-0-.md` — Retro kit amend: the kit paints its own dark ground (StateBlock/CountdownTimer readable in light scheme), palette fallback, OS reduced motion, static sprite reactions, torch focus and the 44 px MapNode — Plan [high] (review: pass) (merged)
-- `harness/plans/2026-09-27-per-task-ai-deadline-is-shared-across-the-fallback-chain-a-s.md` — Per-task AI deadline is shared across the fallback chain; a slow preferred provider starves the fallback — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-no-per-user-subscription-cap-and-no-length-bound-on-endpoint.md` — Push subscriptions: validate `p256dh`/`auth`, cap 10 per user (evict oldest), prune after 3 consecutive send failures — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-migrate-s-advisory-lock-leaks-into-the-pool-when-unlock-runs.md` — Migrate's advisory lock leaks into the pool when unlock runs on a cancelled context — Plan [medium] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-integration-gate-tests-only-prove-the-skip-and-would-pass-if.md` — Integration gate tests only prove the skip and would pass if the gate always skipped — Plan [low] (review: pass-with-bugs) (merged)
-- `harness/plans/2026-09-27-google-403-accessnotconfigured-api-disabled-still-maps-to-re.md` — Google 403 accessNotConfigured (API disabled) still maps to reauth_required, looping users through re-consent — Plan [low] (review: pass-with-bugs) (merged)
 
 ## Failed
 

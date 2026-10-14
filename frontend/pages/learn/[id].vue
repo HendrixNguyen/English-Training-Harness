@@ -7,6 +7,7 @@ import { ApiError } from '~/utils/apiClient'
 import { classifyContent, hasTrustedContent, questionsOf } from '~/utils/content'
 import { clearDraft, clearOwnerDrafts, clearTaskDrafts, initialSession, readDraft, validateSession, writeDraft, type DraftScope, type LearningSession } from '~/utils/learningSession'
 import { clampDuration } from '~/utils/progress'
+import Chest from '~/components/retro/Chest.vue'
 import RetroPanel from '~/components/retro/RetroPanel.vue'
 import RetroButton from '~/components/retro/RetroButton.vue'
 
@@ -175,18 +176,20 @@ function optionText(questionId: string, option: string) { return questions.value
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-screen max-w-md flex-col px-4 pb-8">
-    <div class="flex items-center justify-between py-3 text-sm">
-      <NuxtLink to="/" class="text-mute hover:underline">‹ Quay lại</NuxtLink>
-      <CountdownTimer v-if="timer" :remaining-seconds="remaining" />
+  <main class="retro-screen mx-auto flex min-h-screen w-full max-w-md flex-col px-4">
+    <div class="flex min-h-16 flex-wrap items-center justify-between gap-2 py-3">
+      <NuxtLink to="/" class="inline-flex min-h-12 items-center font-display text-[22px] text-ink-1">‹ Trại</NuxtLink>
+      <CountdownTimer v-if="timer && !saved" :remaining-seconds="remaining" />
+      <NuxtLink to="/settings" class="inline-flex min-h-12 items-center font-display text-[22px] text-ink-1">Cài đặt</NuxtLink>
     </div>
-    <AppCard class="flex-1">
+    <div class="flex-1 space-y-4">
       <StateBlock v-if="hydrating" state="loading" message="Đang tải nội dung…" />
       <StateBlock v-else-if="hydrationError || (quest.error && !quest.daily)" state="error" :message="hydrationError || 'Chưa tải được nhiệm vụ. Thử lại.'" :action="invalid ? 'Tạo lại nội dung' : 'Thử lại'" @action="openTask(invalid)" />
       <StateBlock v-else-if="!task" state="empty" message="Nhiệm vụ này không còn khả dụng." action="Về trang chính" @action="navigateTo('/')" />
       <template v-else-if="ready">
-        <ContentViewer v-if="!summary" :key="`${id}:${task.content_revision}`" :content="content" :title="task.title" :session="session" @session-change="changeSession" />
-        <RetroPanel v-else>
+        <ContentViewer v-if="!summary" :key="`${id}:${task.content_revision}`" :content="content" :title="task.title" :session="session" :speaker="pet.status?.plant_name || 'Mầm Non'" :companion="pet.status ? { stage: pet.status.stage, health: pet.status.health_points } : undefined" @session-change="changeSession" />
+        <RetroPanel v-else :tone="saved ? 'torch' : 'plain'">
+          <Chest :open="saved" :items="[]" class="mb-4" />
           <div class="space-y-4 font-body text-[17px] leading-[26px]">
             <h2 ref="summaryHeading" tabindex="-1" class="font-bold">{{ task.title }}</h2>
             <p>{{ saved ? 'Đã lưu kết quả' : 'Chưa lưu kết quả' }}</p>
@@ -207,13 +210,15 @@ function optionText(questionId: string, option: string) { return questions.value
           </div>
         </RetroPanel>
       </template>
-    </AppCard>
+    </div>
     <p v-if="notice" class="mt-3 font-body text-sm" role="status">{{ notice }}</p>
     <p v-if="error" class="mt-3 border border-ember bg-ground-1 px-4 py-3 font-body text-sm text-ink-0" role="status">{{ error }}</p>
     <p v-if="memoryOnly && !saved" class="mt-3 font-body text-sm">Tiến độ chưa lưu chỉ giữ trong lần mở này.</p>
     <p v-if="!online" class="mt-3 text-center text-sm text-mute">Cần kết nối để ghi tiến độ</p>
-    <RetroButton v-if="ready && summary && saved" class="mt-4" block @click="navigateTo('/')">Về trang chính</RetroButton>
-    <RetroButton v-else-if="ready && summary && session.uncertain && !posting" class="mt-4" block :loading="checking" :disabled="!online" @click="reconcile">Kiểm tra lại</RetroButton>
-    <RetroButton v-else-if="ready && summary" class="mt-4" block :loading="posting" :disabled="!online || checking || task?.is_completed" @click="complete">Hoàn thành</RetroButton>
+    <div v-if="ready && summary" class="retro-bottom-bar">
+      <RetroButton v-if="saved" class="mt-4" block @click="navigateTo('/')">Về trại</RetroButton>
+      <RetroButton v-else-if="session.uncertain && !posting" class="mt-4" block :loading="checking" :disabled="!online" @click="reconcile">Kiểm tra lại</RetroButton>
+      <RetroButton v-else class="mt-4" block :loading="posting" :disabled="!online || checking || task?.is_completed" @click="complete">Hoàn thành</RetroButton>
+    </div>
   </main>
 </template>

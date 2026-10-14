@@ -32,6 +32,25 @@ interface Fixture {
 }
 const auth = (f: Fixture) => ({ Authorization: `Bearer ${f.auth.accessToken}` });
 const passage = (p: Page) => p.getByRole('region', { name: 'Đoạn văn', exact: true });
+test('retro learning room stays readable at 375 and 200% layout zoom', async ({ page, request }) => {
+    test.skip(live, 'Deterministic visual fixture; genuine content is covered by the three lifecycle cases');
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const f = await seed(page, request);
+    await page.goto(`/learn/${f.exercise}`);
+    await expect(passage(page)).toBeVisible();
+    await page.screenshot({ path: `${logs}/learning-room-375.png`, fullPage: true });
+    await page.evaluate(() => { document.documentElement.style.zoom = '200%' });
+    await expect(passage(page)).toBeVisible();
+    const metrics = await page.evaluate(() => ({ dpr: devicePixelRatio, zoom: getComputedStyle(document.documentElement).zoom, viewport: innerWidth, html: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
+    expect(metrics.zoom).toBe('2');
+    expect(metrics.dpr).toBe(1);
+    expect(metrics.html).toBeLessThanOrEqual(metrics.viewport + 1);
+    expect(metrics.body).toBeLessThanOrEqual(metrics.viewport + 1);
+    await expect(page.getByRole('button', { name: 'Đọc xong →' })).toBeVisible();
+    await page.screenshot({ path: `${logs}/learning-room-375-zoom200.png`, fullPage: true });
+    await writeFile(`${logs}/learning-room-zoom.json`, JSON.stringify(metrics, null, 2));
+});
 async function seed(p: Page, r: APIRequestContext, params = ''): Promise<Fixture> {
     await r.post(`${infra}/control?reset=1`);
     const f = await (await r.post(`${infra}/fixture?${params}`)).json() as Fixture;
@@ -210,10 +229,10 @@ test('strict API rejects partial/tampered/stale before writes; expiry and offlin
     await expect(page.getByRole('button', { name: 'Trả lời', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Hoàn thành', exact: true })).toHaveCount(0);
     await page.getByRole('radio').first().click();
-    await page.getByRole('link', { name: '‹ Quay lại' }).click();
+    await page.getByRole('link', { name: '‹ Trại' }).click();
     await page.waitForURL('/');
     await context.setOffline(true);
-    await page.getByRole('link', { name: /Học: Community library/ }).click();
+    await page.getByRole('button', { name: /Community library, Vào/ }).click();
     await expect(page.getByRole('radio').first()).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('Cần kết nối để ghi tiến độ', { exact: true })).toBeVisible();
     for (let i = 0; i < 3; i++) {
@@ -390,8 +409,8 @@ async function loadStore(p: Page, wait = true) {
 }
 test('saved result survives initial outline worker fallback, offline hub/reopen and a re-created store', async ({ page, context, request }) => {
     test.setTimeout(45_000);
-    const f = await seed(page, request); await page.goto('/'); await expect(page.getByRole('link', { name: /Học: Community library/ })).toBeVisible(); await worker(page); await loadStore(page);
-    await page.getByRole('link', { name: /Học: Community library/ }).click(); await expect(passage(page)).toBeVisible();
+    const f = await seed(page, request); await page.goto('/'); await expect(page.getByRole('button', { name: /Community library, Vào/ })).toBeVisible(); await worker(page); await loadStore(page);
+    await page.getByRole('button', { name: /Community library, Vào/ }).click(); await expect(passage(page)).toBeVisible();
     // Prime the real initial outline response before hydration in a fresh store.
     // The first navigation daily already contains that outline; wait for cachePut.
     await expect.poll(() => page.evaluate(async id => { const cache = await caches.open('api-state'); for (const key of await cache.keys()) { if (key.url.includes('/quests/daily')) { const body = await (await cache.match(key))!.json(); if (body.tasks.some((t: { id: string; content_origin: string }) => t.id === id && t.content_origin === 'outline')) return true; } } return false; }, f.exercise)).toBe(true);
@@ -399,8 +418,8 @@ test('saved result survives initial outline worker fallback, offline hub/reopen 
     for (const q of task.content_json.content.questions as Q[]) { await page.getByRole('radio').filter({ hasText: `(${q.answer})` }).click(); await page.getByRole('button', { name: 'Trả lời', exact: true }).click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click(); }
     await page.getByRole('button', { name: 'Hoàn thành', exact: true }).click(); await expect(page.getByText('Đã lưu kết quả', { exact: true })).toBeVisible();
     const saved = await evidence(request, f); expect(saved.result.score_percent).toBe(100); expect(saved.progressPosts).toBe(1);
-    await context.setOffline(true); await page.getByRole('button', { name: 'Về trang chính', exact: true }).click(); await page.waitForURL('/'); expect(await loadStore(page)).toBe(true);
-    await expect(page.getByText('Xong', { exact: true })).toBeVisible();
+    await context.setOffline(true); await page.getByRole('button', { name: 'Về trại', exact: true }).click(); await page.waitForURL('/'); expect(await loadStore(page)).toBe(true);
+    await expect(page.getByRole('button', { name: /Community library, Đã xong/ })).toBeVisible();
     await page.evaluate(id => { const app = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $router: { push(path: string): Promise<void> } } } } }).__vue_app__; return app.config.globalProperties.$router.push(`/learn/${id}`); }, f.exercise); await expect(page.getByText('Đã lưu kết quả', { exact: true })).toBeVisible();
     // Reload document online while blocking only daily transport. Re-created
     // Pinia must read the durable checkpoint + real worker fallback.
@@ -413,7 +432,7 @@ test('saved result survives initial outline worker fallback, offline hub/reopen 
 for (const path of ['/api/v1/quests/daily', '/api/v1/pet/status']) test(`late prior-owner worker cache write cannot serve B fallback: ${path}`, async ({ page, context, request }) => {
     test.setTimeout(45_000);
     const a = await seed(page, request, 'type=practice&keyless=1'); const privateTask = await dto(request, a); expect((await request.post(`${api}/progress`, { headers: auth(a), data: { exercise_id: a.exercise, duration_seconds: 65, content_revision: privateTask.content_revision, user_answers: { q1: 'B' } } })).ok()).toBe(true); const b = await (await request.post(`${infra}/fixture?legacy=1`)).json() as Fixture;
-    await page.goto('/'); await expect(page.getByText('Xong', { exact: true })).toBeVisible(); await worker(page); expect(await loadStore(page)).toBe(true);
+    await page.goto('/'); await expect(page.getByRole('button', { name: /Community library, Đã xong/ })).toBeVisible(); await worker(page); expect(await loadStore(page)).toBe(true);
     await request.post(`${infra}/control?defer=${a.auth.user.id}&path=${encodeURIComponent(path)}`);
     if (path.endsWith('/daily')) await loadStore(page, false);
     else await page.evaluate(() => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { load(): Promise<void> }> } } } } }).__vue_app__.config.globalProperties.$pinia; void pinia._s.get('pet')!.load(); });
@@ -425,7 +444,7 @@ for (const path of ['/api/v1/quests/daily', '/api/v1/pet/status']) test(`late pr
         expect(leakedCandidate.answers[0].selected_option).toBe('B');
     }
     await context.setOffline(true);
-    if (path.endsWith('/daily')) { expect(await loadStore(page)).toBe(false); await expect(page.getByRole('link', { name: /Học: Community library/ })).toHaveCount(0); }
+    if (path.endsWith('/daily')) { expect(await loadStore(page)).toBe(false); await expect(page.getByRole('button', { name: /Community library, Vào/ })).toHaveCount(0); }
     else {
         const response = await page.evaluate(async () => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { $reset(): void; load(): Promise<void>; status: unknown; error: string | null }> } } } } }).__vue_app__.config.globalProperties.$pinia; const pet = pinia._s.get('pet')!; pet.$reset(); await pet.load(); return { status: pet.status, error: pet.error }; }); expect(response.status).toBeNull(); expect(response.error).toBe('network_error');
     }
@@ -444,9 +463,12 @@ for (const route of ['/', '/settings']) test(`central signout from ${route} clea
     const f = await seed(page, request); await page.goto(`/learn/${f.exercise}`); await expect(passage(page)).toBeVisible();
     await page.getByRole('button', { name: 'Đọc xong →' }).click(); await page.getByRole('radio').first().click();
     expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')).length)).toBe(1);
-    await page.getByRole('link', { name: '‹ Quay lại' }).click(); await page.waitForURL('/');
-    if (route === '/settings') { await page.getByRole('button', { name: 'Tài khoản', exact: true }).click(); await page.getByRole('menuitem', { name: 'Cài đặt', exact: true }).click(); await page.waitForURL('/settings'); }
-    await page.getByRole('button', { name: 'Tài khoản', exact: true }).click(); await page.getByRole('menuitem', { name: 'Đăng xuất', exact: true }).click(); await page.waitForURL('/login');
+    await page.getByRole('link', { name: '‹ Trại' }).click(); await page.waitForURL('/');
+    if (route === '/settings') await page.goto('/settings');
+    else await page.getByRole('link', { name: /Cài đặt tài khoản/ }).click();
+    await page.waitForURL('/settings');
+    await page.getByRole('button', { name: 'Rời quán · Đăng xuất' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Đăng xuất' }).click(); await page.waitForURL('/login');
     expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')))).toEqual([]);
     await replaceSession(page, f); await page.evaluate(id => { const app = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $router: { push(path: string): Promise<void> } } } } }).__vue_app__; return app.config.globalProperties.$router.push(`/learn/${id}`); }, f.exercise);
     await expect(passage(page)).toBeVisible(); await page.getByRole('button', { name: 'Đọc xong →' }).click(); await expect(page.getByRole('radio').first()).toHaveAttribute('aria-checked', 'false'); expect((await evidence(request, f)).progressPosts).toBe(0);
@@ -455,7 +477,7 @@ for (const route of ['/', '/settings']) test(`central signout from ${route} clea
 test('API session lifetime protects same-owner replacement and renewal from deferred real responses', async ({ page, request }) => {
     const f = await seed(page, request); await page.goto(`/learn/${f.exercise}`); await expect(passage(page)).toBeVisible();
     await page.getByRole('button', { name: 'Đọc xong →' }).click(); await page.getByRole('radio').first().click();
-    await page.getByRole('link', { name: '‹ Quay lại' }).click(); await page.waitForURL('/'); expect(await loadStore(page)).toBe(true);
+    await page.getByRole('link', { name: '‹ Trại' }).click(); await page.waitForURL('/'); expect(await loadStore(page)).toBe(true);
     await expect.poll(() => page.evaluate(() => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { loading: boolean }> } } } } }).__vue_app__.config.globalProperties.$pinia; return pinia._s.get('pet')!.loading; })).toBe(false);
     const outcomes = [];
     for (const scenario of ['relogin200', 'relogin401', 'renewal401', 'renewal200']) {
@@ -465,7 +487,10 @@ test('API session lifetime protects same-owner replacement and renewal from defe
         await request.post(`${infra}/control?defer=${f.auth.user.id}&path=${encodeURIComponent('/api/v1/pet/status')}`);
         const epoch = await page.evaluate(() => {
             const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { $reset(): void; load(): Promise<void>; sessionEpoch: number }> } } } } }).__vue_app__.config.globalProperties.$pinia;
-            const pet = pinia._s.get('pet')!; pet.$reset(); void pet.load(); return pinia._s.get('auth')!.sessionEpoch;
+            const pet = pinia._s.get('pet')!; pet.$reset();
+            (window as Window & { __petReadSettled?: boolean }).__petReadSettled = false;
+            void pet.load().finally(() => { (window as Window & { __petReadSettled?: boolean }).__petReadSettled = true });
+            return pinia._s.get('auth')!.sessionEpoch;
         });
         await expect.poll(async () => (await (await request.get(`${infra}/deferred`)).json()).count).toBe(1);
         if (!rejected) token = ((await (await request.post(`${infra}/renew?exercise=${f.exercise}`)).json()) as { access_token: string }).access_token;
@@ -482,14 +507,20 @@ test('API session lifetime protects same-owner replacement and renewal from defe
         if (await studied.count()) await studied.click(); await page.getByRole('radio').first().click();
         expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')).length)).toBe(1);
         await request.post(`${infra}/release`);
-        await expect.poll(() => page.evaluate(() => { const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { loading: boolean }> } } } } }).__vue_app__.config.globalProperties.$pinia; return pinia._s.get('pet')!.loading; })).toBe(false);
+        await expect.poll(() => page.evaluate(() => (window as Window & { __petReadSettled?: boolean }).__petReadSettled)).toBe(true);
         const outcome = await page.evaluate(() => {
             const pinia = (document.querySelector('#__nuxt') as unknown as { __vue_app__: { config: { globalProperties: { $pinia: { _s: Map<string, { status: unknown; error: string | null; isAuthenticated: boolean; sessionEpoch: number }> } } } } }).__vue_app__.config.globalProperties.$pinia;
             const pet = pinia._s.get('pet')!, auth = pinia._s.get('auth')!; return { authenticated: auth.isAuthenticated, epoch: auth.sessionEpoch, pet: pet.status, error: pet.error, drafts: Object.keys(localStorage).filter(k => k.startsWith('aelp.learning-draft')).length };
         });
         expect(outcome.authenticated).toBe(true); expect(outcome.epoch).toBe(nextEpoch); expect(outcome.drafts).toBe(1); await expect(page.getByRole('radio').first()).toHaveAttribute('aria-checked', 'true');
         if (scenario === 'renewal200') { expect(outcome.pet).not.toBeNull(); expect(outcome.error).toBeNull(); }
-        else { expect(outcome.pet).toBeNull(); expect(outcome.error).toBe('session_changed'); }
+        else {
+            expect(outcome.pet).toBeNull();
+            // Account replacement retires the old store request before it can
+            // write an error into the current account. Renewal keeps that store
+            // lifetime and reports the rejected prior-token response.
+            expect(outcome.error).toBe(replacement ? null : 'session_changed');
+        }
         outcomes.push({ scenario, ...outcome });
     }
     expect((await evidence(request, f)).progressPosts).toBe(0);

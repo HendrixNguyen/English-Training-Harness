@@ -337,6 +337,12 @@ func NewRouter() (*Router, error) {
 
 ## **6.2 Quests & Progress Endpoints**
 
+* GET /api/v1/roadmap (added 2026-10-13)
+  * Bearer authenticated, current active roadmap owned by caller only. Read only; no AI, hydration, exercise content/answer keys, or mutation. Unknown caller/no active roadmap: 404 `no_active_roadmap`; absent authentication: 401 `unauthorized`; read errors: 500 `internal_error`.
+  * Exact response: `{roadmap_id,title,cefr_level,today,day_number,modules:[{week,title,focus,days:[{day_number,date,title,minutes_spent,is_target_met,tasks:[{id,task_type,title,duration_minutes,is_completed}]}]}]}`. Four real modules with seven days each; titles/focus are persisted roadmap metadata. Task summaries/IDs/completion come from real exercises (vocabulary → reading → practice); nullable historical completion means unknown. No completion inferred from calendar age.
+  * `today` and day `date` are YYYY-MM-DD in learner IANA timezone (invalid/empty timezone uses UTC). Day1 is the roadmap creation local date; calendar arithmetic handles DST. `day_number` is at least1 and can exceed28 after the final date, preventing perpetual today on day28. Existing daily endpoint retains its released clamped task selection.
+  * `minutes_spent`/`is_target_met` read authoritative owned SQL daily_progress by local date; absent rows are 0/false. A single PostgreSQL statement reads the selected roadmap, exercise metadata and progress consistently.
+
 * GET /api/v1/quests/daily  
   * Description: Fetching current day's 30-minute exercise suite (3x 10-min tasks).  
   * Request Headers: Authorization: Bearer \<JWT\>  
@@ -404,6 +410,11 @@ func NewRouter() (*Router, error) {
 ```
 
 ## **6.4 Settings & Integration Endpoints**
+
+* GET /api/v1/settings (added 2026-10-13)
+  * Bearer authenticated, persisted caller preferences only. Exact response: `{notification_time,timezone,next_reminder_at,push_configured}`. `notification_time` is HH:MM:SS (existing NULL fallback20:00:00); timezone is IANA (NULL/invalid fallbackUTC). `next_reminder_at` is the prospective server-computed RFC3339 UTC next occurrence using the existing DST scheduling rule, not evidence of queued/sent push or Google sync.
+  * `push_configured` means the server sender is wired with public/private VAPID keys. This says nothing about this-device support, permission or subscription. No subscription endpoint/keys/credentials are exposed; the read never schedules, sends or updates anything. No optional Google sync state is added.
+  * Missing user:404 `user_not_found`; absent authentication:401 `unauthorized`; read errors:500 `internal_error`. Existing POST routes/DTOs remain compatible.
 
 * POST /api/v1/settings/notifications  
   * Description: Saving Web Push VAPID subscriptions and updating preferred practice time.  

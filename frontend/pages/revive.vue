@@ -1,126 +1,71 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { REVIVE_SECONDS, usePetStore } from '~/stores/pet'
 import { useQuestStore } from '~/stores/quest'
+import { useAuthStore } from '~/stores/auth'
 import { daysSince } from '~/utils/plant'
-
 const pet = usePetStore()
 const quest = useQuestStore()
-
+const auth = useAuthStore()
 const busy = ref(false)
 const error = ref<string | null>(null)
 const passed = ref(false)
-
-onMounted(async () => {
-  pet.hydrateChallenge()
-  await Promise.all([pet.status ? Promise.resolve() : pet.load(), quest.daily ? Promise.resolve() : quest.load()])
-})
-
+const online = ref(true)
+const owner = () => `${auth.user?.id ?? ''}:${auth.sessionEpoch}`
+watch(owner, () => { busy.value = false; error.value = null; passed.value = false })
+function connection() { online.value = navigator.onLine }
+async function load() { await Promise.all([pet.load(), quest.load()]) }
+onMounted(() => { connection(); window.addEventListener('online', connection); window.addEventListener('offline', connection); pet.hydrateChallenge(); void load() })
+onBeforeUnmount(() => { window.removeEventListener('online', connection); window.removeEventListener('offline', connection) })
 const missedDays = computed(() => daysSince(pet.status?.last_practiced_at ?? null))
-// One string, computed here: a leading space inside <template v-if> is a
-// text node Vue's whitespace condensing strips, which rendered "bỏ học2 ngày".
-const missedLine = computed(() =>
-  missedDays.value === null ? 'Bạn đã bỏ học.' : `Bạn đã bỏ học ${missedDays.value} ngày liên tiếp.`)
-const today = computed(() => quest.daily?.date ?? new Date().toISOString().slice(0, 10))
-const challengeActive = computed(() => pet.challenge !== null && pet.challenge.date === today.value)
-const progress = computed(() => pet.challengeProgress(quest.accumulatedSeconds))
+const missedLine = computed(() => missedDays.value === null ? 'Cậu bỏ tớ một thời gian rồi.' : `Cậu bỏ tớ ${missedDays.value} ngày liền.`)
+const today = computed(() => quest.daily?.date ?? null)
+const challengeActive = computed(() => !!today.value && pet.challenge?.date === today.value)
+const progress = computed(() => challengeActive.value ? pet.challengeProgress(quest.accumulatedSeconds) : 0)
 const canCheck = computed(() => progress.value >= REVIVE_SECONDS)
-
 async function revive() {
-  busy.value = true
-  error.value = null
-  try {
-    const res = await pet.revive(today.value, quest.accumulatedSeconds)
-    if (res?.revival_passed) passed.value = true
-  } catch {
-    error.value = 'Không bắt đầu được thử thách. Thử lại.'
-  } finally {
-    busy.value = false
-  }
+ if (busy.value || !online.value || !today.value || (challengeActive.value && !canCheck.value)) return
+ const ticket = owner(); busy.value = true; error.value = null
+ try { const res = await pet.revive(today.value, quest.accumulatedSeconds); if (owner() === ticket && res?.revival_passed) passed.value = true }
+ catch { if (owner() === ticket) error.value = 'Không bắt đầu được thử thách. Thử lại.' }
+ finally { if (owner() === ticket) busy.value = false }
 }
 </script>
-
 <template>
-  <main class="mx-auto max-w-md px-4 pb-8">
-    <template v-if="passed">
-      <AppCard class="mt-4 text-center">
-        <PlantSvg :stage="pet.status?.stage ?? 'sprout'" :health="pet.status?.health_points ?? 50" />
-        <p class="mt-3 font-display text-2xl text-growth-deep dark:text-growth">
-          Cây đã hồi sinh!
-        </p>
-        <p class="text-mute">
-          Máu cây: {{ pet.status?.health_points ?? 50 }}%
-        </p>
-        <AppButton class="mt-4" block @click="navigateTo('/')">
-          Về trang chính
-        </AppButton>
-      </AppCard>
+  <main class="retro-screen mx-auto max-w-md px-4 pb-8 font-body text-base">
+    <NuxtLink to="/" class="flex min-h-12 items-center text-line-lit">‹ Trại</NuxtLink>
+    <h1 class="mb-4 font-display text-[28px]">Hồi sinh</h1>
+    <p v-if="!online" class="mb-4 text-sm text-ink-1">Cần mạng để hồi sinh. Tiến độ đã lưu vẫn còn.</p>
+    <template v-if="passed && pet.status">
+      <RetroPanel tone="growth" :announce="false" class="text-center">
+        <CompanionSprite :stage="pet.status.stage" :health="pet.status.health_points" react="levelup" />
+        <HpBar :value="pet.status.health_points" />
+        <p role="status" class="mt-4">{{ pet.status.plant_name }} đã hồi sinh!</p>
+      </RetroPanel>
+      <div class="retro-bottom-bar"><RetroButton block @click="navigateTo('/')">Về trại</RetroButton></div>
     </template>
-
     <template v-else-if="pet.notWilted || (pet.status && !pet.isWilted)">
-      <AppCard class="mt-4 text-center">
-        <PlantSvg :stage="pet.status?.stage ?? 'sprout'" :health="pet.status?.health_points ?? 100" />
-        <p class="mt-3 font-display text-2xl">
-          Cây của bạn vẫn khỏe 🌱
-        </p>
-        <AppButton class="mt-4" block @click="navigateTo('/')">
-          Về trang chính
-        </AppButton>
-      </AppCard>
+      <RetroPanel :announce="false" class="text-center">
+        <template v-if="pet.status"><CompanionSprite :stage="pet.status.stage" :health="pet.status.health_points" /><HpBar :value="pet.status.health_points" /></template>
+        <p class="mt-4">Bạn đồng hành của cậu vẫn khỏe.</p>
+      </RetroPanel>
+      <div class="retro-bottom-bar"><RetroButton block @click="navigateTo('/')">Về trại</RetroButton></div>
     </template>
-
-    <!-- Real data, and it says wilted: the only way into the alarm. -->
     <template v-else-if="pet.status">
-      <div class="mt-4 rounded-card bg-alert px-4 py-3 text-center font-semibold uppercase tracking-wide text-ground-0" role="alert">
-        ⚠️ <span class="normal-case">{{ pet.status.plant_name || 'Cây xanh' }}</span> đang bị héo rũ!
+      <RetroPanel band tone="ember" :announce="false" class="mb-6"><p role="alert">{{ pet.status.plant_name }} đang bị héo rũ!</p></RetroPanel>
+      <RetroPanel :speaker="pet.status.plant_name" tone="ember" :announce="false" class="text-center">
+        <CompanionSprite :stage="pet.status.stage" :health="pet.status.health_points" react="down" />
+        <HpBar :value="pet.status.health_points" />
+        <p class="mt-4">{{ missedLine }} Học 15 phút để tớ đứng dậy nhé.</p>
+      </RetroPanel>
+      <div v-if="challengeActive" class="mt-6"><h2 class="font-display text-xl">Nhiệm vụ hồi sinh</h2><DayBar :value-seconds="progress" :segments="1" :segment-seconds="900" :cells="40" :met="canCheck" /><p class="mt-2 text-sm text-ink-1">{{ canCheck ? 'Đã đủ thời gian. Kiểm tra hồi sinh nhé.' : `Còn ${Math.ceil((REVIVE_SECONDS - progress) / 60)} phút học nữa.` }}</p></div>
+      <StateBlock v-if="!today" class="mt-6" :state="quest.error ? 'error' : 'loading'" message="Chưa đọc được thời gian học hôm nay." action="Thử lại" @action="quest.load()" />
+      <p v-if="error" role="alert" class="mt-4 text-sm text-ember">{{ error }}</p>
+      <div class="retro-bottom-bar">
+        <RetroButton v-if="challengeActive && !canCheck" block @click="navigateTo('/')">Vào học ngay</RetroButton>
+        <RetroButton v-else block :variant="challengeActive ? 'primary' : 'danger'" :loading="busy" :disabled="!online || !today" @click="revive">{{ challengeActive ? 'Hồi sinh' : 'Hồi sinh (15 phút)' }}</RetroButton>
       </div>
-
-      <AppCard class="mt-4 text-center">
-        <PlantSvg stage="wilted" :health="0" />
-        <p class="text-sm text-mute">
-          Cây héo - 0%
-        </p>
-      </AppCard>
-
-      <AppCard v-if="!challengeActive" class="mt-4">
-        <p class="font-display text-lg">
-          "{{ missedLine }} Hãy hoàn thành Bài kiểm tra Cứu Cây 15 phút để hồi sinh!"
-        </p>
-        <AppButton class="mt-4" variant="danger" block :loading="busy" @click="revive">
-          🚨 Cứu cây ngay (Quiz 15 phút)
-        </AppButton>
-      </AppCard>
-
-      <AppCard v-else class="mt-4">
-        <SegmentedProgress :value-seconds="progress" label="Học 15 phút để hồi sinh" :segments="1" :segment-seconds="900" :met="canCheck" />
-        <div class="mt-4 flex flex-col gap-2">
-          <AppButton block @click="navigateTo('/')">
-            Vào học ngay
-          </AppButton>
-          <AppButton variant="ghost" block :loading="busy" @click="revive">
-            Kiểm tra hồi sinh
-          </AppButton>
-        </div>
-      </AppCard>
-
-      <p v-if="error" class="mt-3 rounded-card border border-alert/40 bg-alert/10 px-4 py-3 text-sm text-alert" role="alert">
-        {{ error }}
-      </p>
     </template>
-
-    <!-- The load failed and nothing is cached: say the state is unknown, offer a retry
-         (same shape as / and /roadmap). Never guess "dead". -->
-    <template v-else-if="pet.error">
-      <AppCard class="mt-4">
-        <StateBlock state="error" message="Không tải được trạng thái cây. Chưa thể biết cây có héo hay không." action="Thử lại" @action="pet.load()" />
-      </AppCard>
-    </template>
-
-    <!-- No status, no error: the load is in flight (or onMounted has not run yet). -->
-    <template v-else>
-      <AppCard class="mt-4">
-        <StateBlock state="loading" />
-      </AppCard>
-    </template>
+    <RetroPanel v-else :announce="false"><StateBlock :state="pet.error ? 'error' : 'loading'" message="Không tải được trạng thái cây. Chưa thể biết cây có héo hay không." action="Thử lại" @action="load" /></RetroPanel>
   </main>
 </template>

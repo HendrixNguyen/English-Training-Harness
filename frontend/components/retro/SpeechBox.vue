@@ -11,12 +11,13 @@ import { useReducedMotion } from '~/composables/useReducedMotion'
  * once, whichever pace it appeared at.
  */
 const props = withDefaults(defineProps<{
+  announce?: boolean
   line: string
   name?: string
   stage?: string
   health?: number
   reduced?: boolean
-}>(), { name: undefined, stage: 'sprout', health: 100, reduced: undefined })
+}>(), { announce: true, name: undefined, stage: 'sprout', health: 100, reduced: undefined })
 
 const emit = defineEmits<{ settled: [] }>()
 
@@ -65,13 +66,13 @@ function revealAll() {
 
 <template>
   <div @click="revealAll">
-    <RetroPanel :speaker="name">
+    <RetroPanel :speaker="name" :announce="announce">
       <template #portrait>
         <CompanionSprite crop="face" :size="48" :stage="stage" :health="health" :reduced="isReduced" />
       </template>
       <p class="font-body text-[17px] text-ink-0">
         <span data-typed aria-hidden="true">{{ typed }}</span>
-        <span data-live-line class="sr-only" aria-live="polite">{{ line }}</span>
+        <span data-live-line class="sr-only" :aria-live="announce ? 'polite' : undefined">{{ line }}</span>
       </p>
     </RetroPanel>
   </div>
