@@ -10,6 +10,8 @@ import RetroButton from '~/components/retro/RetroButton.vue'
 import MapNode from '~/components/retro/MapNode.vue'
 import CompanionSprite from '~/components/retro/CompanionSprite.vue'
 
+// This page positions today's cached region after mounting; disable the router's later reset.
+definePageMeta({ scrollToTop: false })
 const roadmap = useRoadmapStore()
 const auth = useAuthStore()
 const companion = ref<PetStatus | null>(null)
@@ -50,7 +52,15 @@ watch(() => [roadmap.outline?.roadmap_id, roadmap.outline?.today], async ([roadm
   if (active && today.value) document.getElementById(`region-day-${today.value.day_number}`)?.scrollIntoView?.({ block: 'center' })
 })
 onMounted(() => {
-  active = true; refresh()
+  active = true
+  window.scrollTo({ top: 0, left: 0 })
+  if (roadmap.outline) {
+    expanded.value = today.value?.date ?? null
+    void nextTick().then(() => {
+      if (active && today.value) document.getElementById(`region-day-${today.value.day_number}`)?.scrollIntoView?.({ block: 'center' })
+    })
+  }
+  refresh()
   void loadCompanion()
   window.addEventListener('focus', refresh)
   window.addEventListener('online', refresh)
@@ -69,7 +79,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="retro-screen space-y-6 text-ink-0">
+  <main class="retro-screen mx-auto max-w-md px-4 space-y-6 text-ink-0">
     <AppHeader :streak="companion?.current_streak ?? null" />
     <div class="flex items-center justify-between">
       <NuxtLink to="/" class="flex min-h-12 items-center font-display text-[22px]">‹ Trại</NuxtLink>

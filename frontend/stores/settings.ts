@@ -7,25 +7,27 @@ export interface Preferences { notification_time: string; timezone: string; next
 export interface DeviceSubscription { endpoint: string; p256dh: string; auth: string }
 function scope() { const auth = useAuthStore(); return `${auth.user?.id ?? ''}:${auth.sessionEpoch}` }
 export const useSettingsStore = defineStore('settings', {
- state: () => ({ data: null as Preferences | null, owner: scope(), serial: 0, loading: false, saving: false, error: null as string | null, syncing: false, googleError: null as string | null, googleCount: null as number | null }),
+ state: () => ({ data: null as Preferences | null, owner: scope(), serial: 0, readRevision: 0, writeRevision: 0, loading: false, saving: false, error: null as string | null, syncing: false, googleError: null as string | null, googleCount: null as number | null }),
  getters: { preferences: s => s.owner === scope() ? s.data : null },
  actions: {
   invalidate() { this.serial++; this.owner = scope(); this.data = null; this.loading = false; this.saving = false; this.error = null; this.syncing = false; this.googleError = null; this.googleCount = null },
   prepare() { registerPrivateMemory(this); if (this.owner !== scope()) this.invalidate(); return { owner: scope(), serial: this.serial } },
   current(ticket: { owner: string; serial: number }) { return ticket.owner === scope() && ticket.serial === this.serial },
   async load() {
-   const ticket = this.prepare(); this.loading = true; this.error = null
-   try { const data = await useApi().get<Preferences>('/api/v1/settings'); if (this.current(ticket)) this.data = data }
-   catch (e) { if (this.current(ticket)) this.error = e instanceof ApiError ? e.code : 'network_error' }
-   finally { if (this.current(ticket)) this.loading = false }
+   const ticket = this.prepare(); const read = ++this.readRevision; const write = this.writeRevision; this.loading = true; this.error = null
+   const latest = () => this.current(ticket) && read === this.readRevision
+   const acceptable = () => latest() && write === this.writeRevision && !this.saving
+   try { const data = await useApi().get<Preferences>('/api/v1/settings'); if (acceptable()) this.data = data }
+   catch (e) { if (acceptable()) this.error = e instanceof ApiError ? e.code : 'network_error' }
+   finally { if (latest()) this.loading = false }
   },
   async save(time: string, subscription?: DeviceSubscription) {
    if (this.saving || !this.preferences) return false
-   const ticket = this.prepare(); this.saving = true; this.error = null
+   const ticket = this.prepare(); this.writeRevision++; this.saving = true; this.error = null
    try {
     const result = await useApi().post<{ status: string; notification_time: string; next_reminder_at: string }>('/api/v1/settings/notifications', { notification_time: `${time}:00`, timezone: this.preferences!.timezone, ...(subscription ? { push_subscription: subscription } : {}) })
     if (!this.current(ticket)) return false
-    this.data = { ...this.data!, notification_time: result.notification_time, next_reminder_at: result.next_reminder_at }; return true
+    this.writeRevision++; this.data = { ...this.data!, notification_time: result.notification_time, next_reminder_at: result.next_reminder_at }; return true
    } catch (e) { if (this.current(ticket)) this.error = e instanceof ApiError ? e.code : 'network_error'; return false }
    finally { if (this.current(ticket)) this.saving = false }
   },

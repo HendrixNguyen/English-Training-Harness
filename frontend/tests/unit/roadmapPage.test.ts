@@ -14,7 +14,7 @@ const tasks = ['vocabulary', 'reading', 'practice'].map((task_type, i) => ({ id:
 const data = { roadmap_id: 'r1', title: 'Real meetings journey', cefr_level: 'B1', today: '2026-10-04', day_number: 4, modules: Array.from({ length: 4 }, (_, week) => ({ week: week + 1, title: `Real region ${week + 1}`, focus: `Focus ${week + 1}`, days: Array.from({ length: 7 }, (_, i) => { const n = week * 7 + i + 1; return { day_number: n, date: `2026-10-${String(n).padStart(2, '0')}`, title: `Actual day ${n}`, tasks, minutes_spent: n === 2 ? 12 : n === 3 ? 30 : 0, is_target_met: n === 3 } }) })) }
 let w: ReturnType<typeof mount>
 function render() { w = mount(RoadmapPage, { attachTo: document.body, global: { components: { AppHeader, StateBlock }, stubs: { NuxtLink: { template: '<a><slot /></a>' } }, mocks: { navigateTo: navigate } } }); return w }
-beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); api.get.mockReset(); navigate.mockReset(); vi.stubGlobal('navigateTo', navigate); vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }); api.get.mockImplementation((path: string) => Promise.resolve(path.endsWith('/pet/status') ? { plant_name: 'Mầm', health_points: 80, stage: 'sprout', current_streak: 1, last_practiced_at: null } : data)) })
+beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); api.get.mockReset(); navigate.mockReset(); vi.stubGlobal('navigateTo', navigate); vi.stubGlobal('definePageMeta', vi.fn()); vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }); api.get.mockImplementation((path: string) => Promise.resolve(path.endsWith('/pet/status') ? { plant_name: 'Mầm', health_points: 80, stage: 'sprout', current_streak: 1, last_practiced_at: null } : data)) })
 afterEach(() => { w?.unmount(); document.body.innerHTML = ''; vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 describe('real retro world map', () => {
   it('renders actual regions, truthful states and today tasks, with inert future nodes', async () => {
@@ -68,4 +68,28 @@ describe('real retro world map', () => {
     api.get.mockResolvedValue(data); window.dispatchEvent(new Event('focus')); await flushPromises(); expect(w.text()).toContain('Real meetings journey')
     api.get.mockImplementation(() => new Promise(() => {})); const auth = useAuthStore(); auth.user = { id: 'new', email: '', full_name: '', cefr_current: null }; await flushPromises(); expect(w.text()).not.toContain('Real meetings journey')
   })
+})
+it.each([true, false])('initializes cached today on fresh entry (online=%s) and preserves mounted history', async online => {
+ const later = { ...data, today: '2026-10-18', day_number: 18 }
+ api.get.mockImplementation((path: string) => Promise.resolve(path.endsWith('/roadmap') ? later : {}))
+ render(); await flushPromises(); w.unmount(); vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online)
+ if (!online) api.get.mockRejectedValue(new Error('offline'))
+ const scroll = vi.fn(); const original = HTMLElement.prototype.scrollIntoView; HTMLElement.prototype.scrollIntoView = scroll
+ try {
+ render(); await flushPromises(); expect(w.find('[aria-label="Nhiệm vụ ngày 18"]').exists()).toBe(true); expect(scroll).toHaveBeenCalledTimes(1)
+ expect(scroll.mock.instances[0]).toBe(document.getElementById('region-day-18'))
+ if (!online) expect(w.text()).toContain('Đang ngoại tuyến — bản đồ là bản đã lưu.')
+ await w.get('button[aria-label^="Ngày 2:"]').trigger('click'); window.dispatchEvent(new Event('focus')); await flushPromises()
+ expect(w.get('button[aria-label^="Ngày 2:"]').attributes('aria-expanded')).toBe('true'); expect(scroll).toHaveBeenCalledTimes(1)
+ } finally { HTMLElement.prototype.scrollIntoView = original }
+})
+
+it('starts a cached completed journey at the top without inventing today', async () => {
+ const completed = { ...data, today: '2026-10-29', day_number: 29 }
+ api.get.mockImplementation((path: string) => Promise.resolve(path.endsWith('/roadmap') ? completed : {}))
+ render(); await flushPromises(); w.unmount()
+ const top = vi.spyOn(window, 'scrollTo'); render(); await flushPromises()
+ expect(top).toHaveBeenCalledWith({ top: 0, left: 0 })
+ expect(w.find('[aria-current="step"]').exists()).toBe(false)
+ expect(w.find('[aria-label^="Nhiệm vụ ngày"]').exists()).toBe(false)
 })

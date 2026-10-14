@@ -101,3 +101,11 @@ it('confirmation traps focus, Escape restores opener, and central signout clears
 it('offline disables time/push/Google writes and explains reconnect', async () => {
  const w = page(); await flushPromises(); vi.stubGlobal('navigator', { onLine: false }); window.dispatchEvent(new Event('offline')); await flushPromises(); expect(button(w, 'Lưu giờ').attributes('disabled')).toBeDefined(); expect(button(w, 'Đồng bộ').attributes('disabled')).toBeDefined(); expect(w.text()).toContain('Cần mạng'); expect(api.post).not.toHaveBeenCalled()
 })
+it.each([false, true])('preserves dirty edit across entry refresh (save=%s)', async save => {
+ useSettingsStore().data = { ...prefs }; let finish!: (value: unknown) => void
+ api.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+ const w = page(); await w.find('input').setValue('09:15')
+ if (save) { await w.find('form').trigger('submit'); await flushPromises() }
+ finish({ ...prefs, notification_time: save ? '07:30:00' : '08:00:00' }); await flushPromises()
+ expect(w.find('input').element.value).toBe('09:15'); expect(w.text()).toContain(`Giờ đã lưu: ${save ? '09:15' : '08:00'}`)
+})

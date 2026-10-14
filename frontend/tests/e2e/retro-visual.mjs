@@ -58,7 +58,19 @@ try {
     if(route==='/revive'){await page.getByText('Cần mạng để hồi sinh. Tiến độ đã lưu vẫn còn.').waitFor();if(!await page.getByRole('button',{name:'Hồi sinh (15 phút)'}).isDisabled())throw Error('offline revive action must be disabled')}
     if(route==='/settings'){await page.getByText('Cần mạng để lưu cài đặt.').waitFor();if(!await page.getByRole('button',{name:'Lưu giờ nhắc'}).isDisabled())throw Error('offline settings save must be disabled')}
     if(route==='/onboarding'){await page.getByRole('radio',{name:'IELTS 7.0'}).click();await page.getByRole('button',{name:'Bắt đầu trận đầu tiên'}).click();await page.getByText('Cần mạng để bắt đầu trận đầu tiên. Kết nối lại rồi thử lại.').waitFor()}
-    if(route==='/')await page.getByRole('button',{name:/Đọc hiểu thông báo/}).waitFor();
+    if(route==='/'){
+     await page.getByRole('button',{name:/Đọc hiểu thông báo/}).waitFor();
+     const notice=page.getByText('Đang ngoại tuyến — tớ nhớ tiến độ giúp cậu.',{exact:true});
+     await notice.waitFor({state:'visible'});
+     if(await notice.count()!==1)throw Error('hub must show exactly one offline notice');
+    }
+   }
+   if(route==='/roadmap'&&mode==='normal'){
+    const geometry=await page.locator('main').evaluate(el=>{
+     const rect=el.getBoundingClientRect(), css=getComputedStyle(el), region=el.querySelector('[id^="region-day-"]').getBoundingClientRect();
+     return {width:rect.width,left:rect.left,paddingLeft:parseFloat(css.paddingLeft),paddingRight:parseFloat(css.paddingRight),regionLeft:region.left,regionRight:region.right};
+    });
+    if(Math.abs(geometry.width-Math.min(width,448))>1||Math.abs(geometry.left-(width-geometry.width)/2)>1||geometry.paddingLeft!==16||geometry.paddingRight!==16||Math.abs(geometry.regionLeft-geometry.left-16)>1||Math.abs(geometry.regionRight-(geometry.left+geometry.width-16))>1)throw Error(`roadmap column geometry ${JSON.stringify(geometry)}`);
    }
    if(route==='/roadmap'&&mode==='history-refresh'){
     const historical=page.getByRole('button',{name:/Ngày 2:/});
