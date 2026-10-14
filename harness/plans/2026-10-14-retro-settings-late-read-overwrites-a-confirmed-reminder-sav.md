@@ -1,6 +1,6 @@
 ---
 idea: harness/ideas/_inbox/retro-settings-late-read-overwrites-a-confirmed-reminder-sav.md
-status: approved
+status: done
 priority: high
 merged: false
 amends: harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-preserving-graded.md
@@ -25,3 +25,8 @@ Files: `frontend/stores/settings.ts` and narrowly related page/store tests, prod
 
 ## Verification
 Deferred same-owner GET→POST→GET resolution, pending read during edit, accepted save retention, account replacement and page lifetime guards; focused settings store/page tests and production browser reproduction. Frontend lint/typecheck/unit/build for changed source; targeted production reproduction and visual/browser checks as relevant. Backend is unchanged and its independent passed checks remain valid. Final exact-head CI and parent review cover this amendment.
+
+## Execution summary
+Implemented in pooled commit `6451df3`, independently scoped-reviewed with no open findings. A delayed older read never overwrites a successful newer write or an active user edit; ownership guards remain intact.
+
+Verification: focused31 tests; final frontend474/51 plus lint/typecheck/build; production ordering/edit/geometry/cached online-offline probes and visual45/7zoom pass. Exact source-head CI run38575020623 passes all five jobs. Unchanged backend25 real integration zero skips and real-API browser19 were independently reproduced by the parent whole-branch review. The parent final passing review covers this amendment.

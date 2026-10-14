@@ -82,3 +82,6 @@ Use Go 1.25 from `/workspace/toolchains/go/bin`, GOCACHE `/workspace/.cache/go-b
 - Harness: `python3 -m unittest discover -s tools/harness/tests` and `python3 tools/harness/cli.py validate`; blockers for this plan must be empty.
 
 Original logs, screenshot manifest and images: `/workspace/cloud-setup/retro-screens/task7/`. Route fixtures are explicitly visual evidence; the learning suite uses actual Go routes, PostgreSQL, Redis, signed disposable sessions and a deterministic provider. It does not prove genuine English generation quality. External Google consent and push delivery were not sent or claimed. Existing NuxtLink unit warnings and NO_COLOR/FORCE_COLOR browser warnings are disclosed. No new UI deployment or main/production write occurred.
+
+### Final review amendments
+All five final-review findings were corrected in `6451df3` and accepted by one scoped independent rereview. Final frontend474/51 and focused31 regressions pass; production stale settings read/save/edit, centered geometry and cached online/offline re-entry probes pass; visual45/7zoom passes. Source-head CI38575020623 passes all five jobs. Final passing review: `harness/reviews/2026-10-14-complete-the-remaining-retro-screens-while-preserving-graded-2.md`, covering the five completed amendment plans. No new UI deployment occurred.
