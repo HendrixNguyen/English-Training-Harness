@@ -5,7 +5,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 const backend = fileURLToPath(new URL('../../../../backend/', import.meta.url));
-const compose = ['compose', '-p', 'reading-flow', '-f', `${backend}docker-compose.yml`];
+const compose = ['compose', '-p', process.env.LEARNING_COMPOSE_PROJECT || 'reading-flow', '-f', `${backend}docker-compose.yml`];
 function docker(args) {
     return execFileSync('docker', [...compose, ...args], { encoding: 'utf8' }).trim();
 }

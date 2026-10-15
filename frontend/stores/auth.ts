@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { clearApiCache } from '~/utils/session'
+import { clearApiCache, invalidatePrivateMemory } from '~/utils/session'
 import { clearOwnerDrafts } from '~/utils/learningSession'
 
 /** Backend spec §6.1 `user`. */
@@ -65,6 +65,7 @@ export const useAuthStore = defineStore('auth', {
       if (!sameOwner) {
         if (this.user?.id) clearOwnerDrafts(this.user.id)
         this.sessionEpoch += 1
+        invalidatePrivateMemory()
       }
       this.accessToken = res.access_token
       this.expiresAt = now + res.expires_in * 1000
@@ -81,6 +82,7 @@ export const useAuthStore = defineStore('auth', {
       this.accessToken = null
       this.expiresAt = null
       this.user = null
+      invalidatePrivateMemory()
       try { storageOrNull()?.removeItem(AUTH_STORAGE_KEY) } catch { /* identity is still discarded in memory */ }
       return clearApiCache()
     },

@@ -54,7 +54,7 @@ function onClick() {
 
 <template>
   <li class="flex flex-col items-center">
-    <div class="flex w-full items-center gap-3">
+    <div data-quest-row class="flex w-full items-center gap-3">
       <span class="w-2 shrink-0" aria-hidden="true">
         <PixelArt v-if="state === 'current'" :rows="GLYPHS.cursor" :size="16" :class="isReduced ? '' : 'retro-blink'" />
       </span>
@@ -62,6 +62,7 @@ function onClick() {
         type="button"
         class="relative flex h-14 w-14 shrink-0 items-center justify-center border-2 bg-ground-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch focus-visible:ring-0 focus-visible:ring-offset-0"
         :class="[border, ink, pressed]"
+        :aria-label="`${index + 1}. ${task.title}, ${actionWord}`"
         :aria-current="state === 'current' ? 'step' : undefined"
         :aria-disabled="disabled ? 'true' : undefined"
         @click="onClick"
@@ -74,13 +75,13 @@ function onClick() {
           <PixelArt :rows="GLYPHS.padlock" :size="16" />
         </span>
       </button>
-      <div class="min-w-0 flex-1">
-        <p class="truncate font-body text-[17px]" :class="state === 'locked' ? 'text-ink-2' : 'text-ink-0'">
+      <div data-quest-title class="min-w-0 flex-1">
+        <p class="break-words font-body text-[17px]" :class="state === 'locked' ? 'text-ink-2' : 'text-ink-0'">
           {{ index + 1 }}. {{ task.title }}
           <span class="text-sm text-ink-1">({{ task.duration_minutes }} phút)</span>
         </p>
       </div>
-      <span class="shrink-0 font-display text-xl leading-6" :class="state === 'locked' ? 'text-ink-2' : 'text-ink-0'">{{ actionWord }}</span>
+      <span data-quest-action class="shrink-0 font-display text-xl leading-6" :class="state === 'locked' ? 'text-ink-2' : 'text-ink-0'">{{ actionWord }}</span>
     </div>
     <div class="h-4 w-1">
       <span
@@ -92,3 +93,11 @@ function onClick() {
     </div>
   </li>
 </template>
+
+<style scoped>
+@container (max-width: 320px) {
+  [data-quest-row] { flex-wrap: wrap; }
+  [data-quest-title] { order: 3; flex-basis: 100%; }
+  [data-quest-action] { order: 2; }
+}
+</style>

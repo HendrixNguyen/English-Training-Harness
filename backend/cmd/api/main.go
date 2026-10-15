@@ -181,11 +181,13 @@ func main() {
 	v1.POST("/auth/google", auth.Handler(authSvc))
 
 	guarded := v1.Group("", auth.Require(tokens, sessions))
+	guarded.GET("/roadmap", quests.RoadmapHandler(quests.NewRoadmapService(questRepo, time.Now)))
 	guarded.GET("/quests/daily", quests.DailyHandler(questSvc))
 	guarded.POST("/quests/progress", quests.ProgressHandler(questSvc))
 	guarded.GET("/quests/exercises/:id", quests.ExerciseHandler(contentSvc))
 	guarded.GET("/pet/status", pet.StatusHandler(petSvc))
 	guarded.POST("/pet/revive", pet.ReviveHandler(petSvc))
+	guarded.GET("/settings", notify.ReadSettingsHandler(notifySvc))
 	guarded.POST("/settings/notifications", notify.SettingsHandler(notifySvc))
 
 	googleSvc := google.NewService(
