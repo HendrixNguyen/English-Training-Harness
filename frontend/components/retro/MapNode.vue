@@ -65,7 +65,7 @@ function onClick() {
 
       <span v-if="state === 'partial'" data-partial-fill class="absolute inset-x-0 bottom-0 h-2 bg-growth" aria-hidden="true" />
 
-      <span v-if="state === 'locked'" class="absolute inset-0 bg-ground-2/60" aria-hidden="true" />
+      <span v-if="state === 'locked'" class="absolute -right-1 -top-1 text-sm" aria-hidden="true">🔒</span>
 
       <slot name="sprite" />
     </span>

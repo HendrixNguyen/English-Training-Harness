@@ -26,10 +26,12 @@ describe('v1 text on growth/alert fills is ground-0; v1 green text follows the s
     expect(w.classes()).not.toContain('text-white')
   })
 
-  it('AppHeader avatar is text-ground-0', () => {
+  it('retro AppHeader inherits high contrast ink on ground-2', () => {
     setActivePinia(createPinia())
     const w = mount(AppHeader, { props: { streak: 3 } })
-    expect(w.find('[aria-label="Tài khoản"]').classes()).toContain('text-ground-0')
+    expect(w.classes()).toContain('text-ink-0')
+    expect(w.find('.bg-ground-2').exists()).toBe(true)
+    expect(w.find('[aria-label^="Cài đặt tài khoản"]').attributes('to')).toBe('/settings')
   })
 
   it('QuestRow next-task "Học" link is text-ground-0', () => {

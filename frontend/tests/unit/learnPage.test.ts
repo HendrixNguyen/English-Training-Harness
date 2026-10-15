@@ -41,6 +41,30 @@ beforeEach(() => {
 })
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.useRealTimers(); vi.restoreAllMocks() })
 describe('/learn/:id learning sessions', () => {
+  it('keeps the treasure closed until explicit save and hides the timer in completed review', async () => {
+    useQuestStore().daily = daily(); const w = mountPage(); await flushPromises()
+    await finish(w)
+    expect(w.find('[data-glyph="chestClosed"]').exists()).toBe(true)
+    expect(w.find('[data-glyph="chestOpen"]').exists()).toBe(false)
+    expect(api.post).not.toHaveBeenCalled()
+    api.post.mockResolvedValue(progress(grade(47)))
+    await action(w, 'Hoàn thành').trigger('click'); await flushPromises()
+    expect(w.findComponent(CountdownTimer).exists()).toBe(false)
+    expect(w.text()).not.toMatch(/XP|\+20 HP|\+10 phút/)
+  })
+  it('offers a radio tab stop and announces feedback only after submission', async () => {
+    useQuestStore().daily = daily(); const w = mountPage(); await flushPromises()
+    await action(w, 'Đọc xong →').trigger('click')
+    const radios = w.findAll('[role="radio"]')
+    expect(radios.map(r => r.attributes('tabindex'))).toEqual(['0', '-1'])
+    expect(w.text()).not.toContain('They signed a contract.')
+    await radios[0]!.trigger('keydown', { key: 'ArrowDown' })
+    expect(w.find('[aria-checked="true"]').text()).toContain('(B)')
+    await action(w, 'Trả lời').trigger('click')
+    expect(w.findAll('[aria-live="polite"]')).toHaveLength(1)
+    expect(w.text()).toContain('They signed a contract.')
+  })
+
   it('clock snaps on visibility/focus and expiry never permits unanswered completion', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(T0)
     api.get.mockResolvedValue(daily()); const w = mountPage(); await flushPromises()

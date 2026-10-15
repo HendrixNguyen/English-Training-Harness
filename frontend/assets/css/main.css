@@ -3,29 +3,13 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    @apply bg-paper font-body text-ink antialiased;
-  }
-  @media (prefers-color-scheme: dark) {
-    html {
-      @apply bg-paper-dark text-paper;
-    }
-  }
-  :focus-visible {
-    @apply outline-none ring-2 ring-growth-deep ring-offset-2;
-  }
-  /*
-   * Cascade note (design A9 deviation): this override must come AFTER the
-   * base `:focus-visible` rule above, not inside the html-only dark block at
-   * :9 — both selectors are plain `:focus-visible` with equal specificity,
-   * so whichever is later in source wins once the media query is active.
-   * Nesting it in the earlier block would make the base `ring-growth-deep`
-   * always win, even in dark mode (verified with `npx tailwindcss` output).
-   * A12/Acceptance item 6 requires the dark ring to compute as `growth`.
-   */
-  @media (prefers-color-scheme: dark) {
-    :focus-visible {
-      @apply ring-growth;
-    }
+  html { @apply bg-ground-0 font-body text-ink-0 antialiased; }
+  :focus-visible { @apply outline outline-2 outline-offset-2 outline-torch; }
+}
+@layer components {
+  .retro-screen { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+  .retro-bottom-bar {
+    @apply fixed inset-x-0 bottom-0 z-20 mx-auto max-w-md border-t-2 border-line-dim bg-ground-0 px-4 pt-3;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
 }

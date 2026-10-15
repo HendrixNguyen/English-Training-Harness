@@ -28,6 +28,8 @@ export interface AssessmentResponse {
 
 export function useOnboardingApi() {
   return {
+    regenerate: (cefr_level: string): Promise<{ status: string, assessed_level: string, roadmap_id: string }> =>
+      useApi().post('/api/v1/roadmaps/regenerate', { cefr_level }),
     quiz: (): Promise<QuizResponse> => useApi().get<QuizResponse>('/api/v1/onboarding/quiz'),
     assess: (req: AssessmentRequest): Promise<AssessmentResponse> =>
       useApi().post<AssessmentResponse>('/api/v1/onboarding/assessment', req),

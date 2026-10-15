@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import ItemPassage from '~/components/learn/ItemPassage.vue'
+import CompanionSprite from '~/components/retro/CompanionSprite.vue'
 import RetroButton from '~/components/retro/RetroButton.vue'
 import RetroPanel from '~/components/retro/RetroPanel.vue'
 import { questionsOf, type Classified } from '~/utils/content'
 import { initialSession, type LearningSession } from '~/utils/learningSession'
-const props = defineProps<{ content: Classified, title: string, session?: LearningSession }>()
+const props = defineProps<{ content: Classified, title: string, session?: LearningSession, speaker?: string, companion?: { stage: string, health: number } }>()
 const emit = defineEmits<{ answer: [questionId: string, option: string], 'session-change': [session: LearningSession], finished: [] }>()
 const state = ref<LearningSession>(props.session ?? initialSession(props.content))
 watch(() => props.session, value => { if (value) state.value = value })
@@ -66,9 +67,10 @@ async function next() {
     <ItemPassage v-if="passageItem && content.kind === 'reading'" ref="passageRef" :passage="content.passage" :glossary="content.glossary">
       <template #eyebrow-action><slot name="eyebrow-action" /></template>
     </ItemPassage>
-    <RetroPanel v-if="wordItem && content.kind === 'words'">
+    <RetroPanel v-if="wordItem && content.kind === 'words'" :speaker="speaker" :announce="false">
+        <template v-if="companion" #portrait><CompanionSprite :stage="companion.stage" :health="companion.health" :name="speaker" :size="48" crop="face" :reduced="true" /></template>
       <div class="space-y-3 font-body text-[17px] leading-[26px]">
-        <p class="font-bold">{{ content.words[state.cursor]?.term }}</p>
+        <p class="font-body text-[24px] font-bold leading-8">{{ content.words[state.cursor]?.term }}</p>
         <p>{{ content.words[state.cursor]?.definition }}</p>
         <p v-if="content.words[state.cursor]?.example">{{ content.words[state.cursor]?.example }}</p>
       </div>
@@ -80,13 +82,14 @@ async function next() {
           <template #eyebrow-action><slot name="eyebrow-action" /></template>
         </ItemPassage>
       </template>
-      <RetroPanel>
+      <RetroPanel :speaker="speaker" :announce="false" :tone="feedback && correct !== null ? correct ? 'growth' : 'ember' : 'plain'">
+        <template v-if="companion" #portrait><CompanionSprite :stage="companion.stage" :health="companion.health" :name="speaker" :size="48" crop="face" :reduced="true" /></template>
         <p class="mb-3 font-display text-[22px]">Đã trả lời {{ Object.keys(state.answers).length }} / {{ questions.length }}</p>
         <p class="mb-4 font-body text-[17px] leading-[26px]">{{ question.prompt }}</p>
         <div role="radiogroup" aria-label="Chọn đáp án" class="space-y-2">
           <button
             v-for="(text, key) in question.options" :key="key" type="button" role="radio"
-            :aria-checked="state.pending === key" :disabled="feedback" :aria-disabled="feedback"
+            :tabindex="state.pending === key || (!state.pending && key === Object.keys(question.options)[0]) ? 0 : -1" :aria-checked="state.pending === key" :disabled="feedback" :aria-disabled="feedback"
             class="block min-h-14 w-full rounded-sm border-2 px-4 py-3 text-left font-body text-[17px] leading-[26px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch"
             :class="feedback && question.answer === key ? 'border-growth bg-ground-2' : feedback && state.pending === key && correct === false ? 'border-ember bg-ground-2' : state.pending === key ? 'border-line-lit bg-ground-2' : 'border-line-dim bg-ground-1'"
             @click="choose(String(key))" @keydown="keys($event, String(key))"
@@ -97,15 +100,15 @@ async function next() {
           </button>
         </div>
         <p v-if="state.phase === 'selection' && !state.pending" class="mt-3 font-body text-sm text-ink-1">Chọn một đáp án rồi trả lời.</p>
-      </RetroPanel>
-      <RetroPanel v-if="feedback" :tone="correct === null ? 'plain' : correct ? 'growth' : 'ember'">
-        <div role="status" aria-live="polite" class="font-body text-[17px] leading-[26px]">
+        <div v-if="feedback" role="status" aria-live="polite" class="mt-4 border-t border-line-lit pt-4 font-body text-[17px] leading-[26px]">
           <h3 ref="feedbackHeading" tabindex="-1" class="font-bold">{{ correct === null ? 'Đã ghi nhận lựa chọn' : correct ? 'Trúng!' : 'Trượt…' }}</h3>
           <p v-if="correct === null">Câu này chưa có đáp án để chấm.</p>
           <p v-if="question.answer && question.explanation">{{ question.explanation }}</p>
         </div>
       </RetroPanel>
     </template>
-    <RetroButton v-if="content.kind !== 'raw' && state.phase !== 'summary'" :key="state.phase" block :disabled="state.phase === 'selection' && !state.pending" @keydown="($event: KeyboardEvent) => { if ($event.repeat) $event.preventDefault() }" @click="next">{{ label }}</RetroButton>
+    <div v-if="content.kind !== 'raw' && state.phase !== 'summary'" class="retro-bottom-bar">
+      <RetroButton :key="state.phase" block :disabled="state.phase === 'selection' && !state.pending" @keydown="($event: KeyboardEvent) => { if ($event.repeat) $event.preventDefault() }" @click="next">{{ label }}</RetroButton>
+    </div>
   </div>
 </template>
