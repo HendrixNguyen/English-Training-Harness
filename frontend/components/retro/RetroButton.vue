@@ -30,7 +30,7 @@ const style = computed(() => ({ '--rb-shadow': VARIANT[props.variant].shadow }))
 <template>
   <button
     :type="type"
-    class="rb relative inline-flex h-12 min-w-[48px] items-center justify-center rounded-sm px-5 font-display text-[22px] leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch disabled:opacity-50 disabled:shadow-none"
+    class="rb relative inline-flex min-h-12 min-w-[48px] items-center justify-center rounded-sm px-5 py-2 text-center font-display text-[22px] leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-torch disabled:opacity-50 disabled:shadow-none"
     :class="[VARIANT[variant].classes, block ? 'w-full' : '']"
     :style="style"
     :disabled="isDisabled"

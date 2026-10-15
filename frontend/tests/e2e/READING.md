@@ -1,6 +1,6 @@
 # Actual API learning-session proof
 
-Run in the reading worktree with disposable PostgreSQL/Redis only. The helper refuses published ports other than 55432/56379 and always uses Compose project `reading-flow`. Never run destructive integration fixtures concurrently with browser fixtures. Preserve historical reading/live-provider evidence; this suite proves the amended saved-grade flow.
+Run with disposable PostgreSQL/Redis only. The helper refuses published ports other than 55432/56379. It selects Compose project `reading-flow` by default; set `LEARNING_COMPOSE_PROJECT=retro-screens` when the nominated scratch services use that project. Never run destructive integration fixtures concurrently with browser fixtures. Preserve historical reading/live-provider evidence; this suite proves the amended saved-grade flow.
 
 ```sh
 # Repository root; use the existing pinned toolchains/dependencies.
