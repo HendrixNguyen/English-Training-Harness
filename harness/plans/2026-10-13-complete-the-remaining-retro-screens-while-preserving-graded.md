@@ -6,6 +6,7 @@ merged: false
 design: harness/designs/retro-screens-compatibility.md
 branch: harness/2026-10-13-high-retro-screens
 worktree: .worktrees/retro-screens
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/64"
 ---
 # Complete the remaining retro screens — Plan
 

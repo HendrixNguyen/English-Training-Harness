@@ -7,6 +7,7 @@ amends: harness/plans/2026-10-13-complete-the-remaining-retro-screens-while-pres
 branch: harness/2026-10-13-high-retro-screens
 worktree: .worktrees/retro-screens
 design: harness/designs/retro-final-review-amendments.md
+pr: "https://github.com/HendrixNguyen/English-Training-Harness/pull/64"
 ---
 # Cached retro roadmap reentry omits current region initialization — Plan
 
